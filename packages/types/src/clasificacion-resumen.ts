@@ -106,8 +106,8 @@ export function buildClasificacionResumen(
   const map = new Map<string, ClasificacionResumen>();
 
   for (const activo of activos) {
-    const { cuenta, grupo, categoria, codigo } = cuentaGrupoActivoValorizacion(activo);
-    const key = codigo ? `${codigo}::${grupo}` : `${cuenta}::${grupo}`;
+    const { cuenta, categoria, codigo } = cuentaGrupoActivoValorizacion(activo);
+    const key = codigo || cuenta;
     const valorEfectivo = valorActivoEfectivo(activo.valor_adquisicion, activo.valor_incremento);
     const periodo = calcPeriodoMesesHasta(
       resolveFechaInicioDepreciacion(activo.fecha_inicio_depreciacion, activo.fecha_adquisicion),
@@ -135,7 +135,7 @@ export function buildClasificacionResumen(
       map.set(key, {
         categoria,
         cuenta,
-        grupo,
+        grupo: "",
         cantidad: 1,
         valorAdquisicion: valor,
         depreciacionAcumulada: dep,

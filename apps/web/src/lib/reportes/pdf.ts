@@ -238,12 +238,12 @@ export async function exportReportePdf(
       head: [[...CLASIFICACION_HEADERS]],
       body: clasificacionToRows(resumen).map((row) =>
         row.map((cell, i) =>
-          i >= 3 ? `S/ ${formatMonedaPE(Number(cell))}` : cell,
+          i >= 2 ? `S/ ${formatMonedaPE(Number(cell))}` : cell,
         ),
       ),
       foot: [
         clasificacionTotalRow(totalesResumen).map((cell, i) =>
-          i >= 3 ? `S/ ${formatMonedaPE(Number(cell))}` : cell,
+          i >= 2 ? `S/ ${formatMonedaPE(Number(cell))}` : cell,
         ),
       ],
       showFoot: "lastPage",

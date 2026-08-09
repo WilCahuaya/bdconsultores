@@ -277,7 +277,7 @@ export function EntidadResumenPanel({
               </thead>
               <tbody>
                 {resumenFilas.map((fila: ClasificacionResumen) => (
-                  <tr key={`${fila.cuenta}::${fila.grupo}`}>
+                  <tr key={fila.cuenta}>
                     <PanelTableTd className="font-medium">{fila.categoria}</PanelTableTd>
                     <PanelTableTd
                       align="right"

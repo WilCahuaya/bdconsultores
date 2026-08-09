@@ -61,7 +61,7 @@ function slugFilename(text: string): string {
 }
 
 function formatClasificacionCells(row: string[]): string[] {
-  return row.map((cell, i) => (i >= 3 ? `S/ ${formatMonedaPE(Number(cell))}` : cell));
+  return row.map((cell, i) => (i >= 2 ? `S/ ${formatMonedaPE(Number(cell))}` : cell));
 }
 
 function textoFicha(value: string | null | undefined): string {

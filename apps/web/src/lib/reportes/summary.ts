@@ -1,7 +1,6 @@
 import {
   buildClasificacionResumen as buildClasificacionResumenCore,
   buildValorizacionTotales as buildValorizacionTotalesCore,
-  formatCuentaContableDisplay,
   resolveCuentaContableActivo,
   type ActivoValorizacionFuente,
 } from "@inventario/types";
@@ -16,7 +15,6 @@ function activoReporteAValorizacion(activo: ActivoReporte): ActivoValorizacionFu
     ...activo,
     cuenta_codigo: resolved.cuenta_codigo,
     contabilidad: resolved.contabilidad,
-    catalogo_grupo: activo.grupo_contable?.trim() || null,
   };
 }
 
@@ -48,8 +46,7 @@ export function buildClasificacionResumen(
 
 export function clasificacionToRows(resumen: ClasificacionResumen[]): string[][] {
   return resumen.map((r) => [
-    r.categoria || formatCuentaContableDisplay(r.cuenta, r.grupo !== "—" ? r.grupo : null),
-    r.grupo,
+    r.categoria || r.cuenta,
     String(r.cantidad),
     r.valorAdquisicion.toFixed(2),
     r.depreciacionAcumulada.toFixed(2),
@@ -60,7 +57,6 @@ export function clasificacionToRows(resumen: ClasificacionResumen[]): string[][]
 export function clasificacionTotalRow(totales: ValorizacionTotales): string[] {
   return [
     "TOTAL",
-    "",
     String(totales.cantidad),
     totales.valorAdquisicion.toFixed(2),
     totales.depreciacionAcumulada.toFixed(2),
@@ -70,7 +66,6 @@ export function clasificacionTotalRow(totales: ValorizacionTotales): string[] {
 
 export const CLASIFICACION_HEADERS = [
   "Cuenta contable",
-  "Grupo",
   "Cantidad",
   "Valor adquisición",
   "Dep. acumulada",
