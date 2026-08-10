@@ -645,6 +645,7 @@ import {
   CODIGO_BARRAS_CATALOGO_DIGITS,
   CORRELATIVO_DIGITS,
   formatCodigoBarras,
+  matchesCodigoBarrasQuery,
   normalizeCodigoBarrasDisplay,
 } from "./codigo-barras";
 
@@ -1205,6 +1206,218 @@ export function pasoFiltroSerieComprobante(
   const serie = normalizarSerieComprobante(activo.comprobante_serie);
   if (!serie) return false;
   return serie.includes(query);
+}
+
+/** Filtros por columna de la tabla de inventario (barra superior no los duplica). */
+export type InventarioColumnFilters = {
+  categoria: "" | CategoriaBien;
+  nombre: string;
+  anioAdquisicion: string;
+  cuentaContable: string;
+  estadoBien: "" | EstadoBien;
+  comprobante: string;
+  ubicacion: string;
+};
+
+export function emptyInventarioColumnFilters(): InventarioColumnFilters {
+  return {
+    categoria: "",
+    nombre: "",
+    anioAdquisicion: "",
+    cuentaContable: "",
+    estadoBien: "",
+    comprobante: "",
+    ubicacion: "",
+  };
+}
+
+export function hasActiveInventarioColumnFilters(filters: InventarioColumnFilters): boolean {
+  return Boolean(
+    filters.categoria ||
+      filters.nombre.trim() ||
+      filters.anioAdquisicion ||
+      filters.cuentaContable.trim() ||
+      filters.estadoBien ||
+      filters.comprobante.trim() ||
+      filters.ubicacion.trim(),
+  );
+}
+
+export type InventarioColumnFilterOption = { value: string; label: string };
+
+export type InventarioColumnFilterOptions = {
+  categorias: InventarioColumnFilterOption[];
+  nombres: InventarioColumnFilterOption[];
+  anios: InventarioColumnFilterOption[];
+  cuentas: InventarioColumnFilterOption[];
+  estados: InventarioColumnFilterOption[];
+  comprobantes: InventarioColumnFilterOption[];
+  ubicaciones: InventarioColumnFilterOption[];
+};
+
+export function emptyInventarioColumnFilterOptions(): InventarioColumnFilterOptions {
+  return {
+    categorias: [],
+    nombres: [],
+    anios: [],
+    cuentas: [],
+    estados: [],
+    comprobantes: [],
+    ubicaciones: [],
+  };
+}
+
+export type ActivoInventarioFiltro = {
+  nombre: string;
+  categoria?: CategoriaBien | null;
+  fecha_adquisicion?: string | null;
+  estado_bien?: EstadoBien | null;
+  codigo_barras?: string | null;
+  codigo_catalogo?: string | null;
+  marca?: string | null;
+  modelo?: string | null;
+  entidad_nombre?: string | null;
+  sede_nombre?: string | null;
+  ambiente_nombre?: string | null;
+  comprobante_serie?: string | null;
+  cuenta_contable_codigo?: string | null;
+  cuenta_contable_nombre?: string | null;
+  cuenta_codigo?: string | null;
+  contabilidad?: string | null;
+  observacion?: string | null;
+};
+
+function inventarioFiltroCuentaTexto(activo: ActivoInventarioFiltro): string {
+  if (activo.cuenta_codigo?.trim() || activo.contabilidad?.trim()) {
+    return formatCuentaContableDisplay(activo.cuenta_codigo, activo.contabilidad);
+  }
+  return formatCuentaContableDisplay(activo.cuenta_contable_codigo, activo.cuenta_contable_nombre);
+}
+
+export function inventarioUbicacionFiltroLabel(
+  activo: { sede_nombre?: string | null; ambiente_nombre?: string | null },
+  conSede = true,
+): string {
+  const ambiente = activo.ambiente_nombre?.trim() || "—";
+  const sede = activo.sede_nombre?.trim();
+  if (conSede && sede) return `${sede} · ${ambiente}`;
+  return ambiente;
+}
+
+function sortedUniqueOptions(values: Iterable<string>): InventarioColumnFilterOption[] {
+  return [...new Set([...values].filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "es"))
+    .map((value) => ({ value, label: value }));
+}
+
+/** Valores distintos presentes en la lista (para menús de filtro por columna). */
+export function opcionesFiltroColumnaDesdeActivos(
+  activos: ActivoInventarioFiltro[],
+  opts?: {
+    incluirUbicacion?: boolean;
+    incluirCuenta?: boolean;
+    ubicacionConSede?: boolean;
+  },
+): InventarioColumnFilterOptions {
+  const categorias = new Set<CategoriaBien>();
+  const nombres = new Set<string>();
+  const anios = new Set<string>();
+  const cuentas = new Set<string>();
+  const estados = new Set<EstadoBien>();
+  const comprobantes = new Set<string>();
+  const ubicaciones = new Set<string>();
+  const conSede = opts?.ubicacionConSede !== false;
+
+  for (const a of activos) {
+    if (a.categoria === "ACTIVO" || a.categoria === "CUENTA_ORDEN") categorias.add(a.categoria);
+    const nombre = a.nombre?.trim();
+    if (nombre) nombres.add(nombre);
+    const anio = anioAdquisicionActivo(a.fecha_adquisicion);
+    if (anio != null) anios.add(String(anio));
+    if (opts?.incluirCuenta !== false) {
+      const cuenta = inventarioFiltroCuentaTexto(a);
+      if (cuenta && cuenta !== "—") cuentas.add(cuenta);
+    }
+    if (a.estado_bien === "BUENO" || a.estado_bien === "REGULAR" || a.estado_bien === "MALO") {
+      estados.add(a.estado_bien);
+    }
+    const serie = a.comprobante_serie?.trim();
+    if (serie) comprobantes.add(serie);
+    if (opts?.incluirUbicacion) {
+      ubicaciones.add(inventarioUbicacionFiltroLabel(a, conSede));
+    }
+  }
+
+  const categoriaOrder: CategoriaBien[] = ["ACTIVO", "CUENTA_ORDEN"];
+  const estadoOrder: EstadoBien[] = ["BUENO", "REGULAR", "MALO"];
+
+  return {
+    categorias: categoriaOrder
+      .filter((c) => categorias.has(c))
+      .map((value) => ({
+        value,
+        label: value === "CUENTA_ORDEN" ? "Cta. Orden" : "Activo",
+      })),
+    nombres: sortedUniqueOptions(nombres),
+    anios: [...anios]
+      .sort((a, b) => Number(b) - Number(a))
+      .map((value) => ({ value, label: value })),
+    cuentas: sortedUniqueOptions(cuentas),
+    estados: estadoOrder
+      .filter((e) => estados.has(e))
+      .map((value) => ({ value, label: estadoBienLabel(value) })),
+    comprobantes: sortedUniqueOptions(comprobantes),
+    ubicaciones: sortedUniqueOptions(ubicaciones),
+  };
+}
+
+/** Búsqueda libre en varias columnas (nombre, código, ubicación, cuenta, comprobante, etc.). */
+export function matchesInventarioBusquedaMultiColumna(
+  activo: ActivoInventarioFiltro,
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (matchesCodigoBarrasQuery(query, activo.codigo_barras, activo.codigo_catalogo)) return true;
+  const cuenta = inventarioFiltroCuentaTexto(activo);
+  const fields = [
+    activo.nombre,
+    activo.marca,
+    activo.modelo,
+    activo.entidad_nombre,
+    activo.sede_nombre,
+    activo.ambiente_nombre,
+    activo.comprobante_serie,
+    cuenta !== "—" ? cuenta : null,
+    activo.observacion,
+  ];
+  return fields.some((f) => f?.toLowerCase().includes(q));
+}
+
+export function pasoFiltrosColumnaInventario(
+  activo: ActivoInventarioFiltro,
+  filters: InventarioColumnFilters,
+  opts?: {
+    aplicarUbicacion?: boolean;
+    aplicarCuenta?: boolean;
+    ubicacionConSede?: boolean;
+  },
+): boolean {
+  if (filters.categoria && activo.categoria !== filters.categoria) return false;
+  if (filters.nombre.trim() && activo.nombre.trim() !== filters.nombre.trim()) return false;
+  if (!pasoFiltroAnioAdquisicion(activo.fecha_adquisicion, filters.anioAdquisicion)) return false;
+  if (opts?.aplicarCuenta !== false && filters.cuentaContable.trim()) {
+    if (inventarioFiltroCuentaTexto(activo) !== filters.cuentaContable.trim()) return false;
+  }
+  if (filters.estadoBien && activo.estado_bien !== filters.estadoBien) return false;
+  if (filters.comprobante.trim()) {
+    if ((activo.comprobante_serie?.trim() || "") !== filters.comprobante.trim()) return false;
+  }
+  if (opts?.aplicarUbicacion !== false && filters.ubicacion.trim()) {
+    const label = inventarioUbicacionFiltroLabel(activo, opts?.ubicacionConSede !== false);
+    if (label !== filters.ubicacion.trim()) return false;
+  }
+  return true;
 }
 
 export function formatMedidas(

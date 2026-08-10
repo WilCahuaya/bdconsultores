@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Activo, CategoriaBien, EstadoRegistro } from "@inventario/types";
-import { matchesCodigoBarrasQuery } from "@inventario/types";
+import type { Activo, EstadoRegistro, InventarioColumnFilters } from "@inventario/types";
+import {
+  emptyInventarioColumnFilters,
+  matchesInventarioBusquedaMultiColumna,
+  opcionesFiltroColumnaDesdeActivos,
+  pasoFiltrosColumnaInventario,
+} from "@inventario/types";
 import { useToast, mensajeEliminacionPreregistros } from "@inventario/ui";
 import {
   ActivoEditScopeNav,
@@ -58,12 +63,6 @@ const FILTROS_ESTADO_AMBIENTE: { value: "" | EstadoRegistro; label: string }[] =
   { value: "DADO_DE_BAJA", label: "Dados de baja" },
 ];
 
-const FILTROS_CATEGORIA: { value: "" | CategoriaBien; label: string }[] = [
-  { value: "", label: "Todas" },
-  { value: "ACTIVO", label: "Activo" },
-  { value: "CUENTA_ORDEN", label: "Cta. Orden" },
-];
-
 export function ActivosAmbientePanel({
   entidadId,
   entidadNombre,
@@ -104,7 +103,9 @@ export function ActivosAmbientePanel({
   const [estadoRegistro, setEstadoRegistro] = useState<"" | EstadoRegistro>(
     esAmbientePreregistro ? "PREREGISTRADO" : "",
   );
-  const [categoria, setCategoria] = useState<"" | CategoriaBien>("");
+  const [columnFilters, setColumnFilters] = useState<InventarioColumnFilters>(() =>
+    emptyInventarioColumnFilters(),
+  );
   const { panelScrollRef, showToolbarTrigger, scrollToToolbar } = usePanelInventarioUnifiedScroll();
   const [preregistroHeaderToolbar, setPreregistroHeaderToolbar] =
     useState<PreregistroGestionToolbarState | null>(null);
@@ -218,8 +219,7 @@ export function ActivosAmbientePanel({
     ambienteSelectProps,
   ]);
 
-  const filtrados = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+  const activosBase = useMemo(() => {
     return activosList.filter((a) => {
       if (esAmbientePreregistro) {
         if (a.estado_registro !== "PREREGISTRADO") return false;
@@ -228,16 +228,27 @@ export function ActivosAmbientePanel({
       } else if (estadoRegistro && a.estado_registro !== estadoRegistro) {
         return false;
       }
-      if (categoria && a.categoria !== categoria) return false;
-      if (!q) return true;
-      return (
-        a.nombre.toLowerCase().includes(q) ||
-        matchesCodigoBarrasQuery(busqueda, a.codigo_barras, a.codigo_catalogo) ||
-        (a.marca?.toLowerCase().includes(q) ?? false) ||
-        (a.modelo?.toLowerCase().includes(q) ?? false)
-      );
+      return matchesInventarioBusquedaMultiColumna(a, busqueda);
     });
-  }, [activosList, busqueda, estadoRegistro, categoria, esAmbientePreregistro]);
+  }, [activosList, busqueda, estadoRegistro, esAmbientePreregistro]);
+
+  const columnFilterOptions = useMemo(
+    () =>
+      opcionesFiltroColumnaDesdeActivos(activosBase, {
+        incluirUbicacion: false,
+        incluirCuenta: !isAdmin,
+      }),
+    [activosBase, isAdmin],
+  );
+
+  const filtrados = useMemo(() => {
+    return activosBase.filter((a) =>
+      pasoFiltrosColumnaInventario(a, columnFilters, {
+        aplicarUbicacion: false,
+        aplicarCuenta: !isAdmin,
+      }),
+    );
+  }, [activosBase, columnFilters, isAdmin]);
 
   function handleSuccess() {
     setEditActivo(null);
@@ -357,35 +368,12 @@ export function ActivosAmbientePanel({
                 )}
 
                 <div
-                  className="inline-flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5"
-                  role="tablist"
-                  aria-label="Categoría"
-                >
-                  {FILTROS_CATEGORIA.map((f) => (
-                    <button
-                      key={f.value || "all-cat"}
-                      type="button"
-                      role="tab"
-                      aria-selected={categoria === f.value}
-                      className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                        categoria === f.value
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      onClick={() => setCategoria(f.value)}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div
-                  className={`min-w-[10rem] flex-1 md:max-w-xs [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm ${esAmbientePreregistro ? "w-full max-w-none" : ""}`}
+                  className={`min-w-[10rem] flex-1 md:max-w-md [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm ${esAmbientePreregistro ? "w-full max-w-none" : ""}`}
                 >
                   <PanelSearchInput
                     value={busqueda}
                     onChange={setBusqueda}
-                    placeholder="Buscar por código, nombre, marca…"
+                    placeholder="Buscar en nombre, código, cuenta, comprobante, marca…"
                   />
                 </div>
 
@@ -432,6 +420,9 @@ export function ActivosAmbientePanel({
           mostrarPosibleAmbiente={esAmbientePreregistro}
           emptyActionLabel={nuevoLabel}
           editarLabel={editarLabel}
+          columnFilters={columnFilters}
+          onColumnFiltersChange={setColumnFilters}
+          columnFilterOptions={columnFilterOptions}
         />
     </div>
   );

@@ -2,12 +2,14 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useMemo } from "react";
-import type { Activo } from "@inventario/types";
+import type { Activo, InventarioColumnFilterOptions, InventarioColumnFilters } from "@inventario/types";
 import {
   buildValorizacionTotales,
+  emptyInventarioColumnFilterOptions,
   formatMonedaPE,
   formatPosibleAmbienteLabel,
 } from "@inventario/types";
+import { ColumnHeaderFilter } from "./inventario-column-header-filter";
 import {
   INVENTARIO_STICKY_DATA_COL_COUNT,
   INVENTARIO_TABLE_ADMIN_COL_COUNT,
@@ -117,7 +119,6 @@ function Th({
   className,
   rowSpan,
   colSpan,
-  multiline,
   style,
   title,
 }: {
@@ -125,6 +126,7 @@ function Th({
   className?: string;
   rowSpan?: number;
   colSpan?: number;
+  /** @deprecated Sin efecto: los títulos usan una sola tipografía. */
   multiline?: boolean;
   style?: CSSProperties;
   title?: string;
@@ -137,13 +139,7 @@ function Th({
       style={style}
       title={title}
     >
-      <span
-        className={
-          multiline
-            ? "block whitespace-normal text-[10px] leading-tight normal-case sm:text-[11px]"
-            : "block truncate"
-        }
-      >
+      <span className="block truncate whitespace-nowrap text-[11px] font-semibold leading-tight tracking-wide">
         {children}
       </span>
     </th>
@@ -175,7 +171,10 @@ export interface ActivosInventarioTableProps<T extends Activo> {
   mostrarUbicacion?: boolean;
   ubicacionMultiplesSedes?: boolean;
   modoAdmin?: boolean;
-  renderComprobante: (activo: T) => ReactNode;
+  columnFilters?: InventarioColumnFilters;
+  onColumnFiltersChange?: (next: InventarioColumnFilters) => void;
+  columnFilterOptions?: InventarioColumnFilterOptions;
+  renderComprobante: (activo: T, meta?: { columnFiltered?: boolean }) => ReactNode;
   renderAcciones: (activo: T) => ReactNode;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
   embeddedInParentScroll?: boolean;
@@ -262,13 +261,23 @@ function SelectionCell<T extends Activo>({
   );
 }
 
-function CuentaContableCell<T extends Activo>({ activo }: { activo: T }) {
+function CuentaContableCell<T extends Activo>({
+  activo,
+  className,
+}: {
+  activo: T;
+  className?: string;
+}) {
   const texto = inventarioCuentaContable(activo);
   return (
-    <InventarioTextCell title={texto} lineClamp2>
+    <InventarioTextCell title={texto} lineClamp2 className={className}>
       {texto !== "—" ? texto : ""}
     </InventarioTextCell>
   );
+}
+
+function filteredColClass(active: boolean, extra?: string): string {
+  return [extra, active ? "inventario-col-filtered" : null].filter(Boolean).join(" ");
 }
 
 function TotalsFooter({
@@ -355,6 +364,7 @@ function FullTableBody<T extends Activo>({
   mostrarUbicacion,
   ubicacionMultiplesSedes = false,
   modoAdmin,
+  columnFilters,
   renderComprobante,
   renderAcciones,
   stickyOffsets,
@@ -366,6 +376,14 @@ function FullTableBody<T extends Activo>({
 }) {
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
   const sel = selection?.withSelection ? 1 : 0;
+  const f = columnFilters;
+  const catOn = Boolean(f?.categoria);
+  const nomOn = Boolean(f?.nombre.trim());
+  const anioOn = Boolean(f?.anioAdquisicion);
+  const cuentaOn = Boolean(f?.cuentaContable.trim());
+  const estadoOn = Boolean(f?.estadoBien);
+  const compOn = Boolean(f?.comprobante.trim());
+  const ubiOn = Boolean(f?.ubicacion.trim());
 
   return (
     <tbody>
@@ -401,7 +419,7 @@ function FullTableBody<T extends Activo>({
             </InventarioTextCell>
             <InventarioCategoriaCell
               activo={activo}
-              className={stickyCat?.className}
+              className={filteredColClass(catOn, stickyCat?.className)}
               style={stickyCat?.style}
             />
             <td
@@ -413,7 +431,7 @@ function FullTableBody<T extends Activo>({
             <InventarioTextCell
               title={activo.nombre}
               lineClamp2
-              className={stickyNom?.className}
+              className={filteredColClass(nomOn, stickyNom?.className)}
               style={stickyNom?.style}
             >
               <span className={inactivo ? "line-through decoration-red-400/60" : undefined}>
@@ -435,9 +453,12 @@ function FullTableBody<T extends Activo>({
             <InventarioFechaCell
               fecha={activo.fecha_adquisicion}
               valorEsMercado={activo.valor_es_mercado}
+              className={filteredColClass(anioOn)}
             />
-            {!modoAdmin && <CuentaContableCell activo={activo} />}
-            <td className={`${tdBase} text-center`}>
+            {!modoAdmin && (
+              <CuentaContableCell activo={activo} className={filteredColClass(cuentaOn)} />
+            )}
+            <td className={`${tdBase} text-center ${filteredColClass(estadoOn)}`}>
               <EstadoBienBadge estado={activo.estado_bien} />
             </td>
             <InventarioValorPaVmCell activo={activo} />
@@ -458,11 +479,12 @@ function FullTableBody<T extends Activo>({
               {valorNeto != null ? `S/ ${formatMonedaPE(valorNeto)}` : ""}
             </InventarioTextCell>
             <ObservacionCell observacion={activo.observacion} lineClamp2 />
-            {renderComprobante(activo)}
+            {renderComprobante(activo, { columnFiltered: compOn })}
             {mostrarUbicacion && (
               <InventarioUbicacionCell
                 activo={activo}
                 mostrarSede={ubicacionMultiplesSedes}
+                className={filteredColClass(ubiOn)}
               />
             )}
             <td className={inventarioTdAccionesClass}>
@@ -485,6 +507,9 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     modoAdmin,
     tableScrollRef,
     embeddedInParentScroll,
+    columnFilters,
+    onColumnFiltersChange,
+    columnFilterOptions = emptyInventarioColumnFilterOptions(),
   } = props;
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
   const withSelection = selection?.withSelection ?? false;
@@ -525,6 +550,12 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
   const tableWrapClass = embeddedInParentScroll
     ? `${panelDataTableWrapClass} ${panelDataTableWrapEmbeddedClass}`
     : panelDataTableWrapClass;
+  const showColumnFilters = Boolean(columnFilters && onColumnFiltersChange);
+
+  function patchFilters(partial: Partial<InventarioColumnFilters>) {
+    if (!columnFilters || !onColumnFiltersChange) return;
+    onColumnFiltersChange({ ...columnFilters, ...partial });
+  }
 
   return (
     <div ref={tableScrollRef} className={tableWrapClass}>
@@ -550,26 +581,56 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
               >
                 N°
               </Th>
-              <Th
-                className={`${inventarioThStd} normal-case ${stickyCat?.className ?? ""}`}
-                style={stickyCat?.style}
-                title="Categoría"
-              >
-                Cat.
-              </Th>
+              {showColumnFilters && columnFilters ? (
+                <ColumnHeaderFilter
+                  label="Cat."
+                  ariaLabel="Filtrar por categoría"
+                  title="Categoría"
+                  value={columnFilters.categoria}
+                  options={columnFilterOptions.categorias}
+                  emptyLabel="Todas"
+                  onChange={(value) =>
+                    patchFilters({ categoria: value as InventarioColumnFilters["categoria"] })
+                  }
+                  className={`normal-case ${stickyCat?.className ?? ""}`}
+                  style={stickyCat?.style}
+                />
+              ) : (
+                <Th
+                  className={`${inventarioThStd} normal-case ${stickyCat?.className ?? ""}`}
+                  style={stickyCat?.style}
+                  title="Categoría"
+                >
+                  Cat.
+                </Th>
+              )}
               <Th
                 className={`${inventarioThStd} ${stickyCod?.className ?? ""}`}
                 style={stickyCod?.style}
               >
                 Código
               </Th>
-              <Th
-                className={`${inventarioThStd} normal-case ${stickyNom?.className ?? ""}`}
-                style={stickyNom?.style}
-                multiline
-              >
-                Nombre del bien
-              </Th>
+              {showColumnFilters && columnFilters ? (
+                <ColumnHeaderFilter
+                  label="Nombre del bien"
+                  ariaLabel="Filtrar por nombre del bien"
+                  value={columnFilters.nombre}
+                  options={columnFilterOptions.nombres}
+                  emptyLabel="Todos"
+                  multiline
+                  onChange={(value) => patchFilters({ nombre: value })}
+                  className={`normal-case ${stickyNom?.className ?? ""}`}
+                  style={stickyNom?.style}
+                />
+              ) : (
+                <Th
+                  className={`${inventarioThStd} normal-case ${stickyNom?.className ?? ""}`}
+                  style={stickyNom?.style}
+                  multiline
+                >
+                  Nombre del bien
+                </Th>
+              )}
               {modoPreregistro && (
                 <Th multiline className={`${inventarioThStd} normal-case`}>
                   Posible ambiente
@@ -578,15 +639,53 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
               <Th multiline className={`${inventarioThStd} normal-case`}>
                 Descripción
               </Th>
-              <Th multiline className={`${inventarioThStd} whitespace-nowrap`}>
-                Fecha adq.
-              </Th>
-              {!modoAdmin && (
-                <Th multiline className={`${inventarioThStd} normal-case`}>
-                  Cuenta contable
+              {showColumnFilters && columnFilters ? (
+                <ColumnHeaderFilter
+                  label="Fecha adq."
+                  ariaLabel="Filtrar por año de adquisición"
+                  value={columnFilters.anioAdquisicion}
+                  options={columnFilterOptions.anios}
+                  emptyLabel="Todos"
+                  multiline
+                  onChange={(value) => patchFilters({ anioAdquisicion: value })}
+                  className="whitespace-nowrap"
+                />
+              ) : (
+                <Th multiline className={`${inventarioThStd} whitespace-nowrap`}>
+                  Fecha adq.
                 </Th>
               )}
-              <Th>Estado</Th>
+              {!modoAdmin &&
+                (showColumnFilters && columnFilters ? (
+                  <ColumnHeaderFilter
+                    label="Cuenta contable"
+                    ariaLabel="Filtrar por cuenta contable"
+                    value={columnFilters.cuentaContable}
+                    options={columnFilterOptions.cuentas}
+                    emptyLabel="Todas"
+                    multiline
+                    onChange={(value) => patchFilters({ cuentaContable: value })}
+                    className="normal-case"
+                  />
+                ) : (
+                  <Th multiline className={`${inventarioThStd} normal-case`}>
+                    Cuenta contable
+                  </Th>
+                ))}
+              {showColumnFilters && columnFilters ? (
+                <ColumnHeaderFilter
+                  label="Estado"
+                  ariaLabel="Filtrar por estado del bien"
+                  value={columnFilters.estadoBien}
+                  options={columnFilterOptions.estados}
+                  emptyLabel="Todos"
+                  onChange={(value) =>
+                    patchFilters({ estadoBien: value as InventarioColumnFilters["estadoBien"] })
+                  }
+                />
+              ) : (
+                <Th>Estado</Th>
+              )}
               <Th multiline title="Precio de adquisición o valor de mercado">
                 Importe
               </Th>
@@ -615,24 +714,45 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
                   </Th>
                 </>
               )}
-              <Th
-                className={inventarioThAccent}
-                multiline
-                title="Valor neto"
-              >
+              <Th className={inventarioThAccent} multiline title="Valor neto">
                 Valor neto
               </Th>
               <Th multiline className={`${inventarioThStd} normal-case`}>
                 Observación
               </Th>
-              <Th multiline className={`${inventarioThStd} normal-case`}>
-                Comprobante
-              </Th>
-              {mostrarUbicacion && (
+              {showColumnFilters && columnFilters ? (
+                <ColumnHeaderFilter
+                  label="Comprobante"
+                  ariaLabel="Filtrar por comprobante"
+                  value={columnFilters.comprobante}
+                  options={columnFilterOptions.comprobantes}
+                  emptyLabel="Todos"
+                  multiline
+                  onChange={(value) => patchFilters({ comprobante: value })}
+                  className="normal-case"
+                />
+              ) : (
                 <Th multiline className={`${inventarioThStd} normal-case`}>
-                  Ubicación
+                  Comprobante
                 </Th>
               )}
+              {mostrarUbicacion &&
+                (showColumnFilters && columnFilters ? (
+                  <ColumnHeaderFilter
+                    label="Ubicación"
+                    ariaLabel="Filtrar por ubicación"
+                    value={columnFilters.ubicacion}
+                    options={columnFilterOptions.ubicaciones}
+                    emptyLabel="Todas"
+                    multiline
+                    onChange={(value) => patchFilters({ ubicacion: value })}
+                    className="normal-case"
+                  />
+                ) : (
+                  <Th multiline className={`${inventarioThStd} normal-case`}>
+                    Ubicación
+                  </Th>
+                ))}
               <Th className={`${inventarioThStd} whitespace-nowrap`}>Acciones</Th>
             </tr>
           </thead>

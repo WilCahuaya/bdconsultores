@@ -280,6 +280,7 @@ export {
   inventarioTableColWidths,
   inventarioTableColWidthsCompact,
 } from "./inventario-table-cols";
+export * from "./inventario-column-header-filter";
 export {
   ActivosInventarioTable,
   type ActivosInventarioTableProps,

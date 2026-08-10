@@ -83,16 +83,16 @@ export const INVENTARIO_TABLE_FULL_PREREGISTRO_COL_COUNT =
 /** Vista administrador: sin cuenta contable ni depreciación detallada (% / periodo / acum.). */
 export const INVENTARIO_TABLE_ADMIN_COL_WIDTHS_PX = [
   40, // N°
-  44, // Cat.
+  56, // Cat.
   108, // Código
-  160, // Nombre del bien
+  180, // Nombre del bien
   160, // Descripción
-  88, // Fecha adq.
-  72, // Estado
+  100, // Fecha adq.
+  84, // Estado
   118, // Importe PA/VM
   118, // Valor neto
   120, // Observación
-  120, // Comprobante
+  130, // Comprobante
   112, // Acciones
 ] as const;
 
@@ -101,17 +101,17 @@ export const INVENTARIO_TABLE_ADMIN_COL_COUNT = INVENTARIO_TABLE_ADMIN_COL_WIDTH
 /** Admin + posible ambiente (preregistro). */
 export const INVENTARIO_TABLE_ADMIN_PREREGISTRO_COL_WIDTHS_PX = [
   40, // N°
-  44, // Cat.
+  56, // Cat.
   108, // Código
-  150, // Nombre del bien
-  140, // Posible ambiente
-  150, // Descripción
-  88, // Fecha adq.
-  72, // Estado
+  180, // Nombre del bien
+  160, // Posible ambiente
+  160, // Descripción
+  100, // Fecha adq.
+  84, // Estado
   118, // Importe PA/VM
   118, // Valor neto
   120, // Observación
-  120, // Comprobante
+  130, // Comprobante
   112, // Acciones
 ] as const;
 
@@ -126,24 +126,24 @@ export const INVENTARIO_STICKY_DATA_COL_COUNT = 4;
 
 export const INVENTARIO_TABLE_COL_WIDTHS_PX = [
   40, // N°
-  44, // Cat.
+  56, // Cat.
   108, // Código
-  160, // Nombre del bien
+  180, // Nombre del bien
   160, // Descripción
-  88, // Fecha adq.
-  120, // Cuenta contable
-  72, // Estado
+  100, // Fecha adq.
+  148, // Cuenta contable
+  84, // Estado
   118, // Importe PA/VM
-  72, // % Deprec.
-  64, // Periodo
+  88, // % Deprec.
+  72, // Periodo
   118, // Dep. acum.
   118, // Valor neto
   120, // Observación
-  120, // Comprobante
+  130, // Comprobante
   112, // Acciones
 ] as const;
 
-const INVENTARIO_UBICACION_COL_WIDTH_PX = 150;
+const INVENTARIO_UBICACION_COL_WIDTH_PX = 160;
 
 function withUbicacionColumn(widths: readonly number[]): number[] {
   const next = [...widths];
@@ -168,52 +168,52 @@ export const INVENTARIO_TABLE_ADMIN_ENTITY_UBICACION_COL_COUNT =
 
 export const INVENTARIO_TABLE_COMPACT_COL_WIDTHS_PX = [
   40, // N°
-  44, // Cat.
+  56, // Cat.
   108, // Código
-  150, // Nombre
-  150, // Descripción
-  72, // Fecha
-  96, // Cuenta contable
-  68, // Estado
+  180, // Nombre
+  160, // Descripción
+  100, // Fecha
+  148, // Cuenta contable
+  84, // Estado
   118, // Precio PA/VM
   118, // Valor neto
-  110, // Observación
-  100, // CP
+  120, // Observación
+  130, // CP
   112, // Acciones
 ] as const;
 
 export const INVENTARIO_TABLE_PREREGISTRO_COL_WIDTHS_PX = [
   40, // N°
-  44, // Cat.
+  56, // Cat.
   108, // Código
-  150, // Nombre del bien
-  130, // Posible ambiente
-  150, // Descripción
-  72, // Fecha adq.
-  96, // Cuenta contable
-  68, // Estado
+  180, // Nombre del bien
+  160, // Posible ambiente
+  160, // Descripción
+  100, // Fecha adq.
+  148, // Cuenta contable
+  84, // Estado
   118, // Precio
-  110, // Observación
+  120, // Observación
   112, // Acciones
 ] as const;
 
 export const INVENTARIO_TABLE_FULL_PREREGISTRO_COL_WIDTHS_PX = [
   40, // N°
-  44, // Cat.
+  56, // Cat.
   108, // Código
-  150, // Nombre del bien
-  140, // Posible ambiente
-  150, // Descripción
-  88, // Fecha adq.
-  120, // Cuenta contable
-  72, // Estado
+  180, // Nombre del bien
+  160, // Posible ambiente
+  160, // Descripción
+  100, // Fecha adq.
+  148, // Cuenta contable
+  84, // Estado
   118, // Importe PA/VM
-  72, // % Deprec.
-  64, // Periodo
+  88, // % Deprec.
+  72, // Periodo
   118, // Dep. acum.
   118, // Valor neto
   120, // Observación
-  120, // Comprobante
+  130, // Comprobante
   112, // Acciones
 ] as const;
 

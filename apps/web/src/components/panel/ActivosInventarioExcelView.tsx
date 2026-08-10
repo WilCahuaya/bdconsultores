@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import type { Activo } from "@inventario/types";
+import type { Activo, InventarioColumnFilterOptions, InventarioColumnFilters } from "@inventario/types";
 import { esActivoPreregistrado } from "@inventario/types";
 import {
   ActivosInventarioTable,
@@ -56,6 +56,9 @@ interface ActivosInventarioExcelViewProps {
   embeddedInParentScroll?: boolean;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
   className?: string;
+  columnFilters?: InventarioColumnFilters;
+  onColumnFiltersChange?: (next: InventarioColumnFilters) => void;
+  columnFilterOptions?: InventarioColumnFilterOptions;
 }
 
 function excelViewShellClass(embeddedInParentScroll: boolean): string {
@@ -86,6 +89,9 @@ export function ActivosInventarioExcelView({
   embeddedInParentScroll = false,
   tableScrollRef,
   className,
+  columnFilters,
+  onColumnFiltersChange,
+  columnFilterOptions,
 }: ActivosInventarioExcelViewProps) {
   const paginationKey = useMemo(
     () => `${activos.length}:${activos[0]?.id ?? ""}`,
@@ -212,6 +218,9 @@ export function ActivosInventarioExcelView({
       mostrarUbicacion={mostrarUbicacion}
       ubicacionMultiplesSedes={ubicacionMultiplesSedes}
       modoAdmin={modoAdmin}
+      columnFilters={columnFilters}
+      onColumnFiltersChange={onColumnFiltersChange}
+      columnFilterOptions={columnFilterOptions}
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       selection={
@@ -227,7 +236,12 @@ export function ActivosInventarioExcelView({
             }
           : undefined
       }
-      renderComprobante={(activo) => <ComprobanteCell activo={activo} />}
+      renderComprobante={(activo, meta) => (
+        <ComprobanteCell
+          activo={activo}
+          className={meta?.columnFiltered ? "inventario-col-filtered" : undefined}
+        />
+      )}
       renderAcciones={(activo) => (
         <ActivoAccionesBar
           activo={activo}

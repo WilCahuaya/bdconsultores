@@ -156,16 +156,18 @@ export type ActivoConUbicacionLista = Activo & {
 export function InventarioUbicacionCell({
   activo,
   mostrarSede,
+  className,
 }: {
   activo: ActivoConUbicacionLista;
   mostrarSede: boolean;
+  className?: string;
 }) {
   const ambiente = activo.ambiente_nombre?.trim() || "—";
   const sede = activo.sede_nombre?.trim();
   const title = mostrarSede && sede ? `${sede} · ${ambiente}` : ambiente;
 
   return (
-    <InventarioTextCell title={title} lineClamp2>
+    <InventarioTextCell title={title} lineClamp2 className={className}>
       {mostrarSede && sede ? (
         <>
           <span className="block truncate">{ambiente}</span>
@@ -365,9 +367,11 @@ export function fechaAdquisicionToneClass(valorEsMercado?: boolean | null): stri
 export function InventarioFechaCell({
   fecha,
   valorEsMercado,
+  className,
 }: {
   fecha?: string | null;
   valorEsMercado?: boolean | null;
+  className?: string;
 }) {
   const corto = formatFechaISOToCortoES(fecha);
   const tabla = formatFechaISOToDDMMYYYY(fecha) || "—";
@@ -380,7 +384,7 @@ export function InventarioFechaCell({
       ? `${corto || tabla} · ${valorEsMercado ? "Fecha aproximada (valor de mercado)" : "Fecha segura (adquisición)"}`
       : corto || undefined;
   return (
-    <td className={`${inventarioTdFechaClass} ${tone}`} title={titulo}>
+    <td className={`${inventarioTdFechaClass} ${tone} ${className ?? ""}`} title={titulo}>
       {tabla}
     </td>
   );

@@ -776,6 +776,71 @@
     background-color: hsl(var(--card));
   }
 
+  .inventario-activos-table thead th.inventario-th-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 16%, hsl(var(--card)));
+  }
+
+  .inventario-activos-table thead th.inventario-sticky-col.inventario-th-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 16%, hsl(var(--card)));
+  }
+
+  /* Columna completa con filtro activo */
+  .inventario-activos-table tbody tr.inventario-row-even td.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 14%, hsl(var(--card)));
+  }
+
+  .inventario-activos-table tbody tr.inventario-row-odd td.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 18%, hsl(var(--muted) / 0.35));
+  }
+
+  .inventario-activos-table tbody tr.inventario-row-inactivo td.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 12%, rgb(239 68 68 / 0.1));
+  }
+
+  .dark .inventario-activos-table tbody tr.inventario-row-inactivo td.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 14%, rgb(239 68 68 / 0.14));
+  }
+
+  .inventario-activos-table tbody tr.inventario-row-prereg td.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 12%, rgb(245 158 11 / 0.14));
+  }
+
+  .inventario-activos-table tbody tr.inventario-table-row:hover td.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 24%, hsl(var(--card)));
+  }
+
+  .dark .inventario-activos-table tbody tr.inventario-table-row:hover td.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 28%, hsl(var(--card)));
+  }
+
+  .inventario-activos-table tbody tr.inventario-row-even td.inventario-sticky-col.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 14%, hsl(var(--card)));
+  }
+
+  .inventario-activos-table tbody tr.inventario-row-odd td.inventario-sticky-col.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 18%, hsl(var(--muted) / 0.35));
+  }
+
+  .inventario-activos-table tbody tr.inventario-row-inactivo td.inventario-sticky-col.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 12%, rgb(239 68 68 / 0.1));
+  }
+
+  .dark .inventario-activos-table tbody tr.inventario-row-inactivo td.inventario-sticky-col.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 14%, rgb(239 68 68 / 0.14));
+  }
+
+  .inventario-activos-table tbody tr.inventario-row-prereg td.inventario-sticky-col.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 12%, rgb(245 158 11 / 0.14));
+  }
+
+  .inventario-activos-table tbody tr.inventario-table-row:hover td.inventario-sticky-col.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 24%, hsl(var(--card)));
+  }
+
+  .dark .inventario-activos-table tbody tr.inventario-table-row:hover td.inventario-sticky-col.inventario-col-filtered {
+    background-color: color-mix(in srgb, hsl(var(--primary)) 28%, hsl(var(--card)));
+  }
+
   .inventario-activos-table thead th.inventario-th-accent {
     background-color: color-mix(in srgb, hsl(var(--primary)) 22%, hsl(var(--card)));
   }
