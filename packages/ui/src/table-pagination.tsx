@@ -35,10 +35,17 @@ export function useTablePagination<T>(
   options?: { initialPageSize?: TablePageSize; persistPageSize?: boolean },
 ) {
   const persistPageSize = options?.persistPageSize !== false;
+  // Misma página inicial en SSR y cliente; localStorage se aplica tras montar (evita hydration mismatch).
   const [pageSize, setPageSizeState] = useState<TablePageSize>(
-    () => options?.initialPageSize ?? readStoredPageSize(),
+    () => options?.initialPageSize ?? TABLE_PAGE_SIZE,
   );
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    if (!persistPageSize) return;
+    const stored = readStoredPageSize();
+    setPageSizeState((prev) => (prev === stored ? prev : stored));
+  }, [persistPageSize]);
 
   useEffect(() => {
     setPage(1);

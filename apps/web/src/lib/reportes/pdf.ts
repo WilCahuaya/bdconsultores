@@ -39,6 +39,8 @@ import {
   buildValorizacionTotales,
   clasificacionToRows,
   clasificacionTotalRow,
+  isClasificacionSectionTitleRow,
+  isClasificacionSectionOrSubtotalRow,
 } from "./summary";
 import type { ActivoReporte, ReporteContexto } from "./types";
 import { REPORTES } from "./types";
@@ -236,11 +238,31 @@ export async function exportReportePdf(
     doc.text("Resumen por clasificación contable", 10, resumenY);
     autoTable(doc, {
       head: [[...CLASIFICACION_HEADERS]],
-      body: clasificacionToRows(resumen).map((row) =>
-        row.map((cell, i) =>
-          i >= 2 ? `S/ ${formatMonedaPE(Number(cell))}` : cell,
-        ),
-      ),
+      body: clasificacionToRows(resumen).map((row) => {
+        if (isClasificacionSectionTitleRow(row)) {
+          return [
+            {
+              content: row[0] ?? "",
+              colSpan: 5,
+              styles: {
+                fontStyle: "bold",
+                fillColor: [226, 232, 240],
+                textColor: [15, 23, 42],
+              },
+            },
+          ];
+        }
+        const cells = row.map((cell, i) =>
+          i >= 2 && cell.trim() ? `S/ ${formatMonedaPE(Number(cell))}` : cell,
+        );
+        if (isClasificacionSectionOrSubtotalRow(row)) {
+          return cells.map((cell) => ({
+            content: cell,
+            styles: { fontStyle: "bold", fillColor: [241, 245, 249] },
+          }));
+        }
+        return cells;
+      }),
       foot: [
         clasificacionTotalRow(totalesResumen).map((cell, i) =>
           i >= 2 ? `S/ ${formatMonedaPE(Number(cell))}` : cell,

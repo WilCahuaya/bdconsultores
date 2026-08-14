@@ -5,15 +5,19 @@ import { useRouter } from "next/navigation";
 import type { Activo, Entidad, EstadoRegistro, InventarioColumnFilters } from "@inventario/types";
 import {
   emptyInventarioColumnFilters,
+  filtrarActivosPorFechaCorte,
   hasActiveInventarioColumnFilters,
   matchesInventarioBusquedaMultiColumna,
   opcionesFiltroColumnaDesdeActivos,
+  parseFechaDDMMYYYY,
   pasoFiltrosColumnaInventario,
+  validarFechaDDMMYYYY,
 } from "@inventario/types";
 import { ActivoEditScopeNav, type ActivoEditScope } from "@inventario/ui/panel";
 import {
   Button,
   EliminarActivosPorCodigosButton,
+  FechaDdMmYyyyInput,
   Select,
   useToast,
   mensajeEliminacionPreregistros,
@@ -44,6 +48,27 @@ interface InventarioItem extends Activo {
   posible_ambiente_nombre?: string;
   posible_sede_nombre?: string;
   posible_sede_id?: string | null;
+}
+
+function dateToDDMMYYYY(date: Date): string {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month}/${date.getFullYear()}`;
+}
+
+function dateFromISO(iso: string): Date {
+  return new Date(`${iso}T12:00:00`);
+}
+
+/** Misma fecha en SSR y primer render del cliente (día UTC); luego se sincroniza al día local. */
+function fechaCorteInicial(): Date {
+  const n = new Date();
+  return new Date(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate(), 12, 0, 0);
+}
+
+function fechaCorteLocalHoy(): Date {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate(), 12, 0, 0);
 }
 
 interface InventarioGlobalPanelProps {
@@ -92,11 +117,20 @@ export function InventarioGlobalPanel({
   const [columnFilters, setColumnFilters] = useState<InventarioColumnFilters>(() =>
     emptyInventarioColumnFilters(),
   );
+  const [fechaCorteText, setFechaCorteText] = useState(() => dateToDDMMYYYY(fechaCorteInicial()));
+  const [fechaCorte, setFechaCorte] = useState(() => fechaCorteInicial());
+  const [fechaCorteError, setFechaCorteError] = useState<string | null>(null);
   const [editActivo, setEditActivo] = useState<InventarioItem | null>(null);
   const [editScope, setEditScope] = useState<ActivoEditScope>("single");
   const { resumen: ejemplaresResumen } = useEjemplaresResumen(editActivo?.id);
   const ejemplaresTotal = ejemplaresResumen?.total ?? 0;
   const { panelScrollRef, showToolbarTrigger, scrollToToolbar } = usePanelInventarioUnifiedScroll();
+
+  useEffect(() => {
+    const local = fechaCorteLocalHoy();
+    setFechaCorte(local);
+    setFechaCorteText(dateToDDMMYYYY(local));
+  }, []);
 
   useEffect(() => {
     setActivosList(activos);
@@ -180,6 +214,33 @@ export function InventarioGlobalPanel({
     });
   }, []);
 
+  const aplicarFechaCorte = (raw: string, { fromBlur }: { fromBlur?: boolean } = {}) => {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      if (fromBlur) {
+        setFechaCorteError("Ingrese la fecha de corte.");
+        setFechaCorteText(dateToDDMMYYYY(fechaCorte));
+      } else {
+        setFechaCorteError(null);
+      }
+      return;
+    }
+    const iso = parseFechaDDMMYYYY(trimmed);
+    if (iso) {
+      setFechaCorteError(null);
+      setFechaCorteText(dateToDDMMYYYY(dateFromISO(iso)));
+      setFechaCorte(dateFromISO(iso));
+      return;
+    }
+    const completa = /^\d{2}\/\d{2}\/\d{4}$/.test(trimmed);
+    if (completa || fromBlur) {
+      setFechaCorteError(validarFechaDDMMYYYY(trimmed) ?? "Fecha inválida.");
+      if (fromBlur) setFechaCorteText(dateToDDMMYYYY(fechaCorte));
+      return;
+    }
+    setFechaCorteError(null);
+  };
+
   const gestionPreregistrosConfig = useMemo(
     () => ({
       alcanceLabel: gestionPreregistrosAlcance,
@@ -191,12 +252,13 @@ export function InventarioGlobalPanel({
   );
 
   const activosBase = useMemo(() => {
-    return activosList.filter((a) => {
+    const scoped = activosList.filter((a) => {
       if (activeEntidadId && a.entidad_id !== activeEntidadId) return false;
       if (estadoRegistro && a.estado_registro !== estadoRegistro) return false;
       return matchesInventarioBusquedaMultiColumna(a, busqueda);
     });
-  }, [activosList, busqueda, activeEntidadId, estadoRegistro]);
+    return filtrarActivosPorFechaCorte(scoped, fechaCorte);
+  }, [activosList, busqueda, activeEntidadId, estadoRegistro, fechaCorte]);
 
   const columnFilterOptions = useMemo(
     () =>
@@ -378,6 +440,32 @@ export function InventarioGlobalPanel({
                     />
                   </div>
 
+                  <div className="w-[9.5rem] shrink-0 space-y-0.5">
+                    <label
+                      htmlFor="inventario_fecha_corte"
+                      className="sr-only"
+                    >
+                      Fecha de corte
+                    </label>
+                    <FechaDdMmYyyyInput
+                      id="inventario_fecha_corte"
+                      value={fechaCorteText}
+                      onChange={(next) => {
+                        setFechaCorteText(next);
+                        aplicarFechaCorte(next);
+                      }}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onBlur={(e) => aplicarFechaCorte(e.currentTarget.value, { fromBlur: true })}
+                      aria-invalid={Boolean(fechaCorteError)}
+                      aria-label="Fecha de corte"
+                      title="Fecha de corte (depreciación y valor neto)"
+                      className="h-8 text-sm"
+                    />
+                    {fechaCorteError && (
+                      <p className="text-[10px] leading-tight text-destructive">{fechaCorteError}</p>
+                    )}
+                  </div>
+
                   {!hasFixedEntidad && !isAdmin && (
                     <Select
                       aria-label="Entidad"
@@ -421,6 +509,7 @@ export function InventarioGlobalPanel({
           columnFilters={columnFilters}
           onColumnFiltersChange={setColumnFilters}
           columnFilterOptions={columnFilterOptions}
+          fechaCorte={fechaCorte}
           editarLabel={isAdmin ? undefined : "Editar activo"}
         />
       </div>

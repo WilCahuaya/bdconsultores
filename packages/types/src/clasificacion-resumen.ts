@@ -12,9 +12,12 @@ import {
 } from "./index";
 
 export interface ClasificacionResumen {
+  /** Texto visible de la cuenta (código + nombre). */
   categoria: string;
   cuenta: string;
   grupo: string;
+  /** Clasificación del bien: Activo o Cuenta de orden. */
+  tipoBien: CategoriaBien;
   cantidad: number;
   valorAdquisicion: number;
   depreciacionAcumulada: number;
@@ -26,6 +29,13 @@ export interface ValorizacionTotales {
   valorAdquisicion: number;
   depreciacionAcumulada: number;
   valorNeto: number;
+}
+
+export interface ClasificacionResumenSeccion {
+  tipoBien: CategoriaBien;
+  label: string;
+  filas: ClasificacionResumen[];
+  subtotal: ValorizacionTotales;
 }
 
 /** Activo mínimo para valorización y resumen contable. */
@@ -42,6 +52,16 @@ export interface ActivoValorizacionFuente extends ActivoCuentaContableSource {
   contabilidad?: string | null;
   catalogo_grupo?: string | null;
   catalogo?: CatalogoCuentaContableSource | null;
+}
+
+export function tipoBienDesdeActivo(activo: {
+  categoria?: CategoriaBien | string | null;
+}): CategoriaBien {
+  return activo.categoria === "CUENTA_ORDEN" ? "CUENTA_ORDEN" : "ACTIVO";
+}
+
+export function categoriaBienResumenLabel(tipo: CategoriaBien): string {
+  return tipo === "CUENTA_ORDEN" ? "Cuenta de orden" : "Activo";
 }
 
 export function cuentaGrupoActivoValorizacion(
@@ -62,6 +82,26 @@ export function cuentaGrupoActivoValorizacion(
   const categoria = cuenta;
 
   return { cuenta, grupo, categoria, codigo: codigo || cuenta };
+}
+
+function emptyTotales(): ValorizacionTotales {
+  return {
+    cantidad: 0,
+    valorAdquisicion: 0,
+    depreciacionAcumulada: 0,
+    valorNeto: 0,
+  };
+}
+
+function sumarTotales(filas: ClasificacionResumen[]): ValorizacionTotales {
+  const t = emptyTotales();
+  for (const fila of filas) {
+    t.cantidad += fila.cantidad;
+    t.valorAdquisicion += fila.valorAdquisicion;
+    t.depreciacionAcumulada += fila.depreciacionAcumulada;
+    t.valorNeto += fila.valorNeto;
+  }
+  return t;
 }
 
 export function buildValorizacionTotales(
@@ -106,8 +146,9 @@ export function buildClasificacionResumen(
   const map = new Map<string, ClasificacionResumen>();
 
   for (const activo of activos) {
+    const tipoBien = tipoBienDesdeActivo(activo);
     const { cuenta, categoria, codigo } = cuentaGrupoActivoValorizacion(activo);
-    const key = codigo || cuenta;
+    const key = `${tipoBien}::${codigo || cuenta}`;
     const valorEfectivo = valorActivoEfectivo(activo.valor_adquisicion, activo.valor_incremento);
     const periodo = calcPeriodoMesesHasta(
       resolveFechaInicioDepreciacion(activo.fecha_inicio_depreciacion, activo.fecha_adquisicion),
@@ -136,6 +177,7 @@ export function buildClasificacionResumen(
         categoria,
         cuenta,
         grupo: "",
+        tipoBien,
         cantidad: 1,
         valorAdquisicion: valor,
         depreciacionAcumulada: dep,
@@ -144,7 +186,87 @@ export function buildClasificacionResumen(
     }
   }
 
-  return Array.from(map.values()).sort((a, b) =>
-    a.categoria.localeCompare(b.categoria, "es", { numeric: true }),
-  );
+  const tipoOrder = (t: CategoriaBien) => (t === "ACTIVO" ? 0 : 1);
+
+  return Array.from(map.values()).sort((a, b) => {
+    const byTipo = tipoOrder(a.tipoBien) - tipoOrder(b.tipoBien);
+    if (byTipo !== 0) return byTipo;
+    return a.categoria.localeCompare(b.categoria, "es", { numeric: true });
+  });
+}
+
+/** Agrupa filas del resumen en secciones Activo / Cuenta de orden (solo las que tengan datos). */
+export function agruparClasificacionResumenPorTipo(
+  resumen: ClasificacionResumen[],
+): ClasificacionResumenSeccion[] {
+  const order: CategoriaBien[] = ["ACTIVO", "CUENTA_ORDEN"];
+  const secciones: ClasificacionResumenSeccion[] = [];
+
+  for (const tipoBien of order) {
+    const filas = resumen.filter((r) => r.tipoBien === tipoBien);
+    if (filas.length === 0) continue;
+    secciones.push({
+      tipoBien,
+      label: categoriaBienResumenLabel(tipoBien),
+      filas,
+      subtotal: sumarTotales(filas),
+    });
+  }
+
+  return secciones;
+}
+
+export interface DepreciacionMensualFila {
+  /** 1 = enero … 12 = diciembre */
+  mes: number;
+  label: string;
+  depreciacionAcumulada: number;
+}
+
+const MESES_ES = [
+  "Enero",
+  "Febrero",
+  "Marzo",
+  "Abril",
+  "Mayo",
+  "Junio",
+  "Julio",
+  "Agosto",
+  "Septiembre",
+  "Octubre",
+  "Noviembre",
+  "Diciembre",
+] as const;
+
+/**
+ * Depreciación acumulada del inventario por mes del año de la fecha de corte,
+ * desde enero hasta el mes de corte (inclusive).
+ * Meses anteriores usan el último día del mes; el mes de corte usa la fecha de corte.
+ */
+export function buildDepreciacionMensualResumen(
+  activos: ActivoValorizacionFuente[],
+  fechaCorte: Date = new Date(),
+): DepreciacionMensualFila[] {
+  const year = fechaCorte.getFullYear();
+  const mesCorte = fechaCorte.getMonth(); // 0-based
+  const filas: DepreciacionMensualFila[] = [];
+
+  for (let mes = 0; mes <= mesCorte; mes++) {
+    const hasta =
+      mes === mesCorte
+        ? new Date(
+            fechaCorte.getFullYear(),
+            fechaCorte.getMonth(),
+            fechaCorte.getDate(),
+          )
+        : new Date(year, mes + 1, 0); // último día del mes
+    const totales = buildValorizacionTotales(activos, hasta);
+    filas.push({
+      mes: mes + 1,
+      label: MESES_ES[mes]!,
+      depreciacionAcumulada: totales.depreciacionAcumulada,
+    });
+  }
+
+  return filas;
 }

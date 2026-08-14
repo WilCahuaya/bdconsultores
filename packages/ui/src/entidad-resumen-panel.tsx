@@ -1,11 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import type { ReactNode } from "react";
 import {
+  agruparClasificacionResumenPorTipo,
   buildClasificacionResumen,
+  buildDepreciacionMensualResumen,
   buildValorizacionTotales,
   entidadMuestraSelectorSede,
+  filtrarActivosPorFechaCorte,
   parseFechaDDMMYYYY,
   validarFechaDDMMYYYY,
   type ActivoValorizacionFuente,
@@ -74,6 +77,7 @@ export interface EntidadResumenPanelProps {
 }
 
 const RESUMEN_TABLE_WIDTHS_PCT = [38, 22, 22, 18] as const;
+const DEPRECIACION_MENSUAL_WIDTHS_PCT = [40, 60] as const;
 const AMBIENTES_RESUMEN_TABLE_WIDTHS_PCT = [18, 14, 30, 10, 12] as const;
 
 /** Incluye registrados y preregistrados; excluye dados de baja. */
@@ -114,6 +118,10 @@ function formatResumenNumero(value: number): string {
 const RESUMEN_TABLA_HEAD_CLASS =
   "bg-sky-100 text-foreground dark:bg-sky-950/50 [&_th]:bg-sky-100 dark:[&_th]:bg-sky-950/50";
 const RESUMEN_TABLA_TOTAL_CLASS = "bg-sky-100/80 font-semibold dark:bg-sky-950/40";
+const RESUMEN_TABLA_SECTION_CLASS =
+  "bg-muted/60 font-semibold uppercase tracking-wide text-foreground dark:bg-muted/40";
+const RESUMEN_TABLA_SUBTOTAL_CLASS =
+  "bg-sky-50/90 font-semibold text-foreground dark:bg-sky-950/25";
 
 export function EntidadResumenPanel({
   entidadNombre,
@@ -129,9 +137,20 @@ export function EntidadResumenPanel({
   const [fechaCorte, setFechaCorte] = useState(() => fechaResumen);
   const [fechaError, setFechaError] = useState<string | null>(null);
 
-  const activosResumen = useMemo(() => filtrarParaResumenDashboard(activos), [activos]);
+  const activosResumen = useMemo(
+    () => filtrarActivosPorFechaCorte(filtrarParaResumenDashboard(activos), fechaCorte),
+    [activos, fechaCorte],
+  );
   const resumenFilas = useMemo(
     () => buildClasificacionResumen(activosResumen, fechaCorte),
+    [activosResumen, fechaCorte],
+  );
+  const resumenSecciones = useMemo(
+    () => agruparClasificacionResumenPorTipo(resumenFilas),
+    [resumenFilas],
+  );
+  const depreciacionMensual = useMemo(
+    () => buildDepreciacionMensualResumen(activosResumen, fechaCorte),
     [activosResumen, fechaCorte],
   );
   const totales = useMemo(
@@ -263,7 +282,7 @@ export function EntidadResumenPanel({
               <PanelTableColgroup widths={RESUMEN_TABLE_WIDTHS_PCT} />
               <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
                 <tr className={panelTableHeadRowClass}>
-                  <PanelTableTh>Categoría</PanelTableTh>
+                  <PanelTableTh>Cuenta contable</PanelTableTh>
                   <PanelTableTh align="right" className="whitespace-nowrap">
                     Suma de Importe
                   </PanelTableTh>
@@ -276,28 +295,56 @@ export function EntidadResumenPanel({
                 </tr>
               </thead>
               <tbody>
-                {resumenFilas.map((fila: ClasificacionResumen) => (
-                  <tr key={fila.cuenta}>
-                    <PanelTableTd className="font-medium">{fila.categoria}</PanelTableTd>
-                    <PanelTableTd
-                      align="right"
-                      className="whitespace-nowrap font-mono text-xs tabular-nums"
-                    >
-                      {formatResumenNumero(fila.valorAdquisicion)}
-                    </PanelTableTd>
-                    <PanelTableTd
-                      align="right"
-                      className="whitespace-nowrap font-mono text-xs tabular-nums"
-                    >
-                      {formatResumenNumero(fila.depreciacionAcumulada)}
-                    </PanelTableTd>
-                    <PanelTableTd
-                      align="right"
-                      className="whitespace-nowrap font-mono text-xs tabular-nums"
-                    >
-                      {formatResumenNumero(fila.valorNeto)}
-                    </PanelTableTd>
-                  </tr>
+                {resumenSecciones.map((seccion) => (
+                  <Fragment key={seccion.tipoBien}>
+                    <tr className={RESUMEN_TABLA_SECTION_CLASS}>
+                      <PanelTableTd colSpan={4}>{seccion.label}</PanelTableTd>
+                    </tr>
+                    {seccion.filas.map((fila: ClasificacionResumen) => (
+                      <tr key={`${seccion.tipoBien}-${fila.cuenta}`}>
+                        <PanelTableTd className="font-medium">{fila.categoria}</PanelTableTd>
+                        <PanelTableTd
+                          align="right"
+                          className="whitespace-nowrap font-mono text-xs tabular-nums"
+                        >
+                          {formatResumenNumero(fila.valorAdquisicion)}
+                        </PanelTableTd>
+                        <PanelTableTd
+                          align="right"
+                          className="whitespace-nowrap font-mono text-xs tabular-nums"
+                        >
+                          {formatResumenNumero(fila.depreciacionAcumulada)}
+                        </PanelTableTd>
+                        <PanelTableTd
+                          align="right"
+                          className="whitespace-nowrap font-mono text-xs tabular-nums"
+                        >
+                          {formatResumenNumero(fila.valorNeto)}
+                        </PanelTableTd>
+                      </tr>
+                    ))}
+                    <tr className={RESUMEN_TABLA_SUBTOTAL_CLASS}>
+                      <PanelTableTd>Total {seccion.label}</PanelTableTd>
+                      <PanelTableTd
+                        align="right"
+                        className="whitespace-nowrap font-mono text-xs tabular-nums"
+                      >
+                        {formatResumenNumero(seccion.subtotal.valorAdquisicion)}
+                      </PanelTableTd>
+                      <PanelTableTd
+                        align="right"
+                        className="whitespace-nowrap font-mono text-xs tabular-nums"
+                      >
+                        {formatResumenNumero(seccion.subtotal.depreciacionAcumulada)}
+                      </PanelTableTd>
+                      <PanelTableTd
+                        align="right"
+                        className="whitespace-nowrap font-mono text-xs tabular-nums"
+                      >
+                        {formatResumenNumero(seccion.subtotal.valorNeto)}
+                      </PanelTableTd>
+                    </tr>
+                  </Fragment>
                 ))}
                 <tr className={RESUMEN_TABLA_TOTAL_CLASS}>
                   <PanelTableTd>Total general</PanelTableTd>
@@ -325,6 +372,45 @@ export function EntidadResumenPanel({
           </div>
         )}
       </section>
+
+      {resumenFilas.length > 0 && (
+        <section className={panelCardClass}>
+          <div className="border-b border-border/60 px-4 py-4 text-center sm:text-left">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
+              Depreciación acumulada por mes
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Del año {fechaCorte.getFullYear()}, de enero hasta el mes de la fecha de corte
+            </p>
+          </div>
+          <div className={`${scrollbarThemedClass} overflow-x-auto`}>
+            <table className="w-full min-w-[20rem] table-fixed text-left text-sm">
+              <PanelTableColgroup widths={DEPRECIACION_MENSUAL_WIDTHS_PCT} />
+              <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
+                <tr className={panelTableHeadRowClass}>
+                  <PanelTableTh>Mes</PanelTableTh>
+                  <PanelTableTh align="right" className="whitespace-nowrap">
+                    Depreciación acumulada
+                  </PanelTableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {depreciacionMensual.map((fila) => (
+                  <tr key={fila.mes}>
+                    <PanelTableTd className="font-medium">{fila.label}</PanelTableTd>
+                    <PanelTableTd
+                      align="right"
+                      className="whitespace-nowrap font-mono text-xs tabular-nums"
+                    >
+                      {formatResumenNumero(fila.depreciacionAcumulada)}
+                    </PanelTableTd>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className={panelCardClass}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">

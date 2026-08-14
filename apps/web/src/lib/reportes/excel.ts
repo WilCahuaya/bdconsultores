@@ -46,6 +46,8 @@ import {
   buildValorizacionTotales,
   clasificacionToRows,
   clasificacionTotalRow,
+  isClasificacionSectionTitleRow,
+  isClasificacionSectionOrSubtotalRow,
 } from "./summary";
 import type { ActivoReporte, ReporteContexto, ReporteId } from "./types";
 import { REPORTES } from "./types";
@@ -61,7 +63,15 @@ function slugFilename(text: string): string {
 }
 
 function formatClasificacionCells(row: string[]): string[] {
-  return row.map((cell, i) => (i >= 2 ? `S/ ${formatMonedaPE(Number(cell))}` : cell));
+  if (isClasificacionSectionTitleRow(row)) {
+    return row.map((cell) => cell);
+  }
+  return row.map((cell, i) => {
+    if (i < 2) return cell;
+    if (!cell.trim()) return cell;
+    const n = Number(cell);
+    return Number.isFinite(n) ? `S/ ${formatMonedaPE(n)}` : cell;
+  });
 }
 
 function textoFicha(value: string | null | undefined): string {
@@ -346,7 +356,16 @@ function writeClasificacionSection(
   r++;
 
   for (const row of resumenRows) {
-    formatClasificacionCells(row).forEach((value, c) => setCell(ws, r, c, value, STYLE_BODY));
+    const formatted = formatClasificacionCells(row);
+    const style = isClasificacionSectionTitleRow(row)
+      ? STYLE_SECTION_TITLE
+      : isClasificacionSectionOrSubtotalRow(row)
+        ? STYLE_TABLE_FOOT
+        : STYLE_BODY;
+    formatted.forEach((value, c) => setCell(ws, r, c, value, style));
+    if (isClasificacionSectionTitleRow(row)) {
+      addMerge(merges, r, 0, Math.min(4, lastCol));
+    }
     r++;
   }
 

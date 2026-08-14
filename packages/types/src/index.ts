@@ -945,6 +945,34 @@ export function calcPeriodoMesesHasta(fechaAdquisicion: string | null, fechaHast
   );
 }
 
+/** Incluye bienes sin fecha de adquisición o adquiridos hasta la fecha de corte (inclusive). */
+export function activoIncluidoEnFechaCorte(
+  activo: { fecha_adquisicion?: string | null },
+  fechaCorte: Date | string,
+): boolean {
+  const fecha = activo.fecha_adquisicion?.trim();
+  if (!fecha) return true;
+  const corteISO =
+    typeof fechaCorte === "string"
+      ? fechaCorte.includes("/")
+        ? parseFechaDDMMYYYY(fechaCorte.trim())
+        : fechaCorte.slice(0, 10)
+      : [
+          fechaCorte.getFullYear(),
+          String(fechaCorte.getMonth() + 1).padStart(2, "0"),
+          String(fechaCorte.getDate()).padStart(2, "0"),
+        ].join("-");
+  if (!corteISO) return true;
+  return fecha.slice(0, 10) <= corteISO;
+}
+
+export function filtrarActivosPorFechaCorte<T extends { fecha_adquisicion?: string | null }>(
+  activos: T[],
+  fechaCorte: Date | string,
+): T[] {
+  return activos.filter((a) => activoIncluidoEnFechaCorte(a, fechaCorte));
+}
+
 /** Valor neto mínimo mientras el activo está vigente (no de baja ni en estado malo). */
 export const VALOR_NETO_MINIMO_ACTIVO = 1;
 
@@ -2067,11 +2095,17 @@ export {
 } from "./historial-activo";
 
 export {
+  agruparClasificacionResumenPorTipo,
   buildClasificacionResumen,
+  buildDepreciacionMensualResumen,
   buildValorizacionTotales,
+  categoriaBienResumenLabel,
   cuentaGrupoActivoValorizacion,
+  tipoBienDesdeActivo,
   type ActivoValorizacionFuente,
   type ClasificacionResumen,
+  type ClasificacionResumenSeccion,
+  type DepreciacionMensualFila,
   type ValorizacionTotales,
 } from "./clasificacion-resumen";
 

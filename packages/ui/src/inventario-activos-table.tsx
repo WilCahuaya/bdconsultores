@@ -174,6 +174,8 @@ export interface ActivosInventarioTableProps<T extends Activo> {
   columnFilters?: InventarioColumnFilters;
   onColumnFiltersChange?: (next: InventarioColumnFilters) => void;
   columnFilterOptions?: InventarioColumnFilterOptions;
+  /** Fecha de corte para depreciación / valor neto (por defecto: hoy). */
+  fechaCorte?: Date;
   renderComprobante: (activo: T, meta?: { columnFiltered?: boolean }) => ReactNode;
   renderAcciones: (activo: T) => ReactNode;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
@@ -282,6 +284,7 @@ function filteredColClass(active: boolean, extra?: string): string {
 
 function TotalsFooter({
   activos,
+  fechaCorte,
   modoAdmin,
   modoPreregistro,
   mostrarUbicacion,
@@ -289,13 +292,17 @@ function TotalsFooter({
   stickyWidths,
 }: {
   activos: Activo[];
+  fechaCorte?: Date;
   modoAdmin?: boolean;
   modoPreregistro?: boolean;
   mostrarUbicacion?: boolean;
   stickyOffsets: number[];
   stickyWidths: readonly number[];
 }) {
-  const totales = useMemo(() => buildValorizacionTotales(activos), [activos]);
+  const totales = useMemo(
+    () => buildValorizacionTotales(activos, fechaCorte ?? new Date()),
+    [activos, fechaCorte],
+  );
   if (activos.length === 0) return null;
 
   const stickyCount = stickyOffsets.length;
@@ -369,6 +376,7 @@ function FullTableBody<T extends Activo>({
   renderAcciones,
   stickyOffsets,
   stickyWidths,
+  fechaCorte,
 }: ActivosInventarioTableProps<T> & {
   colSpan: number;
   stickyOffsets: number[];
@@ -384,6 +392,7 @@ function FullTableBody<T extends Activo>({
   const estadoOn = Boolean(f?.estadoBien);
   const compOn = Boolean(f?.comprobante.trim());
   const ubiOn = Boolean(f?.ubicacion.trim());
+  const corte = fechaCorte ?? new Date();
 
   return (
     <tbody>
@@ -398,7 +407,7 @@ function FullTableBody<T extends Activo>({
         const rowIndex = rowOffset + index;
         const descripcion = inventarioDescripcion(activo);
         const inactivo = activo.estado_registro === "DADO_DE_BAJA";
-        const { periodo, depAcum, valorNeto } = inventarioDepreciacionFila(activo, inactivo);
+        const { periodo, depAcum, valorNeto } = inventarioDepreciacionFila(activo, inactivo, corte);
         const stickySel = stickyCellProps(stickyOffsets, 0, stickyWidths);
         const stickyN = stickyCellProps(stickyOffsets, sel, stickyWidths);
         const stickyCat = stickyCellProps(stickyOffsets, sel + 1, stickyWidths);
@@ -759,6 +768,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
           <FullTableBody {...props} colSpan={colSpan} stickyOffsets={stickyOffsets} stickyWidths={stickyWidths} />
           <TotalsFooter
             activos={props.activos}
+            fechaCorte={props.fechaCorte}
             modoAdmin={modoAdmin}
             modoPreregistro={modoPreregistro}
             mostrarUbicacion={mostrarUbicacion}

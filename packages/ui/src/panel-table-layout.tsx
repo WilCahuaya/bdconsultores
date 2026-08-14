@@ -152,19 +152,22 @@ export function PanelTableTd({
   className,
   align,
   title,
+  colSpan,
 }: {
   children: ReactNode;
   className?: string;
   align?: "left" | "center" | "right";
   title?: string;
+  colSpan?: number;
 }) {
   const nowrap = className?.includes("whitespace-nowrap");
 
   return (
     <td
+      colSpan={colSpan}
       className={cn(
         "overflow-hidden px-2 py-2.5 align-middle text-sm sm:px-3",
-        nowrap ? "w-0 whitespace-nowrap" : "max-w-0",
+        nowrap ? "w-0 whitespace-nowrap" : colSpan ? undefined : "max-w-0",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className,
@@ -172,7 +175,7 @@ export function PanelTableTd({
       title={title}
     >
       {typeof children === "string" || typeof children === "number" ? (
-        <span className={cn("block", !nowrap && "truncate")}>{children}</span>
+        <span className={cn("block", !nowrap && !colSpan && "truncate")}>{children}</span>
       ) : (
         children
       )}

@@ -59,6 +59,8 @@ interface ActivosInventarioExcelViewProps {
   columnFilters?: InventarioColumnFilters;
   onColumnFiltersChange?: (next: InventarioColumnFilters) => void;
   columnFilterOptions?: InventarioColumnFilterOptions;
+  /** Fecha de corte para depreciación / valor neto (por defecto: hoy). */
+  fechaCorte?: Date;
 }
 
 function excelViewShellClass(embeddedInParentScroll: boolean): string {
@@ -92,6 +94,7 @@ export function ActivosInventarioExcelView({
   columnFilters,
   onColumnFiltersChange,
   columnFilterOptions,
+  fechaCorte,
 }: ActivosInventarioExcelViewProps) {
   const paginationKey = useMemo(
     () => `${activos.length}:${activos[0]?.id ?? ""}`,
@@ -221,6 +224,7 @@ export function ActivosInventarioExcelView({
       columnFilters={columnFilters}
       onColumnFiltersChange={onColumnFiltersChange}
       columnFilterOptions={columnFilterOptions}
+      fechaCorte={fechaCorte}
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       selection={
@@ -286,6 +290,7 @@ export function ActivosInventarioExcelView({
       selectedIds={gestionEnabled ? selectedIds : undefined}
       onToggleSelect={gestionEnabled ? toggleSelect : undefined}
       puedeSeleccionar={gestionEnabled ? esActivoPreregistrado : undefined}
+      fechaCorte={fechaCorte}
     />
   );
 

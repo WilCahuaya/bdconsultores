@@ -1,4 +1,5 @@
 import {
+  agruparClasificacionResumenPorTipo,
   buildClasificacionResumen as buildClasificacionResumenCore,
   buildValorizacionTotales as buildValorizacionTotalesCore,
   resolveCuentaContableActivo,
@@ -45,13 +46,30 @@ export function buildClasificacionResumen(
 }
 
 export function clasificacionToRows(resumen: ClasificacionResumen[]): string[][] {
-  return resumen.map((r) => [
-    r.categoria || r.cuenta,
-    String(r.cantidad),
-    r.valorAdquisicion.toFixed(2),
-    r.depreciacionAcumulada.toFixed(2),
-    r.valorNeto.toFixed(2),
-  ]);
+  const secciones = agruparClasificacionResumenPorTipo(resumen);
+  const rows: string[][] = [];
+
+  for (const seccion of secciones) {
+    rows.push([seccion.label, "", "", "", ""]);
+    for (const r of seccion.filas) {
+      rows.push([
+        r.categoria || r.cuenta,
+        String(r.cantidad),
+        r.valorAdquisicion.toFixed(2),
+        r.depreciacionAcumulada.toFixed(2),
+        r.valorNeto.toFixed(2),
+      ]);
+    }
+    rows.push([
+      `Total ${seccion.label}`,
+      String(seccion.subtotal.cantidad),
+      seccion.subtotal.valorAdquisicion.toFixed(2),
+      seccion.subtotal.depreciacionAcumulada.toFixed(2),
+      seccion.subtotal.valorNeto.toFixed(2),
+    ]);
+  }
+
+  return rows;
 }
 
 export function clasificacionTotalRow(totales: ValorizacionTotales): string[] {
@@ -71,3 +89,16 @@ export const CLASIFICACION_HEADERS = [
   "Dep. acumulada",
   "Valor neto",
 ] as const;
+
+/** Fila de título de sección (Activo / Cuenta de orden) o subtotal de sección. */
+export function isClasificacionSectionOrSubtotalRow(row: string[]): boolean {
+  const label = row[0]?.trim() ?? "";
+  if (!label) return false;
+  if (label === "Activo" || label === "Cuenta de orden") return true;
+  return label.startsWith("Total Activo") || label.startsWith("Total Cuenta de orden");
+}
+
+export function isClasificacionSectionTitleRow(row: string[]): boolean {
+  const label = row[0]?.trim() ?? "";
+  return label === "Activo" || label === "Cuenta de orden";
+}

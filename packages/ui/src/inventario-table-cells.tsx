@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import type { Activo, CategoriaBien, EstadoBien } from "@inventario/types";
 import {
   buildDescripcionBien,
-  calcPeriodoMeses,
+  calcPeriodoMesesHasta,
   calcValorizacionActivo,
   resolveFechaInicioDepreciacion,
   valorActivoEfectivo,
@@ -295,11 +295,13 @@ export function ValorBienCell({ activo }: { activo: Activo }) {
 export function ValorNetoCell({
   activo,
   inactivo,
+  fechaCorte,
 }: {
   activo: Activo;
   inactivo: boolean;
+  fechaCorte?: Date;
 }) {
-  const { valorNeto } = inventarioDepreciacionFila(activo, inactivo);
+  const { valorNeto } = inventarioDepreciacionFila(activo, inactivo, fechaCorte);
 
   return (
     <td className={`${tdBase} text-right tabular-nums`} title={valorNeto != null ? `S/ ${formatMonedaPE(valorNeto)}` : undefined}>
@@ -435,9 +437,14 @@ export function inventarioDescripcion(activo: Activo): string {
   );
 }
 
-export function inventarioDepreciacionFila(activo: Activo, inactivo: boolean) {
-  const periodo = calcPeriodoMeses(
+export function inventarioDepreciacionFila(
+  activo: Activo,
+  inactivo: boolean,
+  fechaCorte: Date = new Date(),
+) {
+  const periodo = calcPeriodoMesesHasta(
     resolveFechaInicioDepreciacion(activo.fecha_inicio_depreciacion, activo.fecha_adquisicion),
+    fechaCorte,
   );
   const valor = valorActivoEfectivo(activo.valor_adquisicion, activo.valor_incremento);
   const { depreciacionAcumulada: depAcum, valorNeto } = calcValorizacionActivo({

@@ -37,6 +37,7 @@ interface ActivosInventarioMobileCardsProps {
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
   puedeSeleccionar?: (activo: Activo) => boolean;
+  fechaCorte?: Date;
 }
 
 function InfoItem({
@@ -96,6 +97,7 @@ export function ActivosInventarioMobileCards({
   selectedIds,
   onToggleSelect,
   puedeSeleccionar,
+  fechaCorte,
 }: ActivosInventarioMobileCardsProps) {
   if (activos.length === 0) {
     return (
@@ -111,7 +113,7 @@ export function ActivosInventarioMobileCards({
         const activoUbicacion = activo as ActivoConUbicacionCard;
         const descripcion = inventarioDescripcion(activo);
         const inactivo = activo.estado_registro === "DADO_DE_BAJA";
-        const { valorNeto } = inventarioDepreciacionFila(activo, inactivo);
+        const { valorNeto } = inventarioDepreciacionFila(activo, inactivo, fechaCorte);
         const preregistrado = activo.estado_registro === "PREREGISTRADO";
         const seleccionable =
           withPreregistroSelection &&
