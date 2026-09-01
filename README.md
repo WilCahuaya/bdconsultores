@@ -1,21 +1,23 @@
-# Sistema de Inventario de Activos Fijos
+# B&D Consultores — Plataforma de gestión
 
-MVP v1.0 — **B&D Consultores Global EIRL**
+Suite web y escritorio de **B&D Consultores Global EIRL**.
 
-Monorepo con plataforma web, app de escritorio Windows y backend Supabase.
+Hoy incluye el módulo **Inventario** (activos fijos). **Planillas** y otros módulos se irán sumando en la misma plataforma (mismo login, mismo panel).
+
+Tras iniciar sesión: [http://localhost:3000/app](http://localhost:3000/app)
 
 ## Estructura
 
 ```
-inventario-activos/
+bdconsultores/
 ├── apps/
-│   ├── web/          # Next.js 14 — plataforma web
-│   └── desktop/      # Electron — app de campo
+│   ├── web/          # Next.js 14 — plataforma (sitio, Inventario, hub /app)
+│   └── desktop/      # Electron — Inventario de campo
 ├── packages/
-│   ├── types/        # Tipos TypeScript compartidos
+│   ├── types/        # Tipos compartidos (plataforma + inventario)
 │   └── ui/           # Componentes UI compartidos
 ├── supabase/         # Migraciones y config Supabase
-└── docs/             # Documentación del proyecto
+└── docs/             # Documentación
 ```
 
 ## Requisitos
@@ -39,8 +41,8 @@ cp .env.example apps/desktop/.env.local
 # 3. Configurar login Google (ver docs/AUTH_GOOGLE.md)
 
 # 4. Desarrollo
-pnpm dev:web       # http://localhost:3000
-pnpm dev:desktop   # Electron + Vite
+pnpm dev:web       # http://localhost:3000  → login → /app
+pnpm dev:desktop   # Electron + Vite (módulo Inventario)
 ```
 
 ## Scripts
@@ -49,11 +51,18 @@ pnpm dev:desktop   # Electron + Vite
 |---|---|
 | `pnpm dev` | Web + Desktop en paralelo |
 | `pnpm dev:web` | Solo plataforma web |
-| `pnpm dev:desktop` | Solo app Electron |
+| `pnpm dev:desktop` | Solo app Electron (Inventario de campo) |
 | `pnpm build` | Build de todos los paquetes |
 | `pnpm typecheck` | Verificación TypeScript |
 
-## Fases de desarrollo
+## Módulos
+
+| Módulo | Estado | Acceso web |
+|---|---|---|
+| Inventario | Operativo | Hub `/app` → `/contador` o `/admin` |
+| Planillas | Pendiente | Visible en el hub como «Próximamente» |
+
+## Fases de desarrollo (Inventario)
 
 Ver [docs/PLAN_DESARROLLO_MVP_v1.md](./docs/PLAN_DESARROLLO_MVP_v1.md)
 
@@ -75,6 +84,7 @@ Resumen: importar repo en Vercel, **Root Directory** = `apps/web`, rama `main`, 
 
 ## Documentación
 
+- [Lo desarrollado (detalle del MVP Inventario)](./docs/DESARROLLADO_MVP.md)
 - [Plan de desarrollo](./docs/PLAN_DESARROLLO_MVP_v1.md)
 - [Deploy Vercel](./docs/DEPLOY_VERCEL.md)
 - [App de escritorio — build e instalación](./apps/desktop/README.md)
@@ -85,4 +95,4 @@ Resumen: importar repo en Vercel, **Root Directory** = `apps/web`, rama `main`, 
 
 ## Stack
 
-Supabase · Next.js 14 · Electron · TypeScript · Tailwind · shadcn-style UI · ZPL (Fase 3)
+Supabase · Next.js 14 · Electron · TypeScript · Tailwind · shadcn-style UI · ZPL (Inventario de campo)

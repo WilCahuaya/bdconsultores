@@ -47,7 +47,7 @@ enable_signup = false
 enable_confirmations = false
 
 [auth.email.template.invite]
-subject = "B&D Consultores — Invitación al Inventario de Activos Fijos"
+subject = "B&D Consultores — Invitación a la plataforma"
 content_path = "./templates/invite.html"
 
 [auth.email.template.magic_link]

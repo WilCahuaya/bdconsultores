@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { APP_CLIENT, APP_NAME } from "@inventario/types";
+import { APP_CLIENT, MODULE_INVENTARIO, PLATFORM_NAME } from "@inventario/types";
 import { Button } from "@inventario/ui";
 import { IconLogOut, IconMenu, PanelBreadcrumbs, PanelSidebarSpa, panelMainScrollClass, panelPageClass } from "@inventario/ui/panel";
 import type { PanelBreadcrumbItem, PanelNavSection } from "@inventario/ui/panel";
@@ -65,9 +65,9 @@ export function AppShell({
               <IconMenu />
             </button>
             <div className="min-w-0">
-              <p className="truncate text-base font-bold text-primary sm:text-lg">{APP_NAME}</p>
+              <p className="truncate text-base font-bold text-primary sm:text-lg">{PLATFORM_NAME}</p>
               <p className="truncate text-xs text-muted-foreground">
-                Panel de campo — {APP_CLIENT}
+                {MODULE_INVENTARIO} · Panel de campo — {APP_CLIENT}
               </p>
             </div>
           </div>

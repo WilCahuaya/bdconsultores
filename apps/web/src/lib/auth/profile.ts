@@ -1,5 +1,5 @@
 import type { Profile, RolUsuario } from "@inventario/types";
-import { homePathForRole } from "@inventario/types";
+import { homePathForRole, inventarioHomePathForRole } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 
 export async function getProfile(): Promise<Profile | null> {
@@ -32,4 +32,4 @@ export async function requireProfile(requiredRole?: RolUsuario): Promise<Profile
   return profile;
 }
 
-export { homePathForRole };
+export { homePathForRole, inventarioHomePathForRole };

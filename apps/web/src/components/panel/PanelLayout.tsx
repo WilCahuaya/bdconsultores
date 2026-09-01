@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { APP_CLIENT, APP_NAME } from "@inventario/types";
+import { MODULE_INVENTARIO, PLATFORM_HOME, PLATFORM_NAME } from "@inventario/types";
 import { ThemeToggle } from "@inventario/ui/theme-toggle";
 import { ToastProvider } from "@inventario/ui";
 import { panelMainScrollClass, panelPageClass } from "@inventario/ui/panel";
@@ -49,14 +49,22 @@ export function PanelLayout({
             </button>
             <Link href={homeHref} className="group min-w-0">
               <p className="truncate text-base font-bold text-primary group-hover:opacity-90 sm:text-lg">
-                {APP_NAME}
+                {PLATFORM_NAME}
               </p>
               <p className="truncate text-xs text-muted-foreground">
-                {panelLabel} — {APP_CLIENT}
+                {MODULE_INVENTARIO} · {panelLabel}
               </p>
             </Link>
           </div>
-          <ThemeToggle />
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              href={PLATFORM_HOME}
+              className="text-xs font-medium text-muted-foreground hover:text-foreground sm:text-sm"
+            >
+              Aplicaciones
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

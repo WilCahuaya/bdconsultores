@@ -2,7 +2,7 @@
   "name": "@inventario/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "App de escritorio — Inventario de Activos Fijos",
+  "description": "App de escritorio — B&D Consultores · Inventario de campo",
   "main": "dist-electron/electron/main.js",
   "scripts": {
     "dev": "pnpm dev:compile-electron && concurrently -k \"vite\" \"pnpm dev:electron\"",
@@ -50,7 +50,7 @@
   },
   "build": {
     "appId": "pe.bdconsultores.inventario",
-    "productName": "Inventario Activos B&D",
+    "productName": "B&D Consultores Inventario",
     "directories": {
       "output": "release"
     },

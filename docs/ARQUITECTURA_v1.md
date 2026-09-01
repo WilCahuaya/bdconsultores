@@ -1,6 +1,8 @@
-# Arquitectura v1 — Inventario de Activos Fijos
+# Arquitectura v1 — Plataforma B&D Consultores (módulo Inventario)
 
-**Versión:** 1.0 · **Fase:** 0 (Fundamentos)
+**Versión:** 1.1 · **Fase:** 0 (Fundamentos)
+
+La web es la **plataforma B&D Consultores**. Tras el login el usuario entra a `/app` (selector de módulos). Inventario vive en `/contador` y `/admin`. Planillas y otros módulos se añadirán al mismo producto.
 
 ## 1. Diagrama de componentes
 

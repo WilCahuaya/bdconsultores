@@ -2,7 +2,7 @@
   "name": "inventario-activos",
   "version": "0.1.0",
   "private": true,
-  "description": "Sistema de Inventario de Activos Fijos — B&D Consultores Global EIRL",
+  "description": "Plataforma B&D Consultores — Inventario, Planillas y módulos de gestión",
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",

@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { APP_CLIENT, APP_NAME } from "@inventario/types";
+import { APP_CLIENT, PLATFORM_NAME } from "@inventario/types";
 import "@inventario/ui/globals.css";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: APP_NAME,
-  description: `Plataforma web — ${APP_CLIENT}`,
+  title: PLATFORM_NAME,
+  description: `Plataforma de gestión — ${APP_CLIENT}`,
 };
 
 const themeScript = `

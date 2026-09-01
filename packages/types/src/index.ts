@@ -1940,7 +1940,15 @@ export interface HistorialCambio {
   created_at: string;
 }
 
-export function homePathForRole(rol: RolUsuario): string {
+/** Inicio de la plataforma tras el login (selector de módulos). */
+export const PLATFORM_HOME = "/app";
+
+export function homePathForRole(_rol?: RolUsuario): string {
+  return PLATFORM_HOME;
+}
+
+/** Inicio del módulo Inventario según rol. */
+export function inventarioHomePathForRole(rol: RolUsuario): string {
   return rol === "ADMIN_ENTIDAD" ? "/admin/portal" : "/contador/portal";
 }
 
@@ -1987,7 +1995,6 @@ export function validarEliminarUsuario(input: {
   return null;
 }
 
-export const APP_NAME = "Inventario de Activos Fijos";
 export const APP_CLIENT = "B&D Consultores Global EIRL";
 
 export {
@@ -2126,3 +2133,11 @@ export {
   isGenericContadorNombre,
   validarNombreContador,
 } from "./bd-portal";
+
+/** Nombre de la plataforma (suite de módulos). */
+export const PLATFORM_NAME = "B&D Consultores";
+export const MODULE_INVENTARIO = "Inventario";
+export const MODULE_INVENTARIO_FULL = "Inventario de Activos Fijos";
+export const MODULE_PLANILLAS = "Planillas";
+/** Alias de plataforma — no usar como nombre del módulo Inventario. */
+export const APP_NAME = PLATFORM_NAME;

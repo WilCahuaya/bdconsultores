@@ -6,7 +6,12 @@ import { isPublicPath } from "@/lib/routes";
 type RolUsuario = "CONTADOR" | "ADMIN_ENTIDAD";
 
 function isPrivatePath(pathname: string): boolean {
-  return pathname.startsWith("/contador") || pathname.startsWith("/admin");
+  return (
+    pathname === "/app" ||
+    pathname.startsWith("/app/") ||
+    pathname.startsWith("/contador") ||
+    pathname.startsWith("/admin")
+  );
 }
 
 function panelForRole(rol: RolUsuario): "/contador" | "/admin" {

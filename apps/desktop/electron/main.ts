@@ -165,7 +165,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 1024,
     minHeight: 700,
-    title: "Inventario Activos B&D",
+    title: "B&D Consultores — Inventario",
     autoHideMenuBar: true,
     webPreferences: {
       preload: resolvePreloadPath(),
