@@ -1,98 +1,85 @@
-# Deploy en Vercel — Staging / Producción
+# Deploy en Vercel — Portal, Inventarios y Planillas
 
-Guía para conectar el monorepo con Vercel y desplegar la plataforma web (`apps/web`).
+Tres proyectos independientes en el mismo repo. El usuario ve un solo dominio: el **Portal** reescribe `/inventarios` y `/planillas` hacia los otros deploys.
 
----
-
-## 1. Conectar el repositorio
-
-1. Entrar a [vercel.com](https://vercel.com) e iniciar sesión (con GitHub).
-2. **Add New → Project**
-3. Importar: `WilCahuaya/Inventario-activos-B-D`
-4. Configurar:
-
-| Campo | Valor |
-|---|---|
-| **Framework Preset** | Next.js |
-| **Root Directory** | `apps/web` ← **Importante** |
-| **Branch** | `main` |
-
-Vercel detectará `apps/web/vercel.json` automáticamente.
+`apps/web` sigue siendo la app actual en producción hasta el corte. No la borre.
 
 ---
 
-## 2. Variables de entorno (obligatorias)
+## Orden de alta (la primera vez)
 
-En **Project Settings → Environment Variables**, agregar:
+1. Crear proyecto **Inventarios** → anotar su URL (`https://….vercel.app`)
+2. Crear proyecto **Planillas** → anotar su URL
+3. Crear proyecto **Portal** → pegar esas URLs en variables `INVENTARIOS_ORIGIN` y `PLANILLAS_ORIGIN`
+4. Dominio custom (`bdyconsultores.com`, etc.) **solo en Portal**
+5. Añadir callbacks en Supabase (sección 4)
 
-| Variable | Entornos | Valor |
+Cada proyecto: **Add New → Project** → mismo repo GitHub → **Root Directory** como en la tabla.
+
+| Proyecto Vercel | Root Directory | `package.json` |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Production, Preview, Development | `https://eeivmgvspexctjeowrmk.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Production, Preview, Development | Tu anon key de Supabase |
+| Portal | `apps/portal` | `@bd/portal` |
+| Inventarios | `apps/inventarios` | `@bd/inventarios` |
+| Planillas | `apps/planillas` | `@bd/planillas` |
+| (actual) Web | `apps/web` | `@inventario/web` |
 
-> No agregar `SUPABASE_SERVICE_ROLE_KEY` hasta Fase 1 (solo en servidor, cuando haya API routes).
+Framework: **Next.js**. Rama: `main`. Vercel usa el `vercel.json` de cada app.
 
 ---
 
-## 3. Supabase — URLs para Vercel
+## Variables de entorno
 
-Después del primer deploy, copiar la URL de Vercel (ej. `https://inventario-activos-b-d.vercel.app`).
+### Portal
 
-En **Supabase Dashboard → Authentication → URL Configuration**:
-
-| Campo | Valor |
+| Variable | Valor |
 |---|---|
-| **Site URL** | `https://TU-PROYECTO.vercel.app` (producción) |
-| **Redirect URLs** | Agregar: |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key |
+| `NEXT_PUBLIC_PORTAL_ORIGIN` | URL pública del Portal (dominio o `https://….vercel.app`) |
+| `NEXT_PUBLIC_SITE_URL` | Igual que `NEXT_PUBLIC_PORTAL_ORIGIN` |
+| `INVENTARIOS_ORIGIN` | Origin de Inventarios **sin** path (`https://bd-inventarios.vercel.app`) |
+| `PLANILLAS_ORIGIN` | Origin de Planillas **sin** path |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo servidor (invitaciones). Nunca `NEXT_PUBLIC_` |
+
+`INVENTARIOS_ORIGIN` / `PLANILLAS_ORIGIN` se leen en el **build** del Portal (rewrites). Si cambian, hay que redeployar Portal.
+
+### Inventarios y Planillas
+
+| Variable | Valor |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Mismo proyecto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Mismo |
+| `NEXT_PUBLIC_PORTAL_ORIGIN` | URL del Portal (login / “Aplicaciones”) |
+| `NEXT_PUBLIC_SITE_URL` | Igual que el Portal (OAuth e invitaciones) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Solo Inventarios, si hay invitaciones desde ese app |
+
+---
+
+## Supabase — URL Configuration
+
+**Site URL** (producción): `https://TU-DOMINIO` o la URL del Portal.
+
+**Redirect URLs** — agregar:
 
 ```
-https://TU-PROYECTO.vercel.app/auth/callback
+https://TU-PORTAL.vercel.app/auth/callback
+http://127.0.0.1:3010/auth/callback
+http://localhost:3010/auth/callback
 http://localhost:3000/auth/callback
-http://localhost:5173/auth/callback
 ```
 
-Mantener las URLs de localhost para desarrollo local.
+Google Cloud no cambia: el callback OAuth sigue siendo `https://TU-PROJECT-REF.supabase.co/auth/v1/callback`.
 
 ---
 
-## 4. Deploy
+## Verificar
 
-- **Automático:** cada `git push` a `main` despliega producción.
-- **Preview:** cada PR genera una URL de preview.
-
-Comandos locales (opcional, requiere Vercel CLI):
-
-```bash
-npm i -g vercel
-cd apps/web
-vercel login
-vercel link
-vercel --prod
-```
-
----
-
-## 5. Verificar después del deploy
-
-- [ ] `/` — landing pública carga
-- [ ] `/nosotros`, `/servicios`, `/blog` — navegación OK
-- [ ] `/login` — botón Google funciona
-- [ ] Login → redirige a `/contador`
-- [ ] Google OAuth sin error `redirect_uri_mismatch`
-
----
-
-## 6. Estructura monorepo
-
-```
-Inventario/
-├── apps/web/          ← Root Directory en Vercel
-│   └── vercel.json    ← install/build desde raíz del monorepo
-├── packages/types/
-└── packages/ui/
-```
-
-Los comandos en `vercel.json` suben a la raíz (`cd ../..`) para instalar workspaces `@inventario/*`.
+- [ ] `https://TU-PORTAL/` — sitio público
+- [ ] `/login` — Google
+- [ ] Tras login → `/app`
+- [ ] `/inventarios/...` — panel de inventario
+- [ ] `/planillas` — cáscara
+- [ ] Si Inventarios está caído, Portal y Planillas siguen
 
 ---
 
@@ -100,7 +87,7 @@ Los comandos en `vercel.json` suben a la raíz (`cd ../..`) para instalar worksp
 
 | Error | Solución |
 |---|---|
-| `Module not found: @inventario/ui` | Root Directory debe ser `apps/web`, no la raíz del repo |
-| Build falla en `pnpm install` | Verificar `packageManager` en `package.json` raíz |
-| Google login falla en Vercel | Agregar URL de callback en Supabase Redirect URLs |
-| `provider is not enabled` | Activar Google en Supabase Providers |
+| `/inventarios` 404 o JS en blanco | `INVENTARIOS_ORIGIN` mal (debe ser origin, sin `/inventarios`) y redeploy Portal |
+| Login Google `redirect_uri_mismatch` | Falta `/auth/callback` del Portal en Supabase Redirect URLs |
+| `Module not found: @inventario/ui` | Root Directory = `apps/portal` (o inventarios/planillas), no la raíz |
+| Logout no vuelve al login | `NEXT_PUBLIC_PORTAL_ORIGIN` en el proyecto Inventarios |

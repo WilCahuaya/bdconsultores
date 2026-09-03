@@ -41,14 +41,18 @@ https://TU-PROJECT-REF.supabase.co/auth/v1/callback
 
 **Authentication → URL Configuration**
 
+Proyecto cloud: [inventario-activos-B&D → URL Configuration](https://supabase.com/dashboard/project/eeivmgvspexctjeowrmk/auth/url-configuration)
+
 | Campo | Valor |
 |---|---|
-| Site URL | `http://localhost:3000` (dev) |
+| Site URL | `http://127.0.0.1:3010` (dev plataforma) o `http://localhost:3000` (`apps/web`) |
 | Redirect URLs | Ver lista abajo |
 
-Agregar estas **Redirect URLs**:
+Agregar estas **Redirect URLs** (las de 3010 son imprescindibles para el Portal):
 
 ```
+http://127.0.0.1:3010/auth/callback
+http://localhost:3010/auth/callback
 http://localhost:3000/auth/callback
 http://localhost:5173/auth/callback
 http://localhost:54324/auth/callback
@@ -113,7 +117,7 @@ pnpm dev:desktop
 |---|---|
 | `redirect_uri_mismatch` | URI en Google Cloud debe ser `https://REF.supabase.co/auth/v1/callback` |
 | Desktop no completa login / abre bdconsultores.org | Agregar `http://localhost:54324/auth/callback` (y `127.0.0.1`) en Redirect URLs; Site URL = app Vercel, no el sitio .org |
-| Vuelve a login sin sesión | Agregar `http://localhost:3000/auth/callback` en Supabase Redirect URLs |
+| Vuelve a login sin sesión | Agregar el callback de esa app: `http://127.0.0.1:3010/auth/callback` (Portal) o `http://localhost:3000/auth/callback` (`apps/web`) |
 | Desktop (Vite) no completa login | Agregar `http://localhost:5173/auth/callback` en Redirect URLs |
 | `Access blocked: app not verified` | Completar OAuth consent screen o usar cuentas de prueba en External |
 

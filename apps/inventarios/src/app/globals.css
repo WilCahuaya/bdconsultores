@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overflow-x: clip;
+  }
+
+  body {
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .panel-main-scroll {
+    overflow-x: clip;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  main.panel-main-padding:has(.panel-inventario-page) {
+    overflow-y: hidden;
+  }
+
+  .panel-main-scroll::-webkit-scrollbar {
+    display: none;
+  }
+
+  .public-main-scroll {
+    overflow-x: clip;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .public-main-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}

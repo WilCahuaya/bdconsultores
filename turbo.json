@@ -3,7 +3,16 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "dist-electron/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "dist-electron/**"],
+      "env": [
+        "INVENTARIOS_ORIGIN",
+        "PLANILLAS_ORIGIN",
+        "NEXT_PUBLIC_PORTAL_ORIGIN",
+        "NEXT_PUBLIC_SITE_URL",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
     },
     "dev": {
       "cache": false,
