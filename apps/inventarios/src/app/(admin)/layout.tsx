@@ -3,12 +3,13 @@ import { PanelLayout } from "@/components/panel/PanelLayout";
 import { EntidadInactivaBlockedView } from "@/components/portal/EntidadInactivaBlockedView";
 import { getAmbientePreregistro } from "@/lib/actions/ubicacion";
 import { resolveAdminEntidadAccess } from "@/lib/auth/admin-entidad-access";
+import { portalLoginHref } from "@/lib/auth/profile";
 import { adminNavSections, getAdminPreregistradoCount } from "@/lib/panel-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const access = await resolveAdminEntidadAccess();
 
-  if (access.status === "unauth") redirect("/login");
+  if (access.status === "unauth") redirect(portalLoginHref());
 
   if (access.status === "inactive") {
     return (

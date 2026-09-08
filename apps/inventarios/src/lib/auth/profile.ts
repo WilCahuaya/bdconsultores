@@ -1,6 +1,11 @@
 import type { Profile, RolUsuario } from "@inventario/types";
 import { homePathForRole, inventarioHomePathForRole } from "@inventario/types";
+import { portalOrigin } from "@bd/config";
 import { createClient } from "@/lib/supabase/server";
+
+export function portalLoginHref(): string {
+  return `${portalOrigin()}/login`;
+}
 
 export async function getProfile(): Promise<Profile | null> {
   const supabase = await createClient();

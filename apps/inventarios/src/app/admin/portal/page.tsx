@@ -2,11 +2,12 @@ import { redirect } from "next/navigation";
 import { EntityPortalView } from "@/components/portal/EntityPortalView";
 import { EntidadInactivaBlockedView } from "@/components/portal/EntidadInactivaBlockedView";
 import { resolveAdminEntidadAccess } from "@/lib/auth/admin-entidad-access";
+import { portalLoginHref } from "@/lib/auth/profile";
 
 export default async function AdminPortalPage() {
   const access = await resolveAdminEntidadAccess();
 
-  if (access.status === "unauth") redirect("/login");
+  if (access.status === "unauth") redirect(portalLoginHref());
 
   if (access.status === "inactive") {
     return (
