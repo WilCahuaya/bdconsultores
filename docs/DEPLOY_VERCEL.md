@@ -57,12 +57,14 @@ Framework: **Next.js**. Rama: `main`. Vercel usa el `vercel.json` de cada app.
 
 ## Supabase — URL Configuration
 
-**Site URL** (producción): `https://TU-DOMINIO` o la URL del Portal.
+**Site URL** (producción): `https://bdconsultores.org`
 
 **Redirect URLs** — agregar:
 
 ```
-https://TU-PORTAL.vercel.app/auth/callback
+https://bdconsultores.org/auth/callback
+https://www.bdconsultores.org/auth/callback
+https://bdconsultores-portal.vercel.app/auth/callback
 http://127.0.0.1:3010/auth/callback
 http://localhost:3010/auth/callback
 http://localhost:3000/auth/callback

@@ -58,11 +58,15 @@ http://localhost:5173/auth/callback
 http://localhost:54324/auth/callback
 http://127.0.0.1:54324/auth/callback
 pe.bdconsultores.inventario://auth/callback
+https://bdconsultores.org/auth/callback
+https://www.bdconsultores.org/auth/callback
+https://bdconsultores-portal.vercel.app/auth/callback
 https://bdconsultores.vercel.app/auth/callback
 https://bdconsultores.vercel.app/auth/desktop-bridge
+https://bdconsultores.org/auth/desktop-bridge
 ```
 
-> **Site URL** recomendado: `https://bdconsultores.vercel.app` (no use `https://bdconsultores.org`).
+> **Site URL** de producción: `https://bdconsultores.org`. En pruebas del Portal nuevo, también `https://bdconsultores-portal.vercel.app`.
 
 **Escritorio:** tras Google, Supabase debe ir al puente `/auth/desktop-bridge`, que reenvía el `code` a `localhost:54324` sin consumirlo (PKCE en Electron). Si abre `bdconsultores.org`, falta el puente en Redirect URLs o el Site URL está mal.
 
