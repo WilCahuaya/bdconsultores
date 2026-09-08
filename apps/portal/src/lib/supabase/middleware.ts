@@ -1,6 +1,6 @@
 import { createMiddlewareSupabase } from "@bd/auth/middleware";
-import { homePathForRole } from "@inventario/types";
 import { NextResponse, type NextRequest } from "next/server";
+import { portalHomePathForRole } from "@/lib/auth/home-path";
 import { isPublicPath } from "@/lib/routes";
 
 type RolUsuario = "CONTADOR" | "ADMIN_ENTIDAD";
@@ -55,7 +55,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && hasValidProfile && pathname === "/login") {
     const url = request.nextUrl.clone();
-    url.pathname = homePathForRole(profile!.rol);
+    url.pathname = portalHomePathForRole(profile!.rol);
     return NextResponse.redirect(url);
   }
 

@@ -1,8 +1,8 @@
 import { supabaseCookieOptions } from "@bd/auth";
 import { createServerClient } from "@supabase/ssr";
-import { homePathForRole } from "@inventario/types";
 import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
+import { portalHomePathForRole } from "@/lib/auth/home-path";
 import { provisionProfileFromContador } from "@/lib/auth/contador-invite";
 import { provisionProfileFromEntidad } from "@/lib/auth/entidad-admin";
 
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const redirectPath = homePathForRole(profile.rol);
+  const redirectPath = portalHomePathForRole(profile.rol);
   return applyCookies(NextResponse.redirect(`${origin}${redirectPath}`), pendingCookies);
 }
 
