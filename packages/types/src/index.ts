@@ -1,5 +1,29 @@
-/** Roles del sistema MVP */
-export type RolUsuario = "CONTADOR" | "ADMIN_ENTIDAD";
+/** Roles del sistema: estudio (todas las entidades) y usuarios de una empresa. */
+export type RolUsuario =
+  | "CONTADOR"
+  | "ASISTENTE"
+  | "ADMIN_ENTIDAD"
+  | "TESORERO_ENTIDAD"
+  | "SECRETARIO_ENTIDAD";
+
+export const ROLES_PERSONAL_ESTUDIO = ["CONTADOR", "ASISTENTE"] as const;
+export const ROLES_USUARIO_ENTIDAD = [
+  "ADMIN_ENTIDAD",
+  "TESORERO_ENTIDAD",
+  "SECRETARIO_ENTIDAD",
+] as const;
+
+export function esPersonalEstudio(rol: RolUsuario): boolean {
+  return rol === "CONTADOR" || rol === "ASISTENTE";
+}
+
+export function esUsuarioEntidad(rol: RolUsuario): boolean {
+  return (
+    rol === "ADMIN_ENTIDAD" ||
+    rol === "TESORERO_ENTIDAD" ||
+    rol === "SECRETARIO_ENTIDAD"
+  );
+}
 
 /** Ciclo de vida del registro del activo */
 export type EstadoRegistro = "PREREGISTRADO" | "REGISTRADO" | "DADO_DE_BAJA";
@@ -102,6 +126,8 @@ export interface Entidad {
   admin_email: string | null;
   admin_dni: string | null;
   admin_telefono: string | null;
+  pe_codigo?: string | null;
+  notas_planillas?: string | null;
   activo: boolean;
   created_at: string;
   updated_at: string;
@@ -1949,13 +1975,47 @@ export function homePathForRole(_rol?: RolUsuario): string {
 
 /** Inicio del módulo Inventario según rol. */
 export function inventarioHomePathForRole(rol: RolUsuario): string {
-  return rol === "ADMIN_ENTIDAD" ? "/admin/portal" : "/contador/portal";
+  return esUsuarioEntidad(rol) ? "/admin/portal" : "/contador/portal";
 }
 
 /** Menú de aplicaciones del Portal (ruta pública, con basePath de Inventarios). */
 export function plataformaModulosPath(rol: RolUsuario): string {
   return `/inventarios${inventarioHomePathForRole(rol)}`;
 }
+
+/** Módulo Planillas — tipos de Fase 1 (persistencia). */
+export type ClasificacionTrabajador = "PATROCINADO" | "SUPERVIVENCIA";
+export type JornadaLaboral = "TIEMPO_COMPLETO" | "TIEMPO_PARCIAL";
+export type EstadoRelacionLaboral = "ACTIVA" | "CESADA";
+export type EstadoContratoPlanilla =
+  | "PENDIENTE_DOCS"
+  | "ELABORADO"
+  | "ENVIADO_FIRMA"
+  | "FIRMADO"
+  | "PRESENTADO_MTPE"
+  | "RECEPCIONADO"
+  | "RECOGIDO"
+  | "REGISTRADO"
+  | "ALTA_TR"
+  | "COMPLETO"
+  | "BAJA"
+  | "NO_UBICADO";
+export type TipoDocumentoPlanilla =
+  | "DNI"
+  | "FICHA_DATOS"
+  | "PENSIONES_FIRMADO"
+  | "ASIGNACION_FAMILIAR"
+  | "CONTRATO_FIRMADO"
+  | "TR_ALTA"
+  | "TR_BAJA"
+  | "CARTA_RENUNCIA"
+  | "VIDA_LEY"
+  | "OTRO";
+export type EstadoDocumentoPlanilla = "SI" | "NO" | "NA" | "PENDIENTE";
+export type TipoPension = "AFP" | "ONP";
+export type EstadoTramitePension = "PENDIENTE" | "TRAMITADO" | "NO_APLICA";
+export type TipoTRegistro = "ALTA" | "BAJA";
+
 
 export type UsuarioGestionResumen = Pick<Profile, "id" | "rol" | "activo" | "nombre" | "email">;
 

@@ -1,9 +1,7 @@
 import { createMiddlewareSupabase } from "@bd/auth/middleware";
-import { inventarioHomePathForRole } from "@inventario/types";
+import { esUsuarioEntidad, inventarioHomePathForRole, type RolUsuario } from "@inventario/types";
 import { portalOrigin } from "@bd/config";
 import { NextResponse, type NextRequest } from "next/server";
-
-type RolUsuario = "CONTADOR" | "ADMIN_ENTIDAD";
 
 function isPrivatePath(pathname: string): boolean {
   return (
@@ -18,7 +16,7 @@ function isOpenPath(pathname: string): boolean {
 }
 
 function panelForRole(rol: RolUsuario): "/contador" | "/admin" {
-  return rol === "ADMIN_ENTIDAD" ? "/admin" : "/contador";
+  return esUsuarioEntidad(rol) ? "/admin" : "/contador";
 }
 
 export async function updateSession(request: NextRequest) {

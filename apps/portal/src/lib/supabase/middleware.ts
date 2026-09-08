@@ -1,9 +1,8 @@
 import { createMiddlewareSupabase } from "@bd/auth/middleware";
 import { NextResponse, type NextRequest } from "next/server";
+import type { RolUsuario } from "@inventario/types";
 import { portalHomePathForRole } from "@/lib/auth/home-path";
 import { isPublicPath } from "@/lib/routes";
-
-type RolUsuario = "CONTADOR" | "ADMIN_ENTIDAD";
 
 function isZonedApp(pathname: string): boolean {
   return pathname.startsWith("/inventarios") || pathname.startsWith("/planillas");

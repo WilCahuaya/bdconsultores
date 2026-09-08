@@ -1,9 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
-import { homePathForRole } from "@inventario/types";
+import { esUsuarioEntidad, homePathForRole, type RolUsuario } from "@inventario/types";
 import { NextResponse, type NextRequest } from "next/server";
 import { isPublicPath } from "@/lib/routes";
-
-type RolUsuario = "CONTADOR" | "ADMIN_ENTIDAD";
 
 function isPrivatePath(pathname: string): boolean {
   return (
@@ -15,7 +13,7 @@ function isPrivatePath(pathname: string): boolean {
 }
 
 function panelForRole(rol: RolUsuario): "/contador" | "/admin" {
-  return rol === "ADMIN_ENTIDAD" ? "/admin" : "/contador";
+  return esUsuarioEntidad(rol) ? "/admin" : "/contador";
 }
 
 export async function updateSession(request: NextRequest) {

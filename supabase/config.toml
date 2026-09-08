@@ -6,7 +6,7 @@ project_id = "inventario-activos"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "graphql_public"]
+schemas = ["public", "graphql_public", "planillas"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 

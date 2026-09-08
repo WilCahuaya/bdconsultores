@@ -41,8 +41,8 @@ export default async function PlanillasHomePage() {
           <div className={`${panelCardClass} space-y-2 p-5`}>
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">En construcción</p>
             <p className="text-sm text-foreground/80">
-              Contratos, documentos, T-Registro y planilla mensual se irán habilitando aquí, con el mismo
-              login del Portal.
+              Contratos, documentos, T-Registro, Vida Ley y planilla mensual se irán habilitando aquí,
+              con el mismo login del Portal. La base de datos del módulo ya está creada.
             </p>
           </div>
         </div>
