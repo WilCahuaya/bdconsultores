@@ -1,52 +1,106 @@
-import { redirect } from "next/navigation";
-import { portalOrigin } from "@bd/config";
-import { MODULE_PLANILLAS, PLATFORM_NAME, plataformaModulosPath } from "@inventario/types";
+import Link from "next/link";
+import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
-import { ThemeToggle } from "@/components/public/ThemeToggle";
-import { LogoutButton } from "@/components/shared/LogoutButton";
-import { getProfile } from "@/lib/auth/profile";
+import { PlanillasShell } from "@/components/PlanillasShell";
+import { EntidadSwitcher } from "@/components/EntidadSwitcher";
+import { requirePlanillasProfile, puedeEscribirPlanillas } from "@/lib/auth/access";
+import { listEntidadesPlanillas } from "@/lib/actions/entidades";
+import { listTrabajadores } from "@/lib/actions/trabajadores";
+import {
+  CLASIFICACION_LABEL,
+  ESTADO_RELACION_LABEL,
+  JORNADA_LABEL,
+  nombreCompleto,
+} from "@/lib/planillas-labels";
 
-export default async function PlanillasHomePage() {
-  const profile = await getProfile();
-  if (!profile) redirect(`${portalOrigin()}/login`);
+export default async function PlanillasHomePage({
+  searchParams,
+}: {
+  searchParams: { entidadId?: string };
+}) {
+  const profile = await requirePlanillasProfile();
+  const entidades = await listEntidadesPlanillas();
+  const selectedId =
+    searchParams.entidadId && entidades.some((e) => e.id === searchParams.entidadId)
+      ? searchParams.entidadId
+      : entidades[0]?.id ?? "";
+  const trabajadores = selectedId ? await listTrabajadores(selectedId) : [];
+  const canWrite = puedeEscribirPlanillas(profile);
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/30">
-      <header className="border-b border-border/70 bg-card shadow-sm">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4">
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-primary sm:text-lg">{PLATFORM_NAME}</p>
-            <p className="truncate text-xs text-muted-foreground">{MODULE_PLANILLAS}</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <a
-              href={`${portalOrigin()}${plataformaModulosPath(profile.rol)}`}
-              className="inline-flex h-9 items-center rounded-md border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
-            >
-              Volver a módulos
-            </a>
-            <ThemeToggle />
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4 sm:p-6 lg:p-8">
-        <div className="space-y-6">
+    <PlanillasShell profile={profile}>
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-primary sm:text-2xl">{MODULE_PLANILLAS}</h1>
+            <h1 className="text-xl font-bold text-primary sm:text-2xl">Trabajadores</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Hola, {profile.nombre}. Este módulo ya está en la plataforma; la lógica de negocio viene después.
+              Hola, {profile.nombre}. Ficha laboral por empresa: datos, contratos, documentos, AFP, T-Registro y Vida Ley.
             </p>
           </div>
-          <div className={`${panelCardClass} space-y-2 p-5`}>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">En construcción</p>
-            <p className="text-sm text-foreground/80">
-              Contratos, documentos, T-Registro, Vida Ley y planilla mensual se irán habilitando aquí,
-              con el mismo login del Portal. La base de datos del módulo ya está creada.
-            </p>
-          </div>
+          {canWrite && selectedId ? (
+            <Link
+              href={`/trabajadores/nuevo?entidadId=${selectedId}`}
+              className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Nuevo trabajador
+            </Link>
+          ) : null}
         </div>
-      </main>
-    </div>
+
+        {entidades.length === 0 ? (
+          <div className={`${panelCardClass} p-5 text-sm text-muted-foreground`}>
+            No hay empresas activas. Primero créelas en Inventarios.
+          </div>
+        ) : (
+          <>
+            <EntidadSwitcher
+              entidades={entidades}
+              selectedId={selectedId}
+              locked={esUsuarioEntidad(profile.rol)}
+            />
+            <div className={`${panelCardClass} overflow-x-auto p-0`}>
+              <table className="w-full min-w-[720px] text-left text-sm">
+                <thead className="border-b bg-muted/40 text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">DNI</th>
+                    <th className="px-4 py-2 font-medium">Nombre</th>
+                    <th className="px-4 py-2 font-medium">Cargo</th>
+                    <th className="px-4 py-2 font-medium">Clasificación</th>
+                    <th className="px-4 py-2 font-medium">Jornada</th>
+                    <th className="px-4 py-2 font-medium">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trabajadores.length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={6}>
+                        No hay trabajadores en esta empresa. El listado arranca en blanco.
+                      </td>
+                    </tr>
+                  ) : (
+                    trabajadores.map((t) => (
+                      <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-2 font-mono">{t.persona.dni}</td>
+                        <td className="px-4 py-2">
+                          <Link href={`/trabajadores/${t.id}`} className="font-medium text-primary hover:underline">
+                            {nombreCompleto(t.persona)}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-2">{t.cargo ?? "—"}</td>
+                        <td className="px-4 py-2">
+                          {t.clasificacion ? CLASIFICACION_LABEL[t.clasificacion] : "—"}
+                        </td>
+                        <td className="px-4 py-2">{t.jornada ? JORNADA_LABEL[t.jornada] : "—"}</td>
+                        <td className="px-4 py-2">{ESTADO_RELACION_LABEL[t.estado]}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </div>
+    </PlanillasShell>
   );
 }
