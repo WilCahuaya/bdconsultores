@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile --filter @bd/planillas...",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile --filter @bd/planillas... --ignore-scripts",
   "buildCommand": "cd ../.. && pnpm --filter @bd/planillas build",
   "outputDirectory": ".next"
 }

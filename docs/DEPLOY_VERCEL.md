@@ -90,4 +90,5 @@ Google Cloud no cambia: el callback OAuth sigue siendo `https://TU-PROJECT-REF.s
 | `/inventarios` 404 o JS en blanco | `INVENTARIOS_ORIGIN` mal (debe ser origin, sin `/inventarios`) y redeploy Portal |
 | Login Google `redirect_uri_mismatch` | Falta `/auth/callback` del Portal en Supabase Redirect URLs |
 | `Module not found: @inventario/ui` | Root Directory = `apps/portal` (o inventarios/planillas), no la raíz |
+| `better-sqlite3` / `gyp ERR!` en el install | Es del escritorio Electron. El `vercel.json` de Portal/Inventarios/Planillas usa `--ignore-scripts` para no compilarlo. Hay que tener ese cambio en `main` y Redeploy. |
 | Logout no vuelve al login | `NEXT_PUBLIC_PORTAL_ORIGIN` en el proyecto Inventarios |
