@@ -60,7 +60,7 @@ export function EntityPortalMenu({
       </div>
 
       <div>
-        <p className="bd-portal-menu-heading">Servicios</p>
+        <p className="bd-portal-menu-heading">Aplicaciones</p>
         <div className="space-y-2.5">
           {items.map((item) => {
             const className = item.disabled

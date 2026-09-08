@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import type { Entidad } from "@inventario/types";
+import { MODULE_PLANILLAS, type Entidad } from "@inventario/types";
 import {
   BdPortalShell,
   EntityPortalMenu,
   type EntityPortalMenuItem,
 } from "@inventario/ui/panel";
-import { portalOrigin } from "@bd/config";
+import { portalOrigin, webAppById } from "@bd/config";
 import { createClient } from "@/lib/supabase/client";
 
 interface EntityPortalViewProps {
@@ -28,15 +28,19 @@ export function EntityPortalView({
   }
 
   const items: EntityPortalMenuItem[] = [
-    { id: "financieros", label: "Estado Financieros", disabled: true },
     {
       id: "inventarios",
       label: "Gestión de Inventarios",
       href: gestionHref,
       highlight: true,
     },
+    {
+      id: "planillas",
+      label: MODULE_PLANILLAS,
+      href: `${portalOrigin()}${webAppById("planillas").basePath}`,
+    },
+    { id: "financieros", label: "Estado Financieros", disabled: true },
     { id: "archivo", label: "Archivo Permanente", disabled: true },
-    { id: "otros", label: "Otros", disabled: true },
   ];
 
   return (

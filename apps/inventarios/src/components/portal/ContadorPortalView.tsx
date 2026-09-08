@@ -3,13 +3,14 @@
 import {
   contadorGestionInventariosPath,
   displayContadorNombre,
+  MODULE_PLANILLAS,
 } from "@inventario/types";
 import {
   BdPortalShell,
   EntityPortalMenu,
   type EntityPortalMenuItem,
 } from "@inventario/ui/panel";
-import { portalOrigin } from "@bd/config";
+import { portalOrigin, webAppById } from "@bd/config";
 import { createClient } from "@/lib/supabase/client";
 
 interface ContadorPortalViewProps {
@@ -25,15 +26,19 @@ export function ContadorPortalView({ nombre, email }: ContadorPortalViewProps) {
   }
 
   const items: EntityPortalMenuItem[] = [
-    { id: "financieros", label: "Estado Financieros", disabled: true },
     {
       id: "inventarios",
       label: "Gestión de Inventarios",
       href: contadorGestionInventariosPath(),
       highlight: true,
     },
+    {
+      id: "planillas",
+      label: MODULE_PLANILLAS,
+      href: `${portalOrigin()}${webAppById("planillas").basePath}`,
+    },
+    { id: "financieros", label: "Estado Financieros", disabled: true },
     { id: "archivo", label: "Archivo Permanente", disabled: true },
-    { id: "otros", label: "Otros", disabled: true },
   ];
 
   return (
