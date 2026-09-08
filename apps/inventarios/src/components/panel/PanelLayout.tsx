@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { MODULE_INVENTARIO, PLATFORM_NAME } from "@inventario/types";
-import { portalOrigin } from "@bd/config";
 import { ThemeToggle } from "@inventario/ui/theme-toggle";
 import { ToastProvider } from "@inventario/ui";
 import { panelMainScrollClass, panelPageClass } from "@inventario/ui/panel";
@@ -58,12 +57,12 @@ export function PanelLayout({
             </Link>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <a
-              href={`${portalOrigin()}/app`}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground sm:text-sm"
+            <Link
+              href={homeHref}
+              className="inline-flex h-9 items-center rounded-md border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
             >
-              Aplicaciones
-            </a>
+              Volver a módulos
+            </Link>
             <ThemeToggle />
           </div>
         </div>

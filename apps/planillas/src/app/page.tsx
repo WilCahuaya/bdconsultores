@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { portalOrigin } from "@bd/config";
-import { MODULE_PLANILLAS, PLATFORM_NAME } from "@inventario/types";
+import { MODULE_PLANILLAS, PLATFORM_NAME, plataformaModulosPath } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { ThemeToggle } from "@/components/public/ThemeToggle";
 import { LogoutButton } from "@/components/shared/LogoutButton";
@@ -20,10 +20,10 @@ export default async function PlanillasHomePage() {
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <a
-              href={`${portalOrigin()}/app`}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              href={`${portalOrigin()}${plataformaModulosPath(profile.rol)}`}
+              className="inline-flex h-9 items-center rounded-md border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
             >
-              Aplicaciones
+              Volver a módulos
             </a>
             <ThemeToggle />
             <LogoutButton />

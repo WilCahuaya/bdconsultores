@@ -1952,6 +1952,11 @@ export function inventarioHomePathForRole(rol: RolUsuario): string {
   return rol === "ADMIN_ENTIDAD" ? "/admin/portal" : "/contador/portal";
 }
 
+/** Menú de aplicaciones del Portal (ruta pública, con basePath de Inventarios). */
+export function plataformaModulosPath(rol: RolUsuario): string {
+  return `/inventarios${inventarioHomePathForRole(rol)}`;
+}
+
 export type UsuarioGestionResumen = Pick<Profile, "id" | "rol" | "activo" | "nombre" | "email">;
 
 export function countContadoresActivos(usuarios: UsuarioGestionResumen[]): number {
