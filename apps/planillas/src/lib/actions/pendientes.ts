@@ -3,20 +3,14 @@
 import type { EstadoContratoPlanilla, EstadoDocumentoPlanilla, TipoDocumentoPlanilla } from "@inventario/types";
 import { entidadAlcance, requirePlanillasProfile } from "@/lib/auth/access";
 import { planillasDb } from "@/lib/supabase/planillas";
-import { ESTADO_CONTRATO_LABEL, ESTADO_DOCUMENTO_LABEL, TIPO_DOCUMENTO_LABEL, nombreCompleto } from "@/lib/planillas-labels";
-
-export const PENDIENTE_TIPOS = ["contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"] as const;
-export type PendienteTipo = (typeof PENDIENTE_TIPOS)[number];
-
-export type PendienteItem = {
-  id: string;
-  relacionId: string;
-  dni: string;
-  nombre: string;
-  tipo: PendienteTipo;
-  detalle: string;
-  tab: "contratos" | "documentos" | "pensiones" | "t-registro" | "vida-ley";
-};
+import {
+  ESTADO_CONTRATO_LABEL,
+  ESTADO_DOCUMENTO_LABEL,
+  TIPO_DOCUMENTO_LABEL,
+  nombreCompleto,
+  type PendienteItem,
+  type PendienteTipo,
+} from "@/lib/planillas-labels";
 
 const HORIZONTE_DIAS = 30;
 
@@ -53,10 +47,6 @@ function personaDe(row: { personas?: PersonaEmbed | PersonaEmbed[] | null }): Pe
   const raw = row.personas;
   const persona = Array.isArray(raw) ? raw[0] : raw;
   return persona ?? null;
-}
-
-export function parsePendienteTipo(value: string | undefined): PendienteTipo | "todos" {
-  return PENDIENTE_TIPOS.some((t) => t === value) ? (value as PendienteTipo) : "todos";
 }
 
 export async function listPendientes(entidadId: string): Promise<PendienteItem[]> {

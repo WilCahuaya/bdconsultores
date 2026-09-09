@@ -76,10 +76,20 @@ export const TIPO_T_REGISTRO_LABEL: Record<TipoTRegistro, string> = {
   BAJA: "Baja",
 };
 
-export const PENDIENTE_TIPO_LABEL: Record<
-  "contrato" | "documento" | "afp" | "t-registro" | "vida-ley" | "vencimiento",
-  string
-> = {
+export const PENDIENTE_TIPOS = ["contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"] as const;
+export type PendienteTipo = (typeof PENDIENTE_TIPOS)[number];
+
+export type PendienteItem = {
+  id: string;
+  relacionId: string;
+  dni: string;
+  nombre: string;
+  tipo: PendienteTipo;
+  detalle: string;
+  tab: "contratos" | "documentos" | "pensiones" | "t-registro" | "vida-ley";
+};
+
+export const PENDIENTE_TIPO_LABEL: Record<PendienteTipo, string> = {
   contrato: "Contrato",
   documento: "Documento",
   afp: "AFP",
@@ -87,6 +97,10 @@ export const PENDIENTE_TIPO_LABEL: Record<
   "vida-ley": "Vida Ley",
   vencimiento: "Vencimiento",
 };
+
+export function parsePendienteTipo(value: string | undefined): PendienteTipo | "todos" {
+  return PENDIENTE_TIPOS.some((t) => t === value) ? (value as PendienteTipo) : "todos";
+}
 
 export function nombreCompleto(persona: {
   nombres: string;

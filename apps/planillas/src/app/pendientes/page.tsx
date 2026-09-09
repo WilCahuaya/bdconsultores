@@ -5,13 +5,13 @@ import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { requirePlanillasProfile } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
+import { listPendientes } from "@/lib/actions/pendientes";
 import {
-  listPendientes,
-  parsePendienteTipo,
   PENDIENTE_TIPOS,
+  PENDIENTE_TIPO_LABEL,
+  parsePendienteTipo,
   type PendienteTipo,
-} from "@/lib/actions/pendientes";
-import { PENDIENTE_TIPO_LABEL } from "@/lib/planillas-labels";
+} from "@/lib/planillas-labels";
 
 function countByTipo(items: { tipo: PendienteTipo }[]) {
   const counts = Object.fromEntries(PENDIENTE_TIPOS.map((tipo) => [tipo, 0])) as Record<PendienteTipo, number>;
