@@ -12,6 +12,7 @@ import type {
 } from "@inventario/types";
 import { puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador } from "@/lib/actions/trabajadores";
+import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 async function assertEscritura(relacionId: string) {
@@ -40,6 +41,7 @@ export type DocumentoRow = {
   tipo: TipoDocumentoPlanilla;
   estado: EstadoDocumentoPlanilla;
   observaciones: string | null;
+  storage_path: string | null;
   created_at: string;
 };
 
@@ -117,23 +119,63 @@ export async function listDocumentos(relacionId: string): Promise<DocumentoRow[]
   const db = await planillasDb();
   const { data, error } = await db
     .from("documentos")
-    .select("id, tipo, estado, observaciones, created_at")
+    .select("id, tipo, estado, observaciones, storage_path, created_at")
     .eq("relacion_id", relacionId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as DocumentoRow[];
 }
 
-export async function addDocumento(relacionId: string, formData: FormData): Promise<{ error?: string }> {
+export async function addDocumento(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string; documentoId?: string }> {
   const gate = await assertEscritura(relacionId);
   if ("error" in gate && gate.error) return { error: gate.error };
   const db = await planillasDb();
-  const { error } = await db.from("documentos").insert({
-    relacion_id: relacionId,
-    tipo: String(formData.get("tipo")) as TipoDocumentoPlanilla,
-    estado: String(formData.get("estado")) as EstadoDocumentoPlanilla,
-    observaciones: String(formData.get("observaciones") ?? "").trim() || null,
-  });
+  const { data, error } = await db
+    .from("documentos")
+    .insert({
+      relacion_id: relacionId,
+      tipo: String(formData.get("tipo")) as TipoDocumentoPlanilla,
+      estado: String(formData.get("estado")) as EstadoDocumentoPlanilla,
+      observaciones: String(formData.get("observaciones") ?? "").trim() || null,
+    })
+    .select("id")
+    .single();
+  if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return { documentoId: data.id };
+}
+
+export async function setDocumentoArchivo(
+  relacionId: string,
+  documentoId: string,
+  storagePath: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscritura(relacionId);
+  if ("error" in gate && gate.error) return { error: gate.error };
+
+  if (!pathPerteneceAlDocumento(gate.trabajador.entidad_id, relacionId, documentoId, storagePath)) {
+    return { error: "Ruta de archivo no válida." };
+  }
+
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("documentos")
+    .select("id")
+    .eq("id", documentoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!actual) return { error: "Documento no encontrado." };
+
+  const { error } = await db
+    .from("documentos")
+    .update({ storage_path: storagePath, estado: "SI" })
+    .eq("id", documentoId)
+    .eq("relacion_id", relacionId);
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");

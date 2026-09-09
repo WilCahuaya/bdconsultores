@@ -53,7 +53,12 @@ export default async function FichaTrabajadorPage({
           <FichaContratos relacionId={params.relacionId} contratos={contratos} canWrite={canWrite} />
         ) : null}
         {tab === "documentos" ? (
-          <FichaDocumentos relacionId={params.relacionId} documentos={documentos} canWrite={canWrite} />
+          <FichaDocumentos
+            relacionId={params.relacionId}
+            entidadId={trabajador.entidad_id}
+            documentos={documentos}
+            canWrite={canWrite}
+          />
         ) : null}
         {tab === "pensiones" ? (
           <FichaPensiones relacionId={params.relacionId} pension={pension} canWrite={canWrite} />
