@@ -11,11 +11,13 @@ import type {
   TipoTRegistro,
 } from "@inventario/types";
 import { puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
-import { getTrabajador } from "@/lib/actions/trabajadores";
+import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { planillasDb } from "@/lib/supabase/planillas";
 
-async function assertEscritura(relacionId: string) {
+async function assertEscritura(
+  relacionId: string,
+): Promise<{ error: string } | { trabajador: TrabajadorListItem }> {
   const profile = await requirePlanillasProfile();
   if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para editar." };
   const trabajador = await getTrabajador(relacionId);
@@ -84,7 +86,7 @@ export async function listContratos(relacionId: string): Promise<ContratoRow[]> 
 
 export async function addContrato(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscritura(relacionId);
-  if ("error" in gate && gate.error) return { error: gate.error };
+  if ("error" in gate) return { error: gate.error };
   const db = await planillasDb();
   const vigentes = await db.from("contratos").select("id").eq("relacion_id", relacionId).eq("es_vigente", true);
   const { count } = await db
@@ -131,7 +133,7 @@ export async function addDocumento(
   formData: FormData,
 ): Promise<{ error?: string; documentoId?: string }> {
   const gate = await assertEscritura(relacionId);
-  if ("error" in gate && gate.error) return { error: gate.error };
+  if ("error" in gate) return { error: gate.error };
   const db = await planillasDb();
   const { data, error } = await db
     .from("documentos")
@@ -155,7 +157,7 @@ export async function setDocumentoArchivo(
   storagePath: string,
 ): Promise<{ error?: string }> {
   const gate = await assertEscritura(relacionId);
-  if ("error" in gate && gate.error) return { error: gate.error };
+  if ("error" in gate) return { error: gate.error };
 
   if (!pathPerteneceAlDocumento(gate.trabajador.entidad_id, relacionId, documentoId, storagePath)) {
     return { error: "Ruta de archivo no válida." };
@@ -196,7 +198,7 @@ export async function getPension(relacionId: string): Promise<PensionRow | null>
 
 export async function savePension(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscritura(relacionId);
-  if ("error" in gate && gate.error) return { error: gate.error };
+  if ("error" in gate) return { error: gate.error };
   const tipo = String(formData.get("tipo")) as TipoPension;
   const payload = {
     relacion_id: relacionId,
@@ -228,7 +230,7 @@ export async function getVidaLey(relacionId: string): Promise<VidaLeyRow | null>
 
 export async function saveVidaLey(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscritura(relacionId);
-  if ("error" in gate && gate.error) return { error: gate.error };
+  if ("error" in gate) return { error: gate.error };
   const payload = {
     relacion_id: relacionId,
     estado: String(formData.get("estado") ?? "").trim() || null,
@@ -258,7 +260,7 @@ export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]>
 
 export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscritura(relacionId);
-  if ("error" in gate && gate.error) return { error: gate.error };
+  if ("error" in gate) return { error: gate.error };
   const db = await planillasDb();
   const { error } = await db.from("t_registro").insert({
     relacion_id: relacionId,
