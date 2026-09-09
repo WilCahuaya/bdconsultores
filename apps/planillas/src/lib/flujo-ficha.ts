@@ -5,6 +5,7 @@ import {
   type EstadoValidacionAltaPlanilla,
   type TipoDocumentoPlanilla,
 } from "@inventario/types";
+import { horarioEstaCompleto } from "@/lib/horario-laboral";
 
 export const PASOS_ALTA = [
   { id: "datos", n: 1, label: "Persona y puesto" },
@@ -57,7 +58,7 @@ export function contratoVigente(contratos: FlujoContrato[]): FlujoContrato | nul
 export function estadoPasosAlta(input: FlujoFichaInput): Record<PasoAltaId, boolean> {
   const vigente = contratoVigente(input.contratos);
   return {
-    datos: Boolean(input.cargo?.trim() && input.horario?.trim() && input.direccion?.trim()),
+    datos: Boolean(input.cargo?.trim() && horarioEstaCompleto(input.horario) && input.direccion?.trim()),
     documentos: CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.every((tipo) => documentoCargado(input.documentos, tipo)),
     contratos: Boolean(
       vigente?.fecha_inicio && vigente.remuneracion != null && vigente.estado !== "PENDIENTE_DOCS",

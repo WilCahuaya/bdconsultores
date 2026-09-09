@@ -7,6 +7,7 @@ import { consultarDni } from "@/lib/actions/entidades";
 import { createTrabajador } from "@/lib/actions/trabajadores";
 import { CLASIFICACION_LABEL, JORNADA_LABEL, opcionesCargo } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
+import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import type { Entidad } from "@inventario/types";
 
 export function NuevoTrabajadorForm({
@@ -28,6 +29,7 @@ export function NuevoTrabajadorForm({
   const [apellidoPaterno, setApellidoPaterno] = useState("");
   const [apellidoMaterno, setApellidoMaterno] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
+  const [jornada, setJornada] = useState("");
 
   async function buscarPorDni() {
     setBuscando(true);
@@ -133,10 +135,12 @@ export function NuevoTrabajadorForm({
           <SelectField
             label="Jornada"
             name="jornada"
+            value={jornada}
             allowEmpty
             options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
+            onChange={(event) => setJornada(event.target.value)}
           />
-          <Field label="Horario" name="horario" placeholder="Ej. Lunes a viernes 8:00 a 13:00" />
+          <HorarioLaboralField jornada={jornada} />
           <DateField label="Fecha de ingreso" name="fecha_ingreso" />
         </div>
       </FormSection>

@@ -27,6 +27,7 @@ export const CARGOS_TRABAJADOR = [
   "Tesorero",
   "Secretario",
   "Coordinador",
+  "Coordinador de implementación programática y monitoreo",
   "Formador educativo espiritual",
 ] as const;
 

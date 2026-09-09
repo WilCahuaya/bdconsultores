@@ -14,6 +14,7 @@ import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfil
 import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { parseFechaCampo } from "@/lib/planillas-labels";
+import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 async function assertEscrituraFicha(
@@ -153,7 +154,7 @@ export async function generarDocumentoContrato(
   const gate = await assertEscrituraFicha(relacionId);
   if ("error" in gate) return { error: gate.error };
   const t = gate.trabajador;
-  if (!t.cargo?.trim() || !t.horario?.trim()) {
+  if (!t.cargo?.trim() || !horarioEstaCompleto(t.horario)) {
     return { error: "Complete cargo y horario en el puesto antes de generar el documento." };
   }
 

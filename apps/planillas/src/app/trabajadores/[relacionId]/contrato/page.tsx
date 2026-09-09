@@ -5,6 +5,7 @@ import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { listContratos } from "@/lib/actions/ficha";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { requirePlanillasProfile } from "@/lib/auth/access";
+import { formatHorarioContrato } from "@/lib/horario-laboral";
 import {
   JORNADA_LABEL,
   formatFechaPlanilla,
@@ -58,7 +59,10 @@ export default async function ContratoDocumentoPage({ params }: { params: { rela
         <h2 className="text-base font-medium">Puesto y contrato</h2>
         <p>Cargo: {trabajador.cargo ?? "—"}</p>
         <p>Jornada: {trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : "—"}</p>
-        <p>Horario: {trabajador.horario ?? "—"}</p>
+        <div>
+          <p>Jornada y horario</p>
+          <div className="whitespace-pre-line">{formatHorarioContrato(trabajador.horario)}</div>
+        </div>
         <p>Inicio: {formatFechaPlanilla(contrato.fecha_inicio)}</p>
         <p>Fin: {formatFechaPlanilla(contrato.fecha_fin)}</p>
         <p>Remuneración: {formatRemuneracion(contrato.remuneracion)}</p>

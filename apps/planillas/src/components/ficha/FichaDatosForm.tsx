@@ -6,6 +6,7 @@ import { Button } from "@inventario/ui";
 import { updateDatosTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { CLASIFICACION_LABEL, JORNADA_LABEL, opcionesCargo } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
+import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 
 export function FichaDatosForm({
   trabajador,
@@ -18,6 +19,7 @@ export function FichaDatosForm({
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [pending, setPending] = useState(false);
+  const [jornada, setJornada] = useState(trabajador.jornada ?? "");
   const p = trabajador.persona;
 
   async function onSubmit(formData: FormData) {
@@ -68,18 +70,13 @@ export function FichaDatosForm({
           <SelectField
             label="Jornada"
             name="jornada"
-            defaultValue={trabajador.jornada}
+            value={jornada}
             allowEmpty
             disabled={!canWrite}
             options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
+            onChange={(event) => setJornada(event.target.value)}
           />
-          <Field
-            label="Horario"
-            name="horario"
-            defaultValue={trabajador.horario}
-            placeholder="Ej. Lunes a viernes 8:00 a 13:00"
-            readOnly={!canWrite}
-          />
+          <HorarioLaboralField jornada={jornada} defaultValue={trabajador.horario} readOnly={!canWrite} />
           <DateField label="Fecha de ingreso" name="fecha_ingreso" defaultValue={trabajador.fecha_ingreso} readOnly={!canWrite} />
           <DateField label="Fecha de cese" name="fecha_cese" defaultValue={trabajador.fecha_cese} readOnly={!canWrite} />
         </div>

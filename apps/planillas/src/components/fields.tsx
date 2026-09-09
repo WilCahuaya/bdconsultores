@@ -120,6 +120,8 @@ export function SelectField({
   required,
   disabled,
   allowEmpty,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -128,6 +130,8 @@ export function SelectField({
   required?: boolean;
   disabled?: boolean;
   allowEmpty?: boolean;
+  value?: string;
+  onChange?: (event: ChangeEvent<HTMLSelectElement>) => void;
 }) {
   return (
     <label className="block space-y-1.5">
@@ -135,7 +139,7 @@ export function SelectField({
       <select
         className={fieldClass}
         name={name}
-        defaultValue={defaultValue ?? ""}
+        {...(value === undefined ? { defaultValue: defaultValue ?? "" } : { value, onChange })}
         required={required}
         disabled={disabled}
       >
