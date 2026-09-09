@@ -1,39 +1,100 @@
 import Link from "next/link";
+import { PASOS_ALTA, type FlujoTab, type PasoAltaId } from "@/lib/flujo-ficha";
 
-const TABS = [
-  { id: "datos", label: "Persona y puesto" },
-  { id: "contratos", label: "Contratos" },
-  { id: "documentos", label: "Documentos" },
+const TRAMITES = [
   { id: "pensiones", label: "Pensiones" },
   { id: "t-registro", label: "T-Registro" },
   { id: "vida-ley", label: "Vida Ley" },
 ] as const;
 
-export type FichaTab = (typeof TABS)[number]["id"];
+export type FichaTab = FlujoTab;
 
-export function FichaTabs({ relacionId, tab }: { relacionId: string; tab: FichaTab }) {
+export function FichaFlujoNav({
+  relacionId,
+  tab,
+  completados,
+  esEstudio,
+}: {
+  relacionId: string;
+  tab: FichaTab;
+  completados: Record<PasoAltaId, boolean>;
+  esEstudio: boolean;
+}) {
   return (
-    <nav className="flex flex-wrap gap-1 border-b border-border pb-px">
-      {TABS.map((item) => {
-        const active = item.id === tab;
-        return (
-          <Link
-            key={item.id}
-            href={`/trabajadores/${relacionId}?tab=${item.id}`}
-            className={
-              active
-                ? "border-b-2 border-primary px-3 py-2 text-sm font-medium text-primary"
-                : "px-3 py-2 text-sm text-muted-foreground hover:text-foreground"
-            }
-          >
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
+    <div className="space-y-4">
+      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {PASOS_ALTA.map((paso) => {
+          const active = tab === paso.id;
+          const done = completados[paso.id];
+          return (
+            <li key={paso.id}>
+              <Link
+                href={`/trabajadores/${relacionId}?tab=${paso.id}`}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                  active
+                    ? "border-primary bg-primary/5 text-primary"
+                    : done
+                      ? "border-border bg-muted/40 text-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : done
+                        ? "bg-primary/80 text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {done && !active ? "✓" : paso.n}
+                </span>
+                <span className="leading-tight">{paso.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+      {esEstudio ? (
+        <nav className="flex flex-wrap items-center gap-1 text-sm">
+          <span className="mr-1 text-xs text-muted-foreground">Trámites del estudio</span>
+          {TRAMITES.map((item) => {
+            const active = tab === item.id;
+            return (
+              <Link
+                key={item.id}
+                href={`/trabajadores/${relacionId}?tab=${item.id}`}
+                className={
+                  active
+                    ? "rounded-md px-2 py-1 font-medium text-primary"
+                    : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
+                }
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
+    </div>
   );
 }
 
-export function parseFichaTab(value: string | undefined): FichaTab {
-  return TABS.some((t) => t.id === value) ? (value as FichaTab) : "datos";
+const TABS: FichaTab[] = [
+  "datos",
+  "documentos",
+  "contratos",
+  "firma",
+  "pensiones",
+  "t-registro",
+  "vida-ley",
+];
+
+export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab {
+  if (!value) return "datos";
+  if (!esEstudio && (value === "pensiones" || value === "t-registro" || value === "vida-ley")) {
+    return "datos";
+  }
+  return TABS.includes(value as FichaTab) ? (value as FichaTab) : "datos";
 }

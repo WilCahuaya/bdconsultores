@@ -3,17 +3,19 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
-import { requirePlanillasProfile, puedeCrearTrabajador, puedeCrearEntidad } from "@/lib/auth/access";
+import {
+  requirePlanillasProfile,
+  puedeCrearTrabajador,
+  puedeCrearEntidad,
+  puedeEscribirPlanillas,
+} from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listPendientes } from "@/lib/actions/pendientes";
-import {
-  ESTADO_VALIDACION_ALTA_LABEL,
-  TIEMPO_LABEL,
-  formatFechaPlanilla,
-  formatRemuneracion,
-  nombreCompleto,
-} from "@/lib/planillas-labels";
+import { claseBadgePaso, flujoDesdeTrabajador, resolverSiguientePaso } from "@/lib/flujo-ficha";
+import { nombreCompleto } from "@/lib/planillas-labels";
+
+const TIPOS_TRAMITE = new Set(["afp", "t-registro", "vida-ley", "vencimiento"]);
 
 export default async function PlanillasHomePage({
   searchParams,
@@ -32,7 +34,11 @@ export default async function PlanillasHomePage({
       : [[], []];
   const canCreateTrabajador = puedeCrearTrabajador(profile);
   const canCreate = puedeCrearEntidad(profile);
+  const esEstudio = puedeEscribirPlanillas(profile);
   const aviso = searchParams.aviso?.trim() || null;
+  const pendientesVisibles = esEstudio
+    ? pendientes
+    : pendientes.filter((p) => !TIPOS_TRAMITE.has(p.tipo) && p.tipo !== "validacion");
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -41,7 +47,7 @@ export default async function PlanillasHomePage({
           <div>
             <h1 className="text-xl font-bold text-primary sm:text-2xl">Trabajadores</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Hola, {profile.nombre}. Ficha laboral por empresa: datos, contratos, documentos, AFP, T-Registro y Vida Ley.
+              Hola, {profile.nombre}. El clic entra al siguiente paso de cada ficha.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -86,53 +92,59 @@ export default async function PlanillasHomePage({
               selectedId={selectedId}
               locked={esUsuarioEntidad(profile.rol)}
             />
-            {pendientes.length > 0 ? (
+            {pendientesVisibles.length > 0 ? (
               <Link
                 href={`/pendientes?entidadId=${selectedId}`}
                 className={`${panelCardClass} block p-4 text-sm hover:bg-muted/30`}
               >
-                Hay <span className="font-semibold text-primary">{pendientes.length}</span> pendientes en esta
-                empresa (validación, contratos, documentos u otros trámites).
+                Hay <span className="font-semibold text-primary">{pendientesVisibles.length}</span> pendientes en
+                esta empresa.
               </Link>
             ) : null}
             <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[960px] text-left text-sm">
+              <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 font-medium">DNI</th>
                     <th className="px-4 py-2 font-medium">Nombre</th>
                     <th className="px-4 py-2 font-medium">Cargo</th>
-                    <th className="px-4 py-2 font-medium">Fecha de ingreso</th>
-                    <th className="px-4 py-2 font-medium">Fecha de cese</th>
-                    <th className="px-4 py-2 font-medium">Tiempo</th>
-                    <th className="px-4 py-2 font-medium">Remuneración</th>
-                    <th className="px-4 py-2 font-medium">Validación</th>
+                    <th className="px-4 py-2 font-medium">Siguiente paso</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trabajadores.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={8}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={4}>
                         No hay trabajadores en esta empresa. El listado arranca en blanco.
                       </td>
                     </tr>
                   ) : (
-                    trabajadores.map((t) => (
-                      <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="px-4 py-2 font-mono">{t.persona.dni}</td>
-                        <td className="px-4 py-2">
-                          <Link href={`/trabajadores/${t.id}`} className="font-medium text-primary hover:underline">
-                            {nombreCompleto(t.persona)}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-2">{t.cargo ?? "—"}</td>
-                        <td className="px-4 py-2">{formatFechaPlanilla(t.fecha_ingreso)}</td>
-                        <td className="px-4 py-2">{formatFechaPlanilla(t.fecha_cese)}</td>
-                        <td className="px-4 py-2">{t.jornada ? TIEMPO_LABEL[t.jornada] : "—"}</td>
-                        <td className="px-4 py-2 tabular-nums">{formatRemuneracion(t.remuneracion)}</td>
-                        <td className="px-4 py-2">{ESTADO_VALIDACION_ALTA_LABEL[t.validacion]}</td>
-                      </tr>
-                    ))
+                    trabajadores.map((t) => {
+                      const siguiente = resolverSiguientePaso(flujoDesdeTrabajador(t), esEstudio);
+                      return (
+                        <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
+                          <td className="px-4 py-2 font-mono">{t.persona.dni}</td>
+                          <td className="px-4 py-2">
+                            <Link
+                              href={`/trabajadores/${t.id}?tab=${siguiente.tab}`}
+                              className="font-medium text-primary hover:underline"
+                            >
+                              {nombreCompleto(t.persona)}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-2">{t.cargo ?? "—"}</td>
+                          <td className="px-4 py-2">
+                            <Link href={`/trabajadores/${t.id}?tab=${siguiente.tab}`}>
+                              <span
+                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}
+                              >
+                                {siguiente.etiqueta}
+                              </span>
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

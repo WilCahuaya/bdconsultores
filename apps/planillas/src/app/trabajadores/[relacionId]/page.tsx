@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { FichaTabs, parseFichaTab } from "@/components/ficha/FichaTabs";
+import { FichaFlujoNav, parseFichaTab } from "@/components/ficha/FichaTabs";
 import { FichaDatosForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
 import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
@@ -19,6 +20,12 @@ import {
 } from "@/lib/auth/access";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro } from "@/lib/actions/ficha";
+import {
+  claseBadgePaso,
+  estadoPasosAlta,
+  flujoDesdeTrabajador,
+  resolverSiguientePaso,
+} from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
 
 export default async function FichaTrabajadorPage({
@@ -32,17 +39,25 @@ export default async function FichaTrabajadorPage({
   const trabajador = await getTrabajador(params.relacionId);
   if (!trabajador) notFound();
 
-  const tab = parseFichaTab(searchParams.tab);
+  const esEstudio = puedeEscribirPlanillas(profile);
+  const flujo = flujoDesdeTrabajador(trabajador);
+  const completados = estadoPasosAlta(flujo);
+  const siguiente = resolverSiguientePaso(flujo, esEstudio);
+  const tab = searchParams.tab ? parseFichaTab(searchParams.tab, esEstudio) : siguiente.tab;
   const canEditFicha = puedeEditarFichaLaboral(profile);
-  const canWriteTramite = puedeEscribirPlanillas(profile);
+  const canWriteTramite = esEstudio;
   const porValidar = trabajador.validacion === "PENDIENTE";
   const [contratos, documentos, pension, vidaLey, tRegistro] = await Promise.all([
-    tab === "contratos" ? listContratos(params.relacionId) : Promise.resolve([]),
-    tab === "documentos" || tab === "contratos" ? listDocumentos(params.relacionId) : Promise.resolve([]),
+    listContratos(params.relacionId),
+    listDocumentos(params.relacionId),
     tab === "pensiones" ? getPension(params.relacionId) : Promise.resolve(null),
     tab === "vida-ley" ? getVidaLey(params.relacionId) : Promise.resolve(null),
     tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
   ]);
+  const continuar =
+    siguiente.paso !== "listo" && siguiente.tab !== tab
+      ? { href: `/trabajadores/${params.relacionId}?tab=${siguiente.tab}`, etiqueta: siguiente.etiqueta }
+      : null;
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
@@ -58,18 +73,30 @@ export default async function FichaTrabajadorPage({
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
         </div>
+        <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
+          <span className="text-muted-foreground">Siguiente paso</span>
+          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}>
+            {siguiente.etiqueta}
+          </span>
+        </p>
         {porValidar ? (
           <div className={`${panelCardClass} space-y-3 p-5`}>
             <p className="text-sm text-foreground">
-              Alta pendiente de validación. Suba DNI, ficha y asignación familiar, y complete fechas, cargo, horario y
-              remuneración.
+              {esEstudio
+                ? "Alta pendiente de validación. Revise documentos y contrato, y acepte el alta cuando corresponda."
+                : "Alta pendiente de validación. Complete documentos y contrato; el estudio aceptará el alta."}
             </p>
             {puedeValidarAlta(profile) ? <AceptarAltaButton relacionId={params.relacionId} /> : (
               <p className="text-sm text-muted-foreground">El contador o el asistente deben aceptar este alta.</p>
             )}
           </div>
         ) : null}
-        <FichaTabs relacionId={params.relacionId} tab={tab} />
+        <FichaFlujoNav
+          relacionId={params.relacionId}
+          tab={tab}
+          completados={completados}
+          esEstudio={esEstudio}
+        />
         {tab === "datos" ? <FichaDatosForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {tab === "contratos" ? (
           <FichaContratos
@@ -77,7 +104,9 @@ export default async function FichaTrabajadorPage({
             contratos={contratos}
             canWrite={canEditFicha}
             canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
-            tieneContratoFirmado={documentos.some((d) => d.tipo === "CONTRATO_FIRMADO" && Boolean(d.storage_path) && d.estado === "SI")}
+            tieneContratoFirmado={documentos.some(
+              (d) => d.tipo === "CONTRATO_FIRMADO" && Boolean(d.storage_path) && d.estado === "SI",
+            )}
           />
         ) : null}
         {tab === "documentos" ? (
@@ -86,16 +115,40 @@ export default async function FichaTrabajadorPage({
             entidadId={trabajador.entidad_id}
             documentos={documentos}
             canWrite={canEditFicha}
+            tiposFiltro={[...CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS]}
+            permitirAgregar={CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.some(
+              (tipo) => !documentos.some((d) => d.tipo === tipo),
+            )}
+            hint="Suba DNI, ficha de datos y asignación familiar. PDF, JPG, PNG o WEBP. Máximo 10 MB."
           />
         ) : null}
-        {tab === "pensiones" ? (
+        {tab === "firma" ? (
+          <FichaDocumentos
+            relacionId={params.relacionId}
+            entidadId={trabajador.entidad_id}
+            documentos={documentos}
+            canWrite={canEditFicha}
+            tiposFiltro={["CONTRATO_FIRMADO"]}
+            permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
+            hint="Suba el PDF firmado. Queda en revisión del estudio; el contador o el asistente lo marcan Recogido."
+          />
+        ) : null}
+        {esEstudio && tab === "pensiones" ? (
           <FichaPensiones relacionId={params.relacionId} pension={pension} canWrite={canWriteTramite} />
         ) : null}
-        {tab === "t-registro" ? (
+        {esEstudio && tab === "t-registro" ? (
           <FichaTRegistro relacionId={params.relacionId} items={tRegistro} canWrite={canWriteTramite} />
         ) : null}
-        {tab === "vida-ley" ? (
+        {esEstudio && tab === "vida-ley" ? (
           <FichaVidaLey relacionId={params.relacionId} vidaLey={vidaLey} canWrite={canWriteTramite} />
+        ) : null}
+        {continuar ? (
+          <Link
+            href={continuar.href}
+            className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            Continuar: {continuar.etiqueta}
+          </Link>
         ) : null}
       </div>
     </PlanillasShell>

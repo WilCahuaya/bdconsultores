@@ -7,6 +7,7 @@ import { panelCardClass } from "@inventario/ui/panel";
 import { addDocumento, setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
 import { ESTADO_DOCUMENTO_LABEL, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import type { TipoDocumentoPlanilla } from "@inventario/types";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 import { Field, SelectField } from "@/components/fields";
@@ -16,11 +17,17 @@ export function FichaDocumentos({
   entidadId,
   documentos,
   canWrite,
+  tiposFiltro,
+  permitirAgregar = true,
+  hint,
 }: {
   relacionId: string;
   entidadId: string;
   documentos: DocumentoRow[];
   canWrite: boolean;
+  tiposFiltro?: TipoDocumentoPlanilla[];
+  permitirAgregar?: boolean;
+  hint?: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -59,17 +66,24 @@ export function FichaDocumentos({
     return saved.error ?? null;
   }
 
+  const visibles = tiposFiltro ? documentos.filter((d) => tiposFiltro.includes(d.tipo)) : documentos;
+  const tipoOptions = (tiposFiltro ?? (Object.keys(TIPO_DOCUMENTO_LABEL) as TipoDocumentoPlanilla[])).map(
+    (value) => ({
+      value,
+      label: TIPO_DOCUMENTO_LABEL[value],
+    }),
+  );
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Un archivo por documento (se puede reemplazar). PDF, JPG, PNG o WEBP. Máximo 10 MB. El contrato firmado se
-        sube aquí; el estudio lo revisa y lo marca Recogido.
+        {hint ?? "Un archivo por documento (se puede reemplazar). PDF, JPG, PNG o WEBP. Máximo 10 MB."}
       </p>
       <ul className={`${panelCardClass} divide-y p-0`}>
-        {documentos.length === 0 ? (
-          <li className="px-4 py-6 text-sm text-muted-foreground">Aún no hay documentos registrados.</li>
+        {visibles.length === 0 ? (
+          <li className="px-4 py-6 text-sm text-muted-foreground">Aún no hay documentos en este paso.</li>
         ) : (
-          documentos.map((d) => (
+          visibles.map((d) => (
             <DocumentoItem
               key={d.id}
               documento={d}
@@ -88,14 +102,14 @@ export function FichaDocumentos({
         )}
       </ul>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {canWrite ? (
-        <form action={onSubmit} key={documentos.length} className={`${panelCardClass} space-y-4 p-5`}>
+      {canWrite && permitirAgregar ? (
+        <form action={onSubmit} key={visibles.length} className={`${panelCardClass} space-y-4 p-5`}>
           <p className="text-sm font-medium">Registrar documento</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               label="Tipo"
               name="tipo"
-              options={Object.entries(TIPO_DOCUMENTO_LABEL).map(([value, label]) => ({ value, label }))}
+              options={tipoOptions}
             />
             <SelectField
               label="Estado"

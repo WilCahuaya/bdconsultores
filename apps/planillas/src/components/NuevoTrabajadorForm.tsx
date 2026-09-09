@@ -56,7 +56,7 @@ export function NuevoTrabajadorForm({
       setError(result.error);
       return;
     }
-    if (result.relacionId) router.push(`/trabajadores/${result.relacionId}`);
+    if (result.relacionId) router.push(`/trabajadores/${result.relacionId}?tab=documentos`);
   }
 
   return (
