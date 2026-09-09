@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { saveVidaLey, type VidaLeyRow } from "@/lib/actions/ficha";
-import { Field } from "@/components/fields";
+import { Field, DateField } from "@/components/fields";
 
 export function FichaVidaLey({
   relacionId,
@@ -39,8 +39,8 @@ export function FichaVidaLey({
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Estado" name="estado" defaultValue={vidaLey?.estado} readOnly={!canWrite} />
         <Field label="N° póliza" name="numero_poliza" defaultValue={vidaLey?.numero_poliza} readOnly={!canWrite} />
-        <Field label="Inicio" name="fecha_inicio" type="date" defaultValue={vidaLey?.fecha_inicio} readOnly={!canWrite} />
-        <Field label="Fin" name="fecha_fin" type="date" defaultValue={vidaLey?.fecha_fin} readOnly={!canWrite} />
+        <DateField label="Inicio" name="fecha_inicio" defaultValue={vidaLey?.fecha_inicio} readOnly={!canWrite} />
+        <DateField label="Fin" name="fecha_fin" defaultValue={vidaLey?.fecha_fin} readOnly={!canWrite} />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {ok ? <p className="text-sm text-primary">Vida Ley guardada.</p> : null}

@@ -8,6 +8,7 @@ import type {
   TipoDocumentoPlanilla,
 } from "@inventario/types";
 import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { parseFechaCampo } from "@/lib/planillas-labels";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 export type PersonaRow = {
@@ -123,6 +124,11 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   const alcance = entidadAlcance(profile);
   if (alcance !== "todas" && alcance !== entidadId) return { error: "Empresa no autorizada." };
 
+  const nacimiento = parseFechaCampo(String(formData.get("fecha_nacimiento") ?? ""), "Fecha de nacimiento");
+  if (nacimiento.error) return { error: nacimiento.error };
+  const ingreso = parseFechaCampo(String(formData.get("fecha_ingreso") ?? ""), "Fecha de ingreso");
+  if (ingreso.error) return { error: ingreso.error };
+
   const db = await planillasDb();
   const { data: existente } = await db.from("personas").select("id").eq("dni", dni).maybeSingle();
 
@@ -135,7 +141,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
         nombres,
         apellido_paterno: String(formData.get("apellido_paterno") ?? "").trim() || null,
         apellido_materno: String(formData.get("apellido_materno") ?? "").trim() || null,
-        fecha_nacimiento: String(formData.get("fecha_nacimiento") ?? "").trim() || null,
+        fecha_nacimiento: nacimiento.value,
         celular: String(formData.get("celular") ?? "").trim() || null,
         correo: String(formData.get("correo") ?? "").trim() || null,
         direccion: String(formData.get("direccion") ?? "").trim() || null,
@@ -154,7 +160,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
       cargo: String(formData.get("cargo") ?? "").trim() || null,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
-      fecha_ingreso: String(formData.get("fecha_ingreso") ?? "").trim() || null,
+      fecha_ingreso: ingreso.value,
       estado: "ACTIVA",
     })
     .select("id")
@@ -201,6 +207,13 @@ export async function updateDatosTrabajador(
   const actual = await getTrabajador(relacionId);
   if (!actual) return { error: "Trabajador no encontrado." };
 
+  const nacimiento = parseFechaCampo(String(formData.get("fecha_nacimiento") ?? ""), "Fecha de nacimiento");
+  if (nacimiento.error) return { error: nacimiento.error };
+  const ingreso = parseFechaCampo(String(formData.get("fecha_ingreso") ?? ""), "Fecha de ingreso");
+  if (ingreso.error) return { error: ingreso.error };
+  const cese = parseFechaCampo(String(formData.get("fecha_cese") ?? ""), "Fecha de cese");
+  if (cese.error) return { error: cese.error };
+
   const db = await planillasDb();
   const { error: pError } = await db
     .from("personas")
@@ -208,7 +221,7 @@ export async function updateDatosTrabajador(
       nombres: String(formData.get("nombres") ?? "").trim(),
       apellido_paterno: String(formData.get("apellido_paterno") ?? "").trim() || null,
       apellido_materno: String(formData.get("apellido_materno") ?? "").trim() || null,
-      fecha_nacimiento: String(formData.get("fecha_nacimiento") ?? "").trim() || null,
+      fecha_nacimiento: nacimiento.value,
       celular: String(formData.get("celular") ?? "").trim() || null,
       correo: String(formData.get("correo") ?? "").trim() || null,
       direccion: String(formData.get("direccion") ?? "").trim() || null,
@@ -216,16 +229,15 @@ export async function updateDatosTrabajador(
     .eq("id", actual.persona.id);
   if (pError) return { error: pError.message };
 
-  const cese = String(formData.get("fecha_cese") ?? "").trim() || null;
   const { error: rError } = await db
     .from("relaciones_laborales")
     .update({
       cargo: String(formData.get("cargo") ?? "").trim() || null,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
-      fecha_ingreso: String(formData.get("fecha_ingreso") ?? "").trim() || null,
-      fecha_cese: cese,
-      estado: cese ? "CESADA" : "ACTIVA",
+      fecha_ingreso: ingreso.value,
+      fecha_cese: cese.value,
+      estado: cese.value ? "CESADA" : "ACTIVA",
     })
     .eq("id", relacionId);
   if (rError) return { error: rError.message };

@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { addTRegistro, type TRegistroRow } from "@/lib/actions/ficha";
-import { TIPO_T_REGISTRO_LABEL } from "@/lib/planillas-labels";
-import { Field, SelectField } from "@/components/fields";
+import { TIPO_T_REGISTRO_LABEL, formatFechaPlanilla } from "@/lib/planillas-labels";
+import { Field, DateField, SelectField } from "@/components/fields";
 
 export function FichaTRegistro({
   relacionId,
@@ -40,7 +40,7 @@ export function FichaTRegistro({
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
               <span>
                 {TIPO_T_REGISTRO_LABEL[item.tipo]}
-                {item.fecha ? ` · ${item.fecha}` : ""}
+                {item.fecha ? ` · ${formatFechaPlanilla(item.fecha)}` : ""}
               </span>
               <span className="text-muted-foreground">{item.realizado ? "Realizado" : "Pendiente"}</span>
             </li>
@@ -56,7 +56,7 @@ export function FichaTRegistro({
               name="tipo"
               options={Object.entries(TIPO_T_REGISTRO_LABEL).map(([value, label]) => ({ value, label }))}
             />
-            <Field label="Fecha" name="fecha" type="date" />
+            <DateField label="Fecha" name="fecha" />
             <Field label="Observaciones" name="observaciones" />
             <label className="flex items-end gap-2 pb-2 text-sm">
               <input type="checkbox" name="realizado" />

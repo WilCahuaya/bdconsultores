@@ -6,7 +6,7 @@ import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { savePension, type PensionRow } from "@/lib/actions/ficha";
 import { TIPO_PENSION_LABEL, TRAMITE_PENSION_LABEL } from "@/lib/planillas-labels";
-import { Field, SelectField } from "@/components/fields";
+import { Field, DateField, SelectField } from "@/components/fields";
 
 export function FichaPensiones({
   relacionId,
@@ -54,7 +54,7 @@ export function FichaPensiones({
           disabled={!canWrite}
           options={Object.entries(TRAMITE_PENSION_LABEL).map(([value, label]) => ({ value, label }))}
         />
-        <Field label="Fecha de trámite" name="fecha_tramite" type="date" defaultValue={pension?.fecha_tramite} readOnly={!canWrite} />
+        <DateField label="Fecha de trámite" name="fecha_tramite" defaultValue={pension?.fecha_tramite} readOnly={!canWrite} />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {ok ? <p className="text-sm text-primary">Pensiones guardadas.</p> : null}

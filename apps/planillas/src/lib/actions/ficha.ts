@@ -13,6 +13,7 @@ import type {
 import { puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
+import { parseFechaCampo } from "@/lib/planillas-labels";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 async function assertEscritura(
@@ -98,12 +99,16 @@ export async function addContrato(relacionId: string, formData: FormData): Promi
   if (esVigente && (vigentes.data?.length ?? 0) > 0) {
     await db.from("contratos").update({ es_vigente: false }).eq("relacion_id", relacionId);
   }
+  const fechaInicio = parseFechaCampo(String(formData.get("fecha_inicio") ?? ""), "Fecha de inicio");
+  if (fechaInicio.error) return { error: fechaInicio.error };
+  const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de fin");
+  if (fechaFin.error) return { error: fechaFin.error };
   const { error } = await db.from("contratos").insert({
     relacion_id: relacionId,
     version,
     numero_contrato: String(formData.get("numero_contrato") ?? "").trim() || null,
-    fecha_inicio: String(formData.get("fecha_inicio") ?? "").trim() || null,
-    fecha_fin: String(formData.get("fecha_fin") ?? "").trim() || null,
+    fecha_inicio: fechaInicio.value,
+    fecha_fin: fechaFin.value,
     remuneracion: Number(formData.get("remuneracion") || 0) || null,
     asignacion_familiar: Number(formData.get("asignacion_familiar") || 0) || null,
     jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
@@ -200,13 +205,15 @@ export async function savePension(relacionId: string, formData: FormData): Promi
   const gate = await assertEscritura(relacionId);
   if ("error" in gate) return { error: gate.error };
   const tipo = String(formData.get("tipo")) as TipoPension;
+  const fechaTramite = parseFechaCampo(String(formData.get("fecha_tramite") ?? ""), "Fecha de trámite");
+  if (fechaTramite.error) return { error: fechaTramite.error };
   const payload = {
     relacion_id: relacionId,
     tipo,
     afp_nombre: tipo === "AFP" ? String(formData.get("afp_nombre") ?? "").trim() || null : null,
     cuspp: String(formData.get("cuspp") ?? "").trim() || null,
     tramite_estado: (tipo === "ONP" ? "NO_APLICA" : String(formData.get("tramite_estado"))) as EstadoTramitePension,
-    fecha_tramite: String(formData.get("fecha_tramite") ?? "").trim() || null,
+    fecha_tramite: fechaTramite.value,
   };
   const db = await planillasDb();
   const { error } = await db.from("pensiones").upsert(payload, { onConflict: "relacion_id" });
@@ -231,12 +238,16 @@ export async function getVidaLey(relacionId: string): Promise<VidaLeyRow | null>
 export async function saveVidaLey(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscritura(relacionId);
   if ("error" in gate) return { error: gate.error };
+  const fechaInicio = parseFechaCampo(String(formData.get("fecha_inicio") ?? ""), "Fecha de inicio");
+  if (fechaInicio.error) return { error: fechaInicio.error };
+  const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de fin");
+  if (fechaFin.error) return { error: fechaFin.error };
   const payload = {
     relacion_id: relacionId,
     estado: String(formData.get("estado") ?? "").trim() || null,
     numero_poliza: String(formData.get("numero_poliza") ?? "").trim() || null,
-    fecha_inicio: String(formData.get("fecha_inicio") ?? "").trim() || null,
-    fecha_fin: String(formData.get("fecha_fin") ?? "").trim() || null,
+    fecha_inicio: fechaInicio.value,
+    fecha_fin: fechaFin.value,
   };
   const db = await planillasDb();
   const { error } = await db.from("vida_ley").upsert(payload, { onConflict: "relacion_id" });
@@ -261,12 +272,14 @@ export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]>
 export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscritura(relacionId);
   if ("error" in gate) return { error: gate.error };
+  const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
+  if (fecha.error) return { error: fecha.error };
   const db = await planillasDb();
   const { error } = await db.from("t_registro").insert({
     relacion_id: relacionId,
     tipo: String(formData.get("tipo")) as TipoTRegistro,
     realizado: formData.get("realizado") === "on",
-    fecha: String(formData.get("fecha") ?? "").trim() || null,
+    fecha: fecha.value,
     observaciones: String(formData.get("observaciones") ?? "").trim() || null,
   });
   if (error) return { error: error.message };

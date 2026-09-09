@@ -483,8 +483,21 @@ export function parseFechaDDMMYYYY(text: string): string | null {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/** Acepta DD/MM/AAAA, DD-MM-AAAA, DD.MM.AAAA o ISO YYYY-MM-DD. */
+export function parseFechaFlexible(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return parseFechaDDMMYYYY(`${iso[3]}/${iso[2]}/${iso[1]}`);
+  const other = trimmed.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
+  if (other) return parseFechaDDMMYYYY(`${other[1]}/${other[2]}/${other[3]}`);
+  return parseFechaDDMMYYYY(trimmed);
+}
+
 /** Formatea dígitos al escribir: 12122025 → 12/12/2025. Ignora barras sueltas (evita 12//12). */
 export function formatFechaInputDDMMYYYY(value: string): string {
+  const iso = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
   const digits = value.replace(/\D/g, "").slice(0, 8);
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;

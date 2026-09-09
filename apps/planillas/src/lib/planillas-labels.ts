@@ -9,6 +9,7 @@ import type {
   TipoPension,
   TipoTRegistro,
 } from "@inventario/types";
+import { parseFechaFlexible } from "@inventario/types";
 
 export const CLASIFICACION_LABEL: Record<ClasificacionTrabajador, string> = {
   PATROCINADO: "Patrocinado",
@@ -125,6 +126,15 @@ export function formatFechaPlanilla(value: string | null | undefined): string {
   const [year, month, day] = iso.split("-");
   if (!year || !month || !day) return value;
   return `${day}/${month}/${year}`;
+}
+
+/** Lee una fecha del formulario (DD/MM/AAAA o ISO) y la deja en YYYY-MM-DD. */
+export function parseFechaCampo(raw: string, label: string): { error?: string; value: string | null } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { value: null };
+  const iso = parseFechaFlexible(trimmed);
+  if (!iso) return { error: `${label} inválida. Escriba o pegue DD/MM/AAAA.` };
+  return { value: iso };
 }
 
 export function formatRemuneracion(value: number | null | undefined): string {

@@ -7,7 +7,7 @@ import { panelCardClass } from "@inventario/ui/panel";
 import { consultarDni } from "@/lib/actions/entidades";
 import { createTrabajador } from "@/lib/actions/trabajadores";
 import { CLASIFICACION_LABEL, JORNADA_LABEL } from "@/lib/planillas-labels";
-import { Field, SelectField } from "@/components/fields";
+import { Field, DateField, SelectField } from "@/components/fields";
 import type { Entidad } from "@inventario/types";
 
 export function NuevoTrabajadorForm({
@@ -107,12 +107,11 @@ export function NuevoTrabajadorForm({
           value={apellidoMaterno}
           onChange={(event) => setApellidoMaterno(event.target.value)}
         />
-        <Field
+        <DateField
           label="Fecha de nacimiento"
           name="fecha_nacimiento"
-          type="date"
           value={fechaNacimiento}
-          onChange={(event) => setFechaNacimiento(event.target.value)}
+          onChange={setFechaNacimiento}
         />
         <Field label="Celular" name="celular" />
         <Field label="Correo" name="correo" type="email" />
@@ -130,7 +129,7 @@ export function NuevoTrabajadorForm({
           allowEmpty
           options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
         />
-        <Field label="Fecha de ingreso" name="fecha_ingreso" type="date" />
+        <DateField label="Fecha de ingreso" name="fecha_ingreso" />
       </div>
       {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}

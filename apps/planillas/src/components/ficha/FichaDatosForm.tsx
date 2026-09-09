@@ -6,7 +6,7 @@ import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { updateDatosTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { CLASIFICACION_LABEL, JORNADA_LABEL } from "@/lib/planillas-labels";
-import { Field, SelectField } from "@/components/fields";
+import { Field, DateField, SelectField } from "@/components/fields";
 
 export function FichaDatosForm({
   trabajador,
@@ -41,7 +41,7 @@ export function FichaDatosForm({
         <Field label="Nombres" name="nombres" defaultValue={p.nombres} required readOnly={!canWrite} />
         <Field label="Apellido paterno" name="apellido_paterno" defaultValue={p.apellido_paterno} readOnly={!canWrite} />
         <Field label="Apellido materno" name="apellido_materno" defaultValue={p.apellido_materno} readOnly={!canWrite} />
-        <Field label="Fecha de nacimiento" name="fecha_nacimiento" type="date" defaultValue={p.fecha_nacimiento} readOnly={!canWrite} />
+        <DateField label="Fecha de nacimiento" name="fecha_nacimiento" defaultValue={p.fecha_nacimiento} readOnly={!canWrite} />
         <Field label="Celular" name="celular" defaultValue={p.celular} readOnly={!canWrite} />
         <Field label="Correo" name="correo" type="email" defaultValue={p.correo} readOnly={!canWrite} />
         <Field label="Dirección" name="direccion" defaultValue={p.direccion} readOnly={!canWrite} />
@@ -62,8 +62,8 @@ export function FichaDatosForm({
           disabled={!canWrite}
           options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
         />
-        <Field label="Fecha de ingreso" name="fecha_ingreso" type="date" defaultValue={trabajador.fecha_ingreso} readOnly={!canWrite} />
-        <Field label="Fecha de cese" name="fecha_cese" type="date" defaultValue={trabajador.fecha_cese} readOnly={!canWrite} />
+        <DateField label="Fecha de ingreso" name="fecha_ingreso" defaultValue={trabajador.fecha_ingreso} readOnly={!canWrite} />
+        <DateField label="Fecha de cese" name="fecha_cese" defaultValue={trabajador.fecha_cese} readOnly={!canWrite} />
       </div>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {ok ? <p className="text-sm text-primary">Datos guardados.</p> : null}

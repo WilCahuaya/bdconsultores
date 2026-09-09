@@ -6,7 +6,7 @@ import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { addContrato, type ContratoRow } from "@/lib/actions/ficha";
 import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL } from "@/lib/planillas-labels";
-import { Field, SelectField } from "@/components/fields";
+import { Field, DateField, SelectField } from "@/components/fields";
 
 export function FichaContratos({
   relacionId,
@@ -76,8 +76,8 @@ export function FichaContratos({
               defaultValue="PENDIENTE_DOCS"
               options={Object.entries(ESTADO_CONTRATO_LABEL).map(([value, label]) => ({ value, label }))}
             />
-            <Field label="Inicio" name="fecha_inicio" type="date" />
-            <Field label="Fin" name="fecha_fin" type="date" />
+            <DateField label="Inicio" name="fecha_inicio" />
+            <DateField label="Fin" name="fecha_fin" />
             <Field label="Remuneración" name="remuneracion" type="number" />
             <Field label="Asignación familiar" name="asignacion_familiar" type="number" />
             <SelectField
