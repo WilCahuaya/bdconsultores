@@ -90,6 +90,8 @@ function portalRewrites() {
   });
 }
 
+const { normalizeRuc, validarRuc, consultarRucSunat } = require("./consultar-ruc");
+
 module.exports = {
   portal,
   webApps,
@@ -97,4 +99,7 @@ module.exports = {
   originFor,
   portalOrigin,
   portalRewrites,
+  normalizeRuc,
+  validarRuc,
+  consultarRucSunat,
 };

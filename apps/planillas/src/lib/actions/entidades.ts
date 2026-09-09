@@ -7,6 +7,7 @@ import {
   validarAdminEntidadDni,
   type Entidad,
 } from "@inventario/types";
+import { consultarRucSunat } from "@bd/config";
 import { createClient } from "@/lib/supabase/server";
 import { puedeCrearEntidad, requirePlanillasProfile } from "@/lib/auth/access";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
@@ -32,6 +33,18 @@ export async function listEntidadesPlanillas(): Promise<Entidad[]> {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as Entidad[];
+}
+
+export async function consultarRuc(ruc: string): Promise<{
+  error?: string;
+  ruc?: string;
+  nombre?: string;
+  direccion?: string;
+  estado?: string;
+}> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeCrearEntidad(profile)) return { error: "No tiene permiso para consultar RUC." };
+  return consultarRucSunat(ruc);
 }
 
 export async function createEntidadPlanillas(formData: FormData): Promise<{

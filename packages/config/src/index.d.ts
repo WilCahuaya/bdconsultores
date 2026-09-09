@@ -18,3 +18,13 @@ export function webAppById(id: string): WebApp;
 export function originFor(app: WebApp): string;
 export function portalOrigin(): string;
 export function portalRewrites(): Array<{ source: string; destination: string }>;
+
+export function normalizeRuc(value: string | null | undefined): string;
+export function validarRuc(value: string | null | undefined): string | null;
+export function consultarRucSunat(ruc: string): Promise<{
+  error?: string;
+  ruc?: string;
+  nombre?: string;
+  direccion?: string;
+  estado?: string;
+}>;

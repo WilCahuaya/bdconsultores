@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Entidad, EntidadConConteo } from "@inventario/types";
 import { normalizeResponsableDni, validarAdminEntidadDni } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
+import { consultarRucSunat } from "@bd/config";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
 import { syncSedePrincipalDireccionFromEntidad } from "@/lib/sede-principal-direccion";
@@ -34,6 +35,17 @@ function parseModulos(input: CreateEntidadInput): {
     return { error: "Elija al menos un módulo: Inventarios o Planillas.", usa_inventarios, usa_planillas };
   }
   return { usa_inventarios, usa_planillas };
+}
+
+export async function consultarRuc(ruc: string): Promise<{
+  error?: string;
+  ruc?: string;
+  nombre?: string;
+  direccion?: string;
+  estado?: string;
+}> {
+  await requireProfile("CONTADOR");
+  return consultarRucSunat(ruc);
 }
 
 export async function createEntidad(input: CreateEntidadInput) {

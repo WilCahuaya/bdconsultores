@@ -31,6 +31,7 @@ import {
 } from "@inventario/ui/panel";
 import {
   createEntidad,
+  consultarRuc,
   deleteEntidad,
   setEntidadActivo,
   updateEntidad,
@@ -69,11 +70,18 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
   const [nombre, setNombre] = useState(entidad?.nombre ?? "");
   const [nombreEtiqueta, setNombreEtiqueta] = useState(entidad?.nombre_etiqueta ?? "");
   const [etiquetaManual, setEtiquetaManual] = useState(Boolean(entidad?.nombre_etiqueta?.trim()));
+  const [ruc, setRuc] = useState(entidad?.ruc ?? "");
+  const [direccion, setDireccion] = useState(entidad?.direccion ?? "");
+  const [buscandoRuc, setBuscandoRuc] = useState(false);
+  const [rucMsg, setRucMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setNombre(entidad?.nombre ?? "");
     setNombreEtiqueta(entidad?.nombre_etiqueta ?? "");
     setEtiquetaManual(Boolean(entidad?.nombre_etiqueta?.trim()));
+    setRuc(entidad?.ruc ?? "");
+    setDireccion(entidad?.direccion ?? "");
+    setRucMsg(null);
   }, [entidad]);
 
   const nombreEtiquetaSugerido = useMemo(
@@ -98,6 +106,23 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
       setNombreEtiqueta(nombreEtiquetaSugerido);
     }
   }, [mostrarNombreEtiqueta, nombreEtiquetaSugerido, etiquetaManual]);
+
+  async function buscarPorRuc() {
+    setBuscandoRuc(true);
+    setRucMsg(null);
+    const result = await consultarRuc(ruc);
+    setBuscandoRuc(false);
+    if (result.error) {
+      setRucMsg(result.error);
+      return;
+    }
+    if (result.ruc) setRuc(result.ruc);
+    if (result.nombre) setNombre(result.nombre);
+    if (result.direccion) setDireccion(result.direccion);
+    setRucMsg(
+      result.estado ? `Padrón SUNAT: ${result.estado}. Puede editar los datos.` : "Datos traídos del padrón. Puede editarlos.",
+    );
+  }
 
   return (
     <>
@@ -132,11 +157,31 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
       )}
       <div className="space-y-2">
         <Label htmlFor="ruc">RUC</Label>
-        <Input id="ruc" name="ruc" placeholder="20XXXXXXXXX" defaultValue={entidad?.ruc ?? ""} />
+        <div className="flex gap-2">
+          <Input
+            id="ruc"
+            name="ruc"
+            placeholder="20XXXXXXXXX"
+            inputMode="numeric"
+            maxLength={11}
+            value={ruc}
+            onChange={(e) => setRuc(e.target.value.replace(/\D/g, "").slice(0, 11))}
+          />
+          <Button type="button" variant="outline" disabled={buscandoRuc} onClick={() => void buscarPorRuc()}>
+            {buscandoRuc ? "Consultando…" : "Buscar"}
+          </Button>
+        </div>
+        {rucMsg ? (
+          <p className={`text-xs ${rucMsg.startsWith("Padrón") || rucMsg.startsWith("Datos") ? "text-muted-foreground" : "text-destructive"}`}>
+            {rucMsg}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Trae razón social y dirección del padrón SUNAT.</p>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="direccion">Dirección</Label>
-        <Input id="direccion" name="direccion" defaultValue={entidad?.direccion ?? ""} />
+        <Input id="direccion" name="direccion" value={direccion} onChange={(e) => setDireccion(e.target.value)} />
         <p className="text-xs text-muted-foreground">
           Corresponde a la sede Principal de la entidad.
         </p>

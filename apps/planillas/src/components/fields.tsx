@@ -1,3 +1,5 @@
+import type { ChangeEvent } from "react";
+
 const fieldClass =
   "flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
@@ -14,6 +16,8 @@ export function Field({
   placeholder,
   autoComplete,
   title,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -27,6 +31,8 @@ export function Field({
   placeholder?: string;
   autoComplete?: string;
   title?: string;
+  value?: string;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
     <label className="block space-y-1.5">
@@ -35,7 +41,7 @@ export function Field({
         className={fieldClass}
         name={name}
         type={type}
-        defaultValue={defaultValue ?? ""}
+        {...(value === undefined ? { defaultValue: defaultValue ?? "" } : { value, onChange })}
         required={required}
         readOnly={readOnly}
         disabled={readOnly}
