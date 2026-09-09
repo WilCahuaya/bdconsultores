@@ -7,9 +7,9 @@ import {
   validarAdminEntidadDni,
   type Entidad,
 } from "@inventario/types";
-import { consultarRucSunat } from "@bd/config";
+import { consultarDniReniec, consultarRucSunat } from "@bd/config";
 import { createClient } from "@/lib/supabase/server";
-import { puedeCrearEntidad, requirePlanillasProfile } from "@/lib/auth/access";
+import { puedeCrearEntidad, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { syncAdminTrabajadorPlanillas } from "@/lib/planillas-admin-trabajador";
 import { syncAdminResponsableForEntidad } from "@/lib/responsables-admin-sync";
@@ -45,6 +45,20 @@ export async function consultarRuc(ruc: string): Promise<{
   const profile = await requirePlanillasProfile();
   if (!puedeCrearEntidad(profile)) return { error: "No tiene permiso para consultar RUC." };
   return consultarRucSunat(ruc);
+}
+
+export async function consultarDni(dni: string): Promise<{
+  error?: string;
+  dni?: string;
+  nombres?: string;
+  apellido_paterno?: string;
+  apellido_materno?: string;
+  nombre_completo?: string;
+  fecha_nacimiento?: string;
+}> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para consultar DNI." };
+  return consultarDniReniec(dni);
 }
 
 export async function createEntidadPlanillas(formData: FormData): Promise<{

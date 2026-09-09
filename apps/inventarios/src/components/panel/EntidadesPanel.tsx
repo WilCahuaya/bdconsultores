@@ -31,6 +31,7 @@ import {
 } from "@inventario/ui/panel";
 import {
   createEntidad,
+  consultarDni,
   consultarRuc,
   deleteEntidad,
   setEntidadActivo,
@@ -72,8 +73,12 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
   const [etiquetaManual, setEtiquetaManual] = useState(Boolean(entidad?.nombre_etiqueta?.trim()));
   const [ruc, setRuc] = useState(entidad?.ruc ?? "");
   const [direccion, setDireccion] = useState(entidad?.direccion ?? "");
+  const [adminNombre, setAdminNombre] = useState(entidad?.admin_nombre ?? "");
+  const [adminDni, setAdminDni] = useState(entidad?.admin_dni ?? "");
   const [buscandoRuc, setBuscandoRuc] = useState(false);
+  const [buscandoDni, setBuscandoDni] = useState(false);
   const [rucMsg, setRucMsg] = useState<string | null>(null);
+  const [dniMsg, setDniMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setNombre(entidad?.nombre ?? "");
@@ -81,7 +86,10 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
     setEtiquetaManual(Boolean(entidad?.nombre_etiqueta?.trim()));
     setRuc(entidad?.ruc ?? "");
     setDireccion(entidad?.direccion ?? "");
+    setAdminNombre(entidad?.admin_nombre ?? "");
+    setAdminDni(entidad?.admin_dni ?? "");
     setRucMsg(null);
+    setDniMsg(null);
   }, [entidad]);
 
   const nombreEtiquetaSugerido = useMemo(
@@ -122,6 +130,20 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
     setRucMsg(
       result.estado ? `Padrón SUNAT: ${result.estado}. Puede editar los datos.` : "Datos traídos del padrón. Puede editarlos.",
     );
+  }
+
+  async function buscarPorDni() {
+    setBuscandoDni(true);
+    setDniMsg(null);
+    const result = await consultarDni(adminDni);
+    setBuscandoDni(false);
+    if (result.error) {
+      setDniMsg(result.error);
+      return;
+    }
+    if (result.dni) setAdminDni(result.dni);
+    if (result.nombre_completo) setAdminNombre(result.nombre_completo);
+    setDniMsg("Datos traídos del padrón RENIEC. Puede editarlos.");
   }
 
   return (
@@ -219,27 +241,42 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
         )}
       </p>
       <div className="space-y-2">
+        <Label htmlFor="admin_dni">DNI</Label>
+        <div className="flex gap-2">
+          <Input
+            id="admin_dni"
+            name="admin_dni"
+            required={requireAdmin}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={8}
+            pattern="[0-9]{8}"
+            title="8 dígitos"
+            placeholder="12345678"
+            value={adminDni}
+            onChange={(e) => setAdminDni(e.target.value.replace(/\D/g, "").slice(0, 8))}
+            className="min-w-0 flex-1"
+          />
+          <Button type="button" variant="outline" disabled={buscandoDni} onClick={() => void buscarPorDni()}>
+            {buscandoDni ? "Consultando…" : "Buscar"}
+          </Button>
+        </div>
+        {dniMsg ? (
+          <p className={`text-xs ${dniMsg.startsWith("Datos") ? "text-muted-foreground" : "text-destructive"}`}>
+            {dniMsg}
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Trae el nombre del padrón RENIEC.</p>
+        )}
+      </div>
+      <div className="space-y-2">
         <Label htmlFor="admin_nombre">Nombre</Label>
         <Input
           id="admin_nombre"
           name="admin_nombre"
           required={requireAdmin}
-          defaultValue={entidad?.admin_nombre ?? ""}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="admin_dni">DNI</Label>
-        <Input
-          id="admin_dni"
-          name="admin_dni"
-          required={requireAdmin}
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={8}
-          pattern="[0-9]{8}"
-          title="8 dígitos"
-          placeholder="12345678"
-          defaultValue={entidad?.admin_dni ?? ""}
+          value={adminNombre}
+          onChange={(e) => setAdminNombre(e.target.value)}
         />
       </div>
       <div className="space-y-2">

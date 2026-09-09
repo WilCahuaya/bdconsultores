@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
-import { consultarRuc, createEntidadPlanillas } from "@/lib/actions/entidades";
+import { consultarDni, consultarRuc, createEntidadPlanillas } from "@/lib/actions/entidades";
 import { Field } from "@/components/fields";
 
 export function NuevaEmpresaForm() {
@@ -13,9 +13,13 @@ export function NuevaEmpresaForm() {
   const [lookupMsg, setLookupMsg] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [buscando, setBuscando] = useState(false);
+  const [buscandoDni, setBuscandoDni] = useState(false);
   const [ruc, setRuc] = useState("");
   const [nombre, setNombre] = useState("");
   const [direccion, setDireccion] = useState("");
+  const [adminDni, setAdminDni] = useState("");
+  const [adminNombre, setAdminNombre] = useState("");
+  const [dniMsg, setDniMsg] = useState<string | null>(null);
 
   async function buscarPorRuc() {
     setBuscando(true);
@@ -33,6 +37,21 @@ export function NuevaEmpresaForm() {
     setLookupMsg(
       result.estado ? `Padrón SUNAT: ${result.estado}. Puede editar los datos si hace falta.` : "Datos traídos del padrón. Puede editarlos si hace falta.",
     );
+  }
+
+  async function buscarPorDni() {
+    setBuscandoDni(true);
+    setError(null);
+    setDniMsg(null);
+    const result = await consultarDni(adminDni);
+    setBuscandoDni(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    if (result.dni) setAdminDni(result.dni);
+    if (result.nombre_completo) setAdminNombre(result.nombre_completo);
+    setDniMsg("Datos traídos del padrón RENIEC. Puede editarlos si hace falta.");
   }
 
   async function onSubmit(formData: FormData) {
@@ -90,21 +109,35 @@ export function NuevaEmpresaForm() {
       {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
       <p className="text-sm font-medium">Administrador de la empresa</p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Nombre" name="admin_nombre" required />
+        <div className="space-y-1.5">
+          <Field
+            label="DNI"
+            name="admin_dni"
+            required
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={8}
+            pattern="[0-9]{8}"
+            title="8 dígitos"
+            placeholder="12345678"
+            value={adminDni}
+            onChange={(event) => setAdminDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
+          />
+          <Button type="button" variant="outline" size="sm" disabled={buscandoDni || pending} onClick={() => void buscarPorDni()}>
+            {buscandoDni ? "Consultando…" : "Buscar en RENIEC"}
+          </Button>
+        </div>
         <Field
-          label="DNI"
-          name="admin_dni"
+          label="Nombre"
+          name="admin_nombre"
           required
-          inputMode="numeric"
-          autoComplete="off"
-          maxLength={8}
-          pattern="[0-9]{8}"
-          title="8 dígitos"
-          placeholder="12345678"
+          value={adminNombre}
+          onChange={(event) => setAdminNombre(event.target.value)}
         />
         <Field label="Correo" name="admin_email" type="email" required />
         <Field label="Teléfono" name="admin_telefono" inputMode="tel" />
       </div>
+      {dniMsg ? <p className="text-sm text-muted-foreground">{dniMsg}</p> : null}
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" name="usa_inventarios" className="mt-1" />
         <span>
@@ -115,7 +148,7 @@ export function NuevaEmpresaForm() {
         </span>
       </label>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" disabled={pending || buscando}>
+      <Button type="submit" disabled={pending || buscando || buscandoDni}>
         {pending ? "Guardando…" : "Crear empresa"}
       </Button>
     </form>

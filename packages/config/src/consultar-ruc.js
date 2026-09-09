@@ -3,6 +3,8 @@
  * Token: SUNAT_RUC_API_TOKEN. URL opcional: SUNAT_RUC_API_URL.
  */
 
+const { pickString, rucToken, fetchPadronJson } = require("./padron-http");
+
 const DEFAULT_URL = "https://api.decolecta.com/v1/sunat/ruc";
 
 function normalizeRuc(value) {
@@ -13,13 +15,6 @@ function validarRuc(value) {
   const ruc = normalizeRuc(value);
   if (ruc.length !== 11) return "El RUC debe tener 11 dígitos.";
   return null;
-}
-
-function pickString(...values) {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value.trim();
-  }
-  return "";
 }
 
 function direccionDesdeRespuesta(data) {
@@ -47,7 +42,7 @@ async function consultarRucSunat(ruc) {
   const invalid = validarRuc(numero);
   if (invalid) return { error: invalid };
 
-  const token = process.env.SUNAT_RUC_API_TOKEN?.trim();
+  const token = rucToken();
   if (!token) {
     return {
       error:
@@ -56,44 +51,11 @@ async function consultarRucSunat(ruc) {
   }
 
   const base = (process.env.SUNAT_RUC_API_URL?.trim() || DEFAULT_URL).replace(/\?.*$/, "");
-  const url = `${base}?numero=${encodeURIComponent(numero)}`;
+  const result = await fetchPadronJson(`${base}?numero=${encodeURIComponent(numero)}`, token);
+  if (result.error === "not_found") return { error: "No se encontró ese RUC en el padrón." };
+  if (result.error) return { error: result.error };
 
-  let response;
-  try {
-    response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-  } catch {
-    return { error: "No se pudo consultar el padrón. Intente de nuevo." };
-  }
-
-  const raw = await response.text();
-  let data = {};
-  try {
-    data = raw ? JSON.parse(raw) : {};
-  } catch {
-    data = {};
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    return { error: "El token de consulta RUC no es válido." };
-  }
-  if (response.status === 404) {
-    return { error: "No se encontró ese RUC en el padrón." };
-  }
-  if (response.status === 429) {
-    return { error: "Se alcanzó el límite de consultas. Espere un momento." };
-  }
-  if (!response.ok) {
-    const message = pickString(data.message, data.error, data.msg);
-    return { error: message || "No se pudo consultar el RUC." };
-  }
-
+  const data = result.data ?? {};
   const nombre = pickString(data.razonSocial, data.razon_social, data.nombre, data.nombreComercial);
   if (!nombre) return { error: "El padrón no devolvió la razón social." };
 

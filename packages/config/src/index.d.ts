@@ -28,3 +28,15 @@ export function consultarRucSunat(ruc: string): Promise<{
   direccion?: string;
   estado?: string;
 }>;
+
+export function normalizeDni(value: string | null | undefined): string;
+export function validarDni(value: string | null | undefined): string | null;
+export function consultarDniReniec(dni: string): Promise<{
+  error?: string;
+  dni?: string;
+  nombres?: string;
+  apellido_paterno?: string;
+  apellido_materno?: string;
+  nombre_completo?: string;
+  fecha_nacimiento?: string;
+}>;

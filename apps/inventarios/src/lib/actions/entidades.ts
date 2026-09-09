@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Entidad, EntidadConConteo } from "@inventario/types";
 import { normalizeResponsableDni, validarAdminEntidadDni } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
-import { consultarRucSunat } from "@bd/config";
+import { consultarDniReniec, consultarRucSunat } from "@bd/config";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
 import { syncSedePrincipalDireccionFromEntidad } from "@/lib/sede-principal-direccion";
@@ -46,6 +46,19 @@ export async function consultarRuc(ruc: string): Promise<{
 }> {
   await requireProfile("CONTADOR");
   return consultarRucSunat(ruc);
+}
+
+export async function consultarDni(dni: string): Promise<{
+  error?: string;
+  dni?: string;
+  nombres?: string;
+  apellido_paterno?: string;
+  apellido_materno?: string;
+  nombre_completo?: string;
+  fecha_nacimiento?: string;
+}> {
+  await requireProfile("CONTADOR");
+  return consultarDniReniec(dni);
 }
 
 export async function createEntidad(input: CreateEntidadInput) {

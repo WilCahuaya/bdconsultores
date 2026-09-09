@@ -52,8 +52,12 @@ Framework: **Next.js**. Rama: `main`. Vercel usa el `vercel.json` de cada app.
 | `NEXT_PUBLIC_PORTAL_ORIGIN` | URL del Portal (login / “Aplicaciones”) |
 | `NEXT_PUBLIC_SITE_URL` | Igual que el Portal (OAuth e invitaciones) |
 | `SUPABASE_SERVICE_ROLE_KEY` | Solo Inventarios, si hay invitaciones desde ese app |
-| `SUNAT_RUC_API_TOKEN` | Token de [apis.net.pe](https://apis.net.pe/) / Decolecta para traer razón social y dirección por RUC. Solo servidor. |
+| `SUNAT_RUC_API_TOKEN` | Token de [apis.net.pe](https://apis.net.pe/) / Decolecta para RUC y DNI. Solo servidor. El mismo vale para ambos. Nunca `NEXT_PUBLIC_`. |
 | `SUNAT_RUC_API_URL` | Opcional. Por defecto `https://api.decolecta.com/v1/sunat/ruc` |
+| `RENIEC_DNI_API_URL` | Opcional. Por defecto `https://api.decolecta.com/v1/reniec/dni` |
+| `RENIEC_DNI_API_TOKEN` | Opcional. Si no está, se usa `SUNAT_RUC_API_TOKEN`. |
+
+RENIEC no publica REST. La consulta de DNI usa el mismo intermediario que el RUC. El acceso oficial (PIDE / convenio RENIEC) se puede cambiar después sin tocar la pantalla.
 
 ---
 

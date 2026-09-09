@@ -91,6 +91,7 @@ function portalRewrites() {
 }
 
 const { normalizeRuc, validarRuc, consultarRucSunat } = require("./consultar-ruc");
+const { normalizeDni, validarDni, consultarDniReniec } = require("./consultar-dni");
 
 module.exports = {
   portal,
@@ -102,4 +103,7 @@ module.exports = {
   normalizeRuc,
   validarRuc,
   consultarRucSunat,
+  normalizeDni,
+  validarDni,
+  consultarDniReniec,
 };
