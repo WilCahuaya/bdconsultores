@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { webAppById } from "@bd/config";
 import { PrintButton } from "@/components/ficha/PrintButton";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { listContratos } from "@/lib/actions/ficha";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { requirePlanillasProfile } from "@/lib/auth/access";
+import { cargoCanonico, funcionesDeCargo } from "@/lib/cargos-funciones";
 import { formatHorarioContrato } from "@/lib/horario-laboral";
 import {
   JORNADA_LABEL,
@@ -37,8 +39,11 @@ export default async function ContratoDocumentoPage({
 
   const persona = nombreCompleto(trabajador.persona);
   const cargo = contrato.cargo ?? trabajador.cargo;
+  const cargoNombre = cargoCanonico(cargo) ?? cargo;
+  const funciones = funcionesDeCargo(cargo);
   const jornada = contrato.jornada ?? trabajador.jornada;
   const horario = contrato.horario ?? trabajador.horario;
+  const wordHref = `${webAppById("planillas").basePath}/api/contratos/${params.relacionId}/word?contratoId=${contrato.id}`;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 bg-background p-8 text-foreground print:p-0">
@@ -46,7 +51,12 @@ export default async function ContratoDocumentoPage({
         <Link href={`/trabajadores/${params.relacionId}?tab=contratos`} className="text-sm text-primary hover:underline">
           ← Volver a la ficha
         </Link>
-        <PrintButton />
+        <div className="flex gap-4">
+          <a href={wordHref} className="text-sm text-primary hover:underline">
+            Descargar Word
+          </a>
+          <PrintButton />
+        </div>
       </div>
       <p className="text-center text-sm font-semibold uppercase tracking-wide text-primary">Contrato de trabajo</p>
       <section className="space-y-2 text-sm">
@@ -70,7 +80,7 @@ export default async function ContratoDocumentoPage({
       </section>
       <section className="space-y-2 text-sm">
         <h2 className="text-base font-medium">Puesto y contrato</h2>
-        <p>Cargo: {cargo ?? "—"}</p>
+        <p>Cargo: {cargoNombre ?? "—"}</p>
         <p>Jornada: {jornada ? JORNADA_LABEL[jornada] : "—"}</p>
         <div>
           <p>Jornada y horario</p>
@@ -80,9 +90,19 @@ export default async function ContratoDocumentoPage({
         <p>Fin: {formatFechaPlanilla(contrato.fecha_fin)}</p>
         <p>Remuneración: {formatRemuneracion(contrato.remuneracion)}</p>
       </section>
+      {funciones.length > 0 ? (
+        <section className="space-y-2 text-sm">
+          <h2 className="text-base font-medium">Funciones</h2>
+          <ol className="list-decimal space-y-1 pl-5">
+            {funciones.map((fn) => (
+              <li key={fn}>{fn}</li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
       <p className="text-xs text-muted-foreground print:hidden">
-        Documento generado para firma. El Word con plantilla legal se agregará después. Imprima o guarde en PDF, haga
-        firmar y súbalo en el paso Contrato.
+        El documento para firmar es el Word. Esta vista es solo una referencia. Haga firmar el Word (o su PDF) y súbalo
+        en el paso Contrato.
       </p>
     </div>
   );

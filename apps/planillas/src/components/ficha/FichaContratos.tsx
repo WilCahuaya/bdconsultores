@@ -13,12 +13,13 @@ import {
   type DocumentoRow,
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
-import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, formatFechaPlanilla, formatRemuneracion, opcionesCargo } from "@/lib/planillas-labels";
+import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, formatRemuneracion, opcionesCargo } from "@/lib/planillas-labels";
+import { descargarContratoWord } from "@/lib/descargar-contrato-word";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
 
-function abrirDocumento(relacionId: string, contratoId: string) {
+function abrirVistaPrevia(relacionId: string, contratoId: string) {
   window.open(
     `${webAppById("planillas").basePath}/trabajadores/${relacionId}/contrato?contratoId=${contratoId}`,
     "_blank",
@@ -64,7 +65,16 @@ export function FichaContratos({
     }
     setMostrarGenerar(false);
     router.refresh();
-    abrirDocumento(relacionId, result.contratoId);
+    const descarga = await descargarContratoWord(relacionId, result.contratoId);
+    if (descarga.error) setError(descarga.error);
+  }
+
+  async function onDescargar(contratoId: string) {
+    setPending(`word-${contratoId}`);
+    setError(null);
+    const descarga = await descargarContratoWord(relacionId, contratoId);
+    setPending(null);
+    if (descarga.error) setError(descarga.error);
   }
 
   async function onConfirmar(contratoId: string, formData: FormData) {
@@ -88,8 +98,8 @@ export function FichaContratos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Al generar se arma el documento con cargo, fechas, sueldo, horario y tipo. Eso no cambia la ficha. Los datos se
-        guardan cuando sube el PDF firmado y los confirma (puede corregirlos si el papel salió distinto).
+        Al generar se descarga el Word con cargo, funciones, fechas, sueldo, horario y tipo. Eso no cambia la ficha. Los
+        datos se guardan cuando sube el PDF firmado y los confirma (puede corregirlos si el papel salió distinto).
       </p>
 
       {canWrite ? (
@@ -98,9 +108,19 @@ export function FichaContratos({
             {mostrarGenerar ? "Ocultar formulario" : "Generar contrato"}
           </Button>
           {abierto ? (
-            <Button type="button" variant="outline" onClick={() => abrirDocumento(relacionId, abierto.id)}>
-              Ver documento
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={pending === `word-${abierto.id}`}
+                onClick={() => void onDescargar(abierto.id)}
+              >
+                {pending === `word-${abierto.id}` ? "Descargando…" : "Descargar Word"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => abrirVistaPrevia(relacionId, abierto.id)}>
+                Vista previa
+              </Button>
+            </>
           ) : null}
         </div>
       ) : null}
@@ -117,7 +137,7 @@ export function FichaContratos({
               contrato={base}
             />
             <Button type="submit" disabled={pending === "generar"}>
-              {pending === "generar" ? "Generando…" : "Generar documento"}
+              {pending === "generar" ? "Generando…" : "Generar Word"}
             </Button>
           </FormSection>
         </form>
@@ -174,7 +194,7 @@ export function FichaContratos({
             {contratos.length === 0 ? (
               <tr>
                 <td className="px-4 py-6 text-muted-foreground" colSpan={7}>
-                  Aún no hay contratos. Genere el documento para firmar.
+                  Aún no hay contratos. Genere el Word para firmar.
                 </td>
               </tr>
             ) : (
@@ -188,8 +208,14 @@ export function FichaContratos({
                   <td className="px-4 py-2">{c.datos_confirmados ? "Sí" : "No"}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" size="sm" variant="outline" onClick={() => abrirDocumento(relacionId, c.id)}>
-                        Ver
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending === `word-${c.id}`}
+                        onClick={() => void onDescargar(c.id)}
+                      >
+                        {pending === `word-${c.id}` ? "…" : "Word"}
                       </Button>
                       {canMarcarRecogido && c.estado === "ELABORADO" && c.datos_confirmados ? (
                         <Button
@@ -226,7 +252,7 @@ function DatosContratoFields({
       <SelectField
         label="Cargo"
         name="cargo"
-        defaultValue={contrato?.cargo ?? trabajador.cargo}
+        defaultValue={cargoCanonico(contrato?.cargo ?? trabajador.cargo) ?? contrato?.cargo ?? trabajador.cargo}
         allowEmpty
         options={opcionesCargo(contrato?.cargo ?? trabajador.cargo)}
       />

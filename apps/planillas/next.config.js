@@ -6,6 +6,9 @@ const app = webAppById("planillas");
 const nextConfig = {
   basePath: app.basePath,
   transpilePackages: ["@bd/auth", "@bd/config", "@inventario/ui", "@inventario/types", "@inventario/auth-invite"],
+  experimental: {
+    serverComponentsExternalPackages: ["docx"],
+  },
   webpack: (config) => {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),

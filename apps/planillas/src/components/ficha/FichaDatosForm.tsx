@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
 import { updateDatosTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
-import { CLASIFICACION_LABEL, JORNADA_LABEL, opcionesCargo } from "@/lib/planillas-labels";
+import { CLASIFICACION_LABEL, JORNADA_LABEL, cargoCanonico, opcionesCargo } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 
@@ -54,7 +54,7 @@ export function FichaDatosForm({
           <SelectField
             label="Cargo"
             name="cargo"
-            defaultValue={trabajador.cargo}
+            defaultValue={cargoCanonico(trabajador.cargo) ?? trabajador.cargo}
             allowEmpty
             disabled={!canWrite}
             options={opcionesCargo(trabajador.cargo)}
