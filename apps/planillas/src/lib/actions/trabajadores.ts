@@ -30,6 +30,7 @@ export type RelacionRow = {
   cargo: string | null;
   clasificacion: ClasificacionTrabajador | null;
   jornada: JornadaLaboral | null;
+  horario: string | null;
   fecha_ingreso: string | null;
   fecha_cese: string | null;
   estado: EstadoRelacionLaboral;
@@ -66,7 +67,7 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version)",
     )
     .eq("entidad_id", entidadId)
     .order("fecha_ingreso", { ascending: false, nullsFirst: false });
@@ -93,7 +94,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion)",
     )
     .eq("id", relacionId)
     .maybeSingle();
@@ -162,6 +163,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
       cargo: cargo.value,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
+      horario: String(formData.get("horario") ?? "").trim() || null,
       fecha_ingreso: ingreso.value,
       estado: "ACTIVA",
     })
@@ -239,6 +241,7 @@ export async function updateDatosTrabajador(
       cargo: cargo.value,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
+      horario: String(formData.get("horario") ?? "").trim() || null,
       fecha_ingreso: ingreso.value,
       fecha_cese: cese.value,
       estado: cese.value ? "CESADA" : "ACTIVA",

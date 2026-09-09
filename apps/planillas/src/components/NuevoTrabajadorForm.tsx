@@ -134,6 +134,11 @@ export function NuevoTrabajadorForm({
           allowEmpty
           options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
         />
+        <Field
+          label="Horario"
+          name="horario"
+          placeholder="Ej. Lunes a viernes 8:00 a 13:00"
+        />
         <DateField label="Fecha de ingreso" name="fecha_ingreso" />
       </div>
       {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}

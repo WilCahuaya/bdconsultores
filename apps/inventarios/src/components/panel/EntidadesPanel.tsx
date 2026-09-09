@@ -75,10 +75,15 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
   const [direccion, setDireccion] = useState(entidad?.direccion ?? "");
   const [adminNombre, setAdminNombre] = useState(entidad?.admin_nombre ?? "");
   const [adminDni, setAdminDni] = useState(entidad?.admin_dni ?? "");
+  const [rlNombre, setRlNombre] = useState(entidad?.representante_legal_nombre ?? "");
+  const [rlDni, setRlDni] = useState(entidad?.representante_legal_dni ?? "");
+  const [rlCargo, setRlCargo] = useState(entidad?.representante_legal_cargo ?? "");
   const [buscandoRuc, setBuscandoRuc] = useState(false);
   const [buscandoDni, setBuscandoDni] = useState(false);
+  const [buscandoRl, setBuscandoRl] = useState(false);
   const [rucMsg, setRucMsg] = useState<string | null>(null);
   const [dniMsg, setDniMsg] = useState<string | null>(null);
+  const [rlMsg, setRlMsg] = useState<string | null>(null);
 
   useEffect(() => {
     setNombre(entidad?.nombre ?? "");
@@ -88,8 +93,12 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
     setDireccion(entidad?.direccion ?? "");
     setAdminNombre(entidad?.admin_nombre ?? "");
     setAdminDni(entidad?.admin_dni ?? "");
+    setRlNombre(entidad?.representante_legal_nombre ?? "");
+    setRlDni(entidad?.representante_legal_dni ?? "");
+    setRlCargo(entidad?.representante_legal_cargo ?? "");
     setRucMsg(null);
     setDniMsg(null);
+    setRlMsg(null);
   }, [entidad]);
 
   const nombreEtiquetaSugerido = useMemo(
@@ -144,6 +153,20 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
     if (result.dni) setAdminDni(result.dni);
     if (result.nombre_completo) setAdminNombre(result.nombre_completo);
     setDniMsg("Datos traídos del padrón RENIEC. Puede editarlos.");
+  }
+
+  async function buscarRepresentantePorDni() {
+    setBuscandoRl(true);
+    setRlMsg(null);
+    const result = await consultarDni(rlDni);
+    setBuscandoRl(false);
+    if (result.error) {
+      setRlMsg(result.error);
+      return;
+    }
+    if (result.dni) setRlDni(result.dni);
+    if (result.nombre_completo) setRlNombre(result.nombre_completo);
+    setRlMsg("Nombre traído del padrón RENIEC. El cargo se toma de la ficha RUC de SUNAT.");
   }
 
   return (
@@ -207,6 +230,55 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
         <p className="text-xs text-muted-foreground">
           Corresponde a la sede Principal de la entidad.
         </p>
+      </div>
+      <p className="text-sm font-medium text-muted-foreground">Representante legal (SUNAT)</p>
+      <p className="text-xs text-muted-foreground">
+        Quien figura en la ficha RUC. No es el administrador de la plataforma.
+      </p>
+      <div className="space-y-2">
+        <Label htmlFor="representante_legal_dni">DNI</Label>
+        <div className="flex gap-2">
+          <Input
+            id="representante_legal_dni"
+            name="representante_legal_dni"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={8}
+            pattern="[0-9]{8}"
+            title="8 dígitos"
+            placeholder="12345678"
+            value={rlDni}
+            onChange={(e) => setRlDni(e.target.value.replace(/\D/g, "").slice(0, 8))}
+            className="min-w-0 flex-1"
+          />
+          <Button type="button" variant="outline" disabled={buscandoRl} onClick={() => void buscarRepresentantePorDni()}>
+            {buscandoRl ? "Consultando…" : "Buscar"}
+          </Button>
+        </div>
+        {rlMsg ? (
+          <p className={`text-xs ${rlMsg.startsWith("Nombre") ? "text-muted-foreground" : "text-destructive"}`}>
+            {rlMsg}
+          </p>
+        ) : null}
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="representante_legal_nombre">Nombre</Label>
+        <Input
+          id="representante_legal_nombre"
+          name="representante_legal_nombre"
+          value={rlNombre}
+          onChange={(e) => setRlNombre(e.target.value)}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="representante_legal_cargo">Cargo en SUNAT</Label>
+        <Input
+          id="representante_legal_cargo"
+          name="representante_legal_cargo"
+          placeholder="Ej. Gerente general, titular"
+          value={rlCargo}
+          onChange={(e) => setRlCargo(e.target.value)}
+        />
       </div>
       <div className="space-y-2">
         <p className="text-sm font-medium text-muted-foreground">Módulos</p>
@@ -317,6 +389,9 @@ function entidadFromForm(form: FormData) {
     admin_dni: String(form.get("admin_dni") || ""),
     admin_email: String(form.get("admin_email") || ""),
     admin_telefono: String(form.get("admin_telefono") || ""),
+    representante_legal_nombre: String(form.get("representante_legal_nombre") || ""),
+    representante_legal_dni: String(form.get("representante_legal_dni") || ""),
+    representante_legal_cargo: String(form.get("representante_legal_cargo") || ""),
     usa_inventarios: form.get("usa_inventarios") === "on",
     usa_planillas: form.get("usa_planillas") === "on",
   };

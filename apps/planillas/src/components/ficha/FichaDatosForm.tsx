@@ -69,6 +69,13 @@ export function FichaDatosForm({
           disabled={!canWrite}
           options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
         />
+        <Field
+          label="Horario"
+          name="horario"
+          defaultValue={trabajador.horario}
+          placeholder="Ej. Lunes a viernes 8:00 a 13:00"
+          readOnly={!canWrite}
+        />
         <DateField label="Fecha de ingreso" name="fecha_ingreso" defaultValue={trabajador.fecha_ingreso} readOnly={!canWrite} />
         <DateField label="Fecha de cese" name="fecha_cese" defaultValue={trabajador.fecha_cese} readOnly={!canWrite} />
       </div>

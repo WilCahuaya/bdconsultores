@@ -20,6 +20,11 @@ export function NuevaEmpresaForm() {
   const [adminDni, setAdminDni] = useState("");
   const [adminNombre, setAdminNombre] = useState("");
   const [dniMsg, setDniMsg] = useState<string | null>(null);
+  const [rlDni, setRlDni] = useState("");
+  const [rlNombre, setRlNombre] = useState("");
+  const [rlCargo, setRlCargo] = useState("");
+  const [buscandoRl, setBuscandoRl] = useState(false);
+  const [rlMsg, setRlMsg] = useState<string | null>(null);
 
   async function buscarPorRuc() {
     setBuscando(true);
@@ -52,6 +57,21 @@ export function NuevaEmpresaForm() {
     if (result.dni) setAdminDni(result.dni);
     if (result.nombre_completo) setAdminNombre(result.nombre_completo);
     setDniMsg("Datos traídos del padrón RENIEC. Puede editarlos si hace falta.");
+  }
+
+  async function buscarRepresentantePorDni() {
+    setBuscandoRl(true);
+    setError(null);
+    setRlMsg(null);
+    const result = await consultarDni(rlDni);
+    setBuscandoRl(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    if (result.dni) setRlDni(result.dni);
+    if (result.nombre_completo) setRlNombre(result.nombre_completo);
+    setRlMsg("Nombre traído del padrón RENIEC. El cargo se toma de la ficha RUC de SUNAT.");
   }
 
   async function onSubmit(formData: FormData) {
@@ -107,6 +127,45 @@ export function NuevaEmpresaForm() {
         </div>
       </div>
       {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
+      <p className="text-sm font-medium">Representante legal (SUNAT)</p>
+      <p className="text-xs text-muted-foreground">
+        No es el administrador de la plataforma. Es quien figura como representante legal en la ficha RUC.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Field
+            label="DNI"
+            name="representante_legal_dni"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={8}
+            pattern="[0-9]{8}"
+            title="8 dígitos"
+            placeholder="12345678"
+            value={rlDni}
+            onChange={(event) => setRlDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
+          />
+          <Button type="button" variant="outline" size="sm" disabled={buscandoRl || pending} onClick={() => void buscarRepresentantePorDni()}>
+            {buscandoRl ? "Consultando…" : "Buscar en RENIEC"}
+          </Button>
+        </div>
+        <Field
+          label="Nombre"
+          name="representante_legal_nombre"
+          value={rlNombre}
+          onChange={(event) => setRlNombre(event.target.value)}
+        />
+        <div className="sm:col-span-2">
+          <Field
+            label="Cargo en SUNAT"
+            name="representante_legal_cargo"
+            placeholder="Ej. Gerente general, titular"
+            value={rlCargo}
+            onChange={(event) => setRlCargo(event.target.value)}
+          />
+        </div>
+      </div>
+      {rlMsg ? <p className="text-sm text-muted-foreground">{rlMsg}</p> : null}
       <p className="text-sm font-medium">Administrador de la empresa</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
@@ -148,7 +207,7 @@ export function NuevaEmpresaForm() {
         </span>
       </label>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Button type="submit" disabled={pending || buscando || buscandoDni}>
+      <Button type="submit" disabled={pending || buscando || buscandoDni || buscandoRl}>
         {pending ? "Guardando…" : "Crear empresa"}
       </Button>
     </form>

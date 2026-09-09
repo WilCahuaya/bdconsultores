@@ -126,6 +126,9 @@ export interface Entidad {
   admin_email: string | null;
   admin_dni: string | null;
   admin_telefono: string | null;
+  representante_legal_nombre?: string | null;
+  representante_legal_dni?: string | null;
+  representante_legal_cargo?: string | null;
   pe_codigo?: string | null;
   notas_planillas?: string | null;
   usa_inventarios: boolean;
@@ -253,6 +256,15 @@ export function validarAdminEntidadDni(dni: string | undefined): string | null {
     return "El DNI debe tener 8 dígitos.";
   }
   return null;
+}
+
+export function parseRepresentanteLegalDni(dni: string | undefined): { error?: string; value: string | null } {
+  const normalized = normalizeResponsableDniForAdmin(dni ?? "");
+  if (!normalized) return { value: null };
+  if (normalized.length !== 8) {
+    return { error: "El DNI del representante legal debe tener 8 dígitos.", value: null };
+  }
+  return { value: normalized };
 }
 
 export interface SedeConConteo extends Sede {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   esUsuarioEntidad,
   normalizeResponsableDni,
+  parseRepresentanteLegalDni,
   validarAdminEntidadDni,
   type Entidad,
 } from "@inventario/types";
@@ -83,6 +84,10 @@ export async function createEntidadPlanillas(formData: FormData): Promise<{
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const dniError = validarAdminEntidadDni(adminDni);
   if (dniError) return { error: dniError };
+  const rlDni = parseRepresentanteLegalDni(String(formData.get("representante_legal_dni") ?? ""));
+  if (rlDni.error) return { error: rlDni.error };
+  const rlNombre = String(formData.get("representante_legal_nombre") ?? "").trim() || null;
+  const rlCargo = String(formData.get("representante_legal_cargo") ?? "").trim() || null;
 
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -95,6 +100,9 @@ export async function createEntidadPlanillas(formData: FormData): Promise<{
       admin_email: adminEmail,
       admin_dni: adminDni,
       admin_telefono: adminTelefono,
+      representante_legal_nombre: rlNombre,
+      representante_legal_dni: rlDni.value,
+      representante_legal_cargo: rlCargo,
       usa_inventarios: usaInventarios,
       usa_planillas: true,
     })

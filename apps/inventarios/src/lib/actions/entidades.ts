@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { Entidad, EntidadConConteo } from "@inventario/types";
-import { normalizeResponsableDni, validarAdminEntidadDni } from "@inventario/types";
+import { normalizeResponsableDni, parseRepresentanteLegalDni, validarAdminEntidadDni } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { consultarDniReniec, consultarRucSunat } from "@bd/config";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
@@ -20,6 +20,9 @@ export interface CreateEntidadInput {
   admin_email?: string;
   admin_dni?: string;
   admin_telefono?: string;
+  representante_legal_nombre?: string;
+  representante_legal_dni?: string;
+  representante_legal_cargo?: string;
   usa_inventarios?: boolean;
   usa_planillas?: boolean;
 }
@@ -76,6 +79,8 @@ export async function createEntidad(input: CreateEntidadInput) {
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
   const dniError = validarAdminEntidadDni(adminDni);
   if (dniError) return { error: dniError };
+  const rlDni = parseRepresentanteLegalDni(input.representante_legal_dni);
+  if (rlDni.error) return { error: rlDni.error };
   const modulos = parseModulos(input);
   if (modulos.error) return { error: modulos.error };
 
@@ -90,6 +95,9 @@ export async function createEntidad(input: CreateEntidadInput) {
       admin_email: adminEmail,
       admin_dni: adminDni,
       admin_telefono: input.admin_telefono?.trim() || null,
+      representante_legal_nombre: input.representante_legal_nombre?.trim() || null,
+      representante_legal_dni: rlDni.value,
+      representante_legal_cargo: input.representante_legal_cargo?.trim() || null,
       usa_inventarios: modulos.usa_inventarios,
       usa_planillas: modulos.usa_planillas,
     })
@@ -204,6 +212,8 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
   const dniError = validarAdminEntidadDni(adminDni);
   if (dniError) return { error: dniError };
+  const rlDni = parseRepresentanteLegalDni(input.representante_legal_dni);
+  if (rlDni.error) return { error: rlDni.error };
   const modulos = parseModulos(input);
   if (modulos.error) return { error: modulos.error };
 
@@ -230,6 +240,9 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
       admin_email: adminEmail,
       admin_dni: adminDni,
       admin_telefono: input.admin_telefono?.trim() || null,
+      representante_legal_nombre: input.representante_legal_nombre?.trim() || null,
+      representante_legal_dni: rlDni.value,
+      representante_legal_cargo: input.representante_legal_cargo?.trim() || null,
       usa_inventarios: modulos.usa_inventarios,
       usa_planillas: modulos.usa_planillas,
     })
