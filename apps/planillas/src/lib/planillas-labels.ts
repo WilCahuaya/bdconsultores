@@ -133,7 +133,7 @@ export function parseFechaCampo(raw: string, label: string): { error?: string; v
   const trimmed = raw.trim();
   if (!trimmed) return { value: null };
   const iso = parseFechaFlexible(trimmed);
-  if (!iso) return { error: `${label} inválida. Escriba o pegue DD/MM/AAAA.` };
+  if (!iso) return { error: `${label} inválida. Escriba o pegue DD/MM/AAAA.`, value: null };
   return { value: iso };
 }
 
