@@ -160,7 +160,8 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
           Planillas
         </label>
         <p className="text-xs text-muted-foreground">
-          Marque los que usa esta empresa. Debe quedar al menos uno.
+          Marque los que usa esta empresa. Debe quedar al menos uno. Si marca Planillas, el
+          administrador se registra como primer trabajador (cargo Administrador).
         </p>
       </div>
       <p className="text-sm font-medium text-muted-foreground">

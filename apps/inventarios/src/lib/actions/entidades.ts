@@ -8,6 +8,7 @@ import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
 import { syncSedePrincipalDireccionFromEntidad } from "@/lib/sede-principal-direccion";
 import { syncAdminResponsableForEntidad } from "@/lib/responsables-admin-sync";
+import { syncAdminTrabajadorPlanillas } from "@/lib/planillas-admin-trabajador";
 
 export interface CreateEntidadInput {
   nombre: string;
@@ -82,6 +83,18 @@ export async function createEntidad(input: CreateEntidadInput) {
     input.admin_telefono,
     adminDni,
   );
+
+  if (modulos.usa_planillas) {
+    const planillas = await syncAdminTrabajadorPlanillas(
+      supabase,
+      data.id,
+      adminNombre,
+      adminEmail,
+      input.admin_telefono,
+      adminDni,
+    );
+    if (planillas.error) return { error: planillas.error };
+  }
 
   const invite = await inviteEntidadAdmin(data.id, adminEmail, adminNombre, nombre);
   if (invite.error) return { error: invite.error };
@@ -212,6 +225,18 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
     input.admin_telefono,
     adminDni,
   );
+
+  if (modulos.usa_planillas) {
+    const planillas = await syncAdminTrabajadorPlanillas(
+      supabase,
+      entidadId,
+      adminNombre,
+      adminEmail,
+      input.admin_telefono,
+      adminDni,
+    );
+    if (planillas.error) return { error: planillas.error };
+  }
 
   const invite = await inviteEntidadAdmin(entidadId, adminEmail, adminNombre, nombre, {
     mode: inviteMode,
