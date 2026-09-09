@@ -193,6 +193,16 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
     personaId = persona.id;
   }
 
+  const { data: relacionExistente } = await lookup
+    .from("relaciones_laborales")
+    .select("id")
+    .eq("persona_id", personaId)
+    .eq("entidad_id", entidadId)
+    .limit(1);
+  if (relacionExistente?.[0]) {
+    return { error: "Esta persona ya tiene una ficha en esa empresa.", relacionId: relacionExistente[0].id as string };
+  }
+
   const { data: relacion, error: relError } = await db
     .from("relaciones_laborales")
     .insert({

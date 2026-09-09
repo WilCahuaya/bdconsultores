@@ -52,12 +52,22 @@ export default async function PlanillasHomePage({
           </div>
           <div className="flex flex-wrap gap-2">
             {canCreate ? (
-              <Link
-                href="/empresas/nueva"
-                className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
-              >
-                Nueva empresa
-              </Link>
+              <>
+                <Link
+                  href="/empresas/nueva"
+                  className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+                >
+                  Nueva empresa
+                </Link>
+                {selectedId ? (
+                  <Link
+                    href={`/empresas/${selectedId}/editar`}
+                    className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+                  >
+                    Editar empresa
+                  </Link>
+                ) : null}
+              </>
             ) : null}
             {canCreateTrabajador && selectedId ? (
               <Link

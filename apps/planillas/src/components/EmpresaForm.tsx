@@ -3,25 +3,27 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
-import { consultarDni, consultarRuc, createEntidadPlanillas } from "@/lib/actions/entidades";
+import type { Entidad } from "@inventario/types";
+import { consultarDni, consultarRuc, createEntidadPlanillas, updateEntidadPlanillas } from "@/lib/actions/entidades";
 import { Field, FormSection } from "@/components/fields";
 
-export function NuevaEmpresaForm() {
+export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
   const router = useRouter();
+  const isEdit = Boolean(entidad);
   const [error, setError] = useState<string | null>(null);
   const [lookupMsg, setLookupMsg] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [buscandoDni, setBuscandoDni] = useState(false);
-  const [ruc, setRuc] = useState("");
-  const [nombre, setNombre] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [adminDni, setAdminDni] = useState("");
-  const [adminNombre, setAdminNombre] = useState("");
+  const [ruc, setRuc] = useState(entidad?.ruc ?? "");
+  const [nombre, setNombre] = useState(entidad?.nombre ?? "");
+  const [direccion, setDireccion] = useState(entidad?.direccion ?? "");
+  const [adminDni, setAdminDni] = useState(entidad?.admin_dni ?? "");
+  const [adminNombre, setAdminNombre] = useState(entidad?.admin_nombre ?? "");
   const [dniMsg, setDniMsg] = useState<string | null>(null);
-  const [rlDni, setRlDni] = useState("");
-  const [rlNombre, setRlNombre] = useState("");
-  const [rlCargo, setRlCargo] = useState("");
+  const [rlDni, setRlDni] = useState(entidad?.representante_legal_dni ?? "");
+  const [rlNombre, setRlNombre] = useState(entidad?.representante_legal_nombre ?? "");
+  const [rlCargo, setRlCargo] = useState(entidad?.representante_legal_cargo ?? "");
   const [buscandoRl, setBuscandoRl] = useState(false);
   const [rlMsg, setRlMsg] = useState<string | null>(null);
 
@@ -76,10 +78,12 @@ export function NuevaEmpresaForm() {
   async function onSubmit(formData: FormData) {
     setPending(true);
     setError(null);
-    const result = await createEntidadPlanillas(formData);
+    const result = isEdit && entidad
+      ? await updateEntidadPlanillas(entidad.id, formData)
+      : await createEntidadPlanillas(formData);
     setPending(false);
     if (result.error || !result.entidadId) {
-      setError(result.error ?? "No se pudo crear la empresa.");
+      setError(result.error ?? (isEdit ? "No se pudo guardar la empresa." : "No se pudo crear la empresa."));
       return;
     }
     const aviso = result.inviteMessage ? `&aviso=${encodeURIComponent(result.inviteMessage)}` : "";
@@ -127,7 +131,12 @@ export function NuevaEmpresaForm() {
         </div>
         {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" name="usa_inventarios" className="mt-1" />
+          <input
+            type="checkbox"
+            name="usa_inventarios"
+            className="mt-1"
+            defaultChecked={entidad ? entidad.usa_inventarios !== false : false}
+          />
           <span>
             También usa Inventarios
             <span className="mt-0.5 block text-xs text-muted-foreground">
@@ -178,7 +187,11 @@ export function NuevaEmpresaForm() {
       </FormSection>
       <FormSection
         title="Administrador de la empresa"
-        hint="Se registra como primer trabajador y recibe invitación para entrar con Google."
+        hint={
+          isEdit
+            ? "Si cambia el correo, se envía una nueva invitación. El administrador sigue figurando como trabajador."
+            : "Se registra como primer trabajador y recibe invitación para entrar con Google."
+        }
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -206,14 +219,14 @@ export function NuevaEmpresaForm() {
             value={adminNombre}
             onChange={(event) => setAdminNombre(event.target.value)}
           />
-          <Field label="Correo" name="admin_email" type="email" required />
-          <Field label="Teléfono" name="admin_telefono" inputMode="tel" />
+          <Field label="Correo" name="admin_email" type="email" required defaultValue={entidad?.admin_email ?? ""} />
+          <Field label="Teléfono" name="admin_telefono" inputMode="tel" defaultValue={entidad?.admin_telefono ?? ""} />
         </div>
         {dniMsg ? <p className="text-sm text-muted-foreground">{dniMsg}</p> : null}
       </FormSection>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={pending || buscando || buscandoDni || buscandoRl}>
-        {pending ? "Guardando…" : "Crear empresa"}
+        {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear empresa"}
       </Button>
     </form>
   );

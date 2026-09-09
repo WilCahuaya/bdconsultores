@@ -8,6 +8,7 @@ import {
   validarAdminEntidadDni,
   type Entidad,
 } from "@inventario/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { consultarDniReniec, consultarRucSunat } from "@bd/config";
 import { createClient } from "@/lib/supabase/server";
 import { entidadAlcance, puedeCrearEntidad, puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
@@ -45,7 +46,7 @@ export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | 
   const { data, error } = await supabase
     .from("entidades")
     .select(
-      "id, nombre, ruc, direccion, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, activo, usa_planillas",
+      "id, nombre, ruc, direccion, admin_nombre, admin_email, admin_dni, admin_telefono, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, activo, usa_inventarios, usa_planillas",
     )
     .eq("id", entidadId)
     .maybeSingle();
@@ -80,14 +81,23 @@ export async function consultarDni(dni: string): Promise<{
   return consultarDniReniec(dni);
 }
 
-export async function createEntidadPlanillas(formData: FormData): Promise<{
-  error?: string;
-  entidadId?: string;
-  inviteMessage?: string | null;
-}> {
-  const profile = await requirePlanillasProfile();
-  if (!puedeCrearEntidad(profile)) return { error: "Solo el contador puede crear empresas." };
+type EmpresaFormParsed =
+  | { error: string }
+  | {
+      nombre: string;
+      ruc: string | null;
+      direccion: string | null;
+      adminNombre: string;
+      adminEmail: string;
+      adminTelefono: string | null;
+      adminDni: string;
+      usaInventarios: boolean;
+      rlNombre: string | null;
+      rlDni: string | null;
+      rlCargo: string | null;
+    };
 
+function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   const nombre = String(formData.get("nombre") ?? "").trim();
   const ruc = String(formData.get("ruc") ?? "").trim() || null;
   const direccion = String(formData.get("direccion") ?? "").trim() || null;
@@ -104,51 +114,154 @@ export async function createEntidadPlanillas(formData: FormData): Promise<{
   if (dniError) return { error: dniError };
   const rlDni = parseRepresentanteLegalDni(String(formData.get("representante_legal_dni") ?? ""));
   if (rlDni.error) return { error: rlDni.error };
-  const rlNombre = String(formData.get("representante_legal_nombre") ?? "").trim() || null;
-  const rlCargo = String(formData.get("representante_legal_cargo") ?? "").trim() || null;
+
+  return {
+    nombre,
+    ruc,
+    direccion,
+    adminNombre,
+    adminEmail,
+    adminTelefono,
+    adminDni,
+    usaInventarios,
+    rlNombre: String(formData.get("representante_legal_nombre") ?? "").trim() || null,
+    rlDni: rlDni.value,
+    rlCargo: String(formData.get("representante_legal_cargo") ?? "").trim() || null,
+  };
+}
+
+async function syncEmpresaRelacionados(
+  supabase: SupabaseClient,
+  entidadId: string,
+  parsed: Exclude<EmpresaFormParsed, { error: string }>,
+  inviteMode: "invite" | "resend" = "invite",
+) {
+  await syncSedePrincipalDireccionFromEntidad(supabase, entidadId, parsed.direccion);
+  await syncAdminResponsableForEntidad(
+    supabase,
+    entidadId,
+    parsed.adminNombre,
+    parsed.adminEmail,
+    parsed.adminTelefono,
+    parsed.adminDni,
+  );
+
+  const planillas = await syncAdminTrabajadorPlanillas(
+    supabase,
+    entidadId,
+    parsed.adminNombre,
+    parsed.adminEmail,
+    parsed.adminTelefono,
+    parsed.adminDni,
+  );
+  if (planillas.error) return { error: planillas.error };
+
+  const invite = await inviteEntidadAdmin(
+    entidadId,
+    parsed.adminEmail,
+    parsed.adminNombre,
+    parsed.nombre,
+    { mode: inviteMode },
+  );
+  if (invite.error) return { error: invite.error };
+
+  return { inviteMessage: invite.message ?? invite.warning ?? null };
+}
+
+function entidadPayload(parsed: Exclude<EmpresaFormParsed, { error: string }>) {
+  return {
+    nombre: parsed.nombre,
+    ruc: parsed.ruc,
+    direccion: parsed.direccion,
+    admin_nombre: parsed.adminNombre,
+    admin_email: parsed.adminEmail,
+    admin_dni: parsed.adminDni,
+    admin_telefono: parsed.adminTelefono,
+    representante_legal_nombre: parsed.rlNombre,
+    representante_legal_dni: parsed.rlDni,
+    representante_legal_cargo: parsed.rlCargo,
+    usa_inventarios: parsed.usaInventarios,
+    usa_planillas: true,
+  };
+}
+
+export async function createEntidadPlanillas(formData: FormData): Promise<{
+  error?: string;
+  entidadId?: string;
+  inviteMessage?: string | null;
+}> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeCrearEntidad(profile)) return { error: "Solo el contador puede crear empresas." };
+
+  const parsed = parseEmpresaForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("entidades")
-    .insert({
-      nombre,
-      ruc,
-      direccion,
-      admin_nombre: adminNombre,
-      admin_email: adminEmail,
-      admin_dni: adminDni,
-      admin_telefono: adminTelefono,
-      representante_legal_nombre: rlNombre,
-      representante_legal_dni: rlDni.value,
-      representante_legal_cargo: rlCargo,
-      usa_inventarios: usaInventarios,
-      usa_planillas: true,
-    })
+    .insert(entidadPayload(parsed))
     .select("id")
     .single();
 
   if (error) return { error: error.message };
 
-  await syncSedePrincipalDireccionFromEntidad(supabase, data.id, direccion);
-  await syncAdminResponsableForEntidad(supabase, data.id, adminNombre, adminEmail, adminTelefono, adminDni);
-
-  const planillas = await syncAdminTrabajadorPlanillas(
-    supabase,
-    data.id,
-    adminNombre,
-    adminEmail,
-    adminTelefono,
-    adminDni,
-  );
-  if (planillas.error) return { error: planillas.error };
-
-  const invite = await inviteEntidadAdmin(data.id, adminEmail, adminNombre, nombre);
-  if (invite.error) return { error: invite.error };
+  const synced = await syncEmpresaRelacionados(supabase, data.id, parsed);
+  if ("error" in synced) return { error: synced.error };
 
   revalidatePath("/");
   revalidatePath("/pendientes");
   return {
     entidadId: data.id,
-    inviteMessage: invite.message ?? invite.warning ?? null,
+    inviteMessage: synced.inviteMessage,
+  };
+}
+
+export async function updateEntidadPlanillas(
+  entidadId: string,
+  formData: FormData,
+): Promise<{
+  error?: string;
+  entidadId?: string;
+  inviteMessage?: string | null;
+}> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeCrearEntidad(profile)) return { error: "Solo el contador puede editar empresas." };
+
+  const parsed = parseEmpresaForm(formData);
+  if ("error" in parsed) return { error: parsed.error };
+
+  const supabase = await createClient();
+  const { data: entidadAnterior } = await supabase
+    .from("entidades")
+    .select("admin_email")
+    .eq("id", entidadId)
+    .eq("activo", true)
+    .maybeSingle();
+
+  if (!entidadAnterior) return { error: "Empresa no encontrada." };
+
+  const adminEmailAnterior = entidadAnterior.admin_email?.trim().toLowerCase() ?? null;
+  const inviteMode =
+    adminEmailAnterior && adminEmailAnterior === parsed.adminEmail.toLowerCase() ? "resend" : "invite";
+
+  const { data, error } = await supabase
+    .from("entidades")
+    .update(entidadPayload(parsed))
+    .eq("id", entidadId)
+    .eq("activo", true)
+    .select("id")
+    .single();
+
+  if (error) return { error: error.message };
+
+  const synced = await syncEmpresaRelacionados(supabase, data.id, parsed, inviteMode);
+  if ("error" in synced) return { error: synced.error };
+
+  revalidatePath("/");
+  revalidatePath("/pendientes");
+  revalidatePath(`/empresas/${entidadId}/editar`);
+  return {
+    entidadId: data.id,
+    inviteMessage: synced.inviteMessage,
   };
 }

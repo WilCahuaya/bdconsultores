@@ -283,7 +283,6 @@ export async function confirmarContratoFirmado(
       horario: snapshot.horario,
       jornada: snapshot.jornada,
       fecha_ingreso: snapshot.fecha_inicio,
-      fecha_cese: snapshot.fecha_fin,
     })
     .eq("id", relacionId);
   if (relError) return { error: relError.message };

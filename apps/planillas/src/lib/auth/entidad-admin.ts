@@ -1,4 +1,4 @@
-import { sendUserInvitation } from "@inventario/auth-invite";
+import { sendUserInvitation, type InviteMode } from "@inventario/auth-invite";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { siteOrigin } from "@/lib/auth/site-origin";
 
@@ -7,6 +7,7 @@ export async function inviteEntidadAdmin(
   email: string,
   nombre: string,
   entidadNombre?: string,
+  options?: { mode?: InviteMode },
 ) {
   const admin = createAdminClient();
   if (!admin) {
@@ -24,7 +25,7 @@ export async function inviteEntidadAdmin(
     rol: "ADMIN_ENTIDAD",
     entidadId,
     entidadNombre,
-    mode: "invite",
+    mode: options?.mode ?? "invite",
     redirectTo: `${siteOrigin()}/auth/callback`,
   });
 }

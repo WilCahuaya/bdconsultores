@@ -69,15 +69,14 @@ export async function syncAdminTrabajadorPlanillas(
       .eq("id", personaId);
   }
 
-  const { data: relacionActiva, error: relFindError } = await db
+  const { data: relaciones, error: relFindError } = await db
     .from("relaciones_laborales")
     .select("id")
     .eq("persona_id", personaId)
     .eq("entidad_id", entidadId)
-    .is("fecha_cese", null)
-    .maybeSingle();
+    .limit(1);
   if (relFindError) return { error: relFindError.message };
-  if (relacionActiva) return {};
+  if (relaciones?.[0]) return {};
 
   const hoy = new Date().toISOString().slice(0, 10);
   const { data: relacion, error: relError } = await db
