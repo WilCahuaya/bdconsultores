@@ -3,11 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
-import { panelCardClass } from "@inventario/ui/panel";
 import { consultarDni } from "@/lib/actions/entidades";
 import { createTrabajador } from "@/lib/actions/trabajadores";
 import { CLASIFICACION_LABEL, JORNADA_LABEL, opcionesCargo } from "@/lib/planillas-labels";
-import { Field, DateField, SelectField } from "@/components/fields";
+import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import type { Entidad } from "@inventario/types";
 
 export function NuevoTrabajadorForm({
@@ -59,89 +58,84 @@ export function NuevoTrabajadorForm({
   }
 
   return (
-    <form action={onSubmit} className={`${panelCardClass} space-y-5 p-5`}>
-      <p className="text-sm text-muted-foreground">
-        Con el DNI se puede traer el nombre. Si ya está registrado, se reutiliza esa persona y se crea la
-        relación en esta empresa.
-      </p>
-      <SelectField
-        label="Empresa"
-        name="entidad_id"
-        defaultValue={defaultEntidadId}
-        options={entidades.map((e) => ({ value: e.id, label: e.nombre }))}
-        required
-      />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Field
-            label="DNI"
-            name="dni"
-            required
-            inputMode="numeric"
-            maxLength={8}
-            pattern="[0-9]{8}"
-            title="8 dígitos"
-            value={dni}
-            onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
-          />
-          <Button type="button" variant="outline" size="sm" disabled={buscando || pending} onClick={() => void buscarPorDni()}>
-            {buscando ? "Consultando…" : "Buscar en RENIEC"}
-          </Button>
-        </div>
-        <Field
-          label="Nombres"
-          name="nombres"
+    <form action={onSubmit} className="space-y-4">
+      <FormSection title="Empresa" hint="Si la persona ya existe por DNI, se reutiliza y se crea el puesto aquí.">
+        <SelectField
+          label="Empresa"
+          name="entidad_id"
+          defaultValue={defaultEntidadId}
+          options={entidades.map((e) => ({ value: e.id, label: e.nombre }))}
           required
-          value={nombres}
-          onChange={(event) => setNombres(event.target.value)}
         />
-        <Field
-          label="Apellido paterno"
-          name="apellido_paterno"
-          value={apellidoPaterno}
-          onChange={(event) => setApellidoPaterno(event.target.value)}
-        />
-        <Field
-          label="Apellido materno"
-          name="apellido_materno"
-          value={apellidoMaterno}
-          onChange={(event) => setApellidoMaterno(event.target.value)}
-        />
-        <DateField
-          label="Fecha de nacimiento"
-          name="fecha_nacimiento"
-          value={fechaNacimiento}
-          onChange={setFechaNacimiento}
-        />
-        <Field label="Celular" name="celular" />
-        <Field label="Correo" name="correo" type="email" />
-        <Field label="Dirección" name="direccion" />
-        <SelectField
-          label="Cargo"
-          name="cargo"
-          allowEmpty
-          options={opcionesCargo()}
-        />
-        <SelectField
-          label="Clasificación"
-          name="clasificacion"
-          allowEmpty
-          options={Object.entries(CLASIFICACION_LABEL).map(([value, label]) => ({ value, label }))}
-        />
-        <SelectField
-          label="Jornada"
-          name="jornada"
-          allowEmpty
-          options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
-        />
-        <Field
-          label="Horario"
-          name="horario"
-          placeholder="Ej. Lunes a viernes 8:00 a 13:00"
-        />
-        <DateField label="Fecha de ingreso" name="fecha_ingreso" />
-      </div>
-      {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
+      </FormSection>
+      <FormSection title="Persona" hint="Con el DNI se puede traer el nombre. La dirección sí va en el contrato.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Field
+              label="DNI"
+              name="dni"
+              required
+              inputMode="numeric"
+              maxLength={8}
+              pattern="[0-9]{8}"
+              title="8 dígitos"
+              value={dni}
+              onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
+            />
+            <Button type="button" variant="outline" size="sm" disabled={buscando || pending} onClick={() => void buscarPorDni()}>
+              {buscando ? "Consultando…" : "Buscar en RENIEC"}
+            </Button>
+          </div>
+          <Field
+            label="Nombres"
+            name="nombres"
+            required
+            value={nombres}
+            onChange={(event) => setNombres(event.target.value)}
+          />
+          <Field
+            label="Apellido paterno"
+            name="apellido_paterno"
+            value={apellidoPaterno}
+            onChange={(event) => setApellidoPaterno(event.target.value)}
+          />
+          <Field
+            label="Apellido materno"
+            name="apellido_materno"
+            value={apellidoMaterno}
+            onChange={(event) => setApellidoMaterno(event.target.value)}
+          />
+          <DateField
+            label="Fecha de nacimiento"
+            name="fecha_nacimiento"
+            value={fechaNacimiento}
+            onChange={setFechaNacimiento}
+          />
+          <Field label="Celular" name="celular" />
+          <Field label="Correo" name="correo" type="email" />
+          <Field label="Dirección" name="direccion" />
+        </div>
+        {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
+      </FormSection>
+      <FormSection title="Puesto en esta empresa">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SelectField label="Cargo" name="cargo" allowEmpty options={opcionesCargo()} />
+          <SelectField
+            label="Clasificación"
+            name="clasificacion"
+            allowEmpty
+            options={Object.entries(CLASIFICACION_LABEL).map(([value, label]) => ({ value, label }))}
+          />
+          <SelectField
+            label="Jornada"
+            name="jornada"
+            allowEmpty
+            options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
+          />
+          <Field label="Horario" name="horario" placeholder="Ej. Lunes a viernes 8:00 a 13:00" />
+          <DateField label="Fecha de ingreso" name="fecha_ingreso" />
+        </div>
+      </FormSection>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={pending || buscando}>
         {pending ? "Guardando…" : "Registrar trabajador"}

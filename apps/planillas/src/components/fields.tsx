@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ChangeEvent } from "react";
+import { useState, type ChangeEvent, type ReactNode } from "react";
 import { FechaDdMmYyyyInput } from "@inventario/ui";
+import { panelCardClass } from "@inventario/ui/panel";
 import { formatFechaInputDDMMYYYY, formatFechaISOToDDMMYYYY } from "@inventario/types";
 
 const fieldClass =
@@ -146,6 +147,26 @@ export function SelectField({
         ))}
       </select>
     </label>
+  );
+}
+
+export function FormSection({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`${panelCardClass} space-y-4 p-5`}>
+      <div>
+        <h2 className="text-sm font-medium text-foreground">{title}</h2>
+        {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      </div>
+      {children}
+    </section>
   );
 }
 

@@ -3,9 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
-import { panelCardClass } from "@inventario/ui/panel";
 import { consultarDni, consultarRuc, createEntidadPlanillas } from "@/lib/actions/entidades";
-import { Field } from "@/components/fields";
+import { Field, FormSection } from "@/components/fields";
 
 export function NuevaEmpresaForm() {
   const router = useRouter();
@@ -88,124 +87,130 @@ export function NuevaEmpresaForm() {
   }
 
   return (
-    <form action={onSubmit} className={`${panelCardClass} space-y-5 p-5`}>
-      <p className="text-sm text-muted-foreground">
-        Con el RUC se puede traer razón social y dirección del padrón. El administrador se registra como primer
-        trabajador y recibe invitación para entrar con Google.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+    <form action={onSubmit} className="space-y-4">
+      <FormSection
+        title="Empresa"
+        hint="Con el RUC se puede traer razón social y dirección del padrón."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Field
+              label="RUC"
+              name="ruc"
+              placeholder="20XXXXXXXXX"
+              inputMode="numeric"
+              maxLength={11}
+              pattern="[0-9]{11}"
+              title="11 dígitos"
+              value={ruc}
+              onChange={(event) => setRuc(event.target.value.replace(/\D/g, "").slice(0, 11))}
+            />
+            <Button type="button" variant="outline" size="sm" disabled={buscando || pending} onClick={() => void buscarPorRuc()}>
+              {buscando ? "Consultando…" : "Buscar en SUNAT"}
+            </Button>
+          </div>
           <Field
-            label="RUC"
-            name="ruc"
-            placeholder="20XXXXXXXXX"
-            inputMode="numeric"
-            maxLength={11}
-            pattern="[0-9]{11}"
-            title="11 dígitos"
-            value={ruc}
-            onChange={(event) => setRuc(event.target.value.replace(/\D/g, "").slice(0, 11))}
-          />
-          <Button type="button" variant="outline" size="sm" disabled={buscando || pending} onClick={() => void buscarPorRuc()}>
-            {buscando ? "Consultando…" : "Buscar en SUNAT"}
-          </Button>
-        </div>
-        <Field
-          label="Razón social"
-          name="nombre"
-          required
-          value={nombre}
-          onChange={(event) => setNombre(event.target.value)}
-        />
-        <div className="sm:col-span-2">
-          <Field
-            label="Dirección"
-            name="direccion"
-            value={direccion}
-            onChange={(event) => setDireccion(event.target.value)}
-          />
-        </div>
-      </div>
-      {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
-      <p className="text-sm font-medium">Representante legal (SUNAT)</p>
-      <p className="text-xs text-muted-foreground">
-        No es el administrador de la plataforma. Es quien figura como representante legal en la ficha RUC.
-      </p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Field
-            label="DNI"
-            name="representante_legal_dni"
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={8}
-            pattern="[0-9]{8}"
-            title="8 dígitos"
-            placeholder="12345678"
-            value={rlDni}
-            onChange={(event) => setRlDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
-          />
-          <Button type="button" variant="outline" size="sm" disabled={buscandoRl || pending} onClick={() => void buscarRepresentantePorDni()}>
-            {buscandoRl ? "Consultando…" : "Buscar en RENIEC"}
-          </Button>
-        </div>
-        <Field
-          label="Nombre"
-          name="representante_legal_nombre"
-          value={rlNombre}
-          onChange={(event) => setRlNombre(event.target.value)}
-        />
-        <div className="sm:col-span-2">
-          <Field
-            label="Cargo en SUNAT"
-            name="representante_legal_cargo"
-            placeholder="Ej. Gerente general, titular"
-            value={rlCargo}
-            onChange={(event) => setRlCargo(event.target.value)}
-          />
-        </div>
-      </div>
-      {rlMsg ? <p className="text-sm text-muted-foreground">{rlMsg}</p> : null}
-      <p className="text-sm font-medium">Administrador de la empresa</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <Field
-            label="DNI"
-            name="admin_dni"
+            label="Razón social"
+            name="nombre"
             required
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={8}
-            pattern="[0-9]{8}"
-            title="8 dígitos"
-            placeholder="12345678"
-            value={adminDni}
-            onChange={(event) => setAdminDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
+            value={nombre}
+            onChange={(event) => setNombre(event.target.value)}
           />
-          <Button type="button" variant="outline" size="sm" disabled={buscandoDni || pending} onClick={() => void buscarPorDni()}>
-            {buscandoDni ? "Consultando…" : "Buscar en RENIEC"}
-          </Button>
+          <div className="sm:col-span-2">
+            <Field
+              label="Dirección"
+              name="direccion"
+              value={direccion}
+              onChange={(event) => setDireccion(event.target.value)}
+            />
+          </div>
         </div>
-        <Field
-          label="Nombre"
-          name="admin_nombre"
-          required
-          value={adminNombre}
-          onChange={(event) => setAdminNombre(event.target.value)}
-        />
-        <Field label="Correo" name="admin_email" type="email" required />
-        <Field label="Teléfono" name="admin_telefono" inputMode="tel" />
-      </div>
-      {dniMsg ? <p className="text-sm text-muted-foreground">{dniMsg}</p> : null}
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" name="usa_inventarios" className="mt-1" />
-        <span>
-          También usa Inventarios
-          <span className="mt-0.5 block text-xs text-muted-foreground">
-            Si no lo marca, la empresa no aparece en el módulo de activos.
+        {lookupMsg ? <p className="text-sm text-muted-foreground">{lookupMsg}</p> : null}
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="usa_inventarios" className="mt-1" />
+          <span>
+            También usa Inventarios
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Si no lo marca, la empresa no aparece en el módulo de activos.
+            </span>
           </span>
-        </span>
-      </label>
+        </label>
+      </FormSection>
+      <FormSection
+        title="Representante legal (SUNAT)"
+        hint="No es el administrador de la plataforma. Es quien figura como representante legal en la ficha RUC."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Field
+              label="DNI"
+              name="representante_legal_dni"
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+              pattern="[0-9]{8}"
+              title="8 dígitos"
+              placeholder="12345678"
+              value={rlDni}
+              onChange={(event) => setRlDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
+            />
+            <Button type="button" variant="outline" size="sm" disabled={buscandoRl || pending} onClick={() => void buscarRepresentantePorDni()}>
+              {buscandoRl ? "Consultando…" : "Buscar en RENIEC"}
+            </Button>
+          </div>
+          <Field
+            label="Nombre"
+            name="representante_legal_nombre"
+            value={rlNombre}
+            onChange={(event) => setRlNombre(event.target.value)}
+          />
+          <div className="sm:col-span-2">
+            <Field
+              label="Cargo en SUNAT"
+              name="representante_legal_cargo"
+              placeholder="Ej. Gerente general, titular"
+              value={rlCargo}
+              onChange={(event) => setRlCargo(event.target.value)}
+            />
+          </div>
+        </div>
+        {rlMsg ? <p className="text-sm text-muted-foreground">{rlMsg}</p> : null}
+      </FormSection>
+      <FormSection
+        title="Administrador de la empresa"
+        hint="Se registra como primer trabajador y recibe invitación para entrar con Google."
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Field
+              label="DNI"
+              name="admin_dni"
+              required
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={8}
+              pattern="[0-9]{8}"
+              title="8 dígitos"
+              placeholder="12345678"
+              value={adminDni}
+              onChange={(event) => setAdminDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
+            />
+            <Button type="button" variant="outline" size="sm" disabled={buscandoDni || pending} onClick={() => void buscarPorDni()}>
+              {buscandoDni ? "Consultando…" : "Buscar en RENIEC"}
+            </Button>
+          </div>
+          <Field
+            label="Nombre"
+            name="admin_nombre"
+            required
+            value={adminNombre}
+            onChange={(event) => setAdminNombre(event.target.value)}
+          />
+          <Field label="Correo" name="admin_email" type="email" required />
+          <Field label="Teléfono" name="admin_telefono" inputMode="tel" />
+        </div>
+        {dniMsg ? <p className="text-sm text-muted-foreground">{dniMsg}</p> : null}
+      </FormSection>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={pending || buscando || buscandoDni || buscandoRl}>
         {pending ? "Guardando…" : "Crear empresa"}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const TABS = [
-  { id: "datos", label: "Datos" },
+  { id: "datos", label: "Persona y puesto" },
   { id: "contratos", label: "Contratos" },
   { id: "documentos", label: "Documentos" },
   { id: "pensiones", label: "Pensiones" },

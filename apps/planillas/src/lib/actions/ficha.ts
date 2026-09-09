@@ -106,12 +106,12 @@ export async function addContrato(relacionId: string, formData: FormData): Promi
   const { error } = await db.from("contratos").insert({
     relacion_id: relacionId,
     version,
-    numero_contrato: String(formData.get("numero_contrato") ?? "").trim() || null,
+    numero_contrato: null,
     fecha_inicio: fechaInicio.value,
     fecha_fin: fechaFin.value,
     remuneracion: Number(formData.get("remuneracion") || 0) || null,
-    asignacion_familiar: Number(formData.get("asignacion_familiar") || 0) || null,
-    jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
+    asignacion_familiar: null,
+    jornada: gate.trabajador.jornada,
     es_vigente: esVigente,
     estado: (String(formData.get("estado") ?? "PENDIENTE_DOCS") as EstadoContratoPlanilla),
   });

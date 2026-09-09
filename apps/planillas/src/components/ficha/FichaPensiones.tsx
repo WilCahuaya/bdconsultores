@@ -3,10 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
-import { panelCardClass } from "@inventario/ui/panel";
 import { savePension, type PensionRow } from "@/lib/actions/ficha";
 import { TIPO_PENSION_LABEL, TRAMITE_PENSION_LABEL } from "@/lib/planillas-labels";
-import { Field, DateField, SelectField } from "@/components/fields";
+import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 
 export function FichaPensiones({
   relacionId,
@@ -36,7 +35,8 @@ export function FichaPensiones({
   }
 
   return (
-    <form action={onSubmit} className={`${panelCardClass} space-y-4 p-5`}>
+    <form action={onSubmit} className="space-y-4">
+      <FormSection title="AFP / ONP" hint="El sistema de pensiones del trabajador, no va en el contrato.">
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField
           label="Sistema"
@@ -65,6 +65,7 @@ export function FichaPensiones({
       ) : (
         <p className="text-sm text-muted-foreground">Solo consulta.</p>
       )}
+      </FormSection>
     </form>
   );
 }
