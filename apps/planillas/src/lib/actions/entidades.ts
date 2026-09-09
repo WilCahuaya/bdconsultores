@@ -10,7 +10,7 @@ import {
 } from "@inventario/types";
 import { consultarDniReniec, consultarRucSunat } from "@bd/config";
 import { createClient } from "@/lib/supabase/server";
-import { puedeCrearEntidad, puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
+import { entidadAlcance, puedeCrearEntidad, puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { syncAdminTrabajadorPlanillas } from "@/lib/planillas-admin-trabajador";
 import { syncAdminResponsableForEntidad } from "@/lib/responsables-admin-sync";
@@ -34,6 +34,24 @@ export async function listEntidadesPlanillas(): Promise<Entidad[]> {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data ?? []) as Entidad[];
+}
+
+export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | null> {
+  const profile = await requirePlanillasProfile();
+  const alcance = entidadAlcance(profile);
+  if (alcance !== "todas" && alcance !== entidadId) return null;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("entidades")
+    .select(
+      "id, nombre, ruc, direccion, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, activo, usa_planillas",
+    )
+    .eq("id", entidadId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return data as Entidad;
 }
 
 export async function consultarRuc(ruc: string): Promise<{

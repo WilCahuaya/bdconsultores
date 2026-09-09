@@ -13,6 +13,7 @@ import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
 import {
   puedeEditarFichaLaboral,
   puedeEscribirPlanillas,
+  puedeMarcarContratoRecogido,
   puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
@@ -37,7 +38,7 @@ export default async function FichaTrabajadorPage({
   const porValidar = trabajador.validacion === "PENDIENTE";
   const [contratos, documentos, pension, vidaLey, tRegistro] = await Promise.all([
     tab === "contratos" ? listContratos(params.relacionId) : Promise.resolve([]),
-    tab === "documentos" ? listDocumentos(params.relacionId) : Promise.resolve([]),
+    tab === "documentos" || tab === "contratos" ? listDocumentos(params.relacionId) : Promise.resolve([]),
     tab === "pensiones" ? getPension(params.relacionId) : Promise.resolve(null),
     tab === "vida-ley" ? getVidaLey(params.relacionId) : Promise.resolve(null),
     tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
@@ -71,7 +72,13 @@ export default async function FichaTrabajadorPage({
         <FichaTabs relacionId={params.relacionId} tab={tab} />
         {tab === "datos" ? <FichaDatosForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {tab === "contratos" ? (
-          <FichaContratos relacionId={params.relacionId} contratos={contratos} canWrite={canEditFicha} />
+          <FichaContratos
+            relacionId={params.relacionId}
+            contratos={contratos}
+            canWrite={canEditFicha}
+            canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
+            tieneContratoFirmado={documentos.some((d) => d.tipo === "CONTRATO_FIRMADO" && Boolean(d.storage_path) && d.estado === "SI")}
+          />
         ) : null}
         {tab === "documentos" ? (
           <FichaDocumentos

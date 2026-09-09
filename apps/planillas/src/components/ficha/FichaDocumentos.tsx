@@ -62,7 +62,8 @@ export function FichaDocumentos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Un archivo por documento (se puede reemplazar). PDF, JPG, PNG o WEBP. Máximo 10 MB.
+        Un archivo por documento (se puede reemplazar). PDF, JPG, PNG o WEBP. Máximo 10 MB. El contrato firmado se
+        sube aquí; el estudio lo revisa y lo marca Recogido.
       </p>
       <ul className={`${panelCardClass} divide-y p-0`}>
         {documentos.length === 0 ? (

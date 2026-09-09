@@ -31,6 +31,11 @@ export function puedeValidarAlta(profile: Profile): boolean {
   return esPersonalEstudio(profile.rol);
 }
 
+/** Solo estudio: revisar el PDF firmado y pasar el contrato a Recogido. */
+export function puedeMarcarContratoRecogido(profile: Profile): boolean {
+  return esPersonalEstudio(profile.rol);
+}
+
 export function entidadAlcance(profile: Profile): string | "todas" {
   if (esUsuarioEntidad(profile.rol) && profile.entidad_id) return profile.entidad_id;
   return "todas";

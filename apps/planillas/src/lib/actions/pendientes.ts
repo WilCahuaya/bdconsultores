@@ -119,11 +119,17 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
       } else {
         const estado = vigente.estado as EstadoContratoPlanilla;
         if (CONTRATO_EN_TRAMITE.has(estado)) {
+          const detalle =
+            estado === "PENDIENTE_DOCS"
+              ? "Contrato: falta generar el documento"
+              : estado === "ELABORADO"
+                ? "Contrato elaborado: falta recoger el firmado"
+                : `Contrato: ${ESTADO_CONTRATO_LABEL[estado]}`;
           items.push({
             ...base,
             id: `${relacion.id}:contrato:${estado}`,
             tipo: "contrato",
-            detalle: `Contrato: ${ESTADO_CONTRATO_LABEL[estado]}`,
+            detalle,
             tab: "contratos",
           });
         }

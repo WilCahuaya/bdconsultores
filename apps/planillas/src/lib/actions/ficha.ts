@@ -123,7 +123,7 @@ export async function addContrato(relacionId: string, formData: FormData): Promi
     asignacion_familiar: null,
     jornada: gate.trabajador.jornada,
     es_vigente: esVigente,
-    estado: (String(formData.get("estado") ?? "PENDIENTE_DOCS") as EstadoContratoPlanilla),
+    estado: "PENDIENTE_DOCS" as EstadoContratoPlanilla,
   });
   if (error) return { error: error.message };
 
@@ -140,6 +140,91 @@ export async function addContrato(relacionId: string, formData: FormData): Promi
       estado: "PENDIENTE",
     });
   }
+
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return {};
+}
+
+export async function generarDocumentoContrato(
+  relacionId: string,
+  contratoId: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const t = gate.trabajador;
+  if (!t.cargo?.trim() || !t.horario?.trim()) {
+    return { error: "Complete cargo y horario en el puesto antes de generar el documento." };
+  }
+
+  const db = await planillasDb();
+  const { data: contrato, error: loadError } = await db
+    .from("contratos")
+    .select("id, estado, fecha_inicio, fecha_fin, remuneracion")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!contrato) return { error: "Contrato no encontrado." };
+  if (contrato.estado === "RECOGIDO" || contrato.estado === "COMPLETO" || contrato.estado === "BAJA") {
+    return { error: "Este contrato ya no se genera de nuevo. Cree una versión nueva." };
+  }
+  if (!contrato.fecha_inicio || contrato.remuneracion == null) {
+    return { error: "Complete inicio y remuneración antes de generar el documento." };
+  }
+
+  if (contrato.estado !== "ELABORADO") {
+    const { error } = await db
+      .from("contratos")
+      .update({ estado: "ELABORADO" as EstadoContratoPlanilla })
+      .eq("id", contratoId)
+      .eq("relacion_id", relacionId);
+    if (error) return { error: error.message };
+  }
+
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return {};
+}
+
+export async function marcarContratoRecogido(
+  relacionId: string,
+  contratoId: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+
+  const db = await planillasDb();
+  const { data: contrato, error: loadError } = await db
+    .from("contratos")
+    .select("id, estado")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!contrato) return { error: "Contrato no encontrado." };
+  if (contrato.estado === "RECOGIDO") return {};
+  if (contrato.estado !== "ELABORADO") {
+    return { error: "Primero hay que generar el documento (estado Elaborado)." };
+  }
+
+  const { data: firmados, error: docError } = await db
+    .from("documentos")
+    .select("id, storage_path, estado")
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "CONTRATO_FIRMADO");
+  if (docError) return { error: docError.message };
+  const firmado = (firmados ?? []).find((d) => d.storage_path && d.estado === "SI");
+  if (!firmado) {
+    return { error: "Suba el PDF del contrato firmado en Documentos antes de marcarlo como recogido." };
+  }
+
+  const { error } = await db
+    .from("contratos")
+    .update({ estado: "RECOGIDO" as EstadoContratoPlanilla })
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
 
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
