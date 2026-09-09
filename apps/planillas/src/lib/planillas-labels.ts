@@ -21,6 +21,37 @@ export const JORNADA_LABEL: Record<JornadaLaboral, string> = {
   TIEMPO_PARCIAL: "Tiempo parcial",
 };
 
+export const CARGOS_TRABAJADOR = [
+  "Administrador",
+  "Tesorero",
+  "Secretario",
+  "Coordinador",
+  "Formador educativo espiritual",
+] as const;
+
+export type CargoTrabajador = (typeof CARGOS_TRABAJADOR)[number];
+
+export function esCargoTrabajador(value: string): value is CargoTrabajador {
+  return (CARGOS_TRABAJADOR as readonly string[]).includes(value);
+}
+
+export function opcionesCargo(actual?: string | null): { value: string; label: string }[] {
+  const options = CARGOS_TRABAJADOR.map((cargo) => ({ value: cargo, label: cargo }));
+  const extra = actual?.trim();
+  if (extra && !esCargoTrabajador(extra)) {
+    return [{ value: extra, label: extra }, ...options];
+  }
+  return options;
+}
+
+export function parseCargoCampo(raw: string, actual?: string | null): { error?: string; value: string | null } {
+  const cargo = raw.trim() || null;
+  if (!cargo) return { value: null };
+  if (esCargoTrabajador(cargo)) return { value: cargo };
+  if (actual?.trim() === cargo) return { value: cargo };
+  return { error: "Elija un cargo de la lista.", value: null };
+}
+
 /** Columna Tiempo del Excel de control (Completo / Parcial). */
 export const TIEMPO_LABEL: Record<JornadaLaboral, string> = {
   TIEMPO_COMPLETO: "Completo",

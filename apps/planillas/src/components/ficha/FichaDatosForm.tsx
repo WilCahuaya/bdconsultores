@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { updateDatosTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
-import { CLASIFICACION_LABEL, JORNADA_LABEL } from "@/lib/planillas-labels";
+import { CLASIFICACION_LABEL, JORNADA_LABEL, opcionesCargo } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField } from "@/components/fields";
 
 export function FichaDatosForm({
@@ -45,7 +45,14 @@ export function FichaDatosForm({
         <Field label="Celular" name="celular" defaultValue={p.celular} readOnly={!canWrite} />
         <Field label="Correo" name="correo" type="email" defaultValue={p.correo} readOnly={!canWrite} />
         <Field label="Dirección" name="direccion" defaultValue={p.direccion} readOnly={!canWrite} />
-        <Field label="Cargo" name="cargo" defaultValue={trabajador.cargo} readOnly={!canWrite} />
+        <SelectField
+          label="Cargo"
+          name="cargo"
+          defaultValue={trabajador.cargo}
+          allowEmpty
+          disabled={!canWrite}
+          options={opcionesCargo(trabajador.cargo)}
+        />
         <SelectField
           label="Clasificación"
           name="clasificacion"

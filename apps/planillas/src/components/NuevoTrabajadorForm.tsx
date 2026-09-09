@@ -6,7 +6,7 @@ import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { consultarDni } from "@/lib/actions/entidades";
 import { createTrabajador } from "@/lib/actions/trabajadores";
-import { CLASIFICACION_LABEL, JORNADA_LABEL } from "@/lib/planillas-labels";
+import { CLASIFICACION_LABEL, JORNADA_LABEL, opcionesCargo } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField } from "@/components/fields";
 import type { Entidad } from "@inventario/types";
 
@@ -116,7 +116,12 @@ export function NuevoTrabajadorForm({
         <Field label="Celular" name="celular" />
         <Field label="Correo" name="correo" type="email" />
         <Field label="Dirección" name="direccion" />
-        <Field label="Cargo" name="cargo" />
+        <SelectField
+          label="Cargo"
+          name="cargo"
+          allowEmpty
+          options={opcionesCargo()}
+        />
         <SelectField
           label="Clasificación"
           name="clasificacion"

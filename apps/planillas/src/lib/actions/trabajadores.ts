@@ -8,7 +8,7 @@ import type {
   TipoDocumentoPlanilla,
 } from "@inventario/types";
 import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
-import { parseFechaCampo } from "@/lib/planillas-labels";
+import { parseFechaCampo, parseCargoCampo } from "@/lib/planillas-labels";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 export type PersonaRow = {
@@ -128,6 +128,8 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   if (nacimiento.error) return { error: nacimiento.error };
   const ingreso = parseFechaCampo(String(formData.get("fecha_ingreso") ?? ""), "Fecha de ingreso");
   if (ingreso.error) return { error: ingreso.error };
+  const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""));
+  if (cargo.error) return { error: cargo.error };
 
   const db = await planillasDb();
   const { data: existente } = await db.from("personas").select("id").eq("dni", dni).maybeSingle();
@@ -157,7 +159,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
     .insert({
       persona_id: personaId,
       entidad_id: entidadId,
-      cargo: String(formData.get("cargo") ?? "").trim() || null,
+      cargo: cargo.value,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
       fecha_ingreso: ingreso.value,
@@ -213,6 +215,8 @@ export async function updateDatosTrabajador(
   if (ingreso.error) return { error: ingreso.error };
   const cese = parseFechaCampo(String(formData.get("fecha_cese") ?? ""), "Fecha de cese");
   if (cese.error) return { error: cese.error };
+  const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""), actual.cargo);
+  if (cargo.error) return { error: cargo.error };
 
   const db = await planillasDb();
   const { error: pError } = await db
@@ -232,7 +236,7 @@ export async function updateDatosTrabajador(
   const { error: rError } = await db
     .from("relaciones_laborales")
     .update({
-      cargo: String(formData.get("cargo") ?? "").trim() || null,
+      cargo: cargo.value,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
       fecha_ingreso: ingreso.value,
