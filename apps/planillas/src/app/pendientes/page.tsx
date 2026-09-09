@@ -47,7 +47,7 @@ export default async function PendientesPage({
 
         {entidades.length === 0 ? (
           <div className={`${panelCardClass} p-5 text-sm text-muted-foreground`}>
-            No hay empresas activas. Primero créelas en Inventarios.
+            No hay empresas con Planillas activas. En Inventarios, edite la entidad y marque el módulo Planillas.
           </div>
         ) : (
           <>

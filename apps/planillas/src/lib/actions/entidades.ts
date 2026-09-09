@@ -12,6 +12,7 @@ export async function listEntidadesPlanillas(): Promise<Entidad[]> {
     .from("entidades")
     .select("id, nombre, ruc, pe_codigo, activo")
     .eq("activo", true)
+    .eq("usa_planillas", true)
     .order("nombre");
 
   if (esUsuarioEntidad(profile.rol) && profile.entidad_id) {

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import type { EstadoRegistro } from "@inventario/types";
+import { entidadUsaInventarios } from "@inventario/types";
 import { InventarioGlobalPanel } from "@/components/panel/InventarioGlobalPanel";
 import { listActivos } from "@/lib/actions/activos";
 import { listEntidades } from "@/lib/actions/entidades";
@@ -26,11 +27,13 @@ export default async function ContadorInventarioPage({
       : "";
 
   const [entidades, activos] = await Promise.all([listEntidades(), listActivos()]);
+  const entidadesInv = entidades.filter(entidadUsaInventarios);
+  const entidadIds = new Set(entidadesInv.map((e) => e.id));
 
   return (
     <InventarioGlobalPanel
-      entidades={entidades}
-      activos={activos}
+      entidades={entidadesInv}
+      activos={activos.filter((a) => entidadIds.has(a.entidad_id))}
       initialEstado={initialEstado}
     />
   );

@@ -7,9 +7,10 @@ export const ENTIDADES_TABLE_COL_WIDTHS_PCT = [24, 9, 15, 24, 8, 20] as const;
 /** grow = ocupa el espacio libre; shrink = solo el ancho del contenido */
 export type PanelTableColSpec = { type: "grow" } | { type: "shrink" };
 
-/** Razón social, RUC, administrador, dirección, ambientes, estado, acciones */
+/** Razón social, RUC, módulos, administrador, dirección, ambientes, estado, acciones */
 export const ENTIDADES_TABLE_COLS: PanelTableColSpec[] = [
   { type: "grow" },
+  { type: "shrink" },
   { type: "shrink" },
   { type: "grow" },
   { type: "grow" },

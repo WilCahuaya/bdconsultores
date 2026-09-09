@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { EntityPortalView } from "@/components/portal/EntityPortalView";
 import { EntidadInactivaBlockedView } from "@/components/portal/EntidadInactivaBlockedView";
-import { resolveAdminEntidadAccess } from "@/lib/auth/admin-entidad-access";
+import { resolveEntidadPortalAccess } from "@/lib/auth/admin-entidad-access";
 import { portalLoginHref } from "@/lib/auth/profile";
 
 export default async function AdminPortalPage() {
-  const access = await resolveAdminEntidadAccess();
+  const access = await resolveEntidadPortalAccess();
 
   if (access.status === "unauth") redirect(portalLoginHref());
 
@@ -23,6 +23,10 @@ export default async function AdminPortalPage() {
   }
 
   return (
-    <EntityPortalView entidad={access.entidad} gestionHref="/admin/inventario" />
+    <EntityPortalView
+      entidad={access.entidad}
+      rol={access.profile.rol}
+      gestionHref="/admin/inventario"
+    />
   );
 }

@@ -18,6 +18,21 @@ export interface CreateEntidadInput {
   admin_email?: string;
   admin_dni?: string;
   admin_telefono?: string;
+  usa_inventarios?: boolean;
+  usa_planillas?: boolean;
+}
+
+function parseModulos(input: CreateEntidadInput): {
+  error?: string;
+  usa_inventarios: boolean;
+  usa_planillas: boolean;
+} {
+  const usa_inventarios = Boolean(input.usa_inventarios);
+  const usa_planillas = Boolean(input.usa_planillas);
+  if (!usa_inventarios && !usa_planillas) {
+    return { error: "Elija al menos un módulo: Inventarios o Planillas.", usa_inventarios, usa_planillas };
+  }
+  return { usa_inventarios, usa_planillas };
 }
 
 export async function createEntidad(input: CreateEntidadInput) {
@@ -35,6 +50,8 @@ export async function createEntidad(input: CreateEntidadInput) {
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
   const dniError = validarAdminEntidadDni(adminDni);
   if (dniError) return { error: dniError };
+  const modulos = parseModulos(input);
+  if (modulos.error) return { error: modulos.error };
 
   const { data, error } = await supabase
     .from("entidades")
@@ -47,6 +64,8 @@ export async function createEntidad(input: CreateEntidadInput) {
       admin_email: adminEmail,
       admin_dni: adminDni,
       admin_telefono: input.admin_telefono?.trim() || null,
+      usa_inventarios: modulos.usa_inventarios,
+      usa_planillas: modulos.usa_planillas,
     })
     .select()
     .single();
@@ -147,6 +166,8 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
   const dniError = validarAdminEntidadDni(adminDni);
   if (dniError) return { error: dniError };
+  const modulos = parseModulos(input);
+  if (modulos.error) return { error: modulos.error };
 
   const { data: entidadAnterior } = await supabase
     .from("entidades")
@@ -171,6 +192,8 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
       admin_email: adminEmail,
       admin_dni: adminDni,
       admin_telefono: input.admin_telefono?.trim() || null,
+      usa_inventarios: modulos.usa_inventarios,
+      usa_planillas: modulos.usa_planillas,
     })
     .eq("id", entidadId)
     .eq("activo", true)

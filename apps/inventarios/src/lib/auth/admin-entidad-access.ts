@@ -1,4 +1,5 @@
 import type { Entidad, Profile } from "@inventario/types";
+import { esUsuarioEntidad } from "@inventario/types";
 import { getEntidad } from "@/lib/actions/entidades";
 import { getProfile } from "@/lib/auth/profile";
 
@@ -12,6 +13,20 @@ export type AdminEntidadAccess =
 export async function resolveAdminEntidadAccess(): Promise<AdminEntidadAccess> {
   const profile = await getProfile();
   if (!profile || profile.rol !== "ADMIN_ENTIDAD") return { status: "unauth" };
+
+  if (!profile.entidad_id) return { status: "missing", profile };
+
+  const entidad = await getEntidad(profile.entidad_id);
+  if (!entidad) return { status: "missing", profile };
+  if (!entidad.activo) return { status: "inactive", profile, entidad };
+
+  return { status: "ok", profile, entidad };
+}
+
+/** Portal de módulos: admin, tesorero y secretario de la empresa. */
+export async function resolveEntidadPortalAccess(): Promise<AdminEntidadAccess> {
+  const profile = await getProfile();
+  if (!profile || !esUsuarioEntidad(profile.rol)) return { status: "unauth" };
 
   if (!profile.entidad_id) return { status: "missing", profile };
 

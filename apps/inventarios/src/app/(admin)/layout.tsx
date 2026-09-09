@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { entidadUsaInventarios } from "@inventario/types";
 import { PanelLayout } from "@/components/panel/PanelLayout";
 import { EntidadInactivaBlockedView } from "@/components/portal/EntidadInactivaBlockedView";
 import { getAmbientePreregistro } from "@/lib/actions/ubicacion";
@@ -25,6 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   const { profile, entidad } = access;
+  if (!entidadUsaInventarios(entidad)) redirect("/admin/portal");
   const [preregistrados, preregistroAmbiente] = await Promise.all([
     getAdminPreregistradoCount(),
     getAmbientePreregistro(entidad.id),

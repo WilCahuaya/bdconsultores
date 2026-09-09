@@ -128,9 +128,21 @@ export interface Entidad {
   admin_telefono: string | null;
   pe_codigo?: string | null;
   notas_planillas?: string | null;
+  usa_inventarios: boolean;
+  usa_planillas: boolean;
   activo: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export function entidadUsaInventarios(
+  entidad: Pick<Entidad, "usa_inventarios">,
+): boolean {
+  return entidad.usa_inventarios !== false;
+}
+
+export function entidadUsaPlanillas(entidad: Pick<Entidad, "usa_planillas">): boolean {
+  return entidad.usa_planillas !== false;
 }
 
 export interface EntidadConConteo extends Entidad {

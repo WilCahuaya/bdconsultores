@@ -7,6 +7,8 @@ import type { EntidadConConteo } from "@inventario/types";
 import {
   LABEL_PRINT_LAYOUT_FONTS,
   entidadNombreRequiereEtiquetaOverride,
+  entidadUsaInventarios,
+  entidadUsaPlanillas,
   suggestNombreEtiqueta,
 } from "@inventario/types";
 import { Button, ConfirmDialog, Dialog, Input, Label } from "@inventario/ui";
@@ -49,6 +51,14 @@ function sortEntidades(items: EntidadConConteo[]) {
     if (a.activo !== b.activo) return a.activo ? -1 : 1;
     return a.nombre.localeCompare(b.nombre);
   });
+}
+
+function modulosEntidadResumen(entidad: EntidadConConteo) {
+  const partes = [
+    entidadUsaInventarios(entidad) ? "Inventarios" : null,
+    entidadUsaPlanillas(entidad) ? "Planillas" : null,
+  ].filter(Boolean);
+  return partes.join(" · ") || "—";
 }
 
 type ConfirmAction =
@@ -131,6 +141,28 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
           Corresponde a la sede Principal de la entidad.
         </p>
       </div>
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-muted-foreground">Módulos</p>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="usa_inventarios"
+            defaultChecked={entidad ? entidadUsaInventarios(entidad) : true}
+          />
+          Inventarios
+        </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="usa_planillas"
+            defaultChecked={entidad ? entidadUsaPlanillas(entidad) : true}
+          />
+          Planillas
+        </label>
+        <p className="text-xs text-muted-foreground">
+          Marque los que usa esta empresa. Debe quedar al menos uno.
+        </p>
+      </div>
       <p className="text-sm font-medium text-muted-foreground">
         Administrador de la entidad
         {requireAdmin && (
@@ -202,6 +234,8 @@ function entidadFromForm(form: FormData) {
     admin_dni: String(form.get("admin_dni") || ""),
     admin_email: String(form.get("admin_email") || ""),
     admin_telefono: String(form.get("admin_telefono") || ""),
+    usa_inventarios: form.get("usa_inventarios") === "on",
+    usa_planillas: form.get("usa_planillas") === "on",
   };
 }
 
@@ -422,7 +456,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
     <div className="space-y-4">
       <PanelPageHeader
         title="Gestión de entidades"
-        subtitle="Administra las entidades y sus ambientes de inventario"
+        subtitle="Administra las entidades y qué módulos usa cada una (Inventarios y/o Planillas)"
         actions={
           <Button type="button" onClick={() => setCreateOpen(true)}>
             + Nueva entidad
@@ -480,6 +514,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
             <tr className={panelTableHeadRowClass}>
               <PanelTableTh>Razón social</PanelTableTh>
               <PanelTableTh className={panelTableShrinkCellClass}>RUC</PanelTableTh>
+              <PanelTableTh className={panelTableNowrapCellClass}>Módulos</PanelTableTh>
               <PanelTableTh>Administrador</PanelTableTh>
               <PanelTableTh>Dirección</PanelTableTh>
               <PanelTableTh align="center" className={panelTableShrinkCellClass}>
@@ -513,6 +548,9 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
                   className={`font-mono text-xs text-muted-foreground ${panelTableShrinkCellClass}`}
                 >
                   {entidad.ruc ?? "—"}
+                </PanelTableTd>
+                <PanelTableTd className={panelTableNowrapCellClass}>
+                  {modulosEntidadResumen(entidad)}
                 </PanelTableTd>
                 <PanelTableTd title={entidad.admin_nombre ?? undefined}>
                   {entidad.admin_nombre ?? "—"}
@@ -564,6 +602,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
                   {entidad.admin_nombre && (
                     <p className="font-medium text-foreground">{entidad.admin_nombre}</p>
                   )}
+                  <p className="text-muted-foreground">{modulosEntidadResumen(entidad)}</p>
                   {entidad.direccion && (
                     <p className="text-muted-foreground">{entidad.direccion}</p>
                   )}
