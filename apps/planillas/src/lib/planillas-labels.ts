@@ -20,6 +20,12 @@ export const JORNADA_LABEL: Record<JornadaLaboral, string> = {
   TIEMPO_PARCIAL: "Tiempo parcial",
 };
 
+/** Columna Tiempo del Excel de control (Completo / Parcial). */
+export const TIEMPO_LABEL: Record<JornadaLaboral, string> = {
+  TIEMPO_COMPLETO: "Completo",
+  TIEMPO_PARCIAL: "Parcial",
+};
+
 export const ESTADO_RELACION_LABEL: Record<EstadoRelacionLaboral, string> = {
   ACTIVA: "Activa",
   CESADA: "Cesada",
@@ -111,4 +117,20 @@ export function nombreCompleto(persona: {
     .map((p) => p?.trim())
     .filter(Boolean)
     .join(" ");
+}
+
+export function formatFechaPlanilla(value: string | null | undefined): string {
+  if (!value) return "—";
+  const iso = value.slice(0, 10);
+  const [year, month, day] = iso.split("-");
+  if (!year || !month || !day) return value;
+  return `${day}/${month}/${year}`;
+}
+
+export function formatRemuneracion(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  return new Intl.NumberFormat("es-PE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }

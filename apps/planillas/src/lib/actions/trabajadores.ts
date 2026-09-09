@@ -36,7 +36,21 @@ export type RelacionRow = {
 
 export type TrabajadorListItem = RelacionRow & {
   persona: PersonaRow;
+  remuneracion: number | null;
 };
+
+type ContratoEmbed = {
+  remuneracion: number | null;
+  es_vigente: boolean;
+  version: number;
+};
+
+function remuneracionDeContratos(contratos: ContratoEmbed[] | ContratoEmbed | null | undefined): number | null {
+  const list = Array.isArray(contratos) ? contratos : contratos ? [contratos] : [];
+  if (list.length === 0) return null;
+  const vigente = list.find((c) => c.es_vigente) ?? [...list].sort((a, b) => b.version - a.version)[0];
+  return vigente?.remuneracion ?? null;
+}
 
 function normalizeDni(value: string): string {
   return value.replace(/\D/g, "").trim();
@@ -51,7 +65,7 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version)",
     )
     .eq("entidad_id", entidadId)
     .order("fecha_ingreso", { ascending: false, nullsFirst: false });
@@ -61,8 +75,14 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   return (data ?? []).flatMap((row) => {
     const persona = Array.isArray(row.personas) ? row.personas[0] : row.personas;
     if (!persona) return [];
-    const { personas: _p, ...relacion } = row;
-    return [{ ...(relacion as RelacionRow), persona: persona as PersonaRow }];
+    const { personas: _p, contratos, ...relacion } = row;
+    return [
+      {
+        ...(relacion as RelacionRow),
+        persona: persona as PersonaRow,
+        remuneracion: remuneracionDeContratos(contratos as ContratoEmbed[] | ContratoEmbed | null),
+      },
+    ];
   });
 }
 
@@ -86,7 +106,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const persona = Array.isArray(data.personas) ? data.personas[0] : data.personas;
   if (!persona) return null;
   const { personas: _p, ...relacion } = data;
-  return { ...(relacion as RelacionRow), persona: persona as PersonaRow };
+  return { ...(relacion as RelacionRow), persona: persona as PersonaRow, remuneracion: null };
 }
 
 export async function createTrabajador(formData: FormData): Promise<{ error?: string; relacionId?: string }> {

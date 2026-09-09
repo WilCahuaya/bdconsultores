@@ -8,9 +8,9 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listPendientes } from "@/lib/actions/pendientes";
 import {
-  CLASIFICACION_LABEL,
-  ESTADO_RELACION_LABEL,
-  JORNADA_LABEL,
+  TIEMPO_LABEL,
+  formatFechaPlanilla,
+  formatRemuneracion,
   nombreCompleto,
 } from "@/lib/planillas-labels";
 
@@ -72,21 +72,22 @@ export default async function PlanillasHomePage({
               </Link>
             ) : null}
             <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[720px] text-left text-sm">
+              <table className="w-full min-w-[860px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 font-medium">DNI</th>
                     <th className="px-4 py-2 font-medium">Nombre</th>
                     <th className="px-4 py-2 font-medium">Cargo</th>
-                    <th className="px-4 py-2 font-medium">Clasificación</th>
-                    <th className="px-4 py-2 font-medium">Jornada</th>
-                    <th className="px-4 py-2 font-medium">Estado</th>
+                    <th className="px-4 py-2 font-medium">Fecha de ingreso</th>
+                    <th className="px-4 py-2 font-medium">Fecha de cese</th>
+                    <th className="px-4 py-2 font-medium">Tiempo</th>
+                    <th className="px-4 py-2 font-medium">Remuneración</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trabajadores.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={6}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={7}>
                         No hay trabajadores en esta empresa. El listado arranca en blanco.
                       </td>
                     </tr>
@@ -100,11 +101,10 @@ export default async function PlanillasHomePage({
                           </Link>
                         </td>
                         <td className="px-4 py-2">{t.cargo ?? "—"}</td>
-                        <td className="px-4 py-2">
-                          {t.clasificacion ? CLASIFICACION_LABEL[t.clasificacion] : "—"}
-                        </td>
-                        <td className="px-4 py-2">{t.jornada ? JORNADA_LABEL[t.jornada] : "—"}</td>
-                        <td className="px-4 py-2">{ESTADO_RELACION_LABEL[t.estado]}</td>
+                        <td className="px-4 py-2">{formatFechaPlanilla(t.fecha_ingreso)}</td>
+                        <td className="px-4 py-2">{formatFechaPlanilla(t.fecha_cese)}</td>
+                        <td className="px-4 py-2">{t.jornada ? TIEMPO_LABEL[t.jornada] : "—"}</td>
+                        <td className="px-4 py-2 tabular-nums">{formatRemuneracion(t.remuneracion)}</td>
                       </tr>
                     ))
                   )}
