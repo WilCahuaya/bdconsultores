@@ -196,6 +196,9 @@ importers:
       '@bd/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@inventario/auth-invite':
+        specifier: workspace:*
+        version: link:../../packages/auth-invite
       '@inventario/types':
         specifier: workspace:*
         version: link:../../packages/types

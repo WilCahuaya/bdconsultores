@@ -8,6 +8,12 @@ export function Field({
   defaultValue,
   required,
   readOnly,
+  inputMode,
+  maxLength,
+  pattern,
+  placeholder,
+  autoComplete,
+  title,
 }: {
   label: string;
   name: string;
@@ -15,6 +21,12 @@ export function Field({
   defaultValue?: string | number | null;
   required?: boolean;
   readOnly?: boolean;
+  inputMode?: "text" | "numeric" | "tel" | "email";
+  maxLength?: number;
+  pattern?: string;
+  placeholder?: string;
+  autoComplete?: string;
+  title?: string;
 }) {
   return (
     <label className="block space-y-1.5">
@@ -27,6 +39,12 @@ export function Field({
         required={required}
         readOnly={readOnly}
         disabled={readOnly}
+        inputMode={inputMode}
+        maxLength={maxLength}
+        pattern={pattern}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        title={title}
       />
     </label>
   );

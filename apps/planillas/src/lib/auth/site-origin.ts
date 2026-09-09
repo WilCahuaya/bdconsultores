@@ -1,0 +1,12 @@
+import { portalOrigin } from "@bd/config";
+
+/** Origin público (login / OAuth). Siempre el Portal, no el módulo. */
+export function siteOrigin() {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return portalOrigin();
+}

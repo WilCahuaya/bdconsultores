@@ -5,7 +5,7 @@ const app = webAppById("planillas");
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   basePath: app.basePath,
-  transpilePackages: ["@bd/auth", "@bd/config", "@inventario/ui", "@inventario/types"],
+  transpilePackages: ["@bd/auth", "@bd/config", "@inventario/ui", "@inventario/types", "@inventario/auth-invite"],
   webpack: (config) => {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),

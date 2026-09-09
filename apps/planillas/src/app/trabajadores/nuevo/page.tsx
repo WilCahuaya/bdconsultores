@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { NuevoTrabajadorForm } from "@/components/NuevoTrabajadorForm";
-import { puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { puedeCrearEntidad, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 
 export default async function NuevoTrabajadorPage({
@@ -29,7 +29,17 @@ export default async function NuevoTrabajadorPage({
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">Nuevo trabajador</h1>
         </div>
         {entidades.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay empresas activas.</p>
+          <p className="text-sm text-muted-foreground">
+            No hay empresas activas.
+            {puedeCrearEntidad(profile) ? (
+              <>
+                {" "}
+                <Link href="/empresas/nueva" className="font-medium text-primary hover:underline">
+                  Crear empresa
+                </Link>
+              </>
+            ) : null}
+          </p>
         ) : (
           <NuevoTrabajadorForm entidades={entidades} defaultEntidadId={defaultEntidadId} />
         )}

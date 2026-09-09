@@ -12,6 +12,7 @@
   "dependencies": {
     "@bd/auth": "workspace:*",
     "@bd/config": "workspace:*",
+    "@inventario/auth-invite": "workspace:*",
     "@inventario/types": "workspace:*",
     "@inventario/ui": "workspace:*",
     "@supabase/ssr": "^0.12.0",

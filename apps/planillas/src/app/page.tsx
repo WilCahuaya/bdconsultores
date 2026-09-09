@@ -3,7 +3,7 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
-import { requirePlanillasProfile, puedeEscribirPlanillas } from "@/lib/auth/access";
+import { requirePlanillasProfile, puedeEscribirPlanillas, puedeCrearEntidad } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listPendientes } from "@/lib/actions/pendientes";
@@ -17,7 +17,7 @@ import {
 export default async function PlanillasHomePage({
   searchParams,
 }: {
-  searchParams: { entidadId?: string };
+  searchParams: { entidadId?: string; aviso?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const entidades = await listEntidadesPlanillas();
@@ -30,6 +30,8 @@ export default async function PlanillasHomePage({
       ? await Promise.all([listTrabajadores(selectedId), listPendientes(selectedId)])
       : [[], []];
   const canWrite = puedeEscribirPlanillas(profile);
+  const canCreate = puedeCrearEntidad(profile);
+  const aviso = searchParams.aviso?.trim() || null;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -41,19 +43,40 @@ export default async function PlanillasHomePage({
               Hola, {profile.nombre}. Ficha laboral por empresa: datos, contratos, documentos, AFP, T-Registro y Vida Ley.
             </p>
           </div>
-          {canWrite && selectedId ? (
-            <Link
-              href={`/trabajadores/nuevo?entidadId=${selectedId}`}
-              className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
-              Nuevo trabajador
-            </Link>
-          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {canCreate ? (
+              <Link
+                href="/empresas/nueva"
+                className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+              >
+                Nueva empresa
+              </Link>
+            ) : null}
+            {canWrite && selectedId ? (
+              <Link
+                href={`/trabajadores/nuevo?entidadId=${selectedId}`}
+                className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                Nuevo trabajador
+              </Link>
+            ) : null}
+          </div>
         </div>
 
+        {aviso ? (
+          <p className={`${panelCardClass} p-4 text-sm text-foreground`}>{aviso}</p>
+        ) : null}
+
         {entidades.length === 0 ? (
-          <div className={`${panelCardClass} p-5 text-sm text-muted-foreground`}>
-            No hay empresas con Planillas activas. En Inventarios, edite la entidad y marque el módulo Planillas.
+          <div className={`${panelCardClass} space-y-2 p-5 text-sm text-muted-foreground`}>
+            <p>No hay empresas con Planillas activas.</p>
+            {canCreate ? (
+              <Link href="/empresas/nueva" className="font-medium text-primary hover:underline">
+                Crear empresa
+              </Link>
+            ) : (
+              <p>Pida al contador que cree la empresa o active Planillas en Inventarios.</p>
+            )}
           </div>
         ) : (
           <>

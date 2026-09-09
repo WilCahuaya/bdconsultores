@@ -13,6 +13,10 @@ export function puedeEscribirPlanillas(profile: Profile): boolean {
   return esPersonalEstudio(profile.rol);
 }
 
+export function puedeCrearEntidad(profile: Profile): boolean {
+  return profile.rol === "CONTADOR";
+}
+
 export function entidadAlcance(profile: Profile): string | "todas" {
   if (esUsuarioEntidad(profile.rol) && profile.entidad_id) return profile.entidad_id;
   return "todas";

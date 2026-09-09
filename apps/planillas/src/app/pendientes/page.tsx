@@ -3,7 +3,7 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
-import { requirePlanillasProfile } from "@/lib/auth/access";
+import { requirePlanillasProfile, puedeCrearEntidad } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listPendientes } from "@/lib/actions/pendientes";
 import {
@@ -25,6 +25,7 @@ export default async function PendientesPage({
   searchParams: { entidadId?: string; tipo?: string };
 }) {
   const profile = await requirePlanillasProfile();
+  const canCreate = puedeCrearEntidad(profile);
   const entidades = await listEntidadesPlanillas();
   const selectedId =
     searchParams.entidadId && entidades.some((e) => e.id === searchParams.entidadId)
@@ -46,8 +47,15 @@ export default async function PendientesPage({
         </div>
 
         {entidades.length === 0 ? (
-          <div className={`${panelCardClass} p-5 text-sm text-muted-foreground`}>
-            No hay empresas con Planillas activas. En Inventarios, edite la entidad y marque el módulo Planillas.
+          <div className={`${panelCardClass} space-y-2 p-5 text-sm text-muted-foreground`}>
+            <p>No hay empresas con Planillas activas.</p>
+            {canCreate ? (
+              <Link href="/empresas/nueva" className="font-medium text-primary hover:underline">
+                Crear empresa
+              </Link>
+            ) : (
+              <p>Pida al contador que cree la empresa o active Planillas en Inventarios.</p>
+            )}
           </div>
         ) : (
           <>
