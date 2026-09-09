@@ -5,6 +5,7 @@ import type {
   ClasificacionTrabajador,
   EstadoRelacionLaboral,
   JornadaLaboral,
+  TipoDocumentoPlanilla,
 } from "@inventario/types";
 import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { planillasDb } from "@/lib/supabase/planillas";
@@ -147,7 +148,26 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   }
 
   revalidatePath("/");
+  revalidatePath("/pendientes");
   revalidatePath(`/trabajadores/${relacion.id}`);
+
+  const checklist: TipoDocumentoPlanilla[] = [
+    "CONTRATO_FIRMADO",
+    "DNI",
+    "FICHA_DATOS",
+    "PENSIONES_FIRMADO",
+    "TR_ALTA",
+    "ASIGNACION_FAMILIAR",
+    "VIDA_LEY",
+  ];
+  await db.from("documentos").insert(
+    checklist.map((tipo) => ({
+      relacion_id: relacion.id,
+      tipo,
+      estado: "PENDIENTE",
+    })),
+  );
+
   return { relacionId: relacion.id };
 }
 
@@ -191,6 +211,7 @@ export async function updateDatosTrabajador(
   if (rError) return { error: rError.message };
 
   revalidatePath("/");
+  revalidatePath("/pendientes");
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }

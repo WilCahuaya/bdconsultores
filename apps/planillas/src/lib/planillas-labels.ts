@@ -76,6 +76,18 @@ export const TIPO_T_REGISTRO_LABEL: Record<TipoTRegistro, string> = {
   BAJA: "Baja",
 };
 
+export const PENDIENTE_TIPO_LABEL: Record<
+  "contrato" | "documento" | "afp" | "t-registro" | "vida-ley" | "vencimiento",
+  string
+> = {
+  contrato: "Contrato",
+  documento: "Documento",
+  afp: "AFP",
+  "t-registro": "T-Registro",
+  "vida-ley": "Vida Ley",
+  vencimiento: "Vencimiento",
+};
+
 export function nombreCompleto(persona: {
   nombres: string;
   apellido_paterno?: string | null;

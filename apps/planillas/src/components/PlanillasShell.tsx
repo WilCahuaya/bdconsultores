@@ -4,8 +4,17 @@ import { portalOrigin } from "@bd/config";
 import { MODULE_PLANILLAS, PLATFORM_NAME, plataformaModulosPath, type Profile } from "@inventario/types";
 import { ThemeToggle } from "@/components/public/ThemeToggle";
 import { LogoutButton } from "@/components/shared/LogoutButton";
+import { PlanillasNav } from "@/components/PlanillasNav";
 
-export function PlanillasShell({ profile, children }: { profile: Profile; children: ReactNode }) {
+export function PlanillasShell({
+  profile,
+  children,
+  entidadId,
+}: {
+  profile: Profile;
+  children: ReactNode;
+  entidadId?: string;
+}) {
   return (
     <div className="flex min-h-screen flex-col bg-muted/30">
       <header className="border-b border-border/70 bg-card shadow-sm">
@@ -26,7 +35,10 @@ export function PlanillasShell({ profile, children }: { profile: Profile; childr
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
+        <PlanillasNav entidadId={entidadId} />
+        {children}
+      </main>
     </div>
   );
 }

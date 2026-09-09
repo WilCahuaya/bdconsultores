@@ -35,7 +35,7 @@ export default async function FichaTrabajadorPage({
   ]);
 
   return (
-    <PlanillasShell profile={profile}>
+    <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
       <div className="space-y-6">
         <div>
           <Link href={`/?entidadId=${trabajador.entidad_id}`} className="text-sm text-primary hover:underline">

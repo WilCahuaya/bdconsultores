@@ -20,7 +20,7 @@ export default async function NuevoTrabajadorPage({
       : entidades[0]?.id ?? "";
 
   return (
-    <PlanillasShell profile={profile}>
+    <PlanillasShell profile={profile} entidadId={defaultEntidadId || undefined}>
       <div className="space-y-6">
         <div>
           <Link href={defaultEntidadId ? `/?entidadId=${defaultEntidadId}` : "/"} className="text-sm text-primary hover:underline">

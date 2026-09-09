@@ -108,6 +108,7 @@ export async function addContrato(relacionId: string, formData: FormData): Promi
   });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
   return {};
 }
 
@@ -135,6 +136,7 @@ export async function addDocumento(relacionId: string, formData: FormData): Prom
   });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
   return {};
 }
 
@@ -166,6 +168,7 @@ export async function savePension(relacionId: string, formData: FormData): Promi
   const { error } = await db.from("pensiones").upsert(payload, { onConflict: "relacion_id" });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
   return {};
 }
 
@@ -195,6 +198,7 @@ export async function saveVidaLey(relacionId: string, formData: FormData): Promi
   const { error } = await db.from("vida_ley").upsert(payload, { onConflict: "relacion_id" });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
   return {};
 }
 
@@ -223,5 +227,6 @@ export async function addTRegistro(relacionId: string, formData: FormData): Prom
   });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
   return {};
 }

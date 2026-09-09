@@ -7,10 +7,12 @@ export function EntidadSwitcher({
   entidades,
   selectedId,
   locked,
+  hrefBase = "/",
 }: {
   entidades: Entidad[];
   selectedId: string;
   locked?: boolean;
+  hrefBase?: string;
 }) {
   const router = useRouter();
 
@@ -22,7 +24,7 @@ export function EntidadSwitcher({
         value={selectedId}
         disabled={locked || entidades.length === 0}
         onChange={(event) => {
-          router.push(`/?entidadId=${event.target.value}`);
+          router.push(`${hrefBase}?entidadId=${event.target.value}`);
         }}
       >
         {entidades.map((entidad) => (

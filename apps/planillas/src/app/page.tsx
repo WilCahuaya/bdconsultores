@@ -6,6 +6,7 @@ import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { requirePlanillasProfile, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
+import { listPendientes } from "@/lib/actions/pendientes";
 import {
   CLASIFICACION_LABEL,
   ESTADO_RELACION_LABEL,
@@ -24,11 +25,14 @@ export default async function PlanillasHomePage({
     searchParams.entidadId && entidades.some((e) => e.id === searchParams.entidadId)
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
-  const trabajadores = selectedId ? await listTrabajadores(selectedId) : [];
+  const [trabajadores, pendientes] =
+    selectedId
+      ? await Promise.all([listTrabajadores(selectedId), listPendientes(selectedId)])
+      : [[], []];
   const canWrite = puedeEscribirPlanillas(profile);
 
   return (
-    <PlanillasShell profile={profile}>
+    <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -58,6 +62,15 @@ export default async function PlanillasHomePage({
               selectedId={selectedId}
               locked={esUsuarioEntidad(profile.rol)}
             />
+            {pendientes.length > 0 ? (
+              <Link
+                href={`/pendientes?entidadId=${selectedId}`}
+                className={`${panelCardClass} block p-4 text-sm hover:bg-muted/30`}
+              >
+                Hay <span className="font-semibold text-primary">{pendientes.length}</span> pendientes en esta
+                empresa (contratos, documentos, AFP, T-Registro, Vida Ley o vencimientos).
+              </Link>
+            ) : null}
             <div className={`${panelCardClass} overflow-x-auto p-0`}>
               <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
