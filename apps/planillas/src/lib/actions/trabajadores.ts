@@ -59,6 +59,7 @@ type ContratoEmbed = {
   version: number;
   estado: string | null;
   fecha_inicio: string | null;
+  datos_confirmados?: boolean;
 };
 
 type DocumentoEmbed = {
@@ -70,7 +71,10 @@ type DocumentoEmbed = {
 function remuneracionDeContratos(contratos: ContratoEmbed[] | ContratoEmbed | null | undefined): number | null {
   const list = Array.isArray(contratos) ? contratos : contratos ? [contratos] : [];
   if (list.length === 0) return null;
-  const vigente = list.find((c) => c.es_vigente) ?? [...list].sort((a, b) => b.version - a.version)[0];
+  const vigente =
+    list.find((c) => c.es_vigente && c.datos_confirmados) ??
+    list.find((c) => c.es_vigente) ??
+    [...list].sort((a, b) => b.version - a.version)[0];
   return vigente?.remuneracion ?? null;
 }
 
@@ -87,7 +91,7 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio), documentos (tipo, estado, storage_path)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
     )
     .eq("entidad_id", entidadId)
     .order("fecha_ingreso", { ascending: false, nullsFirst: false });
@@ -118,7 +122,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio), documentos (tipo, estado, storage_path)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
     )
     .eq("id", relacionId)
     .maybeSingle();

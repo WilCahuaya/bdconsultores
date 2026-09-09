@@ -13,7 +13,13 @@ import {
   nombreCompleto,
 } from "@/lib/planillas-labels";
 
-export default async function ContratoDocumentoPage({ params }: { params: { relacionId: string } }) {
+export default async function ContratoDocumentoPage({
+  params,
+  searchParams,
+}: {
+  params: { relacionId: string };
+  searchParams: { contratoId?: string };
+}) {
   await requirePlanillasProfile();
   const trabajador = await getTrabajador(params.relacionId);
   if (!trabajador) notFound();
@@ -22,10 +28,17 @@ export default async function ContratoDocumentoPage({ params }: { params: { rela
     listContratos(params.relacionId),
   ]);
   if (!entidad) notFound();
-  const contrato = contratos.find((c) => c.es_vigente) ?? contratos[0];
+  const contrato =
+    (searchParams.contratoId ? contratos.find((c) => c.id === searchParams.contratoId) : null) ??
+    contratos.find((c) => !c.datos_confirmados && c.estado === "ELABORADO") ??
+    contratos.find((c) => c.es_vigente) ??
+    contratos[0];
   if (!contrato) notFound();
 
   const persona = nombreCompleto(trabajador.persona);
+  const cargo = contrato.cargo ?? trabajador.cargo;
+  const jornada = contrato.jornada ?? trabajador.jornada;
+  const horario = contrato.horario ?? trabajador.horario;
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 bg-background p-8 text-foreground print:p-0">
@@ -57,11 +70,11 @@ export default async function ContratoDocumentoPage({ params }: { params: { rela
       </section>
       <section className="space-y-2 text-sm">
         <h2 className="text-base font-medium">Puesto y contrato</h2>
-        <p>Cargo: {trabajador.cargo ?? "—"}</p>
-        <p>Jornada: {trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : "—"}</p>
+        <p>Cargo: {cargo ?? "—"}</p>
+        <p>Jornada: {jornada ? JORNADA_LABEL[jornada] : "—"}</p>
         <div>
           <p>Jornada y horario</p>
-          <div className="whitespace-pre-line">{formatHorarioContrato(trabajador.horario)}</div>
+          <div className="whitespace-pre-line">{formatHorarioContrato(horario)}</div>
         </div>
         <p>Inicio: {formatFechaPlanilla(contrato.fecha_inicio)}</p>
         <p>Fin: {formatFechaPlanilla(contrato.fecha_fin)}</p>
@@ -69,7 +82,7 @@ export default async function ContratoDocumentoPage({ params }: { params: { rela
       </section>
       <p className="text-xs text-muted-foreground print:hidden">
         Documento generado para firma. El Word con plantilla legal se agregará después. Imprima o guarde en PDF, haga
-        firmar y suba el archivo en Documentos (Contrato firmado).
+        firmar y súbalo en el paso Contrato.
       </p>
     </div>
   );

@@ -6,59 +6,81 @@ import { webAppById } from "@bd/config";
 import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
-  addContrato,
-  generarDocumentoContrato,
+  confirmarContratoFirmado,
+  generarContratoParaFirma,
   marcarContratoRecogido,
   type ContratoRow,
+  type DocumentoRow,
 } from "@/lib/actions/ficha";
-import { ESTADO_CONTRATO_LABEL, formatFechaPlanilla, formatRemuneracion } from "@/lib/planillas-labels";
-import { Field, DateField, FormSection } from "@/components/fields";
+import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, formatFechaPlanilla, formatRemuneracion, opcionesCargo } from "@/lib/planillas-labels";
+import { Field, DateField, FormSection, SelectField } from "@/components/fields";
+import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
+import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
+
+function abrirDocumento(relacionId: string, contratoId: string) {
+  window.open(
+    `${webAppById("planillas").basePath}/trabajadores/${relacionId}/contrato?contratoId=${contratoId}`,
+    "_blank",
+  );
+}
 
 export function FichaContratos({
   relacionId,
+  entidadId,
+  trabajador,
   contratos,
+  documentos,
   canWrite,
   canMarcarRecogido,
-  tieneContratoFirmado,
 }: {
   relacionId: string;
+  entidadId: string;
+  trabajador: TrabajadorListItem;
   contratos: ContratoRow[];
+  documentos: DocumentoRow[];
   canWrite: boolean;
   canMarcarRecogido: boolean;
-  tieneContratoFirmado: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [accionId, setAccionId] = useState<string | null>(null);
+  const [pending, setPending] = useState<"generar" | "confirmar" | string | null>(null);
+  const [mostrarGenerar, setMostrarGenerar] = useState(contratos.length === 0);
 
-  async function onSubmit(formData: FormData) {
-    setPending(true);
+  const abierto = contratos.find(
+    (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
+  );
+  const tieneFirmado = documentos.some((d) => d.tipo === "CONTRATO_FIRMADO" && Boolean(d.storage_path) && d.estado === "SI");
+  const base = abierto ?? contratos.find((c) => c.datos_confirmados) ?? null;
+
+  async function onGenerar(formData: FormData) {
+    setPending("generar");
     setError(null);
-    const result = await addContrato(relacionId, formData);
-    setPending(false);
+    const result = await generarContratoParaFirma(relacionId, formData);
+    setPending(null);
+    if (result.error || !result.contratoId) {
+      setError(result.error ?? "No se pudo generar el contrato.");
+      return;
+    }
+    setMostrarGenerar(false);
+    router.refresh();
+    abrirDocumento(relacionId, result.contratoId);
+  }
+
+  async function onConfirmar(contratoId: string, formData: FormData) {
+    setPending("confirmar");
+    setError(null);
+    const result = await confirmarContratoFirmado(relacionId, contratoId, formData);
+    setPending(null);
     if (result.error) setError(result.error);
     else router.refresh();
   }
 
-  async function onGenerar(contratoId: string) {
-    setAccionId(contratoId);
-    setError(null);
-    const result = await generarDocumentoContrato(relacionId, contratoId);
-    setAccionId(null);
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-    router.refresh();
-    window.open(`${webAppById("planillas").basePath}/trabajadores/${relacionId}/contrato`, "_blank");
-  }
-
   async function onRecoger(contratoId: string) {
-    setAccionId(contratoId);
+    setPending(contratoId);
     setError(null);
     const result = await marcarContratoRecogido(relacionId, contratoId);
-    setAccionId(null);
+    setPending(null);
     if (result.error) setError(result.error);
     else router.refresh();
   }
@@ -66,9 +88,75 @@ export function FichaContratos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Al generar el documento el contrato pasa a Elaborado. El trabajador firma y se sube el PDF en Documentos. Solo el
-        contador o el asistente, al revisarlo, lo marcan Recogido.
+        Al generar se arma el documento con cargo, fechas, sueldo, horario y tipo. Eso no cambia la ficha. Los datos se
+        guardan cuando sube el PDF firmado y los confirma (puede corregirlos si el papel salió distinto).
       </p>
+
+      {canWrite ? (
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={() => setMostrarGenerar((v) => !v)}>
+            {mostrarGenerar ? "Ocultar formulario" : "Generar contrato"}
+          </Button>
+          {abierto ? (
+            <Button type="button" variant="outline" onClick={() => abrirDocumento(relacionId, abierto.id)}>
+              Ver documento
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {canWrite && mostrarGenerar ? (
+        <form action={onGenerar}>
+          <FormSection
+            title="Generar contrato"
+            hint="Estos datos son solo para el documento. La ficha no cambia hasta confirmar el firmado."
+          >
+            <DatosContratoFields
+              key={`gen-${base?.id ?? "nuevo"}-${base?.horario ?? ""}`}
+              trabajador={trabajador}
+              contrato={base}
+            />
+            <Button type="submit" disabled={pending === "generar"}>
+              {pending === "generar" ? "Generando…" : "Generar documento"}
+            </Button>
+          </FormSection>
+        </form>
+      ) : null}
+
+      {abierto ? (
+        <FormSection
+          title="Contrato firmado"
+          hint="Suba el PDF. Luego revise los datos generados; si el papel cambió algo, corríjalo aquí y guarde."
+        >
+          <FichaDocumentos
+            relacionId={relacionId}
+            entidadId={entidadId}
+            documentos={documentos}
+            canWrite={canWrite}
+            tiposFiltro={["CONTRATO_FIRMADO"]}
+            permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
+            hint="PDF firmado. Hasta confirmar, no se actualiza el puesto ni queda como contrato vigente."
+          />
+          {canWrite && tieneFirmado ? (
+            <form action={(formData) => void onConfirmar(abierto.id, formData)} className="space-y-4">
+              <p className="text-sm font-medium">Datos a guardar (del generado; se pueden cambiar)</p>
+              <DatosContratoFields
+                key={`conf-${abierto.id}-${abierto.horario}-${abierto.remuneracion}`}
+                trabajador={trabajador}
+                contrato={abierto}
+              />
+              <Button type="submit" disabled={pending === "confirmar"}>
+                {pending === "confirmar" ? "Guardando…" : "Confirmar y guardar contrato"}
+              </Button>
+            </form>
+          ) : canWrite ? (
+            <p className="text-sm text-muted-foreground">Cuando suba el firmado podrá confirmar y guardar los datos.</p>
+          ) : null}
+        </FormSection>
+      ) : null}
+
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
       <div className={`${panelCardClass} overflow-x-auto p-0`}>
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b bg-muted/40 text-muted-foreground">
@@ -78,7 +166,7 @@ export function FichaContratos({
               <th className="px-4 py-2 font-medium">Fin</th>
               <th className="px-4 py-2 font-medium">Estado</th>
               <th className="px-4 py-2 font-medium">Remuneración</th>
-              <th className="px-4 py-2 font-medium">Vigente</th>
+              <th className="px-4 py-2 font-medium">Guardado</th>
               <th className="px-4 py-2 font-medium">Acciones</th>
             </tr>
           </thead>
@@ -86,7 +174,7 @@ export function FichaContratos({
             {contratos.length === 0 ? (
               <tr>
                 <td className="px-4 py-6 text-muted-foreground" colSpan={7}>
-                  Aún no hay contratos.
+                  Aún no hay contratos. Genere el documento para firmar.
                 </td>
               </tr>
             ) : (
@@ -97,33 +185,20 @@ export function FichaContratos({
                   <td className="px-4 py-2">{formatFechaPlanilla(c.fecha_fin)}</td>
                   <td className="px-4 py-2">{ESTADO_CONTRATO_LABEL[c.estado]}</td>
                   <td className="px-4 py-2">{formatRemuneracion(c.remuneracion)}</td>
-                  <td className="px-4 py-2">{c.es_vigente ? "Sí" : "No"}</td>
+                  <td className="px-4 py-2">{c.datos_confirmados ? "Sí" : "No"}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap gap-2">
-                      {canWrite && (c.estado === "PENDIENTE_DOCS" || c.estado === "ELABORADO") ? (
+                      <Button type="button" size="sm" variant="outline" onClick={() => abrirDocumento(relacionId, c.id)}>
+                        Ver
+                      </Button>
+                      {canMarcarRecogido && c.estado === "ELABORADO" && c.datos_confirmados ? (
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          disabled={accionId === c.id}
-                          onClick={() => void onGenerar(c.id)}
-                        >
-                          {accionId === c.id ? "Generando…" : "Generar documento"}
-                        </Button>
-                      ) : null}
-                      {canMarcarRecogido && c.estado === "ELABORADO" ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={accionId === c.id || !tieneContratoFirmado}
+                          disabled={pending === c.id || !tieneFirmado}
                           onClick={() => void onRecoger(c.id)}
-                          title={
-                            tieneContratoFirmado
-                              ? "Marcar como recogido tras revisar el PDF firmado"
-                              : "Falta el PDF firmado en Documentos"
-                          }
                         >
-                          Marcar recogido
+                          {pending === c.id ? "Guardando…" : "Marcar recogido"}
                         </Button>
                       ) : null}
                     </div>
@@ -134,26 +209,44 @@ export function FichaContratos({
           </tbody>
         </table>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+    </div>
+  );
+}
 
-      {canWrite ? (
-        <form action={onSubmit} key={contratos.length}>
-          <FormSection title="Nueva versión" hint="Queda pendiente hasta generar el documento. Jornada y horario están en el puesto.">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <DateField label="Inicio" name="fecha_inicio" />
-              <DateField label="Fin" name="fecha_fin" />
-              <Field label="Remuneración" name="remuneracion" type="number" />
-              <label className="flex items-end gap-2 pb-2 text-sm">
-                <input type="checkbox" name="es_vigente" defaultChecked />
-                Marcar como vigente
-              </label>
-            </div>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando…" : "Agregar contrato"}
-            </Button>
-          </FormSection>
-        </form>
-      ) : null}
+function DatosContratoFields({
+  trabajador,
+  contrato,
+}: {
+  trabajador: TrabajadorListItem;
+  contrato: ContratoRow | null;
+}) {
+  const [jornada, setJornada] = useState(contrato?.jornada ?? trabajador.jornada ?? "");
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <SelectField
+        label="Cargo"
+        name="cargo"
+        defaultValue={contrato?.cargo ?? trabajador.cargo}
+        allowEmpty
+        options={opcionesCargo(contrato?.cargo ?? trabajador.cargo)}
+      />
+      <SelectField
+        label="Tipo de contrato"
+        name="jornada"
+        value={jornada}
+        allowEmpty
+        options={Object.entries(JORNADA_LABEL).map(([value, label]) => ({ value, label }))}
+        onChange={(event) => setJornada(event.target.value)}
+      />
+      <DateField label="Fecha de inicio" name="fecha_inicio" defaultValue={contrato?.fecha_inicio ?? trabajador.fecha_ingreso} />
+      <DateField label="Fecha de cese" name="fecha_fin" defaultValue={contrato?.fecha_fin ?? trabajador.fecha_cese} />
+      <Field
+        label="Remuneración"
+        name="remuneracion"
+        type="number"
+        defaultValue={contrato?.remuneracion ?? trabajador.remuneracion ?? ""}
+      />
+      <HorarioLaboralField jornada={jornada} defaultValue={contrato?.horario ?? trabajador.horario} />
     </div>
   );
 }

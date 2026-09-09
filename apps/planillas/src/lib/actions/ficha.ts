@@ -13,7 +13,7 @@ import type {
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
-import { parseFechaCampo } from "@/lib/planillas-labels";
+import { parseFechaCampo, parseCargoCampo } from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { planillasDb } from "@/lib/supabase/planillas";
 
@@ -41,6 +41,8 @@ export type ContratoRow = {
   id: string;
   version: number;
   numero_contrato: string | null;
+  cargo: string | null;
+  horario: string | null;
   fecha_inicio: string | null;
   fecha_fin: string | null;
   remuneracion: number | null;
@@ -48,6 +50,7 @@ export type ContratoRow = {
   jornada: JornadaLaboral | null;
   es_vigente: boolean;
   estado: EstadoContratoPlanilla;
+  datos_confirmados: boolean;
 };
 
 export type DocumentoRow = {
@@ -89,45 +92,44 @@ export async function listContratos(relacionId: string): Promise<ContratoRow[]> 
   const db = await planillasDb();
   const { data, error } = await db
     .from("contratos")
-    .select("id, version, numero_contrato, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado")
+    .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados")
     .eq("relacion_id", relacionId)
     .order("version", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as ContratoRow[];
 }
 
-export async function addContrato(relacionId: string, formData: FormData): Promise<{ error?: string }> {
-  const gate = await assertEscrituraFicha(relacionId);
-  if ("error" in gate) return { error: gate.error };
-  const db = await planillasDb();
-  const vigentes = await db.from("contratos").select("id").eq("relacion_id", relacionId).eq("es_vigente", true);
-  const { count } = await db
-    .from("contratos")
-    .select("id", { count: "exact", head: true })
-    .eq("relacion_id", relacionId);
-  const version = (count ?? 0) + 1;
-  const esVigente = formData.get("es_vigente") === "on";
-  if (esVigente && (vigentes.data?.length ?? 0) > 0) {
-    await db.from("contratos").update({ es_vigente: false }).eq("relacion_id", relacionId);
-  }
+function parseSnapshotContrato(formData: FormData, cargoActual: string | null) {
+  const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""), cargoActual);
+  if (cargo.error) return { error: cargo.error };
+  if (!cargo.value) return { error: "Elija el cargo del contrato." };
   const fechaInicio = parseFechaCampo(String(formData.get("fecha_inicio") ?? ""), "Fecha de inicio");
   if (fechaInicio.error) return { error: fechaInicio.error };
+  if (!fechaInicio.value) return { error: "La fecha de inicio es obligatoria." };
   const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de fin");
   if (fechaFin.error) return { error: fechaFin.error };
-  const { error } = await db.from("contratos").insert({
-    relacion_id: relacionId,
-    version,
-    numero_contrato: null,
-    fecha_inicio: fechaInicio.value,
-    fecha_fin: fechaFin.value,
-    remuneracion: Number(formData.get("remuneracion") || 0) || null,
-    asignacion_familiar: null,
-    jornada: gate.trabajador.jornada,
-    es_vigente: esVigente,
-    estado: "PENDIENTE_DOCS" as EstadoContratoPlanilla,
-  });
-  if (error) return { error: error.message };
+  const jornada = String(formData.get("jornada") ?? "").trim();
+  if (jornada !== "TIEMPO_COMPLETO" && jornada !== "TIEMPO_PARCIAL") {
+    return { error: "Elija tiempo completo o parcial." };
+  }
+  const horario = String(formData.get("horario") ?? "").trim();
+  if (!horarioEstaCompleto(horario)) return { error: "Complete el horario del contrato." };
+  const remuneracion = Number(formData.get("remuneracion") || 0);
+  if (!Number.isFinite(remuneracion) || remuneracion <= 0) return { error: "Indique la remuneración." };
+  return {
+    value: {
+      cargo: cargo.value,
+      fecha_inicio: fechaInicio.value,
+      fecha_fin: fechaFin.value,
+      jornada: jornada as JornadaLaboral,
+      horario,
+      remuneracion,
+    },
+  };
+}
 
+async function asegurarDocumentoFirmado(relacionId: string) {
+  const db = await planillasDb();
   const { data: contratoDoc } = await db
     .from("documentos")
     .select("id")
@@ -141,50 +143,154 @@ export async function addContrato(relacionId: string, formData: FormData): Promi
       estado: "PENDIENTE",
     });
   }
-
-  revalidatePath(`/trabajadores/${relacionId}`);
-  revalidatePath("/pendientes");
-  return {};
 }
 
-export async function generarDocumentoContrato(
+async function hayPdfFirmado(relacionId: string): Promise<{ error?: string; ok: boolean }> {
+  const db = await planillasDb();
+  const { data: firmados, error } = await db
+    .from("documentos")
+    .select("id, storage_path, estado")
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "CONTRATO_FIRMADO");
+  if (error) return { error: error.message, ok: false };
+  return { ok: Boolean((firmados ?? []).find((d) => d.storage_path && d.estado === "SI")) };
+}
+
+export async function generarContratoParaFirma(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string; contratoId?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const parsed = parseSnapshotContrato(formData, gate.trabajador.cargo);
+  if (parsed.error || !parsed.value) return { error: parsed.error ?? "Datos incompletos." };
+  const snapshot = parsed.value;
+
+  const db = await planillasDb();
+  const { data: existentes, error: listError } = await db
+    .from("contratos")
+    .select("id, version, estado, datos_confirmados")
+    .eq("relacion_id", relacionId)
+    .order("version", { ascending: false });
+  if (listError) return { error: listError.message };
+
+  const abierto = (existentes ?? []).find(
+    (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
+  );
+  const campos = {
+    cargo: snapshot.cargo,
+    horario: snapshot.horario,
+    jornada: snapshot.jornada,
+    fecha_inicio: snapshot.fecha_inicio,
+    fecha_fin: snapshot.fecha_fin,
+    remuneracion: snapshot.remuneracion,
+    datos_confirmados: false,
+    es_vigente: false,
+  };
+
+  let contratoId = abierto?.id as string | undefined;
+  if (abierto) {
+    const { error } = await db.from("contratos").update(campos).eq("id", abierto.id).eq("relacion_id", relacionId);
+    if (error) return { error: error.message };
+    if (abierto.estado !== "ELABORADO") {
+      const { error: estadoError } = await db
+        .from("contratos")
+        .update({ estado: "ELABORADO" as EstadoContratoPlanilla })
+        .eq("id", abierto.id)
+        .eq("relacion_id", relacionId);
+      if (estadoError) return { error: estadoError.message };
+    }
+  } else {
+    const version = ((existentes ?? [])[0]?.version ?? 0) + 1;
+    const { data: creado, error } = await db
+      .from("contratos")
+      .insert({
+        relacion_id: relacionId,
+        version,
+        numero_contrato: null,
+        asignacion_familiar: null,
+        estado: "PENDIENTE_DOCS" as EstadoContratoPlanilla,
+        ...campos,
+      })
+      .select("id")
+      .single();
+    if (error || !creado) return { error: error?.message ?? "No se pudo generar el contrato." };
+    contratoId = creado.id;
+    const { error: estadoError } = await db
+      .from("contratos")
+      .update({ estado: "ELABORADO" as EstadoContratoPlanilla })
+      .eq("id", creado.id)
+      .eq("relacion_id", relacionId);
+    if (estadoError) return { error: estadoError.message };
+  }
+
+  await asegurarDocumentoFirmado(relacionId);
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return { contratoId };
+}
+
+export async function confirmarContratoFirmado(
   relacionId: string,
   contratoId: string,
+  formData: FormData,
 ): Promise<{ error?: string }> {
   const gate = await assertEscrituraFicha(relacionId);
   if ("error" in gate) return { error: gate.error };
-  const t = gate.trabajador;
-  if (!t.cargo?.trim() || !horarioEstaCompleto(t.horario)) {
-    return { error: "Complete cargo y horario en el puesto antes de generar el documento." };
-  }
+  const parsed = parseSnapshotContrato(formData, gate.trabajador.cargo);
+  if (parsed.error || !parsed.value) return { error: parsed.error ?? "Datos incompletos." };
+  const snapshot = parsed.value;
 
   const db = await planillasDb();
   const { data: contrato, error: loadError } = await db
     .from("contratos")
-    .select("id, estado, fecha_inicio, fecha_fin, remuneracion")
+    .select("id, estado")
     .eq("id", contratoId)
     .eq("relacion_id", relacionId)
     .maybeSingle();
   if (loadError) return { error: loadError.message };
   if (!contrato) return { error: "Contrato no encontrado." };
-  if (contrato.estado === "RECOGIDO" || contrato.estado === "COMPLETO" || contrato.estado === "BAJA") {
-    return { error: "Este contrato ya no se genera de nuevo. Cree una versión nueva." };
-  }
-  if (!contrato.fecha_inicio || contrato.remuneracion == null) {
-    return { error: "Complete inicio y remuneración antes de generar el documento." };
+  if (contrato.estado === "RECOGIDO" || contrato.estado === "BAJA" || contrato.estado === "COMPLETO") {
+    return { error: "Este contrato ya está cerrado." };
   }
 
-  if (contrato.estado !== "ELABORADO") {
-    const { error } = await db
-      .from("contratos")
-      .update({ estado: "ELABORADO" as EstadoContratoPlanilla })
-      .eq("id", contratoId)
-      .eq("relacion_id", relacionId);
-    if (error) return { error: error.message };
-  }
+  const pdf = await hayPdfFirmado(relacionId);
+  if (pdf.error) return { error: pdf.error };
+  if (!pdf.ok) return { error: "Suba el PDF firmado antes de guardar los datos del contrato." };
 
-  revalidatePath(`/trabajadores/${relacionId}`);
+  await db.from("contratos").update({ es_vigente: false }).eq("relacion_id", relacionId);
+
+  const { error } = await db
+    .from("contratos")
+    .update({
+      cargo: snapshot.cargo,
+      horario: snapshot.horario,
+      jornada: snapshot.jornada,
+      fecha_inicio: snapshot.fecha_inicio,
+      fecha_fin: snapshot.fecha_fin,
+      remuneracion: snapshot.remuneracion,
+      datos_confirmados: true,
+      es_vigente: true,
+    })
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+
+  const { error: relError } = await db
+    .from("relaciones_laborales")
+    .update({
+      cargo: snapshot.cargo,
+      horario: snapshot.horario,
+      jornada: snapshot.jornada,
+      fecha_ingreso: snapshot.fecha_inicio,
+      fecha_cese: snapshot.fecha_fin,
+    })
+    .eq("id", relacionId);
+  if (relError) return { error: relError.message };
+
+  revalidatePath("/");
   revalidatePath("/pendientes");
+  revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }
 
@@ -198,7 +304,7 @@ export async function marcarContratoRecogido(
   const db = await planillasDb();
   const { data: contrato, error: loadError } = await db
     .from("contratos")
-    .select("id, estado")
+    .select("id, estado, datos_confirmados")
     .eq("id", contratoId)
     .eq("relacion_id", relacionId)
     .maybeSingle();
@@ -208,16 +314,14 @@ export async function marcarContratoRecogido(
   if (contrato.estado !== "ELABORADO") {
     return { error: "Primero hay que generar el documento (estado Elaborado)." };
   }
+  if (!contrato.datos_confirmados) {
+    return { error: "Confirme los datos del PDF firmado antes de marcarlo Recogido." };
+  }
 
-  const { data: firmados, error: docError } = await db
-    .from("documentos")
-    .select("id, storage_path, estado")
-    .eq("relacion_id", relacionId)
-    .eq("tipo", "CONTRATO_FIRMADO");
-  if (docError) return { error: docError.message };
-  const firmado = (firmados ?? []).find((d) => d.storage_path && d.estado === "SI");
-  if (!firmado) {
-    return { error: "Suba el PDF del contrato firmado en Documentos antes de marcarlo como recogido." };
+  const pdf = await hayPdfFirmado(relacionId);
+  if (pdf.error) return { error: pdf.error };
+  if (!pdf.ok) {
+    return { error: "Suba el PDF del contrato firmado antes de marcarlo como recogido." };
   }
 
   const { error } = await db

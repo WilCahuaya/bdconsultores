@@ -11,11 +11,10 @@ export const PASOS_ALTA = [
   { id: "datos", n: 1, label: "Persona y puesto" },
   { id: "documentos", n: 2, label: "Documentos" },
   { id: "contratos", n: 3, label: "Contrato" },
-  { id: "firma", n: 4, label: "Firma" },
 ] as const;
 
 export type PasoAltaId = (typeof PASOS_ALTA)[number]["id"];
-export type FlujoTab = PasoAltaId | "pensiones" | "t-registro" | "vida-ley";
+export type FlujoTab = PasoAltaId | "firma" | "pensiones" | "t-registro" | "vida-ley";
 
 export type FlujoDocumento = {
   tipo: TipoDocumentoPlanilla;
@@ -28,6 +27,7 @@ export type FlujoContrato = {
   fecha_inicio: string | null;
   remuneracion: number | null;
   es_vigente: boolean;
+  datos_confirmados?: boolean;
 };
 
 export type FlujoFichaInput = {
@@ -55,20 +55,34 @@ export function contratoVigente(contratos: FlujoContrato[]): FlujoContrato | nul
   return contratos.find((c) => c.es_vigente) ?? contratos[0];
 }
 
+export function contratoBorrador(contratos: FlujoContrato[]): FlujoContrato | null {
+  return (
+    contratos.find(
+      (c) =>
+        !c.datos_confirmados &&
+        c.estado !== "RECOGIDO" &&
+        c.estado !== "BAJA" &&
+        c.estado !== "COMPLETO",
+    ) ?? null
+  );
+}
+
+export function contratoConfirmado(contratos: FlujoContrato[]): FlujoContrato | null {
+  return contratos.find((c) => c.datos_confirmados && c.es_vigente) ?? contratos.find((c) => c.datos_confirmados) ?? null;
+}
+
 export function estadoPasosAlta(input: FlujoFichaInput): Record<PasoAltaId, boolean> {
-  const vigente = contratoVigente(input.contratos);
   return {
     datos: Boolean(input.cargo?.trim() && horarioEstaCompleto(input.horario) && input.direccion?.trim()),
     documentos: CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.every((tipo) => documentoCargado(input.documentos, tipo)),
-    contratos: Boolean(
-      vigente?.fecha_inicio && vigente.remuneracion != null && vigente.estado !== "PENDIENTE_DOCS",
-    ),
-    firma: documentoCargado(input.documentos, "CONTRATO_FIRMADO"),
+    contratos: Boolean(contratoConfirmado(input.contratos)),
   };
 }
 
 export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean): SiguientePaso {
-  const vigente = contratoVigente(input.contratos);
+  const borrador = contratoBorrador(input.contratos);
+  const confirmado = contratoConfirmado(input.contratos);
+  const vigente = confirmado ?? contratoVigente(input.contratos);
   const firmado = documentoCargado(input.documentos, "CONTRATO_FIRMADO");
   const pasos = estadoPasosAlta(input);
 
@@ -78,26 +92,26 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   if (!pasos.documentos) {
     return { paso: "documentos", tab: "documentos", etiqueta: "Subir documentos", rol: "empresa" };
   }
-  if (!vigente || !vigente.fecha_inicio || vigente.remuneracion == null) {
-    return { paso: "contratos", tab: "contratos", etiqueta: "Cargar contrato", rol: "empresa" };
+  if (!borrador && !confirmado) {
+    return { paso: "contratos", tab: "contratos", etiqueta: "Generar contrato", rol: "empresa" };
   }
-  if (vigente.estado === "PENDIENTE_DOCS") {
-    return { paso: "contratos", tab: "contratos", etiqueta: "Generar documento", rol: "empresa" };
+  if (borrador && !firmado) {
+    return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado", rol: "empresa" };
   }
-  if (vigente.estado === "ELABORADO" && !firmado) {
-    return { paso: "firma", tab: "firma", etiqueta: "Subir contrato firmado", rol: "empresa" };
+  if (borrador && firmado) {
+    return { paso: "contratos", tab: "contratos", etiqueta: "Confirmar datos del firmado", rol: "empresa" };
   }
   if (input.validacion === "PENDIENTE") {
     return esEstudio
       ? { paso: "datos", tab: "datos", etiqueta: "Validar alta", rol: "estudio" }
-      : { paso: "firma", tab: "firma", etiqueta: "En revisión del estudio", rol: "empresa" };
+      : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
-  if (vigente.estado === "ELABORADO" && firmado) {
+  if (vigente?.estado === "ELABORADO" && firmado) {
     return esEstudio
       ? { paso: "contratos", tab: "contratos", etiqueta: "Marcar recogido", rol: "estudio" }
-      : { paso: "firma", tab: "firma", etiqueta: "En revisión del estudio", rol: "empresa" };
+      : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
-  if (vigente.estado === "RECOGIDO" || vigente.estado === "COMPLETO") {
+  if (vigente?.estado === "RECOGIDO" || vigente?.estado === "COMPLETO") {
     return { paso: "listo", tab: "contratos", etiqueta: "Recogido", rol: "hecho" };
   }
   return { paso: "contratos", tab: "contratos", etiqueta: "Revisar contrato", rol: "empresa" };

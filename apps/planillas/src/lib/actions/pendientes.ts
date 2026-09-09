@@ -130,7 +130,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
             id: `${relacion.id}:contrato:${estado}`,
             tipo: "contrato",
             detalle,
-            tab: estado === "ELABORADO" ? "firma" : "contratos",
+            tab: "contratos",
           });
         }
         if (vigente.fecha_fin && vigente.fecha_fin <= limite) {
@@ -237,7 +237,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
           id: `${relacion.id}:doc:${doc.id}`,
           tipo: "documento",
           detalle: `${TIPO_DOCUMENTO_LABEL[tipo]}: ${ESTADO_DOCUMENTO_LABEL[estado]}`,
-          tab: tipo === "CONTRATO_FIRMADO" ? "firma" : "documentos",
+          tab: "contratos",
         });
       }
     } else {

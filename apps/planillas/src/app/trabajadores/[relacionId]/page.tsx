@@ -101,12 +101,12 @@ export default async function FichaTrabajadorPage({
         {tab === "contratos" ? (
           <FichaContratos
             relacionId={params.relacionId}
+            entidadId={trabajador.entidad_id}
+            trabajador={trabajador}
             contratos={contratos}
+            documentos={documentos}
             canWrite={canEditFicha}
             canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
-            tieneContratoFirmado={documentos.some(
-              (d) => d.tipo === "CONTRATO_FIRMADO" && Boolean(d.storage_path) && d.estado === "SI",
-            )}
           />
         ) : null}
         {tab === "documentos" ? (
@@ -120,17 +120,6 @@ export default async function FichaTrabajadorPage({
               (tipo) => !documentos.some((d) => d.tipo === tipo),
             )}
             hint="Suba DNI, ficha de datos y asignación familiar. PDF, JPG, PNG o WEBP. Máximo 10 MB."
-          />
-        ) : null}
-        {tab === "firma" ? (
-          <FichaDocumentos
-            relacionId={params.relacionId}
-            entidadId={trabajador.entidad_id}
-            documentos={documentos}
-            canWrite={canEditFicha}
-            tiposFiltro={["CONTRATO_FIRMADO"]}
-            permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
-            hint="Suba el PDF firmado. Queda en revisión del estudio; el contador o el asistente lo marcan Recogido."
           />
         ) : null}
         {esEstudio && tab === "pensiones" ? (

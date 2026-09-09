@@ -22,7 +22,7 @@ export function FichaFlujoNav({
 }) {
   return (
     <div className="space-y-4">
-      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <ol className="grid grid-cols-3 gap-2">
         {PASOS_ALTA.map((paso) => {
           const active = tab === paso.id;
           const done = completados[paso.id];
@@ -93,6 +93,7 @@ const TABS: FichaTab[] = [
 
 export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab {
   if (!value) return "datos";
+  if (value === "firma") return "contratos";
   if (!esEstudio && (value === "pensiones" || value === "t-registro" || value === "vida-ley")) {
     return "datos";
   }
