@@ -10,13 +10,23 @@ import type {
   TipoPension,
   TipoTRegistro,
 } from "@inventario/types";
-import { puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { parseFechaCampo } from "@/lib/planillas-labels";
 import { planillasDb } from "@/lib/supabase/planillas";
 
-async function assertEscritura(
+async function assertEscrituraFicha(
+  relacionId: string,
+): Promise<{ error: string } | { trabajador: TrabajadorListItem }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para editar." };
+  const trabajador = await getTrabajador(relacionId);
+  if (!trabajador) return { error: "Trabajador no encontrado." };
+  return { trabajador };
+}
+
+async function assertEscrituraTramite(
   relacionId: string,
 ): Promise<{ error: string } | { trabajador: TrabajadorListItem }> {
   const profile = await requirePlanillasProfile();
@@ -86,7 +96,7 @@ export async function listContratos(relacionId: string): Promise<ContratoRow[]> 
 }
 
 export async function addContrato(relacionId: string, formData: FormData): Promise<{ error?: string }> {
-  const gate = await assertEscritura(relacionId);
+  const gate = await assertEscrituraFicha(relacionId);
   if ("error" in gate) return { error: gate.error };
   const db = await planillasDb();
   const vigentes = await db.from("contratos").select("id").eq("relacion_id", relacionId).eq("es_vigente", true);
@@ -116,6 +126,21 @@ export async function addContrato(relacionId: string, formData: FormData): Promi
     estado: (String(formData.get("estado") ?? "PENDIENTE_DOCS") as EstadoContratoPlanilla),
   });
   if (error) return { error: error.message };
+
+  const { data: contratoDoc } = await db
+    .from("documentos")
+    .select("id")
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "CONTRATO_FIRMADO")
+    .maybeSingle();
+  if (!contratoDoc) {
+    await db.from("documentos").insert({
+      relacion_id: relacionId,
+      tipo: "CONTRATO_FIRMADO",
+      estado: "PENDIENTE",
+    });
+  }
+
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
   return {};
@@ -137,7 +162,7 @@ export async function addDocumento(
   relacionId: string,
   formData: FormData,
 ): Promise<{ error?: string; documentoId?: string }> {
-  const gate = await assertEscritura(relacionId);
+  const gate = await assertEscrituraFicha(relacionId);
   if ("error" in gate) return { error: gate.error };
   const db = await planillasDb();
   const { data, error } = await db
@@ -161,7 +186,7 @@ export async function setDocumentoArchivo(
   documentoId: string,
   storagePath: string,
 ): Promise<{ error?: string }> {
-  const gate = await assertEscritura(relacionId);
+  const gate = await assertEscrituraFicha(relacionId);
   if ("error" in gate) return { error: gate.error };
 
   if (!pathPerteneceAlDocumento(gate.trabajador.entidad_id, relacionId, documentoId, storagePath)) {
@@ -202,7 +227,7 @@ export async function getPension(relacionId: string): Promise<PensionRow | null>
 }
 
 export async function savePension(relacionId: string, formData: FormData): Promise<{ error?: string }> {
-  const gate = await assertEscritura(relacionId);
+  const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
   const tipo = String(formData.get("tipo")) as TipoPension;
   const fechaTramite = parseFechaCampo(String(formData.get("fecha_tramite") ?? ""), "Fecha de trámite");
@@ -236,7 +261,7 @@ export async function getVidaLey(relacionId: string): Promise<VidaLeyRow | null>
 }
 
 export async function saveVidaLey(relacionId: string, formData: FormData): Promise<{ error?: string }> {
-  const gate = await assertEscritura(relacionId);
+  const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
   const fechaInicio = parseFechaCampo(String(formData.get("fecha_inicio") ?? ""), "Fecha de inicio");
   if (fechaInicio.error) return { error: fechaInicio.error };
@@ -270,7 +295,7 @@ export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]>
 }
 
 export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
-  const gate = await assertEscritura(relacionId);
+  const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
   const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
   if (fecha.error) return { error: fecha.error };

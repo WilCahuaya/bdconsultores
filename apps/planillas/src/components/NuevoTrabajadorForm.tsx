@@ -12,9 +12,11 @@ import type { Entidad } from "@inventario/types";
 export function NuevoTrabajadorForm({
   entidades,
   defaultEntidadId,
+  lockEntidad = false,
 }: {
   entidades: Entidad[];
   defaultEntidadId: string;
+  lockEntidad?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -60,12 +62,14 @@ export function NuevoTrabajadorForm({
   return (
     <form action={onSubmit} className="space-y-4">
       <FormSection title="Empresa" hint="Si la persona ya existe por DNI, se reutiliza y se crea el puesto aquí.">
+        {lockEntidad ? <input type="hidden" name="entidad_id" value={defaultEntidadId} /> : null}
         <SelectField
           label="Empresa"
-          name="entidad_id"
+          name={lockEntidad ? "entidad_id_vista" : "entidad_id"}
           defaultValue={defaultEntidadId}
           options={entidades.map((e) => ({ value: e.id, label: e.nombre }))}
-          required
+          required={!lockEntidad}
+          disabled={lockEntidad}
         />
       </FormSection>
       <FormSection title="Persona" hint="Con el DNI se puede traer el nombre. La dirección sí va en el contrato.">

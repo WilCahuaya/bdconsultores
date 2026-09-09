@@ -4,11 +4,19 @@ import { revalidatePath } from "next/cache";
 import type {
   ClasificacionTrabajador,
   EstadoRelacionLaboral,
+  EstadoValidacionAltaPlanilla,
   JornadaLaboral,
-  TipoDocumentoPlanilla,
 } from "@inventario/types";
-import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS, esPersonalEstudio } from "@inventario/types";
+import {
+  entidadAlcance,
+  puedeCrearTrabajador,
+  puedeEditarFichaLaboral,
+  puedeValidarAlta,
+  requirePlanillasProfile,
+} from "@/lib/auth/access";
 import { parseFechaCampo, parseCargoCampo } from "@/lib/planillas-labels";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 export type PersonaRow = {
@@ -34,6 +42,7 @@ export type RelacionRow = {
   fecha_ingreso: string | null;
   fecha_cese: string | null;
   estado: EstadoRelacionLaboral;
+  validacion: EstadoValidacionAltaPlanilla;
 };
 
 export type TrabajadorListItem = RelacionRow & {
@@ -67,7 +76,7 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version)",
     )
     .eq("entidad_id", entidadId)
     .order("fecha_ingreso", { ascending: false, nullsFirst: false });
@@ -94,7 +103,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion)",
     )
     .eq("id", relacionId)
     .maybeSingle();
@@ -113,7 +122,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
 
 export async function createTrabajador(formData: FormData): Promise<{ error?: string; relacionId?: string }> {
   const profile = await requirePlanillasProfile();
-  if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para registrar trabajadores." };
+  if (!puedeCrearTrabajador(profile)) return { error: "No tiene permiso para registrar trabajadores." };
 
   const entidadId = String(formData.get("entidad_id") ?? "").trim();
   const dni = normalizeDni(String(formData.get("dni") ?? ""));
@@ -133,7 +142,9 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   if (cargo.error) return { error: cargo.error };
 
   const db = await planillasDb();
-  const { data: existente } = await db.from("personas").select("id").eq("dni", dni).maybeSingle();
+  const admin = createAdminClient();
+  const lookup = admin?.schema("planillas") ?? db;
+  const { data: existente } = await lookup.from("personas").select("id").eq("dni", dni).maybeSingle();
 
   let personaId = existente?.id as string | undefined;
   if (!personaId) {
@@ -166,6 +177,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
       horario: String(formData.get("horario") ?? "").trim() || null,
       fecha_ingreso: ingreso.value,
       estado: "ACTIVA",
+      validacion: esPersonalEstudio(profile.rol) ? "ACEPTADA" : "PENDIENTE",
     })
     .select("id")
     .single();
@@ -181,17 +193,8 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   revalidatePath("/pendientes");
   revalidatePath(`/trabajadores/${relacion.id}`);
 
-  const checklist: TipoDocumentoPlanilla[] = [
-    "CONTRATO_FIRMADO",
-    "DNI",
-    "FICHA_DATOS",
-    "PENSIONES_FIRMADO",
-    "TR_ALTA",
-    "ASIGNACION_FAMILIAR",
-    "VIDA_LEY",
-  ];
   await db.from("documentos").insert(
-    checklist.map((tipo) => ({
+    CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.map((tipo) => ({
       relacion_id: relacion.id,
       tipo,
       estado: "PENDIENTE",
@@ -206,7 +209,7 @@ export async function updateDatosTrabajador(
   formData: FormData,
 ): Promise<{ error?: string }> {
   const profile = await requirePlanillasProfile();
-  if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para editar." };
+  if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para editar." };
 
   const actual = await getTrabajador(relacionId);
   if (!actual) return { error: "Trabajador no encontrado." };
@@ -248,6 +251,27 @@ export async function updateDatosTrabajador(
     })
     .eq("id", relacionId);
   if (rError) return { error: rError.message };
+
+  revalidatePath("/");
+  revalidatePath("/pendientes");
+  revalidatePath(`/trabajadores/${relacionId}`);
+  return {};
+}
+
+export async function aceptarAltaTrabajador(relacionId: string): Promise<{ error?: string }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeValidarAlta(profile)) return { error: "Solo el estudio puede validar el alta." };
+
+  const actual = await getTrabajador(relacionId);
+  if (!actual) return { error: "Trabajador no encontrado." };
+  if (actual.validacion === "ACEPTADA") return {};
+
+  const db = await planillasDb();
+  const { error } = await db
+    .from("relaciones_laborales")
+    .update({ validacion: "ACEPTADA" })
+    .eq("id", relacionId);
+  if (error) return { error: error.message };
 
   revalidatePath("/");
   revalidatePath("/pendientes");

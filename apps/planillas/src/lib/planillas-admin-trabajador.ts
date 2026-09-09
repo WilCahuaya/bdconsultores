@@ -1,20 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS,
   RESPONSABLE_CARGO_ADMIN,
   normalizeResponsableDni,
   normalizeResponsableNombre,
-  type TipoDocumentoPlanilla,
 } from "@inventario/types";
-
-const CHECKLIST_ALTA: TipoDocumentoPlanilla[] = [
-  "CONTRATO_FIRMADO",
-  "DNI",
-  "FICHA_DATOS",
-  "PENSIONES_FIRMADO",
-  "TR_ALTA",
-  "ASIGNACION_FAMILIAR",
-  "VIDA_LEY",
-];
 
 function splitNombrePersona(full: string): {
   nombres: string;
@@ -97,6 +87,7 @@ export async function syncAdminTrabajadorPlanillas(
       entidad_id: entidadId,
       cargo: RESPONSABLE_CARGO_ADMIN,
       estado: "ACTIVA",
+      validacion: "ACEPTADA",
       fecha_ingreso: hoy,
     })
     .select("id")
@@ -108,7 +99,7 @@ export async function syncAdminTrabajadorPlanillas(
   }
 
   const { error: docsError } = await db.from("documentos").insert(
-    CHECKLIST_ALTA.map((tipo) => ({
+    CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.map((tipo) => ({
       relacion_id: relacion.id,
       tipo,
       estado: "PENDIENTE",

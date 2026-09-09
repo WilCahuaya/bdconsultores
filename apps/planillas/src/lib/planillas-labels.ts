@@ -4,6 +4,7 @@ import type {
   EstadoDocumentoPlanilla,
   EstadoRelacionLaboral,
   EstadoTramitePension,
+  EstadoValidacionAltaPlanilla,
   JornadaLaboral,
   TipoDocumentoPlanilla,
   TipoPension,
@@ -114,7 +115,12 @@ export const TIPO_T_REGISTRO_LABEL: Record<TipoTRegistro, string> = {
   BAJA: "Baja",
 };
 
-export const PENDIENTE_TIPOS = ["contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"] as const;
+export const ESTADO_VALIDACION_ALTA_LABEL: Record<EstadoValidacionAltaPlanilla, string> = {
+  PENDIENTE: "Por validar",
+  ACEPTADA: "Aceptada",
+};
+
+export const PENDIENTE_TIPOS = ["validacion", "contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"] as const;
 export type PendienteTipo = (typeof PENDIENTE_TIPOS)[number];
 
 export type PendienteItem = {
@@ -124,10 +130,11 @@ export type PendienteItem = {
   nombre: string;
   tipo: PendienteTipo;
   detalle: string;
-  tab: "contratos" | "documentos" | "pensiones" | "t-registro" | "vida-ley";
+  tab: "datos" | "contratos" | "documentos" | "pensiones" | "t-registro" | "vida-ley";
 };
 
 export const PENDIENTE_TIPO_LABEL: Record<PendienteTipo, string> = {
+  validacion: "Validación",
   contrato: "Contrato",
   documento: "Documento",
   afp: "AFP",

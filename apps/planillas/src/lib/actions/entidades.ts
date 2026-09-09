@@ -10,7 +10,7 @@ import {
 } from "@inventario/types";
 import { consultarDniReniec, consultarRucSunat } from "@bd/config";
 import { createClient } from "@/lib/supabase/server";
-import { puedeCrearEntidad, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { puedeCrearEntidad, puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { syncAdminTrabajadorPlanillas } from "@/lib/planillas-admin-trabajador";
 import { syncAdminResponsableForEntidad } from "@/lib/responsables-admin-sync";
@@ -58,7 +58,7 @@ export async function consultarDni(dni: string): Promise<{
   fecha_nacimiento?: string;
 }> {
   const profile = await requirePlanillasProfile();
-  if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para consultar DNI." };
+  if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para consultar DNI." };
   return consultarDniReniec(dni);
 }
 

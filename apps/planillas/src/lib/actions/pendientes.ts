@@ -58,7 +58,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
   const { data: relaciones, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, estado, personas!persona_id (dni, nombres, apellido_paterno, apellido_materno)",
+      "id, estado, validacion, personas!persona_id (dni, nombres, apellido_paterno, apellido_materno)",
     )
     .eq("entidad_id", entidadId);
 
@@ -88,12 +88,23 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
     const nombre = nombreCompleto(persona);
     const base = { relacionId: relacion.id, dni: persona.dni, nombre };
     const activa = relacion.estado === "ACTIVA";
+    const pendienteValidacion = relacion.validacion === "PENDIENTE";
 
     const contratos = (contratosRes.data ?? []).filter((c) => c.relacion_id === relacion.id);
     const documentos = (documentosRes.data ?? []).filter((d) => d.relacion_id === relacion.id);
     const pension = (pensionesRes.data ?? []).find((p) => p.relacion_id === relacion.id);
     const vidaLey = (vidaLeyRes.data ?? []).find((v) => v.relacion_id === relacion.id);
     const tRegistros = (tRegistroRes.data ?? []).filter((t) => t.relacion_id === relacion.id);
+
+    if (pendienteValidacion) {
+      items.push({
+        ...base,
+        id: `${relacion.id}:validacion`,
+        tipo: "validacion",
+        detalle: "Alta pendiente de validación del estudio",
+        tab: "datos",
+      });
+    }
 
     if (activa) {
       const vigente = contratos.find((c) => c.es_vigente);
@@ -130,7 +141,8 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
         }
       }
 
-      if (!pension) {
+      if (!pendienteValidacion) {
+        if (!pension) {
         items.push({
           ...base,
           id: `${relacion.id}:afp:sin`,
@@ -208,6 +220,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
           });
         }
       }
+      }
 
       for (const doc of documentos) {
         const estado = doc.estado as EstadoDocumentoPlanilla;
@@ -235,7 +248,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
     }
   }
 
-  const ordenTipo: PendienteTipo[] = ["contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"];
+  const ordenTipo: PendienteTipo[] = ["validacion", "contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"];
   items.sort((a, b) => {
     const tipo = ordenTipo.indexOf(a.tipo) - ordenTipo.indexOf(b.tipo);
     if (tipo !== 0) return tipo;

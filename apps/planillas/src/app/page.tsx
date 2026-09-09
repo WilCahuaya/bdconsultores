@@ -3,11 +3,12 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
-import { requirePlanillasProfile, puedeEscribirPlanillas, puedeCrearEntidad } from "@/lib/auth/access";
+import { requirePlanillasProfile, puedeCrearTrabajador, puedeCrearEntidad } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listPendientes } from "@/lib/actions/pendientes";
 import {
+  ESTADO_VALIDACION_ALTA_LABEL,
   TIEMPO_LABEL,
   formatFechaPlanilla,
   formatRemuneracion,
@@ -29,7 +30,7 @@ export default async function PlanillasHomePage({
     selectedId
       ? await Promise.all([listTrabajadores(selectedId), listPendientes(selectedId)])
       : [[], []];
-  const canWrite = puedeEscribirPlanillas(profile);
+  const canCreateTrabajador = puedeCrearTrabajador(profile);
   const canCreate = puedeCrearEntidad(profile);
   const aviso = searchParams.aviso?.trim() || null;
 
@@ -52,7 +53,7 @@ export default async function PlanillasHomePage({
                 Nueva empresa
               </Link>
             ) : null}
-            {canWrite && selectedId ? (
+            {canCreateTrabajador && selectedId ? (
               <Link
                 href={`/trabajadores/nuevo?entidadId=${selectedId}`}
                 className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
@@ -91,11 +92,11 @@ export default async function PlanillasHomePage({
                 className={`${panelCardClass} block p-4 text-sm hover:bg-muted/30`}
               >
                 Hay <span className="font-semibold text-primary">{pendientes.length}</span> pendientes en esta
-                empresa (contratos, documentos, AFP, T-Registro, Vida Ley o vencimientos).
+                empresa (validación, contratos, documentos u otros trámites).
               </Link>
             ) : null}
             <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[860px] text-left text-sm">
+              <table className="w-full min-w-[960px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 font-medium">DNI</th>
@@ -105,12 +106,13 @@ export default async function PlanillasHomePage({
                     <th className="px-4 py-2 font-medium">Fecha de cese</th>
                     <th className="px-4 py-2 font-medium">Tiempo</th>
                     <th className="px-4 py-2 font-medium">Remuneración</th>
+                    <th className="px-4 py-2 font-medium">Validación</th>
                   </tr>
                 </thead>
                 <tbody>
                   {trabajadores.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={7}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={8}>
                         No hay trabajadores en esta empresa. El listado arranca en blanco.
                       </td>
                     </tr>
@@ -128,6 +130,7 @@ export default async function PlanillasHomePage({
                         <td className="px-4 py-2">{formatFechaPlanilla(t.fecha_cese)}</td>
                         <td className="px-4 py-2">{t.jornada ? TIEMPO_LABEL[t.jornada] : "—"}</td>
                         <td className="px-4 py-2 tabular-nums">{formatRemuneracion(t.remuneracion)}</td>
+                        <td className="px-4 py-2">{ESTADO_VALIDACION_ALTA_LABEL[t.validacion]}</td>
                       </tr>
                     ))
                   )}

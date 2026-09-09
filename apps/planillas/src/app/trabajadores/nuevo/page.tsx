@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { esUsuarioEntidad } from "@inventario/types";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { NuevoTrabajadorForm } from "@/components/NuevoTrabajadorForm";
-import { puedeCrearEntidad, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { puedeCrearEntidad, puedeCrearTrabajador, requirePlanillasProfile } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 
 export default async function NuevoTrabajadorPage({
@@ -11,7 +12,7 @@ export default async function NuevoTrabajadorPage({
   searchParams: { entidadId?: string };
 }) {
   const profile = await requirePlanillasProfile();
-  if (!puedeEscribirPlanillas(profile)) redirect("/");
+  if (!puedeCrearTrabajador(profile)) redirect("/");
 
   const entidades = await listEntidadesPlanillas();
   const defaultEntidadId =
@@ -27,6 +28,13 @@ export default async function NuevoTrabajadorPage({
             ← Trabajadores
           </Link>
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">Nuevo trabajador</h1>
+          {esUsuarioEntidad(profile.rol) ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              El estudio (contador o asistente) validará el alta antes de continuar el trámite.
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">El alta queda aceptada al registrarla desde el estudio.</p>
+          )}
         </div>
         {entidades.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -41,7 +49,11 @@ export default async function NuevoTrabajadorPage({
             ) : null}
           </p>
         ) : (
-          <NuevoTrabajadorForm entidades={entidades} defaultEntidadId={defaultEntidadId} />
+          <NuevoTrabajadorForm
+            entidades={entidades}
+            defaultEntidadId={defaultEntidadId}
+            lockEntidad={esUsuarioEntidad(profile.rol)}
+          />
         )}
       </div>
     </PlanillasShell>

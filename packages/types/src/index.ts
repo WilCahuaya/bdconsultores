@@ -2024,6 +2024,7 @@ export function plataformaModulosPath(rol: RolUsuario): string {
 export type ClasificacionTrabajador = "PATROCINADO" | "SUPERVIVENCIA";
 export type JornadaLaboral = "TIEMPO_COMPLETO" | "TIEMPO_PARCIAL";
 export type EstadoRelacionLaboral = "ACTIVA" | "CESADA";
+export type EstadoValidacionAltaPlanilla = "PENDIENTE" | "ACEPTADA";
 export type EstadoContratoPlanilla =
   | "PENDIENTE_DOCS"
   | "ELABORADO"
@@ -2052,6 +2053,13 @@ export type EstadoDocumentoPlanilla = "SI" | "NO" | "NA" | "PENDIENTE";
 export type TipoPension = "AFP" | "ONP";
 export type EstadoTramitePension = "PENDIENTE" | "TRAMITADO" | "NO_APLICA";
 export type TipoTRegistro = "ALTA" | "BAJA";
+
+/** Documentos que pide la empresa al trabajador para armar el contrato. */
+export const CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS: TipoDocumentoPlanilla[] = [
+  "DNI",
+  "FICHA_DATOS",
+  "ASIGNACION_FAMILIAR",
+];
 
 
 export type UsuarioGestionResumen = Pick<Profile, "id" | "rol" | "activo" | "nombre" | "email">;

@@ -42,7 +42,8 @@ export default async function PendientesPage({
         <div>
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Pendientes</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Contratos por recoger, documentos, AFP, T-Registro, Vida Ley y vencimientos a 30 días.
+            Contratos, documentos por subir y altas por validar. AFP, T-Registro y Vida Ley aparecen después de aceptar el
+            alta.
           </p>
         </div>
 
@@ -66,7 +67,7 @@ export default async function PendientesPage({
               hrefBase="/pendientes"
             />
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
               {PENDIENTE_TIPOS.map((tipo) => {
                 const active = filtro === tipo;
                 return (
