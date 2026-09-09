@@ -216,18 +216,35 @@ function anioInicio(iso: string): string {
   return partesFecha(iso).anio;
 }
 
-function celdaFirma(lineas: string[]): TableCell {
+const SIN_BORDE = {
+  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+};
+
+function lineaParaFirmar(): Paragraph {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: convertMillimetersToTwip(18), after: 160 },
+    indent: { left: convertMillimetersToTwip(10), right: convertMillimetersToTwip(10) },
+    border: {
+      bottom: { style: BorderStyle.SINGLE, size: 8, color: "000000", space: 1 },
+    },
+    children: [run(" ")],
+  });
+}
+
+function celdaFirma(rol: string, nombre: string, dni: string): TableCell {
   return new TableCell({
     width: { size: 50, type: WidthType.PERCENTAGE },
-    borders: {
-      top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-      bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-      left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-      right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
-    },
-    children: lineas.map((linea, i) =>
-      parrafo(linea, { center: true, justify: false, after: i === lineas.length - 1 ? 0 : 80 }),
-    ),
+    borders: SIN_BORDE,
+    children: [
+      lineaParaFirmar(),
+      parrafo(rol, { center: true, justify: false, after: 80, bold: true }),
+      parrafo(nombre, { center: true, justify: false, after: 80 }),
+      parrafo(`DNI ${dni}`, { center: true, justify: false, after: 0 }),
+    ],
   });
 }
 
@@ -332,8 +349,8 @@ function tablaFirmas(d: ContratoWordDatos, g: Genero, nombreTrab: string): Table
     rows: [
       new TableRow({
         children: [
-          celdaFirma(["EL EMPLEADOR", dato(d.rlNombre), `DNI ${dato(d.rlDni)}`]),
-          celdaFirma([g.parte, nombreTrab, `DNI ${dato(d.dni)}`]),
+          celdaFirma("EL EMPLEADOR", dato(d.rlNombre), dato(d.rlDni)),
+          celdaFirma(g.parte, nombreTrab, dato(d.dni)),
         ],
       }),
     ],
@@ -502,7 +519,7 @@ export function construirDocumentoContrato(d: ContratoWordDatos): Document {
             },
           },
         },
-        children: [...children, new Paragraph({ spacing: { before: 400 }, children: [] }), tablaFirmas(d, g, nombreTrab)],
+        children: [...children, new Paragraph({ spacing: { before: 200 }, children: [] }), tablaFirmas(d, g, nombreTrab)],
       },
     ],
   });
