@@ -3,12 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@inventario/ui";
 import { fieldClass } from "@/components/fields";
+import { HorarioContratoVista } from "@/components/ficha/HorarioContratoVista";
 import {
   DIA_LABEL,
   DIAS_SEMANA,
   formatClausulaCompleto,
-  formatClausulaParcial,
-  formatHorarioContrato,
   horasEfectivasBloque,
   horasEfectivasCompleto,
   horasEfectivasSemanaParcial,
@@ -325,9 +324,9 @@ function HorarioParcialEditor({
         </Button>
       ) : null}
       <p className="text-xs text-muted-foreground">Total semana: {formatoHoras(semana)}</p>
-      <pre className="whitespace-pre-wrap rounded-md bg-muted/40 px-3 py-2 font-sans text-sm text-foreground">
-        {formatClausulaParcial(value) || formatHorarioContrato(serializeHorario(value))}
-      </pre>
+      <div className="rounded-md bg-muted/40 px-3 py-2 text-sm text-foreground">
+        <HorarioContratoVista value={value} />
+      </div>
     </div>
   );
 }

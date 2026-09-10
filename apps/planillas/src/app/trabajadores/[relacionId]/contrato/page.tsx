@@ -7,7 +7,7 @@ import { listContratos } from "@/lib/actions/ficha";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { requirePlanillasProfile } from "@/lib/auth/access";
 import { cargoCanonico, funcionesDeCargo } from "@/lib/cargos-funciones";
-import { formatHorarioContrato } from "@/lib/horario-laboral";
+import { HorarioContratoVista } from "@/components/ficha/HorarioContratoVista";
 import {
   JORNADA_LABEL,
   formatFechaPlanilla,
@@ -84,7 +84,7 @@ export default async function ContratoDocumentoPage({
         <p>Jornada: {jornada ? JORNADA_LABEL[jornada] : "—"}</p>
         <div>
           <p>Jornada y horario</p>
-          <div className="whitespace-pre-line">{formatHorarioContrato(horario)}</div>
+          <HorarioContratoVista className="mt-1" value={horario} />
         </div>
         <p>Inicio: {formatFechaPlanilla(contrato.fecha_inicio)}</p>
         <p>Fin: {formatFechaPlanilla(contrato.fecha_fin)}</p>
