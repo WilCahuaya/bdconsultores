@@ -174,6 +174,18 @@ export const TIPO_T_REGISTRO_LABEL: Record<TipoTRegistro, string> = {
   BAJA: "Baja",
 };
 
+export const VIDA_LEY_ESTADOS = ["Elaborado", "Enviado", "Tramitado"] as const;
+export type VidaLeyEstado = (typeof VIDA_LEY_ESTADOS)[number];
+
+export function opcionesEstadoVidaLey(actual?: string | null): { value: string; label: string }[] {
+  const options = VIDA_LEY_ESTADOS.map((estado) => ({ value: estado, label: estado }));
+  const extra = actual?.trim();
+  if (extra && !VIDA_LEY_ESTADOS.includes(extra as VidaLeyEstado)) {
+    return [{ value: extra, label: extra }, ...options];
+  }
+  return options;
+}
+
 export const ESTADO_VALIDACION_ALTA_LABEL: Record<EstadoValidacionAltaPlanilla, string> = {
   PENDIENTE: "Por validar",
   ACEPTADA: "Aceptada",

@@ -12,10 +12,11 @@ import type {
 } from "@inventario/types";
 import { TIPOS_DOCUMENTO_ALTA_INICIALES } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
-import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
+import { fechaFinPeriodoVidaLey } from "@/lib/vida-ley-word";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 async function assertEscrituraFicha(
@@ -674,6 +675,7 @@ export async function saveVidaLey(relacionId: string, formData: FormData): Promi
   if (fechaFin.error) return { error: fechaFin.error };
   const payload = {
     relacion_id: relacionId,
+    entidad_id: gate.trabajador.entidad_id,
     estado: String(formData.get("estado") ?? "").trim() || null,
     numero_poliza: String(formData.get("numero_poliza") ?? "").trim() || null,
     fecha_inicio: fechaInicio.value,
@@ -685,6 +687,82 @@ export async function saveVidaLey(relacionId: string, formData: FormData): Promi
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
   return {};
+}
+
+function sinTramiteVidaLey(estado: string | null | undefined): boolean {
+  return !estado?.trim();
+}
+
+export async function listTrabajadoresSinVidaLey(entidadId: string): Promise<TrabajadorListItem[]> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEscribirPlanillas(profile)) return [];
+  const trabajadores = (await listTrabajadores(entidadId)).filter(
+    (t) => t.estado === "ACTIVA" && t.validacion !== "PENDIENTE",
+  );
+  if (trabajadores.length === 0) return [];
+  const db = await planillasDb();
+  const { data, error } = await db
+    .from("vida_ley")
+    .select("relacion_id, estado")
+    .in(
+      "relacion_id",
+      trabajadores.map((t) => t.id),
+    );
+  if (error) throw new Error(error.message);
+  const conTramite = new Set(
+    (data ?? []).filter((row) => !sinTramiteVidaLey(row.estado)).map((row) => row.relacion_id as string),
+  );
+  return trabajadores.filter((t) => !conTramite.has(t.id));
+}
+
+async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promise<{ error?: string }> {
+  if (trabajadores.length === 0) return { error: "No hay trabajadores para el trámite Vida Ley." };
+  const db = await planillasDb();
+  const ids = trabajadores.map((t) => t.id);
+  const { data: existentes, error: loadError } = await db
+    .from("vida_ley")
+    .select("relacion_id, numero_poliza, fecha_inicio, fecha_fin")
+    .in("relacion_id", ids);
+  if (loadError) return { error: loadError.message };
+  const actualPorId = new Map((existentes ?? []).map((row) => [row.relacion_id as string, row]));
+  const hoy = new Date().toISOString().slice(0, 10);
+  const payload = trabajadores.map((t) => {
+    const actual = actualPorId.get(t.id);
+    const inicio = actual?.fecha_inicio ?? t.fecha_ingreso ?? hoy;
+    return {
+      relacion_id: t.id,
+      entidad_id: t.entidad_id,
+      estado: "Elaborado",
+      numero_poliza: actual?.numero_poliza ?? null,
+      fecha_inicio: inicio,
+      fecha_fin: actual?.fecha_fin ?? fechaFinPeriodoVidaLey(t.fecha_ingreso ?? inicio),
+    };
+  });
+  const { error } = await db.from("vida_ley").upsert(payload, { onConflict: "relacion_id" });
+  if (error) return { error: error.message };
+  for (const t of trabajadores) {
+    revalidatePath(`/trabajadores/${t.id}`);
+  }
+  revalidatePath("/pendientes");
+  return {};
+}
+
+export async function generarVidaLey(relacionId: string): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  return marcarVidaLeyElaborado([gate.trabajador]);
+}
+
+export async function generarVidaLeyGrupo(
+  entidadId: string,
+): Promise<{ error?: string; ids?: string[]; count?: number }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para editar." };
+  const pendientes = await listTrabajadoresSinVidaLey(entidadId);
+  if (pendientes.length === 0) return { error: "No hay trabajadores sin Vida Ley en esta empresa." };
+  const marked = await marcarVidaLeyElaborado(pendientes);
+  if (marked.error) return { error: marked.error };
+  return { ids: pendientes.map((t) => t.id), count: pendientes.length };
 }
 
 export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]> {

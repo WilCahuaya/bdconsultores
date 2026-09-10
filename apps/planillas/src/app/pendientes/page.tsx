@@ -9,6 +9,7 @@ import { listPendientes } from "@/lib/actions/pendientes";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { claseBadgePaso, flujoDesdeTrabajador, resolverSiguientePaso } from "@/lib/flujo-ficha";
 import { PENDIENTE_TIPO_LABEL, nombreCompleto } from "@/lib/planillas-labels";
+import { GenerarVidaLeyGrupoButton } from "@/components/ficha/GenerarVidaLeyGrupoButton";
 
 const TIPOS_TRAMITE = new Set(["afp", "t-registro", "vida-ley", "vencimiento"]);
 
@@ -35,6 +36,9 @@ export default async function PendientesPage({
     }))
     .filter(({ siguiente }) => (esEstudio ? siguiente.rol !== "hecho" : siguiente.rol === "empresa"));
   const tramites = esEstudio ? pendientes.filter((p) => TIPOS_TRAMITE.has(p.tipo)) : [];
+  const sinVidaLey = tramites.filter(
+    (p) => p.tipo === "vida-ley" && (p.detalle === "Sin Vida Ley" || p.detalle === "Vida Ley sin estado"),
+  ).length;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -117,7 +121,10 @@ export default async function PendientesPage({
 
             {esEstudio ? (
               <section className="space-y-3">
-                <h2 className="text-sm font-medium text-foreground">Trámites</h2>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-sm font-medium text-foreground">Trámites</h2>
+                  {selectedId ? <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={sinVidaLey} /> : null}
+                </div>
                 <div className={`${panelCardClass} overflow-x-auto p-0`}>
                   <table className="w-full min-w-[640px] text-left text-sm">
                     <thead className="border-b bg-muted/40 text-muted-foreground">

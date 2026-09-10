@@ -156,7 +156,12 @@ export default async function FichaTrabajadorPage({
           />
         ) : null}
         {esEstudio && tab === "vida-ley" ? (
-          <FichaVidaLey relacionId={params.relacionId} vidaLey={vidaLey} canWrite={canWriteTramite} />
+          <FichaVidaLey
+            relacionId={params.relacionId}
+            trabajador={trabajador}
+            vidaLey={vidaLey}
+            canWrite={canWriteTramite}
+          />
         ) : null}
         {continuar ? (
           <Link
