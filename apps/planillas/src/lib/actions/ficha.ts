@@ -108,7 +108,7 @@ function parseSnapshotContrato(formData: FormData, cargoActual: string | null) {
   const fechaInicio = parseFechaCampo(String(formData.get("fecha_inicio") ?? ""), "Fecha de inicio de contrato");
   if (fechaInicio.error) return { error: fechaInicio.error };
   if (!fechaInicio.value) return { error: "La fecha de inicio de contrato es obligatoria." };
-  const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de cese de contrato");
+  const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de fin de contrato");
   if (fechaFin.error) return { error: fechaFin.error };
   const jornada = String(formData.get("jornada") ?? "").trim();
   if (jornada !== "TIEMPO_COMPLETO" && jornada !== "TIEMPO_PARCIAL") {

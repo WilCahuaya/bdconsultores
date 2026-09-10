@@ -48,7 +48,7 @@ export async function GET(
   if (!cargo) {
     return NextResponse.json({ error: "El contrato no tiene cargo." }, { status: 400 });
   }
-  const fechaInicio = contrato.fecha_inicio ?? trabajador.fecha_ingreso;
+  const fechaInicio = contrato.fecha_inicio;
   if (!fechaInicio) {
     return NextResponse.json({ error: "El contrato no tiene fecha de inicio." }, { status: 400 });
   }

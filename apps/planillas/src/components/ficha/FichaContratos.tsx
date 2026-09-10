@@ -139,9 +139,9 @@ export function FichaContratos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Al generar se descarga el Word con cargo, funciones, fechas de ese contrato, sueldo, horario y tipo. Eso no
-        cambia la fecha de ingreso a la empresa. Los datos del contrato se guardan cuando sube el PDF firmado y los
-        confirma (puede corregirlos si el papel salió distinto). Puede haber varios contratos durante la estadía.
+        Al generar se descarga el Word con cargo, funciones, fechas de ese contrato, sueldo, horario y tipo. El inicio
+        y el fin son del contrato, no de la estadía en la empresa. Los datos se guardan cuando sube el PDF firmado y
+        los confirma. Puede haber varios contratos durante la estadía.
       </p>
 
       {canWrite ? (
@@ -174,7 +174,7 @@ export function FichaContratos({
         <form action={onGenerar}>
           <FormSection
             title="Generar contrato"
-            hint="Estos datos van al documento. Al confirmar el firmado se actualizan cargo, horario y jornada. La fecha de ingreso a la empresa no cambia."
+            hint="Estos datos van al documento. Al confirmar el firmado se actualizan cargo, horario y jornada del puesto. No se toca la fecha de ingreso a la empresa."
           >
             <DatosContratoFields
               key={`gen-${base?.id ?? "nuevo"}-${base?.horario ?? ""}`}
@@ -223,7 +223,7 @@ export function FichaContratos({
             canWrite={canWrite}
             tiposFiltro={["CONTRATO_FIRMADO"]}
             permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
-            hint="PDF firmado. Hasta confirmar, no se actualizan cargo, horario ni jornada. La fecha de ingreso a la empresa no cambia."
+            hint="PDF firmado. Hasta confirmar, no se actualizan cargo, horario ni jornada. El ingreso a la empresa no cambia."
           />
           {canWrite && tieneFirmado ? (
             mostrarConfirmar ? (
@@ -265,7 +265,7 @@ export function FichaContratos({
             <tr>
               <th className="px-4 py-2 font-medium">Versión</th>
               <th className="px-4 py-2 font-medium">Inicio contrato</th>
-              <th className="px-4 py-2 font-medium">Cese contrato</th>
+              <th className="px-4 py-2 font-medium">Fin contrato</th>
               <th className="px-4 py-2 font-medium">Estado</th>
               <th className="px-4 py-2 font-medium">Remuneración</th>
               <th className="px-4 py-2 font-medium">Guardado</th>
@@ -391,9 +391,9 @@ function DatosContratoFields({
       <DateField
         label="Fecha de inicio de contrato"
         name="fecha_inicio"
-        defaultValue={contrato?.fecha_inicio ?? trabajador.fecha_ingreso}
+        defaultValue={contrato?.fecha_inicio ?? ""}
       />
-      <DateField label="Fecha de cese de contrato" name="fecha_fin" defaultValue={contrato?.fecha_fin ?? ""} />
+      <DateField label="Fecha de fin de contrato" name="fecha_fin" defaultValue={contrato?.fecha_fin ?? ""} />
       <Field
         label="Remuneración"
         name="remuneracion"

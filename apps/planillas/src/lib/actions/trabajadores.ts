@@ -295,10 +295,8 @@ export async function updatePuestoTrabajador(
   const actual = await getTrabajador(relacionId);
   if (!actual) return { error: "Trabajador no encontrado." };
 
-  const ingreso = parseFechaCampo(String(formData.get("fecha_ingreso") ?? ""), "Fecha de ingreso");
+  const ingreso = parseFechaCampo(String(formData.get("fecha_ingreso") ?? ""), "Fecha de ingreso a la empresa");
   if (ingreso.error) return { error: ingreso.error };
-  const cese = parseFechaCampo(String(formData.get("fecha_cese") ?? ""), "Fecha de cese");
-  if (cese.error) return { error: cese.error };
   const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""), actual.cargo);
   if (cargo.error) return { error: cargo.error };
 
@@ -311,8 +309,40 @@ export async function updatePuestoTrabajador(
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
       horario: String(formData.get("horario") ?? "").trim() || null,
       fecha_ingreso: ingreso.value,
+    })
+    .eq("id", relacionId);
+  if (error) return { error: error.message };
+
+  revalidatePath("/");
+  revalidatePath("/pendientes");
+  revalidatePath(`/trabajadores/${relacionId}`);
+  return {};
+}
+
+export async function darDeBajaTrabajador(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para editar." };
+
+  const actual = await getTrabajador(relacionId);
+  if (!actual) return { error: "Trabajador no encontrado." };
+  if (actual.estado === "CESADA") return { error: "Esta ficha ya está de baja." };
+
+  const cese = parseFechaCampo(String(formData.get("fecha_cese") ?? ""), "Fecha de cese en la empresa");
+  if (cese.error) return { error: cese.error };
+  if (!cese.value) return { error: "Indique la fecha de cese en la empresa." };
+  if (actual.fecha_ingreso && cese.value < actual.fecha_ingreso) {
+    return { error: "El cese no puede ser anterior al ingreso a la empresa." };
+  }
+
+  const db = await planillasDb();
+  const { error } = await db
+    .from("relaciones_laborales")
+    .update({
       fecha_cese: cese.value,
-      estado: cese.value ? "CESADA" : "ACTIVA",
+      estado: "CESADA",
     })
     .eq("id", relacionId);
   if (error) return { error: error.message };

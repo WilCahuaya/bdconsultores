@@ -28,15 +28,11 @@ export default async function NuevoTrabajadorPage({
             ← Trabajadores
           </Link>
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">Nuevo trabajador</h1>
-          {esUsuarioEntidad(profile.rol) ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Identifique a la persona y siga a Documentos. Ahí se suben DNI, ficha y AFP/ONP, y se capturan los datos del contrato. El estudio validará el alta.
-            </p>
-          ) : (
-            <p className="mt-1 text-sm text-muted-foreground">
-              Identifique a la persona y siga a Documentos. Ahí se suben DNI, ficha y AFP/ONP, y se capturan los datos del contrato. El alta queda aceptada al registrarla desde el estudio.
-            </p>
-          )}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {esUsuarioEntidad(profile.rol)
+              ? "Empiece por Documentos. Luego Persona, Puesto y Contrato. El estudio validará el alta."
+              : "Empiece por Documentos. Luego Persona, Puesto y Contrato. El alta queda aceptada al registrarla desde el estudio."}
+          </p>
         </div>
         {entidades.length === 0 ? (
           <p className="text-sm text-muted-foreground">
