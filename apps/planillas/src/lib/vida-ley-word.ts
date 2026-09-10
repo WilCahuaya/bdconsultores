@@ -165,16 +165,16 @@ function tablaEmpresa(d: VidaLeyWordDatos): Table {
   });
 }
 
-const COLS = [
+const COLS: { key: string; label: string; width: number; center: boolean }[] = [
   { key: "n", label: "N°", width: 5, center: true },
-  { key: "nombre", label: "NOMBRE Y APELLIDO", width: 22 },
+  { key: "nombre", label: "NOMBRE Y APELLIDO", width: 22, center: false },
   { key: "dni", label: "DNI", width: 10, center: true },
   { key: "ingreso", label: "FECHA DE INGRESO", width: 11, center: true },
   { key: "rem", label: "REMUNERACION", width: 11, center: true },
-  { key: "cargo", label: "CARGO", width: 18 },
+  { key: "cargo", label: "CARGO", width: 18, center: false },
   { key: "nac", label: "FECHA DE NACIMIENTO", width: 12, center: true },
   { key: "periodo", label: "PERIODO", width: 11, center: true },
-] as const;
+];
 
 function tablaTrabajadores(trabajadores: VidaLeyTrabajadorWord[]): Table {
   const header = new TableRow({
@@ -194,7 +194,7 @@ function tablaTrabajadores(trabajadores: VidaLeyTrabajadorWord[]): Table {
     ];
     return new TableRow({
       children: COLS.map((col, idx) =>
-        celda(vals[idx] ?? "", { width: col.width, center: Boolean(col.center) }),
+        celda(vals[idx] ?? "", { width: col.width, center: col.center }),
       ),
     });
   });
