@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, useToast } from "@inventario/ui";
+import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
-import { addTRegistro, type DocumentoRow, type PensionRow, type TRegistroRow } from "@/lib/actions/ficha";
+import {
+  addTRegistro,
+  setDocumentoArchivo,
+  type DocumentoRow,
+  type PensionRow,
+  type TRegistroRow,
+} from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import {
   TIPO_DOCUMENTO_LABEL,
@@ -18,6 +24,8 @@ import {
 import { Field, DateField, SelectField } from "@/components/fields";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
+import { uploadDocumentoFile } from "@/lib/upload-documento";
 
 function tipoAfpCopia(pension: PensionRow | null): string {
   if (!pension?.tipo) return "";
@@ -37,6 +45,7 @@ export function FichaTRegistro({
   trabajador,
   documentoDni,
   documentoFicha,
+  documentoTrAlta,
   canWrite,
 }: {
   relacionId: string;
@@ -45,14 +54,65 @@ export function FichaTRegistro({
   trabajador: TrabajadorListItem;
   documentoDni: DocumentoRow | null;
   documentoFicha: DocumentoRow | null;
+  documentoTrAlta: DocumentoRow | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
+  const [pendingAlta, setPendingAlta] = useState(false);
   const [pending, setPending] = useState(false);
-  const [mostrarForm, setMostrarForm] = useState(items.length === 0);
+  const [fileAlta, setFileAlta] = useState<File | null>(null);
+  const [mostrarForm, setMostrarForm] = useState(false);
   const persona = trabajador.persona;
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
+  const yaAlta = items.some((item) => item.tipo === "ALTA" && item.realizado);
+
+  async function guardarAlta(formData: FormData) {
+    if (!fileAlta && !documentoTrAlta?.storage_path) {
+      pushToast("Suba el alta de T-Registro.", "error");
+      return;
+    }
+    setPendingAlta(true);
+    if (fileAlta) {
+      if (!documentoTrAlta) {
+        setPendingAlta(false);
+        pushToast("No se pudo registrar el alta. Recargue la página.", "error");
+        return;
+      }
+      const upload = await uploadDocumentoFile(
+        trabajador.entidad_id,
+        relacionId,
+        documentoTrAlta.id,
+        fileAlta,
+        documentoTrAlta.storage_path,
+      );
+      if (upload.error || !upload.path) {
+        setPendingAlta(false);
+        pushToast(upload.error ?? "No se pudo subir el alta de T-Registro.", "error");
+        return;
+      }
+      const savedFile = await setDocumentoArchivo(relacionId, documentoTrAlta.id, upload.path);
+      if (savedFile.error) {
+        setPendingAlta(false);
+        pushToast(savedFile.error, "error");
+        return;
+      }
+    }
+    if (!yaAlta) {
+      formData.set("tipo", "ALTA");
+      formData.set("realizado", "on");
+      const result = await addTRegistro(relacionId, formData);
+      if (result.error) {
+        setPendingAlta(false);
+        pushToast(result.error, "error");
+        return;
+      }
+    }
+    setFileAlta(null);
+    setPendingAlta(false);
+    pushToast("Alta de T-Registro guardada.");
+    router.refresh();
+  }
 
   async function onSubmit(formData: FormData) {
     setPending(true);
@@ -115,6 +175,45 @@ export function FichaTRegistro({
           {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
         </p>
       </section>
+
+      <form action={guardarAlta} className="space-y-4">
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.TR_ALTA}
+          storagePath={fileAlta ? null : documentoTrAlta?.storage_path}
+          file={fileAlta}
+          vacio="Suba el alta de T-Registro cuando lo tenga en SUNAT."
+          extra={
+            canWrite ? (
+              <FileInput
+                accept={DOCUMENTO_ACCEPT}
+                disabled={pendingAlta}
+                file={fileAlta}
+                buttonLabel={
+                  fileAlta || documentoTrAlta?.storage_path ? "Cambiar alta de T-Registro" : "Subir alta de T-Registro"
+                }
+                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                onFileChange={setFileAlta}
+              />
+            ) : null
+          }
+        />
+        {canWrite ? (
+          <div className={`${panelCardClass} space-y-4 p-5`}>
+            <DateField
+              label="Fecha de alta"
+              name="fecha"
+              defaultValue={items.find((item) => item.tipo === "ALTA")?.fecha ?? trabajador.fecha_ingreso}
+              readOnly={pendingAlta}
+            />
+            <Button type="submit" disabled={pendingAlta}>
+              {pendingAlta ? "Guardando…" : "Guardar alta de T-Registro"}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Solo consulta.</p>
+        )}
+      </form>
+
       <ul className={`${panelCardClass} divide-y p-0`}>
         {items.length === 0 ? (
           <li className="px-4 py-6 text-sm text-muted-foreground">Sin altas ni bajas registradas.</li>
@@ -132,7 +231,7 @@ export function FichaTRegistro({
       </ul>
       {canWrite && !mostrarForm ? (
         <Button type="button" variant="outline" onClick={() => setMostrarForm(true)}>
-          Registrar alta o baja
+          Registrar baja u otro movimiento
         </Button>
       ) : null}
       {canWrite && mostrarForm ? (
@@ -155,11 +254,9 @@ export function FichaTRegistro({
             <Button type="submit" disabled={pending}>
               {pending ? "Guardando…" : "Agregar"}
             </Button>
-            {items.length > 0 ? (
-              <Button type="button" variant="outline" disabled={pending} onClick={() => setMostrarForm(false)}>
-                Cancelar
-              </Button>
-            ) : null}
+            <Button type="button" variant="outline" disabled={pending} onClick={() => setMostrarForm(false)}>
+              Cancelar
+            </Button>
           </div>
         </form>
       ) : null}

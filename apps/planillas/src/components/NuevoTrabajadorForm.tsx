@@ -29,6 +29,7 @@ export function NuevoTrabajadorForm({
   const [buscando, setBuscando] = useState(false);
   const [dniFile, setDniFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
   const [dni, setDni] = useState("");
   const [nombres, setNombres] = useState("");
   const [apellidoPaterno, setApellidoPaterno] = useState("");
@@ -39,6 +40,7 @@ export function NuevoTrabajadorForm({
   useEffect(() => {
     if (!dniFile) {
       setPreviewUrl(null);
+      setPreviewVisible(false);
       return;
     }
     const url = URL.createObjectURL(dniFile);
@@ -134,12 +136,19 @@ export function NuevoTrabajadorForm({
         </div>
         <div className="space-y-4">
           {previewUrl ? (
-            esPdf ? (
-              <iframe title="Vista previa del DNI" src={previewUrl} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={previewUrl} alt="Vista previa del DNI" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
-            )
+            <div className="space-y-2">
+              <Button type="button" size="sm" variant="outline" onClick={() => setPreviewVisible((v) => !v)}>
+                {previewVisible ? "Ocultar previsualización" : "Ver previsualización"}
+              </Button>
+              {previewVisible ? (
+                esPdf ? (
+                  <iframe title="Vista previa del DNI" src={previewUrl} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={previewUrl} alt="Vista previa del DNI" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
+                )
+              ) : null}
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">Suba el escaneo para verlo aquí y complete los campos a mano.</p>
           )}

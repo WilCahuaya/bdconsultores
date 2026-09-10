@@ -26,14 +26,14 @@ export function DocumentoPrevisualizacion({
   extra?: ReactNode;
 }) {
   const hayArchivo = Boolean(file || storagePath);
-  const [visible, setVisible] = useState(defaultVisible ?? hayArchivo);
+  const [visible, setVisible] = useState(Boolean(defaultVisible));
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setVisible(defaultVisible ?? hayArchivo);
-  }, [hayArchivo, defaultVisible]);
+    if (!hayArchivo) setVisible(false);
+  }, [hayArchivo]);
 
   useEffect(() => {
     if (!file) {

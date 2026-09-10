@@ -411,6 +411,17 @@ export async function asegurarDocumentosAlta(relacionId: string): Promise<void> 
 }
 
 export async function asegurarDocumentoTramiteAfp(relacionId: string): Promise<void> {
+  await asegurarDocumentoTramite(relacionId, "TRAMITE_AFP");
+}
+
+export async function asegurarDocumentoTrAlta(relacionId: string): Promise<void> {
+  await asegurarDocumentoTramite(relacionId, "TR_ALTA");
+}
+
+async function asegurarDocumentoTramite(
+  relacionId: string,
+  tipo: Extract<TipoDocumentoPlanilla, "TRAMITE_AFP" | "TR_ALTA">,
+): Promise<void> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return;
   const db = await planillasDb();
@@ -418,12 +429,12 @@ export async function asegurarDocumentoTramiteAfp(relacionId: string): Promise<v
     .from("documentos")
     .select("id")
     .eq("relacion_id", relacionId)
-    .eq("tipo", "TRAMITE_AFP")
+    .eq("tipo", tipo)
     .maybeSingle();
   if (data) return;
   await db.from("documentos").insert({
     relacion_id: relacionId,
-    tipo: "TRAMITE_AFP",
+    tipo,
     estado: "PENDIENTE",
   });
 }

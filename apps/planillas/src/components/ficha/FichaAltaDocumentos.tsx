@@ -33,6 +33,7 @@ function PreviewEscaneo({
   esPdf: boolean;
   vacio?: string;
 }) {
+  const [visible, setVisible] = useState(false);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!file) {
@@ -47,12 +48,20 @@ function PreviewEscaneo({
   if (!src) {
     return <p className="text-sm text-muted-foreground">{vacio}</p>;
   }
-  if (esPdf) {
-    return <iframe title="Vista previa" src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />;
-  }
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="Vista previa del escaneo" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
+    <div className="space-y-2">
+      <Button type="button" size="sm" variant="outline" onClick={() => setVisible((v) => !v)}>
+        {visible ? "Ocultar previsualización" : "Ver previsualización"}
+      </Button>
+      {visible ? (
+        esPdf ? (
+          <iframe title="Vista previa" src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt="Vista previa del escaneo" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
+        )
+      ) : null}
+    </div>
   );
 }
 
