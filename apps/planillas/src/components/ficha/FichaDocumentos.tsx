@@ -94,8 +94,12 @@ export function FichaDocumentos({
                 setPending(true);
                 const uploadError = await adjuntarArchivo(d.id, file, d.storage_path);
                 setPending(false);
-                if (uploadError) setError(uploadError);
-                else router.refresh();
+                if (uploadError) {
+                  setError(uploadError);
+                  return false;
+                }
+                router.refresh();
+                return true;
               }}
             />
           ))
@@ -130,9 +134,19 @@ export function FichaDocumentos({
               onFileChange={setNuevoArchivo}
             />
           </div>
-          <Button type="submit" disabled={pending}>
-            {pending ? "Guardando…" : "Agregar"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Agregar"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
+              onClick={() => setNuevoArchivo(null)}
+            >
+              Cancelar
+            </Button>
+          </div>
         </form>
       ) : null}
     </div>
@@ -148,10 +162,11 @@ function DocumentoItem({
   documento: DocumentoRow;
   canWrite: boolean;
   disabled: boolean;
-  onUpload: (file: File) => Promise<void>;
+  onUpload: (file: File) => Promise<boolean>;
 }) {
   const [opening, setOpening] = useState<"ver" | "descargar" | null>(null);
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [archivoPendiente, setArchivoPendiente] = useState<File | null>(null);
   const tieneArchivo = Boolean(documento.storage_path);
 
   async function abrir(modo: "ver" | "descargar") {
@@ -168,6 +183,12 @@ function DocumentoItem({
       return;
     }
     window.open(result.url, "_blank", "noopener,noreferrer");
+  }
+
+  async function guardarPendiente() {
+    if (!archivoPendiente) return;
+    const ok = await onUpload(archivoPendiente);
+    if (ok) setArchivoPendiente(null);
   }
 
   return (
@@ -189,10 +210,20 @@ function DocumentoItem({
               {opening === "descargar" ? "Preparando…" : "Descargar"}
             </Button>
           </>
-        ) : (
+        ) : archivoPendiente ? null : (
           <span className="text-muted-foreground">Sin archivo</span>
         )}
-        {canWrite ? (
+        {canWrite && archivoPendiente ? (
+          <>
+            <span className="text-muted-foreground">{archivoPendiente.name}</span>
+            <Button type="button" size="sm" disabled={disabled} onClick={() => void guardarPendiente()}>
+              {disabled ? "Guardando…" : "Guardar"}
+            </Button>
+            <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => setArchivoPendiente(null)}>
+              Cancelar
+            </Button>
+          </>
+        ) : canWrite ? (
           <label className="inline-flex">
             <input
               type="file"
@@ -203,7 +234,7 @@ function DocumentoItem({
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 event.target.value = "";
-                if (file) void onUpload(file);
+                if (file) setArchivoPendiente(file);
               }}
             />
             <span

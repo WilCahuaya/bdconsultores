@@ -50,6 +50,7 @@ export function FichaContratos({
   const [mostrarGenerar, setMostrarGenerar] = useState(contratos.length === 0);
   const [editando, setEditando] = useState<ContratoRow | null>(null);
   const [eliminando, setEliminando] = useState<ContratoRow | null>(null);
+  const [mostrarConfirmar, setMostrarConfirmar] = useState(true);
 
   const abierto = contratos.find(
     (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
@@ -219,17 +220,33 @@ export function FichaContratos({
             hint="PDF firmado. Hasta confirmar, no se actualiza el puesto ni queda como contrato vigente."
           />
           {canWrite && tieneFirmado ? (
-            <form action={(formData) => void onConfirmar(abierto.id, formData)} className="space-y-4">
-              <p className="text-sm font-medium">Datos a guardar (del generado; se pueden cambiar)</p>
-              <DatosContratoFields
-                key={`conf-${abierto.id}-${abierto.horario}-${abierto.remuneracion}`}
-                trabajador={trabajador}
-                contrato={abierto}
-              />
-              <Button type="submit" disabled={pending === "confirmar"}>
-                {pending === "confirmar" ? "Guardando…" : "Confirmar y guardar contrato"}
+            mostrarConfirmar ? (
+              <form action={(formData) => void onConfirmar(abierto.id, formData)} className="space-y-4">
+                <p className="text-sm font-medium">Datos a guardar (del generado; se pueden cambiar)</p>
+                <DatosContratoFields
+                  key={`conf-${abierto.id}-${abierto.horario}-${abierto.remuneracion}`}
+                  trabajador={trabajador}
+                  contrato={abierto}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={pending === "confirmar"}>
+                    {pending === "confirmar" ? "Guardando…" : "Confirmar y guardar contrato"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={pending === "confirmar"}
+                    onClick={() => setMostrarConfirmar(false)}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setMostrarConfirmar(true)}>
+                Confirmar datos del firmado
               </Button>
-            </form>
+            )
           ) : canWrite ? (
             <p className="text-sm text-muted-foreground">Cuando suba el firmado podrá confirmar y guardar los datos.</p>
           ) : null}
