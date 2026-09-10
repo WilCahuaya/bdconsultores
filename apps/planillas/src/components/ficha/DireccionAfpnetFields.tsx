@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { CopiarValor, Field, SelectField, fieldClass } from "@/components/fields";
 import { armarDireccionPersona, opcionesTipoVia } from "@/lib/planillas-labels";
 import {
@@ -62,13 +62,12 @@ function UbigeoCombobox({
   opciones: string[];
   disabled?: boolean;
   placeholder?: string;
-  inputRef?: RefObject<HTMLInputElement | null>;
+  inputRef?: MutableRefObject<HTMLInputElement | null>;
   onChange: (value: string) => void;
   onPicked?: () => void;
 }) {
   const listId = useId();
-  const innerRef = useRef<HTMLInputElement>(null);
-  const fieldRef = inputRef ?? innerRef;
+  const innerRef = useRef<HTMLInputElement | null>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value);
   const opcionesConValor = useMemo(() => {
@@ -100,7 +99,10 @@ function UbigeoCombobox({
       <span className="text-sm font-medium text-foreground">{label}</span>
       <input type="hidden" name={name} value={value} />
       <input
-        ref={fieldRef}
+        ref={(el) => {
+          innerRef.current = el;
+          if (inputRef) inputRef.current = el;
+        }}
         className={fieldClass}
         value={query}
         disabled={disabled}
@@ -112,7 +114,7 @@ function UbigeoCombobox({
         onFocus={() => {
           if (disabled) return;
           setOpen(true);
-          fieldRef.current?.select();
+          innerRef.current?.select();
         }}
         onBlur={() => {
           window.setTimeout(() => setOpen(false), 120);
@@ -172,8 +174,8 @@ export function DireccionAfpnetFields({
   onChange: (next: DireccionAfpnetValue) => void;
   canWrite: boolean;
 }) {
-  const provinciaInput = useRef<HTMLInputElement>(null);
-  const distritoInput = useRef<HTMLInputElement>(null);
+  const provinciaInput = useRef<HTMLInputElement | null>(null);
+  const distritoInput = useRef<HTMLInputElement | null>(null);
   const regiones = regionesPeru();
   const region = canonizarUbigeo(regiones, value.region);
   const provincias = provinciasPeru(region);
