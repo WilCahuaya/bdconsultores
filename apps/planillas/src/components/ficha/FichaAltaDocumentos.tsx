@@ -17,7 +17,7 @@ import {
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { Field, DateField, SelectField } from "@/components/fields";
-import { AFPNET_URL, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import { TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
@@ -86,7 +86,7 @@ export function FichaAltaDocumentos({
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Primero los escaneos. Al lado de cada uno, complete a mano los datos que más adelante usa Persona y el contrato.
-        En pensiones, en este paso solo se marca AFP u ONP.
+        En Sistema de pensión, el estudio inicia el alta AFP o, si es ONP, solo deja indicado que es ONP.
       </p>
       <CapturaDni relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={dniDoc} canWrite={canWrite} />
       <CapturaFicha relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={fichaDoc} canWrite={canWrite} />
@@ -416,7 +416,7 @@ function CapturaPension({
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}</p>
         <p className="text-sm text-muted-foreground">
-          En el alta solo se indica AFP u ONP, para el trámite del estudio. Nombre de AFP, CUSPP y fechas se registran después en Pensiones.
+          En el alta solo se indica AFP u ONP. Si es AFP, el estudio registra el alta, CUSPP y fecha de afiliación en Sistema de pensión.
         </p>
       </div>
       <div className="space-y-4">
@@ -443,16 +443,6 @@ function CapturaPension({
           ]}
           onChange={(event) => setTipo(event.target.value as TipoPension | "")}
         />
-        {tipo === "AFP" ? (
-          <a
-            href={AFPNET_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            Abrir AFPNet
-          </a>
-        ) : null}
       </div>
       {canWrite ? (
         <Button type="button" disabled={pending} onClick={() => void guardar()}>

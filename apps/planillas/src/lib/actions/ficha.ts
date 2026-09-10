@@ -616,15 +616,15 @@ export async function savePension(relacionId: string, formData: FormData): Promi
   if ("error" in gate) return { error: gate.error };
   const tipo = String(formData.get("tipo")) as TipoPension;
   if (tipo !== "AFP" && tipo !== "ONP") return { error: "Indique si es AFP u ONP." };
-  const fechaTramite = parseFechaCampo(String(formData.get("fecha_tramite") ?? ""), "Fecha de trámite");
+  const fechaTramite = parseFechaCampo(String(formData.get("fecha_tramite") ?? ""), "Fecha de afiliación");
   if (fechaTramite.error) return { error: fechaTramite.error };
   const afpNombre = tipo === "AFP" ? String(formData.get("afp_nombre") ?? "").trim() || null : null;
   const cuspp = String(formData.get("cuspp") ?? "").trim() || null;
   const tramiteEstado = (tipo === "ONP" ? "NO_APLICA" : String(formData.get("tramite_estado"))) as EstadoTramitePension;
   if (tipo === "AFP" && tramiteEstado === "TRAMITADO") {
-    if (!afpNombre) return { error: "Indique la AFP que aparece en la constancia." };
-    if (!cuspp) return { error: "Indique el CUSPP de la constancia." };
-    if (!fechaTramite.value) return { error: "Indique la fecha de trámite de la constancia." };
+    if (!afpNombre) return { error: "Indique la AFP (Habitat, Integra, Prima o Profuturo)." };
+    if (!cuspp) return { error: "Indique el CUSPP." };
+    if (!fechaTramite.value) return { error: "Indique la fecha de afiliación." };
   }
   const payload = {
     relacion_id: relacionId,
@@ -691,13 +691,6 @@ export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]>
 export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
-  const tipo = String(formData.get("tipo")) as TipoTRegistro;
-  if (tipo === "ALTA") {
-    const pension = await getPension(relacionId);
-    if (pension?.tipo === "AFP" && pension.tramite_estado !== "TRAMITADO") {
-      return { error: "Primero registre el alta en AFP (trámite y CUSPP) antes del alta en T-Registro." };
-    }
-  }
   const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
   if (fecha.error) return { error: fecha.error };
   const db = await planillasDb();

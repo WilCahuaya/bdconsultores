@@ -88,7 +88,7 @@ export function NuevoTrabajadorForm({
       }
     }
     setPending(false);
-    pushToast("Ficha abierta. Siga con ficha y pensiones.");
+    pushToast("Ficha abierta. Siga con ficha y sistema de pensión.");
     if (result.relacionId) router.push(`/trabajadores/${result.relacionId}?tab=documentos`);
   }
 
@@ -109,7 +109,7 @@ export function NuevoTrabajadorForm({
 
       <p className="text-sm text-muted-foreground">
         Primero los escaneos. Al lado de cada uno, complete a mano los datos que más adelante usa Persona y el contrato.
-        En pensiones, en este paso solo se marca AFP u ONP.
+        En Sistema de pensión, en este paso solo se marca AFP u ONP.
       </p>
 
       {!lockEntidad ? (

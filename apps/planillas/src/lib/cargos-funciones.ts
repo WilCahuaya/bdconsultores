@@ -192,7 +192,27 @@ export const CODIGO_OCUPACION_TREGISTRO: Record<CargoTrabajador, string> = {
   "Formador educativo y espiritual": "246004",
 };
 
+const CARGO_OCUPACION_CORTO: Record<CargoTrabajador, string> = {
+  Administrador: "Administrador",
+  "Responsable de tesorería, logística y almacén": "Tesorero",
+  "Responsable de procesos administrativos y comunicaciones del participante": "Secretario",
+  "Coordinador de implementación programática y monitoreo": "CORD",
+  "Formador educativo y espiritual": "FEE",
+};
+
+export const LEYENDA_CODIGO_OCUPACION = [
+  { corto: "Administrador", codigo: "252003" },
+  { corto: "Tesorero", codigo: "451020" },
+  { corto: "Secretario", codigo: "413016" },
+  { corto: "FEE y CORD", codigo: "246004" },
+] as const;
+
 export function codigoOcupacionTRegistro(cargo: string | null | undefined): string {
   const canon = cargoCanonico(cargo);
   return canon ? CODIGO_OCUPACION_TREGISTRO[canon] : "";
+}
+
+export function etiquetaCodigoOcupacion(cargo: string | null | undefined): string {
+  const canon = cargoCanonico(cargo);
+  return canon ? `Código · ${CARGO_OCUPACION_CORTO[canon]}` : "Código";
 }

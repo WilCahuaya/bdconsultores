@@ -17,7 +17,9 @@ export {
   CARGOS_TRABAJADOR,
   cargoCanonico,
   codigoOcupacionTRegistro,
+  etiquetaCodigoOcupacion,
   esCargoTrabajador,
+  LEYENDA_CODIGO_OCUPACION,
   type CargoTrabajador,
 } from "@/lib/cargos-funciones";
 
@@ -85,7 +87,7 @@ export const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoPlanilla, string> = {
   TR_BAJA: "T-Registro baja",
   CARTA_RENUNCIA: "Carta de renuncia",
   VIDA_LEY: "Vida Ley",
-  TRAMITE_AFP: "Constancia de trámite AFP",
+  TRAMITE_AFP: "Documento de alta AFP",
   OTRO: "Otro",
 };
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -12,7 +11,9 @@ import {
   TIPO_T_REGISTRO_LABEL,
   TREGISTRO_URL,
   codigoOcupacionTRegistro,
+  etiquetaCodigoOcupacion,
   formatFechaPlanilla,
+  LEYENDA_CODIGO_OCUPACION,
 } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField } from "@/components/fields";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
@@ -50,7 +51,6 @@ export function FichaTRegistro({
   const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(items.length === 0);
-  const afpPendiente = pension?.tipo === "AFP" && pension.tramite_estado !== "TRAMITADO";
   const persona = trabajador.persona;
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
 
@@ -106,23 +106,15 @@ export function FichaTRegistro({
             label="Fecha de inicio del trabajador"
             value={trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : ""}
           />
-          <DatoAlta label="Código" value={codigoOcupacion} />
+          <DatoAlta label={etiquetaCodigoOcupacion(trabajador.cargo)} value={codigoOcupacion} />
           <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
           <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
           <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
         </div>
-      </section>
-      {afpPendiente ? (
-        <p className={`${panelCardClass} p-4 text-sm`}>
-          Si es AFP, primero hay que registrar el alta en Pensiones (CUSPP y trámite).{" "}
-          <Link href={`/trabajadores/${relacionId}?tab=pensiones`} className="font-medium text-primary hover:underline">
-            Ir a Pensiones
-          </Link>
+        <p className="text-xs text-muted-foreground">
+          {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
         </p>
-      ) : null}
-      {pension?.tipo === "ONP" ? (
-        <p className="text-sm text-muted-foreground">Es ONP: no hace falta alta AFP. Puede registrar T-Registro.</p>
-      ) : null}
+      </section>
       <ul className={`${panelCardClass} divide-y p-0`}>
         {items.length === 0 ? (
           <li className="px-4 py-6 text-sm text-muted-foreground">Sin altas ni bajas registradas.</li>

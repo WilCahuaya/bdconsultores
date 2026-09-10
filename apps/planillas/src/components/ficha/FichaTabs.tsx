@@ -3,7 +3,7 @@ import { PASOS_ALTA, type FlujoTab, type PasoAltaId } from "@/lib/flujo-ficha";
 import { AFPNET_URL, TREGISTRO_URL } from "@/lib/planillas-labels";
 
 const TRAMITES = [
-  { id: "pensiones", label: "Pensiones" },
+  { id: "pensiones", label: "Sistema de pensión" },
   { id: "t-registro", label: "T-Registro" },
   { id: "vida-ley", label: "Vida Ley" },
 ] as const;
