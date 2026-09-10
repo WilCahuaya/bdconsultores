@@ -94,6 +94,8 @@ export const TIPO_PENSION_LABEL: Record<TipoPension, string> = {
   ONP: "ONP",
 };
 
+export const AFP_NOMBRES = ["Habitat", "Integra", "Prima", "Profuturo"] as const;
+
 export const TRAMITE_PENSION_LABEL: Record<EstadoTramitePension, string> = {
   PENDIENTE: "Pendiente",
   TRAMITADO: "Tramitado",

@@ -17,6 +17,7 @@ import {
   puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
+import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta } from "@/lib/actions/ficha";
 import {
@@ -49,12 +50,15 @@ export default async function FichaTrabajadorPage({
   if (tab === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
   }
-  const [contratos, documentos, pension, vidaLey, tRegistro] = await Promise.all([
+  const [contratos, documentos, pension, vidaLey, tRegistro, entidad] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
-    tab === "pensiones" || tab === "documentos" ? getPension(params.relacionId) : Promise.resolve(null),
+    tab === "pensiones" || tab === "documentos" || tab === "t-registro"
+      ? getPension(params.relacionId)
+      : Promise.resolve(null),
     tab === "vida-ley" ? getVidaLey(params.relacionId) : Promise.resolve(null),
     tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
+    tab === "pensiones" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
   ]);
   const continuar =
     siguiente.paso !== "listo" && siguiente.tab !== tab
@@ -123,10 +127,21 @@ export default async function FichaTrabajadorPage({
           />
         ) : null}
         {esEstudio && tab === "pensiones" ? (
-          <FichaPensiones relacionId={params.relacionId} pension={pension} canWrite={canWriteTramite} />
+          <FichaPensiones
+            relacionId={params.relacionId}
+            pension={pension}
+            trabajador={trabajador}
+            entidad={entidad}
+            canWrite={canWriteTramite}
+          />
         ) : null}
         {esEstudio && tab === "t-registro" ? (
-          <FichaTRegistro relacionId={params.relacionId} items={tRegistro} canWrite={canWriteTramite} />
+          <FichaTRegistro
+            relacionId={params.relacionId}
+            items={tRegistro}
+            pension={pension}
+            canWrite={canWriteTramite}
+          />
         ) : null}
         {esEstudio && tab === "vida-ley" ? (
           <FichaVidaLey relacionId={params.relacionId} vidaLey={vidaLey} canWrite={canWriteTramite} />

@@ -639,6 +639,13 @@ export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]>
 export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
+  const tipo = String(formData.get("tipo")) as TipoTRegistro;
+  if (tipo === "ALTA") {
+    const pension = await getPension(relacionId);
+    if (pension?.tipo === "AFP" && pension.tramite_estado !== "TRAMITADO") {
+      return { error: "Primero registre el alta en AFP (trámite y CUSPP) antes del alta en T-Registro." };
+    }
+  }
   const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
   if (fecha.error) return { error: fecha.error };
   const db = await planillasDb();

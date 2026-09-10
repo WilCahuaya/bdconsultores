@@ -20,16 +20,17 @@ import { Field, DateField, SelectField } from "@/components/fields";
 import { TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
-import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
 
 function PreviewEscaneo({
   file,
   remoteUrl,
   esPdf,
+  vacio = "Suba el escaneo para verlo aquí y complete los campos a mano.",
 }: {
   file: File | null;
   remoteUrl?: string | null;
   esPdf: boolean;
+  vacio?: string;
 }) {
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -43,7 +44,7 @@ function PreviewEscaneo({
   }, [file]);
   const src = localUrl ?? remoteUrl ?? null;
   if (!src) {
-    return <p className="text-sm text-muted-foreground">Suba el escaneo para verlo aquí y complete los campos a mano.</p>;
+    return <p className="text-sm text-muted-foreground">{vacio}</p>;
   }
   if (esPdf) {
     return <iframe title="Vista previa" src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />;
@@ -90,19 +91,12 @@ export function FichaAltaDocumentos({
       <CapturaFicha relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={fichaDoc} canWrite={canWrite} />
       <CapturaPension relacionId={relacionId} entidadId={entidadId} documento={pensionDoc} pension={pension} canWrite={canWrite} />
       {recibe ? (
-        <div className={`${panelCardClass} space-y-3 p-5`}>
-          <p className="text-sm font-medium">Asignación familiar</p>
-          <p className="text-sm text-muted-foreground">La ficha indica que sí recibe. Suba el sustento.</p>
-          <FichaDocumentos
-            relacionId={relacionId}
-            entidadId={entidadId}
-            documentos={asignacionDoc ? [asignacionDoc] : []}
-            canWrite={canWrite}
-            tiposFiltro={["ASIGNACION_FAMILIAR"]}
-            permitirAgregar={!asignacionDoc}
-            hint="Partida o documento de asignación familiar. PDF o imagen. Máximo 10 MB."
-          />
-        </div>
+        <CapturaAsignacion
+          relacionId={relacionId}
+          entidadId={entidadId}
+          documento={asignacionDoc}
+          canWrite={canWrite}
+        />
       ) : null}
     </div>
   );
@@ -447,6 +441,93 @@ function CapturaPension({
       {canWrite ? (
         <Button type="button" disabled={pending} onClick={() => void guardar()}>
           {pending ? "Guardando…" : "Guardar AFP u ONP"}
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
+function CapturaAsignacion({
+  relacionId,
+  entidadId,
+  documento,
+  canWrite,
+}: {
+  relacionId: string;
+  entidadId: string;
+  documento: DocumentoRow | null;
+  canWrite: boolean;
+}) {
+  const router = useRouter();
+  const { pushToast } = useToast();
+  const [file, setFile] = useState<File | null>(null);
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!documento?.storage_path) {
+      setRemoteUrl(null);
+      return;
+    }
+    void getSignedDocumentoUrl(documento.storage_path).then((result) => {
+      if (result.url) setRemoteUrl(result.url);
+    });
+  }, [documento?.storage_path]);
+
+  async function guardar() {
+    if (!documento) return;
+    if (!file && !documento.storage_path) {
+      pushToast("Suba el sustento de asignación familiar.", "error");
+      return;
+    }
+    setPending(true);
+    if (file) {
+      const upload = await uploadDocumentoFile(entidadId, relacionId, documento.id, file, documento.storage_path);
+      if (upload.error || !upload.path) {
+        setPending(false);
+        pushToast(upload.error ?? "No se pudo subir el documento.", "error");
+        return;
+      }
+      const savedFile = await setDocumentoArchivo(relacionId, documento.id, upload.path);
+      if (savedFile.error) {
+        setPending(false);
+        pushToast(savedFile.error, "error");
+        return;
+      }
+    }
+    setPending(false);
+    setFile(null);
+    pushToast("Asignación familiar guardada.");
+    router.refresh();
+  }
+
+  return (
+    <section className={`${panelCardClass} space-y-4 p-5`}>
+      <div>
+        <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.ASIGNACION_FAMILIAR}</p>
+        <p className="text-sm text-muted-foreground">La ficha indica que sí recibe. Suba el sustento (partida u otro documento).</p>
+      </div>
+      <div className="space-y-4">
+        <PreviewEscaneo
+          file={file}
+          remoteUrl={file ? null : remoteUrl}
+          esPdf={archivoEsPdf(file, documento?.storage_path ?? null)}
+          vacio="Suba el escaneo para verlo aquí."
+        />
+        {canWrite ? (
+          <FileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={pending}
+            file={file}
+            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir asignación familiar"}
+            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            onFileChange={setFile}
+          />
+        ) : null}
+      </div>
+      {canWrite ? (
+        <Button type="button" disabled={pending || !documento} onClick={() => void guardar()}>
+          {pending ? "Guardando…" : "Guardar asignación familiar"}
         </Button>
       ) : null}
     </section>

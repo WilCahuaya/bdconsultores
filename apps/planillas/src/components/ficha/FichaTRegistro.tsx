@@ -1,26 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
-import { addTRegistro, type TRegistroRow } from "@/lib/actions/ficha";
+import { addTRegistro, type PensionRow, type TRegistroRow } from "@/lib/actions/ficha";
 import { TIPO_T_REGISTRO_LABEL, formatFechaPlanilla } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField } from "@/components/fields";
 
 export function FichaTRegistro({
   relacionId,
   items,
+  pension,
   canWrite,
 }: {
   relacionId: string;
   items: TRegistroRow[];
+  pension: PensionRow | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(items.length === 0);
+  const afpPendiente = pension?.tipo === "AFP" && pension.tramite_estado !== "TRAMITADO";
 
   async function onSubmit(formData: FormData) {
     setPending(true);
@@ -37,6 +41,17 @@ export function FichaTRegistro({
 
   return (
     <div className="space-y-4">
+      {afpPendiente ? (
+        <p className={`${panelCardClass} p-4 text-sm`}>
+          Si es AFP, primero hay que registrar el alta en Pensiones (CUSPP y trámite).{" "}
+          <Link href={`/trabajadores/${relacionId}?tab=pensiones`} className="font-medium text-primary hover:underline">
+            Ir a Pensiones
+          </Link>
+        </p>
+      ) : null}
+      {pension?.tipo === "ONP" ? (
+        <p className="text-sm text-muted-foreground">Es ONP: no hace falta alta AFP. Puede registrar T-Registro.</p>
+      ) : null}
       <ul className={`${panelCardClass} divide-y p-0`}>
         {items.length === 0 ? (
           <li className="px-4 py-6 text-sm text-muted-foreground">Sin altas ni bajas registradas.</li>
