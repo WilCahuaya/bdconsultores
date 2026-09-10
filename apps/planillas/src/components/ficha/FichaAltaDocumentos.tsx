@@ -46,11 +46,11 @@ function PreviewEscaneo({
     return <p className="text-sm text-muted-foreground">Suba el escaneo para verlo aquí y complete los campos a mano.</p>;
   }
   if (esPdf) {
-    return <iframe title="Vista previa" src={src} className="h-72 w-full rounded-md border bg-background" />;
+    return <iframe title="Vista previa" src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />;
   }
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt="Vista previa del escaneo" className="max-h-80 w-full rounded-md border bg-muted object-contain" />
+    <img src={src} alt="Vista previa del escaneo" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
   );
 }
 
@@ -199,20 +199,18 @@ function CapturaDni({
           Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato. El número de DNI de la ficha no se cambia aquí.
         </p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-3">
-          <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
-          {canWrite ? (
-            <FileInput
-              accept={DOCUMENTO_ACCEPT}
-              disabled={pending}
-              file={file}
-              buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir DNI escaneado"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-              onFileChange={setFile}
-            />
-          ) : null}
-        </div>
+      <div className="space-y-4">
+        <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
+        {canWrite ? (
+          <FileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={pending}
+            file={file}
+            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir DNI escaneado"}
+            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            onFileChange={setFile}
+          />
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="DNI" name="dni_leido" value={dni} onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
           <Field label="Nombres" name="nombres" value={nombres} onChange={(event) => setNombres(event.target.value)} readOnly={!canWrite} />
@@ -312,20 +310,18 @@ function CapturaFicha({
           Suba el escaneo y complete dirección, celular, correo y si recibe asignación familiar. La dirección entra al contrato; si recibe asignación, después se pide el sustento.
         </p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-3">
-          <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
-          {canWrite ? (
-            <FileInput
-              accept={DOCUMENTO_ACCEPT}
-              disabled={pending}
-              file={file}
-              buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir ficha escaneada"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-              onFileChange={setFile}
-            />
-          ) : null}
-        </div>
+      <div className="space-y-4">
+        <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
+        {canWrite ? (
+          <FileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={pending}
+            file={file}
+            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir ficha escaneada"}
+            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            onFileChange={setFile}
+          />
+        ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Celular" name="celular" value={celular} onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
           <Field label="Correo" name="correo" type="email" value={correo} onChange={(event) => setCorreo(event.target.value)} readOnly={!canWrite} />
@@ -423,20 +419,18 @@ function CapturaPension({
           En el alta solo se indica AFP u ONP, para el trámite del estudio. Nombre de AFP, CUSPP y fechas se registran después en Pensiones.
         </p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-3">
-          <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
-          {canWrite ? (
-            <FileInput
-              accept={DOCUMENTO_ACCEPT}
-              disabled={pending}
-              file={file}
-              buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir sistema de pensiones"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-              onFileChange={setFile}
-            />
-          ) : null}
-        </div>
+      <div className="space-y-4">
+        <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
+        {canWrite ? (
+          <FileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={pending}
+            file={file}
+            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir sistema de pensiones"}
+            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            onFileChange={setFile}
+          />
+        ) : null}
         <SelectField
           label="Sistema"
           name="tipo"

@@ -132,27 +132,25 @@ export function NuevoTrabajadorForm({
             Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato.
           </p>
         </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="space-y-3">
-            {previewUrl ? (
-              esPdf ? (
-                <iframe title="Vista previa del DNI" src={previewUrl} className="h-72 w-full rounded-md border bg-background" />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={previewUrl} alt="Vista previa del DNI" className="max-h-80 w-full rounded-md border bg-muted object-contain" />
-              )
+        <div className="space-y-4">
+          {previewUrl ? (
+            esPdf ? (
+              <iframe title="Vista previa del DNI" src={previewUrl} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
             ) : (
-              <p className="text-sm text-muted-foreground">Suba el escaneo para verlo aquí y complete los campos a mano.</p>
-            )}
-            <FileInput
-              accept={DOCUMENTO_ACCEPT}
-              disabled={pending}
-              file={dniFile}
-              buttonLabel={dniFile ? "Cambiar escaneo" : "Subir DNI escaneado"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-              onFileChange={setDniFile}
-            />
-          </div>
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previewUrl} alt="Vista previa del DNI" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
+            )
+          ) : (
+            <p className="text-sm text-muted-foreground">Suba el escaneo para verlo aquí y complete los campos a mano.</p>
+          )}
+          <FileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={pending}
+            file={dniFile}
+            buttonLabel={dniFile ? "Cambiar escaneo" : "Subir DNI escaneado"}
+            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            onFileChange={setDniFile}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
               label="DNI"
