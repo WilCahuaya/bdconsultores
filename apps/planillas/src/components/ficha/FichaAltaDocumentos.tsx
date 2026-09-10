@@ -16,15 +16,6 @@ import {
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
-import { leerTextoEscaneo } from "@/lib/ocr-documento";
-import {
-  extraerAsignacionFamiliarDeTexto,
-  extraerCelularDeTexto,
-  extraerCorreoDeTexto,
-  extraerDireccionDeTexto,
-  extraerDniDeTexto,
-  extraerTipoPensionDeTexto,
-} from "@/lib/parse-ocr-alta";
 import { Field, DateField, SelectField } from "@/components/fields";
 import { TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
@@ -52,7 +43,7 @@ function PreviewEscaneo({
   }, [file]);
   const src = localUrl ?? remoteUrl ?? null;
   if (!src) {
-    return <p className="text-sm text-muted-foreground">Suba el escaneo para verlo aquí. Si está borroso, complete los campos a mano.</p>;
+    return <p className="text-sm text-muted-foreground">Suba el escaneo para verlo aquí y complete los campos a mano.</p>;
   }
   if (esPdf) {
     return <iframe title="Vista previa" src={src} className="h-72 w-full rounded-md border bg-background" />;
@@ -92,7 +83,7 @@ export function FichaAltaDocumentos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Empiece por los escaneos. La aplicación intenta leerlos y rellenar los campos; si sale borroso, complete a mano.
+        Primero los escaneos. Al lado de cada uno, complete a mano los datos que más adelante usa Persona y el contrato.
         En pensiones, en este paso solo se marca AFP u ONP.
       </p>
       <CapturaDni relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={dniDoc} canWrite={canWrite} />
@@ -135,7 +126,6 @@ function CapturaDni({
   const p = trabajador.persona;
   const [file, setFile] = useState<File | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
-  const [leyendo, setLeyendo] = useState(false);
   const [pending, setPending] = useState(false);
   const [dni, setDni] = useState(p.dni);
   const [nombres, setNombres] = useState(p.nombres);
@@ -152,35 +142,6 @@ function CapturaDni({
       if (result.url) setRemoteUrl(result.url);
     });
   }, [documento?.storage_path]);
-
-  async function onFile(next: File | null) {
-    setFile(next);
-    if (!next || !canWrite) return;
-    setLeyendo(true);
-    try {
-      const texto = await leerTextoEscaneo(next);
-      const leido = extraerDniDeTexto(texto);
-      if (leido) {
-        setDni(leido);
-        const reniec = await consultarDni(leido);
-        if (!reniec.error) {
-          if (reniec.nombres) setNombres(reniec.nombres);
-          setApellidoPaterno(reniec.apellido_paterno ?? "");
-          setApellidoMaterno(reniec.apellido_materno ?? "");
-          if (reniec.fecha_nacimiento) setFechaNacimiento(reniec.fecha_nacimiento);
-          pushToast("Se leyeron datos del DNI. Revíselos antes de guardar.");
-        } else {
-          pushToast("Se leyó el número. Complete el resto a mano o busque en RENIEC.", "error");
-        }
-      } else {
-        pushToast("No se pudo leer el DNI. Está borroso o de costado: complete los campos a mano.", "error");
-      }
-    } catch {
-      pushToast("No se pudo leer el escaneo. Complete los campos a mano.", "error");
-    } finally {
-      setLeyendo(false);
-    }
-  }
 
   async function buscarReniec() {
     setPending(true);
@@ -234,7 +195,9 @@ function CapturaDni({
     <section className={`${panelCardClass} space-y-4 p-5`}>
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.DNI}</p>
-        <p className="text-sm text-muted-foreground">Escaneo. Se intenta el número y luego RENIEC. El DNI de la ficha no se cambia aquí.</p>
+        <p className="text-sm text-muted-foreground">
+          Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato. El número de DNI de la ficha no se cambia aquí.
+        </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
@@ -242,17 +205,16 @@ function CapturaDni({
           {canWrite ? (
             <FileInput
               accept={DOCUMENTO_ACCEPT}
-              disabled={pending || leyendo}
+              disabled={pending}
               file={file}
               buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir DNI escaneado"}
               emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-              onFileChange={(next) => void onFile(next)}
+              onFileChange={setFile}
             />
           ) : null}
-          {leyendo ? <p className="text-sm text-muted-foreground">Leyendo el escaneo…</p> : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="DNI leído" name="dni_leido" value={dni} onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
+          <Field label="DNI" name="dni_leido" value={dni} onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
           <Field label="Nombres" name="nombres" value={nombres} onChange={(event) => setNombres(event.target.value)} readOnly={!canWrite} />
           <Field label="Apellido paterno" name="apellido_paterno" value={apellidoPaterno} onChange={(event) => setApellidoPaterno(event.target.value)} readOnly={!canWrite} />
           <Field label="Apellido materno" name="apellido_materno" value={apellidoMaterno} onChange={(event) => setApellidoMaterno(event.target.value)} readOnly={!canWrite} />
@@ -261,10 +223,10 @@ function CapturaDni({
       </div>
       {canWrite ? (
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={pending || leyendo || dni.length < 8} onClick={() => void buscarReniec()}>
+          <Button type="button" variant="outline" disabled={pending || dni.length < 8} onClick={() => void buscarReniec()}>
             Buscar en RENIEC
           </Button>
-          <Button type="button" disabled={pending || leyendo} onClick={() => void guardar()}>
+          <Button type="button" disabled={pending} onClick={() => void guardar()}>
             {pending ? "Guardando…" : "Guardar datos del DNI"}
           </Button>
         </div>
@@ -291,7 +253,6 @@ function CapturaFicha({
   const p = trabajador.persona;
   const [file, setFile] = useState<File | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
-  const [leyendo, setLeyendo] = useState(false);
   const [pending, setPending] = useState(false);
   const [celular, setCelular] = useState(p.celular ?? "");
   const [correo, setCorreo] = useState(p.correo ?? "");
@@ -309,33 +270,6 @@ function CapturaFicha({
       if (result.url) setRemoteUrl(result.url);
     });
   }, [documento?.storage_path]);
-
-  async function onFile(next: File | null) {
-    setFile(next);
-    if (!next || !canWrite) return;
-    setLeyendo(true);
-    try {
-      const texto = await leerTextoEscaneo(next);
-      const cel = extraerCelularDeTexto(texto);
-      const mail = extraerCorreoDeTexto(texto);
-      const dir = extraerDireccionDeTexto(texto);
-      const asig = extraerAsignacionFamiliarDeTexto(texto);
-      if (cel) setCelular(cel);
-      if (mail) setCorreo(mail);
-      if (dir) setDireccion(dir);
-      if (asig === true) setRecibe("si");
-      if (asig === false) setRecibe("no");
-      if (cel || mail || dir || asig !== null) {
-        pushToast("Se leyeron datos de la ficha. Revíselos antes de guardar.");
-      } else {
-        pushToast("No se pudo leer la ficha. Complete los campos mirando el escaneo.", "error");
-      }
-    } catch {
-      pushToast("No se pudo leer el escaneo. Complete los campos a mano.", "error");
-    } finally {
-      setLeyendo(false);
-    }
-  }
 
   async function guardar() {
     if (!documento) return;
@@ -374,7 +308,9 @@ function CapturaFicha({
     <section className={`${panelCardClass} space-y-4 p-5`}>
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.FICHA_DATOS}</p>
-        <p className="text-sm text-muted-foreground">De aquí salen dirección, celular, correo y si recibe asignación familiar.</p>
+        <p className="text-sm text-muted-foreground">
+          Suba el escaneo y complete dirección, celular, correo y si recibe asignación familiar. La dirección entra al contrato; si recibe asignación, después se pide el sustento.
+        </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
@@ -382,14 +318,13 @@ function CapturaFicha({
           {canWrite ? (
             <FileInput
               accept={DOCUMENTO_ACCEPT}
-              disabled={pending || leyendo}
+              disabled={pending}
               file={file}
               buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir ficha escaneada"}
               emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-              onFileChange={(next) => void onFile(next)}
+              onFileChange={setFile}
             />
           ) : null}
-          {leyendo ? <p className="text-sm text-muted-foreground">Leyendo el escaneo…</p> : null}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Celular" name="celular" value={celular} onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
@@ -412,7 +347,7 @@ function CapturaFicha({
         </div>
       </div>
       {canWrite ? (
-        <Button type="button" disabled={pending || leyendo} onClick={() => void guardar()}>
+        <Button type="button" disabled={pending} onClick={() => void guardar()}>
           {pending ? "Guardando…" : "Guardar datos de la ficha"}
         </Button>
       ) : null}
@@ -437,7 +372,6 @@ function CapturaPension({
   const { pushToast } = useToast();
   const [file, setFile] = useState<File | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
-  const [leyendo, setLeyendo] = useState(false);
   const [pending, setPending] = useState(false);
   const [tipo, setTipo] = useState<TipoPension | "">(pension?.tipo ?? "");
 
@@ -450,26 +384,6 @@ function CapturaPension({
       if (result.url) setRemoteUrl(result.url);
     });
   }, [documento?.storage_path]);
-
-  async function onFile(next: File | null) {
-    setFile(next);
-    if (!next || !canWrite) return;
-    setLeyendo(true);
-    try {
-      const texto = await leerTextoEscaneo(next);
-      const leido = extraerTipoPensionDeTexto(texto);
-      if (leido) {
-        setTipo(leido);
-        pushToast(`Se leyó ${leido}. Revíselo antes de guardar.`);
-      } else {
-        pushToast("No se vio si es AFP u ONP. Márquelo a mano.", "error");
-      }
-    } catch {
-      pushToast("No se pudo leer el escaneo. Marque AFP u ONP a mano.", "error");
-    } finally {
-      setLeyendo(false);
-    }
-  }
 
   async function guardar() {
     if (!documento) return;
@@ -506,7 +420,7 @@ function CapturaPension({
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}</p>
         <p className="text-sm text-muted-foreground">
-          En el alta solo se indica AFP u ONP. Nombre de AFP, CUSPP y trámite se registran después, cuando el estudio da de alta la AFP.
+          En el alta solo se indica AFP u ONP, para el trámite del estudio. Nombre de AFP, CUSPP y fechas se registran después en Pensiones.
         </p>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
@@ -515,14 +429,13 @@ function CapturaPension({
           {canWrite ? (
             <FileInput
               accept={DOCUMENTO_ACCEPT}
-              disabled={pending || leyendo}
+              disabled={pending}
               file={file}
               buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir sistema de pensiones"}
               emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-              onFileChange={(next) => void onFile(next)}
+              onFileChange={setFile}
             />
           ) : null}
-          {leyendo ? <p className="text-sm text-muted-foreground">Leyendo el escaneo…</p> : null}
         </div>
         <SelectField
           label="Sistema"
@@ -538,7 +451,7 @@ function CapturaPension({
         />
       </div>
       {canWrite ? (
-        <Button type="button" disabled={pending || leyendo} onClick={() => void guardar()}>
+        <Button type="button" disabled={pending} onClick={() => void guardar()}>
           {pending ? "Guardando…" : "Guardar AFP u ONP"}
         </Button>
       ) : null}

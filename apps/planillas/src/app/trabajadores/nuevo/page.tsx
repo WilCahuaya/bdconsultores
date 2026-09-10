@@ -30,11 +30,11 @@ export default async function NuevoTrabajadorPage({
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">Nuevo trabajador</h1>
           {esUsuarioEntidad(profile.rol) ? (
             <p className="mt-1 text-sm text-muted-foreground">
-              Empiece por el DNI escaneado. Luego se suben ficha y AFP/ONP. El estudio (contador o asistente) validará el alta.
+              Identifique a la persona y siga a Documentos. Ahí se suben DNI, ficha y AFP/ONP, y se capturan los datos del contrato. El estudio validará el alta.
             </p>
           ) : (
             <p className="mt-1 text-sm text-muted-foreground">
-              Empiece por el DNI escaneado. Luego ficha y AFP/ONP. El alta queda aceptada al registrarla desde el estudio.
+              Identifique a la persona y siga a Documentos. Ahí se suben DNI, ficha y AFP/ONP, y se capturan los datos del contrato. El alta queda aceptada al registrarla desde el estudio.
             </p>
           )}
         </div>

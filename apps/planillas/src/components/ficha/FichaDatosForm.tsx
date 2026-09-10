@@ -38,7 +38,7 @@ export function FichaPersonaForm({
 
   return (
     <form action={onSubmit} className="space-y-4">
-      <FormSection title="Persona" hint="Estos datos salen del DNI y de la ficha. El DNI no se cambia. La dirección sí va en el contrato.">
+      <FormSection title="Persona" hint="Revise lo capturado en Documentos. El DNI no se cambia. La dirección sí va en el contrato.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="DNI" name="dni" defaultValue={p.dni} readOnly />
           <Field label="Nombres" name="nombres" defaultValue={p.nombres} required readOnly={!canWrite} />
@@ -101,7 +101,7 @@ export function FichaPuestoForm({
     <form action={onSubmit} className="space-y-4">
       <FormSection
         title="Puesto en esta empresa"
-        hint="La fecha de ingreso no cambia con cada contrato. El cese es cuando deja la empresa."
+        hint="Va después de los documentos. La fecha de ingreso no cambia con cada contrato. El cese es cuando deja la empresa."
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <SelectField
