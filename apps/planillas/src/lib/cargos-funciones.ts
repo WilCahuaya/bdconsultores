@@ -182,3 +182,17 @@ export function funcionesDeCargo(cargo: string | null | undefined): string[] {
   if (!canon) return [];
   return FUNCIONES_POR_CARGO[canon];
 }
+
+/** Código de ocupación SUNAT (T-Registro) según el cargo. */
+export const CODIGO_OCUPACION_TREGISTRO: Record<CargoTrabajador, string> = {
+  Administrador: "252003",
+  "Responsable de tesorería, logística y almacén": "451020",
+  "Responsable de procesos administrativos y comunicaciones del participante": "413016",
+  "Coordinador de implementación programática y monitoreo": "246004",
+  "Formador educativo y espiritual": "246004",
+};
+
+export function codigoOcupacionTRegistro(cargo: string | null | undefined): string {
+  const canon = cargoCanonico(cargo);
+  return canon ? CODIGO_OCUPACION_TREGISTRO[canon] : "";
+}

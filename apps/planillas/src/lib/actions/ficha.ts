@@ -410,6 +410,24 @@ export async function asegurarDocumentosAlta(relacionId: string): Promise<void> 
   );
 }
 
+export async function asegurarDocumentoTramiteAfp(relacionId: string): Promise<void> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return;
+  const db = await planillasDb();
+  const { data } = await db
+    .from("documentos")
+    .select("id")
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "TRAMITE_AFP")
+    .maybeSingle();
+  if (data) return;
+  await db.from("documentos").insert({
+    relacion_id: relacionId,
+    tipo: "TRAMITE_AFP",
+    estado: "PENDIENTE",
+  });
+}
+
 export async function guardarDatosDniEscaneo(
   relacionId: string,
   formData: FormData,
@@ -597,14 +615,23 @@ export async function savePension(relacionId: string, formData: FormData): Promi
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
   const tipo = String(formData.get("tipo")) as TipoPension;
+  if (tipo !== "AFP" && tipo !== "ONP") return { error: "Indique si es AFP u ONP." };
   const fechaTramite = parseFechaCampo(String(formData.get("fecha_tramite") ?? ""), "Fecha de trámite");
   if (fechaTramite.error) return { error: fechaTramite.error };
+  const afpNombre = tipo === "AFP" ? String(formData.get("afp_nombre") ?? "").trim() || null : null;
+  const cuspp = String(formData.get("cuspp") ?? "").trim() || null;
+  const tramiteEstado = (tipo === "ONP" ? "NO_APLICA" : String(formData.get("tramite_estado"))) as EstadoTramitePension;
+  if (tipo === "AFP" && tramiteEstado === "TRAMITADO") {
+    if (!afpNombre) return { error: "Indique la AFP que aparece en la constancia." };
+    if (!cuspp) return { error: "Indique el CUSPP de la constancia." };
+    if (!fechaTramite.value) return { error: "Indique la fecha de trámite de la constancia." };
+  }
   const payload = {
     relacion_id: relacionId,
     tipo,
-    afp_nombre: tipo === "AFP" ? String(formData.get("afp_nombre") ?? "").trim() || null : null,
-    cuspp: String(formData.get("cuspp") ?? "").trim() || null,
-    tramite_estado: (tipo === "ONP" ? "NO_APLICA" : String(formData.get("tramite_estado"))) as EstadoTramitePension,
+    afp_nombre: afpNombre,
+    cuspp,
+    tramite_estado: tramiteEstado,
     fecha_tramite: fechaTramite.value,
   };
   const db = await planillasDb();

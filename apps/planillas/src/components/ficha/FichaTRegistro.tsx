@@ -5,19 +5,45 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
-import { addTRegistro, type PensionRow, type TRegistroRow } from "@/lib/actions/ficha";
-import { TIPO_T_REGISTRO_LABEL, formatFechaPlanilla } from "@/lib/planillas-labels";
+import { addTRegistro, type DocumentoRow, type PensionRow, type TRegistroRow } from "@/lib/actions/ficha";
+import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
+import {
+  TIPO_DOCUMENTO_LABEL,
+  TIPO_T_REGISTRO_LABEL,
+  TREGISTRO_URL,
+  codigoOcupacionTRegistro,
+  formatFechaPlanilla,
+} from "@/lib/planillas-labels";
 import { Field, DateField, SelectField } from "@/components/fields";
+import { DatoAlta } from "@/components/ficha/DatoAlta";
+import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+
+function tipoAfpCopia(pension: PensionRow | null): string {
+  if (!pension?.tipo) return "";
+  if (pension.tipo === "ONP") return "ONP";
+  return pension.afp_nombre?.trim() ?? "";
+}
+
+function remuneracionCopia(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return "";
+  return value.toFixed(2);
+}
 
 export function FichaTRegistro({
   relacionId,
   items,
   pension,
+  trabajador,
+  documentoDni,
+  documentoFicha,
   canWrite,
 }: {
   relacionId: string;
   items: TRegistroRow[];
   pension: PensionRow | null;
+  trabajador: TrabajadorListItem;
+  documentoDni: DocumentoRow | null;
+  documentoFicha: DocumentoRow | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -25,6 +51,8 @@ export function FichaTRegistro({
   const [pending, setPending] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(items.length === 0);
   const afpPendiente = pension?.tipo === "AFP" && pension.tramite_estado !== "TRAMITADO";
+  const persona = trabajador.persona;
+  const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
 
   async function onSubmit(formData: FormData) {
     setPending(true);
@@ -41,6 +69,49 @@ export function FichaTRegistro({
 
   return (
     <div className="space-y-4">
+      <DocumentoPrevisualizacion
+        titulo={TIPO_DOCUMENTO_LABEL.DNI}
+        storagePath={documentoDni?.storage_path}
+        vacio="Suba el DNI en Documentos para verlo aquí."
+      />
+      <DocumentoPrevisualizacion
+        titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
+        storagePath={documentoFicha?.storage_path}
+        vacio="Suba la ficha en Documentos para verla aquí."
+      />
+      <section className={`${panelCardClass} space-y-4 p-5`}>
+        <div>
+          <p className="text-sm font-medium">Datos para pegar en T-Registro</p>
+          <p className="text-sm text-muted-foreground">
+            Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta.
+          </p>
+        </div>
+        <a
+          href={TREGISTRO_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+        >
+          Abrir T-Registro
+        </a>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <DatoAlta label="DNI" value={persona.dni} />
+          <DatoAlta
+            label="Fecha de nacimiento"
+            value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
+          />
+          <DatoAlta label="Número de teléfono" value={persona.celular ?? ""} />
+          <DatoAlta label="Correo" value={persona.correo ?? ""} />
+          <DatoAlta
+            label="Fecha de inicio del trabajador"
+            value={trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : ""}
+          />
+          <DatoAlta label="Código" value={codigoOcupacion} />
+          <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
+          <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
+          <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
+        </div>
+      </section>
       {afpPendiente ? (
         <p className={`${panelCardClass} p-4 text-sm`}>
           Si es AFP, primero hay que registrar el alta en Pensiones (CUSPP y trámite).{" "}

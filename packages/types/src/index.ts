@@ -2048,6 +2048,7 @@ export type TipoDocumentoPlanilla =
   | "TR_BAJA"
   | "CARTA_RENUNCIA"
   | "VIDA_LEY"
+  | "TRAMITE_AFP"
   | "OTRO";
 export type EstadoDocumentoPlanilla = "SI" | "NO" | "NA" | "PENDIENTE";
 export type TipoPension = "AFP" | "ONP";

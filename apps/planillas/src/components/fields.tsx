@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ChangeEvent, type ReactNode } from "react";
-import { FechaDdMmYyyyInput } from "@inventario/ui";
+import { FechaDdMmYyyyInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { formatFechaInputDDMMYYYY, formatFechaISOToDDMMYYYY } from "@inventario/types";
 
@@ -14,6 +14,28 @@ function toDdMmYyyy(value: string | number | null | undefined): string {
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return formatFechaISOToDDMMYYYY(iso[0]);
   return formatFechaInputDDMMYYYY(raw);
+}
+
+export function CopiarValor({ value }: { value: string }) {
+  const { pushToast } = useToast();
+  const texto = value.trim();
+  if (!texto) return null;
+  return (
+    <button
+      type="button"
+      className="text-xs font-medium text-primary hover:underline"
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void navigator.clipboard.writeText(texto).then(
+          () => pushToast("Copiado."),
+          () => pushToast("No se pudo copiar.", "error"),
+        );
+      }}
+    >
+      Copiar
+    </button>
+  );
 }
 
 export function Field({
@@ -31,6 +53,7 @@ export function Field({
   title,
   value,
   onChange,
+  copyable,
 }: {
   label: string;
   name: string;
@@ -46,10 +69,15 @@ export function Field({
   title?: string;
   value?: string;
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  copyable?: boolean;
 }) {
+  const copyValue = String(value ?? defaultValue ?? "").trim();
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-foreground">{label}</span>
+      <span className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        {copyable ? <CopiarValor value={copyValue} /> : null}
+      </span>
       <input
         className={fieldClass}
         name={name}

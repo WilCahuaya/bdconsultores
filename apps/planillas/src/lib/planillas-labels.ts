@@ -13,7 +13,13 @@ import type {
 import { parseFechaFlexible } from "@inventario/types";
 import { cargoCanonico, CARGOS_TRABAJADOR, esCargoTrabajador } from "@/lib/cargos-funciones";
 
-export { CARGOS_TRABAJADOR, cargoCanonico, esCargoTrabajador, type CargoTrabajador } from "@/lib/cargos-funciones";
+export {
+  CARGOS_TRABAJADOR,
+  cargoCanonico,
+  codigoOcupacionTRegistro,
+  esCargoTrabajador,
+  type CargoTrabajador,
+} from "@/lib/cargos-funciones";
 
 export const CLASIFICACION_LABEL: Record<ClasificacionTrabajador, string> = {
   PATROCINADO: "Patrocinado",
@@ -79,6 +85,7 @@ export const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoPlanilla, string> = {
   TR_BAJA: "T-Registro baja",
   CARTA_RENUNCIA: "Carta de renuncia",
   VIDA_LEY: "Vida Ley",
+  TRAMITE_AFP: "Constancia de trámite AFP",
   OTRO: "Otro",
 };
 
@@ -104,6 +111,7 @@ export const AFP_PORTAL_URL: Record<(typeof AFP_NOMBRES)[number], string> = {
 };
 
 export const AFPNET_URL = "https://www.afpnet.com.pe/";
+export const TREGISTRO_URL = "https://e-menu.sunat.gob.pe/";
 
 export const TIPOS_VIA_AFPNET = [
   { value: "Av.", label: "Av." },
@@ -146,11 +154,11 @@ export function armarDireccionPersona(input: {
   direccion?: string | null;
 }): string | null {
   const via = [input.tipo_via, input.via_nombre, input.via_numero].map((p) => p?.trim()).filter(Boolean).join(" ");
-  const ref = input.referencia?.trim();
-  const ubigeo = [input.distrito, input.provincia, input.region].map((p) => p?.trim()).filter(Boolean).join(", ");
-  const partes = [via, ref ? `Ref: ${ref}` : "", ubigeo].filter(Boolean);
-  if (partes.length) return partes.join(". ");
-  return input.direccion?.trim() || null;
+  const lugar = [input.distrito, input.provincia, input.region].map((p) => p?.trim()).filter(Boolean).join(" - ");
+  if (via && lugar) return `${via} - ${lugar}`;
+  if (via) return via;
+  if (lugar) return lugar;
+  return input.referencia?.trim() || input.direccion?.trim() || null;
 }
 
 export const TRAMITE_PENSION_LABEL: Record<EstadoTramitePension, string> = {

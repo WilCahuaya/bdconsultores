@@ -232,6 +232,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
         const estado = doc.estado as EstadoDocumentoPlanilla;
         if (!DOC_PENDIENTE.has(estado)) continue;
         const tipo = doc.tipo as TipoDocumentoPlanilla;
+        if (tipo === "TRAMITE_AFP") continue;
         items.push({
           ...base,
           id: `${relacion.id}:doc:${doc.id}`,

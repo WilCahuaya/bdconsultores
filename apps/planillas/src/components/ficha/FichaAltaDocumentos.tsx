@@ -17,7 +17,8 @@ import {
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { Field, DateField, SelectField } from "@/components/fields";
-import { AFPNET_URL, TIPO_DOCUMENTO_LABEL, opcionesTipoVia } from "@/lib/planillas-labels";
+import { AFPNET_URL, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
@@ -206,7 +207,7 @@ function CapturaDni({
           />
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="DNI" name="dni_leido" value={dni} onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
+          <Field label="DNI" name="dni_leido" value={dni} copyable onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
           <Field label="Nombres" name="nombres" value={nombres} onChange={(event) => setNombres(event.target.value)} readOnly={!canWrite} />
           <Field label="Apellido paterno" name="apellido_paterno" value={apellidoPaterno} onChange={(event) => setApellidoPaterno(event.target.value)} readOnly={!canWrite} />
           <Field label="Apellido materno" name="apellido_materno" value={apellidoMaterno} onChange={(event) => setApellidoMaterno(event.target.value)} readOnly={!canWrite} />
@@ -248,13 +249,7 @@ function CapturaFicha({
   const [pending, setPending] = useState(false);
   const [celular, setCelular] = useState(p.celular ?? "");
   const [correo, setCorreo] = useState(p.correo ?? "");
-  const [tipoVia, setTipoVia] = useState(p.tipo_via ?? "");
-  const [viaNombre, setViaNombre] = useState(p.via_nombre ?? "");
-  const [viaNumero, setViaNumero] = useState(p.via_numero ?? "");
-  const [referencia, setReferencia] = useState(p.referencia ?? "");
-  const [distrito, setDistrito] = useState(p.distrito ?? "");
-  const [provincia, setProvincia] = useState(p.provincia ?? "");
-  const [region, setRegion] = useState(p.region ?? "");
+  const [direccion, setDireccion] = useState(() => direccionAfpnetDesdePersona(p));
   const [recibe, setRecibe] = useState(
     trabajador.recibe_asignacion_familiar === true ? "si" : trabajador.recibe_asignacion_familiar === false ? "no" : "",
   );
@@ -289,14 +284,14 @@ function CapturaFicha({
     const form = new FormData();
     form.set("celular", celular);
     form.set("correo", correo);
-    form.set("tipo_via", tipoVia);
-    form.set("via_nombre", viaNombre);
-    form.set("via_numero", viaNumero);
-    form.set("referencia", referencia);
-    form.set("distrito", distrito);
-    form.set("provincia", provincia);
-    form.set("region", region);
-    form.set("direccion", p.direccion ?? "");
+    form.set("tipo_via", direccion.tipo_via);
+    form.set("via_nombre", direccion.via_nombre);
+    form.set("via_numero", direccion.via_numero);
+    form.set("referencia", direccion.referencia);
+    form.set("distrito", direccion.distrito);
+    form.set("provincia", direccion.provincia);
+    form.set("region", direccion.region);
+    form.set("direccion", "");
     form.set("recibe_asignacion_familiar", recibe);
     const saved = await guardarDatosFichaEscaneo(relacionId, form);
     setPending(false);
@@ -314,7 +309,7 @@ function CapturaFicha({
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.FICHA_DATOS}</p>
         <p className="text-sm text-muted-foreground">
-          Suba el escaneo y complete tipo de vía, nombre, número (o referencia si no hay número), distrito, provincia, región, celular, correo y si recibe asignación familiar. Eso se copia en AFPNet y la dirección armada entra al contrato.
+          Suba el escaneo y complete la dirección: región, provincia, distrito, tipo de vía y número. Eso se copia en AFPNet y queda armado para la ficha, por ejemplo Av. Grau 123 - El Tambo - Huancayo - Junín.
         </p>
       </div>
       <div className="space-y-4">
@@ -332,40 +327,7 @@ function CapturaFicha({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Celular" name="celular" value={celular} inputMode="tel" onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
           <Field label="Correo" name="correo" type="email" value={correo} onChange={(event) => setCorreo(event.target.value)} readOnly={!canWrite} />
-          <SelectField
-            label="Tipo de vía"
-            name="tipo_via"
-            value={tipoVia}
-            allowEmpty
-            disabled={!canWrite}
-            options={opcionesTipoVia(tipoVia)}
-            onChange={(event) => setTipoVia(event.target.value)}
-          />
-          <Field
-            label="Nombre de avenida, calle o jirón"
-            name="via_nombre"
-            value={viaNombre}
-            onChange={(event) => setViaNombre(event.target.value)}
-            readOnly={!canWrite}
-          />
-          <Field
-            label="Número de casa"
-            name="via_numero"
-            value={viaNumero}
-            onChange={(event) => setViaNumero(event.target.value)}
-            readOnly={!canWrite}
-          />
-          <Field
-            label="Referencia"
-            name="referencia"
-            value={referencia}
-            placeholder="Si no tiene número de casa"
-            onChange={(event) => setReferencia(event.target.value)}
-            readOnly={!canWrite}
-          />
-          <Field label="Distrito" name="distrito" value={distrito} onChange={(event) => setDistrito(event.target.value)} readOnly={!canWrite} />
-          <Field label="Provincia" name="provincia" value={provincia} onChange={(event) => setProvincia(event.target.value)} readOnly={!canWrite} />
-          <Field label="Región" name="region" value={region} onChange={(event) => setRegion(event.target.value)} readOnly={!canWrite} />
+          <DireccionAfpnetFields value={direccion} onChange={setDireccion} canWrite={canWrite} />
           <SelectField
             label="¿Recibe asignación familiar?"
             name="recibe_asignacion_familiar"

@@ -3,14 +3,15 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, useToast } from "@inventario/ui";
+import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import type { Entidad, TipoPension } from "@inventario/types";
-import { savePension, type PensionRow } from "@/lib/actions/ficha";
+import { savePension, setDocumentoArchivo, type DocumentoRow, type PensionRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import {
   AFPNET_URL,
   AFP_NOMBRES,
+  TIPO_DOCUMENTO_LABEL,
   TIPO_PENSION_LABEL,
   TRAMITE_PENSION_LABEL,
   formatFechaPlanilla,
@@ -18,38 +19,10 @@ import {
   urlPortalAfp,
 } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
-
-function Copiar({ value }: { value: string }) {
-  const { pushToast } = useToast();
-  return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      disabled={!value}
-      onClick={() => {
-        void navigator.clipboard.writeText(value).then(
-          () => pushToast("Copiado."),
-          () => pushToast("No se pudo copiar.", "error"),
-        );
-      }}
-    >
-      Copiar
-    </Button>
-  );
-}
-
-function DatoAlta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-wrap items-end justify-between gap-2">
-      <div>
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="font-mono text-sm">{value || "—"}</p>
-      </div>
-      {value ? <Copiar value={value} /> : null}
-    </div>
-  );
-}
+import { DatoAlta } from "@/components/ficha/DatoAlta";
+import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
+import { uploadDocumentoFile } from "@/lib/upload-documento";
 
 function EnlaceAfpnet({ afpNombre }: { afpNombre?: string | null }) {
   const portal = urlPortalAfp(afpNombre);
@@ -82,17 +55,22 @@ export function FichaPensiones({
   pension,
   trabajador,
   entidad,
+  documentoPension,
+  documentoTramiteAfp,
   canWrite,
 }: {
   relacionId: string;
   pension: PensionRow | null;
   trabajador: TrabajadorListItem;
   entidad: Entidad | null;
+  documentoPension: DocumentoRow | null;
+  documentoTramiteAfp: DocumentoRow | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
+  const [fileTramite, setFileTramite] = useState<File | null>(null);
   const [tipo, setTipo] = useState<TipoPension | "">(pension?.tipo ?? "");
   const esAfp = tipo === "AFP";
   const esOnp = tipo === "ONP";
@@ -102,28 +80,73 @@ export function FichaPensiones({
   const fechaInicioLabor = trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : "";
 
   async function onSubmit(formData: FormData) {
+    if (esAfp && fileTramite) {
+      formData.set("tramite_estado", "TRAMITADO");
+    }
+    const afpNombre = String(formData.get("afp_nombre") ?? "").trim();
+    const cuspp = String(formData.get("cuspp") ?? "").trim();
+    const fechaTramite = String(formData.get("fecha_tramite") ?? "").trim();
+    const estado = String(formData.get("tramite_estado") ?? "");
+    if (esAfp && (fileTramite || estado === "TRAMITADO")) {
+      if (!afpNombre || !cuspp || !fechaTramite) {
+        pushToast("Revise la constancia y complete AFP, CUSPP y fecha de trámite.", "error");
+        return;
+      }
+    }
     setPending(true);
+    if (esAfp && fileTramite) {
+      if (!documentoTramiteAfp) {
+        setPending(false);
+        pushToast("No se pudo registrar la constancia. Recargue la página.", "error");
+        return;
+      }
+      const upload = await uploadDocumentoFile(
+        trabajador.entidad_id,
+        relacionId,
+        documentoTramiteAfp.id,
+        fileTramite,
+        documentoTramiteAfp.storage_path,
+      );
+      if (upload.error || !upload.path) {
+        setPending(false);
+        pushToast(upload.error ?? "No se pudo subir la constancia AFP.", "error");
+        return;
+      }
+      const savedFile = await setDocumentoArchivo(relacionId, documentoTramiteAfp.id, upload.path);
+      if (savedFile.error) {
+        setPending(false);
+        pushToast(savedFile.error, "error");
+        return;
+      }
+    }
     const result = await savePension(relacionId, formData);
     setPending(false);
     if (result.error) {
       pushToast(result.error, "error");
       return;
     }
-    pushToast(esAfp ? "Alta AFP registrada en Planillas." : "Pensiones guardadas.");
+    setFileTramite(null);
+    pushToast(esAfp ? "Trámite AFP guardado." : "Pensiones guardadas.");
     router.refresh();
   }
 
   return (
     <div className="space-y-4">
+      <DocumentoPrevisualizacion
+        titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
+        storagePath={documentoPension?.storage_path}
+        vacio="Suba el sistema de pensiones en Documentos para verlo aquí."
+      />
       {esOnp ? null : (
         <section className={`${panelCardClass} space-y-3 p-5`}>
           <div>
             <p className="text-sm font-medium">Portal AFPNet</p>
             <p className="text-sm text-muted-foreground">
-              Planillas no entra sola. Abra AFPNet, copie los datos de abajo y péguelos en el alta.
+              Planillas no entra sola. Abra AFPNet, copie el DNI y los datos de abajo y péguelos en el alta.
             </p>
           </div>
           <EnlaceAfpnet afpNombre={pension?.afp_nombre} />
+          <DatoAlta label="DNI" value={persona.dni} />
         </section>
       )}
 
@@ -157,7 +180,7 @@ export function FichaPensiones({
           <div>
             <p className="text-sm font-medium">Datos para pegar en AFPNet</p>
             <p className="text-sm text-muted-foreground">
-              Tipo de vía, nombre, número o referencia, distrito, provincia, región, teléfono, correo e inicio de labor. Si falta alguno, complételo en Ficha o Persona.
+              DNI, tipo de vía, nombre, número, distrito, provincia, región, teléfono, correo e inicio de labor. La dirección queda así: Av. Grau 123 - El Tambo - Huancayo - Junín.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -194,11 +217,31 @@ export function FichaPensiones({
       ) : null}
 
       <form action={onSubmit} className="space-y-4">
+        {esAfp ? (
+          <DocumentoPrevisualizacion
+            titulo={TIPO_DOCUMENTO_LABEL.TRAMITE_AFP}
+            storagePath={fileTramite ? null : documentoTramiteAfp?.storage_path}
+            file={fileTramite}
+            vacio="Suba la constancia del trámite AFP. Al guardarla, confirme AFP, CUSPP y fecha."
+            extra={
+              canWrite ? (
+                <FileInput
+                  accept={DOCUMENTO_ACCEPT}
+                  disabled={pending}
+                  file={fileTramite}
+                  buttonLabel={fileTramite || documentoTramiteAfp?.storage_path ? "Cambiar constancia AFP" : "Subir constancia AFP"}
+                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  onFileChange={setFileTramite}
+                />
+              ) : null
+            }
+          />
+        ) : null}
         <FormSection
-          title={esAfp ? "Registrar el trámite AFP" : "AFP / ONP"}
+          title={esAfp ? "Confirmar datos del trámite AFP" : "AFP / ONP"}
           hint={
             esAfp
-              ? "Cuando el portal de la AFP confirme el alta, indique AFP, CUSPP y márquelo tramitado."
+              ? "Vea la constancia, afirme AFP, CUSPP y fecha, y márquelo tramitado. Si sube el PDF, queda tramitado."
               : "El tipo se marca en Documentos. Si cambia aquí, quede alineado con el expediente."
           }
         >
@@ -245,7 +288,7 @@ export function FichaPensiones({
           </div>
           {canWrite ? (
             <Button type="submit" disabled={pending}>
-              {pending ? "Guardando…" : esAfp ? "Guardar trámite AFP" : "Guardar"}
+              {pending ? "Guardando…" : esAfp ? "Guardar constancia y datos AFP" : "Guardar"}
             </Button>
           ) : (
             <p className="text-sm text-muted-foreground">Solo consulta.</p>

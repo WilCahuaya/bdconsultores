@@ -19,7 +19,7 @@ import {
 } from "@/lib/auth/access";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
-import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta } from "@/lib/actions/ficha";
+import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp } from "@/lib/actions/ficha";
 import {
   claseBadgePaso,
   estadoPasosAlta,
@@ -49,6 +49,9 @@ export default async function FichaTrabajadorPage({
   const porValidar = trabajador.validacion === "PENDIENTE";
   if (tab === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
+  }
+  if (esEstudio && tab === "pensiones") {
+    await asegurarDocumentoTramiteAfp(params.relacionId);
   }
   const [contratos, documentos, pension, vidaLey, tRegistro, entidad] = await Promise.all([
     listContratos(params.relacionId),
@@ -132,6 +135,8 @@ export default async function FichaTrabajadorPage({
             pension={pension}
             trabajador={trabajador}
             entidad={entidad}
+            documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
+            documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
             canWrite={canWriteTramite}
           />
         ) : null}
@@ -140,6 +145,9 @@ export default async function FichaTrabajadorPage({
             relacionId={params.relacionId}
             items={tRegistro}
             pension={pension}
+            trabajador={trabajador}
+            documentoDni={documentos.find((d) => d.tipo === "DNI") ?? null}
+            documentoFicha={documentos.find((d) => d.tipo === "FICHA_DATOS") ?? null}
             canWrite={canWriteTramite}
           />
         ) : null}
