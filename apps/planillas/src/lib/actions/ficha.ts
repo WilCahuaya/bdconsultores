@@ -94,6 +94,7 @@ export async function listContratos(relacionId: string): Promise<ContratoRow[]> 
     .from("contratos")
     .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados")
     .eq("relacion_id", relacionId)
+    .neq("estado", "BAJA")
     .order("version", { ascending: false });
   if (error) throw new Error(error.message);
   return (data ?? []) as ContratoRow[];
@@ -156,9 +157,14 @@ async function hayPdfFirmado(relacionId: string): Promise<{ error?: string; ok: 
   return { ok: Boolean((firmados ?? []).find((d) => d.storage_path && d.estado === "SI")) };
 }
 
+function contratoEstaCerrado(estado: EstadoContratoPlanilla): boolean {
+  return estado === "RECOGIDO" || estado === "BAJA" || estado === "COMPLETO";
+}
+
 export async function generarContratoParaFirma(
   relacionId: string,
   formData: FormData,
+  contratoId?: string,
 ): Promise<{ error?: string; contratoId?: string }> {
   const gate = await assertEscrituraFicha(relacionId);
   if ("error" in gate) return { error: gate.error };
@@ -174,9 +180,12 @@ export async function generarContratoParaFirma(
     .order("version", { ascending: false });
   if (listError) return { error: listError.message };
 
-  const abierto = (existentes ?? []).find(
-    (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
-  );
+  const abierto = (existentes ?? []).find((c) => !contratoEstaCerrado(c.estado as EstadoContratoPlanilla));
+  const destino = contratoId ? (existentes ?? []).find((c) => c.id === contratoId) : abierto;
+  if (contratoId && !destino) return { error: "Contrato no encontrado." };
+  if (destino && contratoEstaCerrado(destino.estado as EstadoContratoPlanilla)) {
+    return { error: "Este contrato ya está cerrado." };
+  }
   const campos = {
     cargo: snapshot.cargo,
     horario: snapshot.horario,
@@ -188,15 +197,15 @@ export async function generarContratoParaFirma(
     es_vigente: false,
   };
 
-  let contratoId = abierto?.id as string | undefined;
-  if (abierto) {
-    const { error } = await db.from("contratos").update(campos).eq("id", abierto.id).eq("relacion_id", relacionId);
+  let idGuardado = destino?.id as string | undefined;
+  if (destino) {
+    const { error } = await db.from("contratos").update(campos).eq("id", destino.id).eq("relacion_id", relacionId);
     if (error) return { error: error.message };
-    if (abierto.estado !== "ELABORADO") {
+    if (destino.estado !== "ELABORADO") {
       const { error: estadoError } = await db
         .from("contratos")
         .update({ estado: "ELABORADO" as EstadoContratoPlanilla })
-        .eq("id", abierto.id)
+        .eq("id", destino.id)
         .eq("relacion_id", relacionId);
       if (estadoError) return { error: estadoError.message };
     }
@@ -215,7 +224,7 @@ export async function generarContratoParaFirma(
       .select("id")
       .single();
     if (error || !creado) return { error: error?.message ?? "No se pudo generar el contrato." };
-    contratoId = creado.id;
+    idGuardado = creado.id;
     const { error: estadoError } = await db
       .from("contratos")
       .update({ estado: "ELABORADO" as EstadoContratoPlanilla })
@@ -227,7 +236,44 @@ export async function generarContratoParaFirma(
   await asegurarDocumentoFirmado(relacionId);
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
-  return { contratoId };
+  return { contratoId: idGuardado };
+}
+
+export async function eliminarContratoGenerado(
+  relacionId: string,
+  contratoId: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+
+  const db = await planillasDb();
+  const { data: contrato, error: loadError } = await db
+    .from("contratos")
+    .select("id, estado")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!contrato) return { error: "Contrato no encontrado." };
+  if (contratoEstaCerrado(contrato.estado as EstadoContratoPlanilla)) {
+    return { error: "Este contrato ya está cerrado. No se puede eliminar." };
+  }
+
+  const { error } = await db
+    .from("contratos")
+    .update({
+      estado: "BAJA" as EstadoContratoPlanilla,
+      es_vigente: false,
+      datos_confirmados: false,
+    })
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  revalidatePath("/");
+  return {};
 }
 
 export async function confirmarContratoFirmado(

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { webAppById } from "@bd/config";
-import { Button } from "@inventario/ui";
+import { Button, ConfirmDialog } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
   confirmarContratoFirmado,
+  eliminarContratoGenerado,
   generarContratoParaFirma,
   marcarContratoRecogido,
   type ContratoRow,
@@ -45,8 +46,10 @@ export function FichaContratos({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<"generar" | "confirmar" | string | null>(null);
+  const [pending, setPending] = useState<"generar" | "editar" | "confirmar" | string | null>(null);
   const [mostrarGenerar, setMostrarGenerar] = useState(contratos.length === 0);
+  const [editando, setEditando] = useState<ContratoRow | null>(null);
+  const [eliminando, setEliminando] = useState<ContratoRow | null>(null);
 
   const abierto = contratos.find(
     (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
@@ -67,6 +70,38 @@ export function FichaContratos({
     router.refresh();
     const descarga = await descargarContratoWord(relacionId, result.contratoId);
     if (descarga.error) setError(descarga.error);
+  }
+
+  async function onEditar(formData: FormData) {
+    if (!editando) return;
+    setPending("editar");
+    setError(null);
+    const result = await generarContratoParaFirma(relacionId, formData, editando.id);
+    setPending(null);
+    if (result.error || !result.contratoId) {
+      setError(result.error ?? "No se pudo guardar el contrato.");
+      return;
+    }
+    setEditando(null);
+    router.refresh();
+    const descarga = await descargarContratoWord(relacionId, result.contratoId);
+    if (descarga.error) setError(descarga.error);
+  }
+
+  async function onEliminar() {
+    if (!eliminando) return;
+    setPending(`del-${eliminando.id}`);
+    setError(null);
+    const result = await eliminarContratoGenerado(relacionId, eliminando.id);
+    setPending(null);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    if (editando?.id === eliminando.id) setEditando(null);
+    setEliminando(null);
+    if (contratos.length <= 1) setMostrarGenerar(true);
+    router.refresh();
   }
 
   async function onDescargar(contratoId: string) {
@@ -104,7 +139,10 @@ export function FichaContratos({
 
       {canWrite ? (
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => setMostrarGenerar((v) => !v)}>
+          <Button type="button" variant="outline" onClick={() => {
+            setEditando(null);
+            setMostrarGenerar((v) => !v);
+          }}>
             {mostrarGenerar ? "Ocultar formulario" : "Generar contrato"}
           </Button>
           {abierto ? (
@@ -125,7 +163,7 @@ export function FichaContratos({
         </div>
       ) : null}
 
-      {canWrite && mostrarGenerar ? (
+      {canWrite && mostrarGenerar && !editando ? (
         <form action={onGenerar}>
           <FormSection
             title="Generar contrato"
@@ -139,6 +177,29 @@ export function FichaContratos({
             <Button type="submit" disabled={pending === "generar"}>
               {pending === "generar" ? "Generando…" : "Generar Word"}
             </Button>
+          </FormSection>
+        </form>
+      ) : null}
+
+      {canWrite && editando ? (
+        <form action={onEditar}>
+          <FormSection
+            title={`Editar contrato (versión ${editando.version})`}
+            hint="Se vuelve a armar el Word. Si ya estaba confirmado, hay que volver a confirmar el firmado."
+          >
+            <DatosContratoFields
+              key={`edit-${editando.id}-${editando.horario}-${editando.remuneracion}`}
+              trabajador={trabajador}
+              contrato={editando}
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={pending === "editar"}>
+                {pending === "editar" ? "Guardando…" : "Guardar y descargar Word"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setEditando(null)}>
+                Cancelar
+              </Button>
+            </div>
           </FormSection>
         </form>
       ) : null}
@@ -217,6 +278,34 @@ export function FichaContratos({
                       >
                         {pending === `word-${c.id}` ? "…" : "Word"}
                       </Button>
+                      {canWrite && c.estado !== "RECOGIDO" && c.estado !== "COMPLETO" ? (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setMostrarGenerar(false);
+                              setEditando(c);
+                              setError(null);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={pending === `del-${c.id}`}
+                            onClick={() => {
+                              setEliminando(c);
+                              setError(null);
+                            }}
+                          >
+                            Eliminar
+                          </Button>
+                        </>
+                      ) : null}
                       {canMarcarRecogido && c.estado === "ELABORADO" && c.datos_confirmados ? (
                         <Button
                           type="button"
@@ -235,6 +324,24 @@ export function FichaContratos({
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={Boolean(eliminando)}
+        onClose={() => {
+          if (pending?.startsWith("del-")) return;
+          setEliminando(null);
+        }}
+        title="Eliminar contrato generado"
+        description={
+          eliminando
+            ? `¿Eliminar la versión ${eliminando.version} del historial? Dejará de aparecer y podrá generar otro.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        confirmVariant="destructive"
+        pending={Boolean(eliminando && pending === `del-${eliminando.id}`)}
+        onConfirm={() => void onEliminar()}
+      />
     </div>
   );
 }
