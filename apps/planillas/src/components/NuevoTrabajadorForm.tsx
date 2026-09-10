@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
 import { consultarDni } from "@/lib/actions/entidades";
 import { createTrabajador } from "@/lib/actions/trabajadores";
 import { CLASIFICACION_LABEL, JORNADA_LABEL, opcionesCargo } from "@/lib/planillas-labels";
@@ -20,7 +20,7 @@ export function NuevoTrabajadorForm({
   lockEntidad?: boolean;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const { pushToast } = useToast();
   const [lookupMsg, setLookupMsg] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [buscando, setBuscando] = useState(false);
@@ -33,12 +33,11 @@ export function NuevoTrabajadorForm({
 
   async function buscarPorDni() {
     setBuscando(true);
-    setError(null);
     setLookupMsg(null);
     const result = await consultarDni(dni);
     setBuscando(false);
     if (result.error) {
-      setError(result.error);
+      pushToast(result.error, "error");
       return;
     }
     if (result.dni) setDni(result.dni);
@@ -51,13 +50,13 @@ export function NuevoTrabajadorForm({
 
   async function onSubmit(formData: FormData) {
     setPending(true);
-    setError(null);
     const result = await createTrabajador(formData);
     setPending(false);
     if (result.error) {
-      setError(result.error);
+      pushToast(result.error, "error");
       return;
     }
+    pushToast("Trabajador registrado.");
     if (result.relacionId) router.push(`/trabajadores/${result.relacionId}?tab=documentos`);
   }
 
@@ -144,7 +143,6 @@ export function NuevoTrabajadorForm({
           <DateField label="Fecha de ingreso" name="fecha_ingreso" />
         </div>
       </FormSection>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={pending || buscando}>
         {pending ? "Guardando…" : "Registrar trabajador"}
       </Button>

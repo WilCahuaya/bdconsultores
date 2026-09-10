@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FileInput } from "@inventario/ui";
+import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { addDocumento, setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
@@ -30,17 +30,18 @@ export function FichaDocumentos({
   hint?: string;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
   const [nuevoArchivo, setNuevoArchivo] = useState<File | null>(null);
+  const visibles = tiposFiltro ? documentos.filter((d) => tiposFiltro.includes(d.tipo)) : documentos;
+  const [mostrarNuevo, setMostrarNuevo] = useState(visibles.length === 0);
 
   async function onSubmit(formData: FormData) {
     setPending(true);
-    setError(null);
     const created = await addDocumento(relacionId, formData);
     if (created.error || !created.documentoId) {
       setPending(false);
-      setError(created.error ?? "No se pudo registrar el documento.");
+      pushToast(created.error ?? "No se pudo registrar el documento.", "error");
       return;
     }
 
@@ -48,14 +49,16 @@ export function FichaDocumentos({
       const uploadError = await adjuntarArchivo(created.documentoId, nuevoArchivo, null);
       if (uploadError) {
         setPending(false);
-        setError(uploadError);
+        pushToast(uploadError, "error");
         router.refresh();
         return;
       }
     }
 
     setNuevoArchivo(null);
+    setMostrarNuevo(false);
     setPending(false);
+    pushToast("Documento guardado.");
     router.refresh();
   }
 
@@ -66,7 +69,6 @@ export function FichaDocumentos({
     return saved.error ?? null;
   }
 
-  const visibles = tiposFiltro ? documentos.filter((d) => tiposFiltro.includes(d.tipo)) : documentos;
   const tipoOptions = (tiposFiltro ?? (Object.keys(TIPO_DOCUMENTO_LABEL) as TipoDocumentoPlanilla[])).map(
     (value) => ({
       value,
@@ -90,14 +92,14 @@ export function FichaDocumentos({
               canWrite={canWrite}
               disabled={pending}
               onUpload={async (file) => {
-                setError(null);
                 setPending(true);
                 const uploadError = await adjuntarArchivo(d.id, file, d.storage_path);
                 setPending(false);
                 if (uploadError) {
-                  setError(uploadError);
+                  pushToast(uploadError, "error");
                   return false;
                 }
+                pushToast("Archivo guardado.");
                 router.refresh();
                 return true;
               }}
@@ -105,8 +107,12 @@ export function FichaDocumentos({
           ))
         )}
       </ul>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {canWrite && permitirAgregar ? (
+      {canWrite && permitirAgregar && !mostrarNuevo ? (
+        <Button type="button" variant="outline" onClick={() => setMostrarNuevo(true)}>
+          Registrar documento
+        </Button>
+      ) : null}
+      {canWrite && permitirAgregar && mostrarNuevo ? (
         <form action={onSubmit} key={visibles.length} className={`${panelCardClass} space-y-4 p-5`}>
           <p className="text-sm font-medium">Registrar documento</p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -142,7 +148,10 @@ export function FichaDocumentos({
               type="button"
               variant="outline"
               disabled={pending}
-              onClick={() => setNuevoArchivo(null)}
+              onClick={() => {
+                setNuevoArchivo(null);
+                setMostrarNuevo(visibles.length === 0);
+              }}
             >
               Cancelar
             </Button>

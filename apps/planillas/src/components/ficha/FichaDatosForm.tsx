@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
 import { updateDatosTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { CLASIFICACION_LABEL, JORNADA_LABEL, cargoCanonico, opcionesCargo } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
@@ -16,23 +16,21 @@ export function FichaDatosForm({
   canWrite: boolean;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
+  const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
   const [jornada, setJornada] = useState(trabajador.jornada ?? "");
   const p = trabajador.persona;
 
   async function onSubmit(formData: FormData) {
     setPending(true);
-    setError(null);
-    setOk(false);
     const result = await updateDatosTrabajador(trabajador.id, formData);
     setPending(false);
-    if (result.error) setError(result.error);
-    else {
-      setOk(true);
-      router.refresh();
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
     }
+    pushToast("Datos guardados.");
+    router.refresh();
   }
 
   return (
@@ -81,8 +79,6 @@ export function FichaDatosForm({
           <DateField label="Fecha de cese" name="fecha_cese" defaultValue={trabajador.fecha_cese} readOnly={!canWrite} />
         </div>
       </FormSection>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {ok ? <p className="text-sm text-primary">Datos guardados.</p> : null}
       {canWrite ? (
         <Button type="submit" disabled={pending}>
           {pending ? "Guardando…" : "Guardar datos"}

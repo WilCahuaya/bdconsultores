@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { webAppById } from "@bd/config";
-import { Button, ConfirmDialog } from "@inventario/ui";
+import { Button, ConfirmDialog, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
   confirmarContratoFirmado,
@@ -45,90 +45,95 @@ export function FichaContratos({
   canMarcarRecogido: boolean;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const { pushToast } = useToast();
+  const abierto = contratos.find(
+    (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
+  );
   const [pending, setPending] = useState<"generar" | "editar" | "confirmar" | string | null>(null);
   const [mostrarGenerar, setMostrarGenerar] = useState(contratos.length === 0);
   const [editando, setEditando] = useState<ContratoRow | null>(null);
   const [eliminando, setEliminando] = useState<ContratoRow | null>(null);
-  const [mostrarConfirmar, setMostrarConfirmar] = useState(true);
-
-  const abierto = contratos.find(
-    (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
-  );
+  const [mostrarConfirmar, setMostrarConfirmar] = useState(!abierto?.datos_confirmados);
   const tieneFirmado = documentos.some((d) => d.tipo === "CONTRATO_FIRMADO" && Boolean(d.storage_path) && d.estado === "SI");
   const base = abierto ?? contratos.find((c) => c.datos_confirmados) ?? null;
 
   async function onGenerar(formData: FormData) {
     setPending("generar");
-    setError(null);
     const result = await generarContratoParaFirma(relacionId, formData);
     setPending(null);
     if (result.error || !result.contratoId) {
-      setError(result.error ?? "No se pudo generar el contrato.");
+      pushToast(result.error ?? "No se pudo generar el contrato.", "error");
       return;
     }
     setMostrarGenerar(false);
+    pushToast("Contrato generado.");
     router.refresh();
     const descarga = await descargarContratoWord(relacionId, result.contratoId);
-    if (descarga.error) setError(descarga.error);
+    if (descarga.error) pushToast(descarga.error, "error");
   }
 
   async function onEditar(formData: FormData) {
     if (!editando) return;
     setPending("editar");
-    setError(null);
     const result = await generarContratoParaFirma(relacionId, formData, editando.id);
     setPending(null);
     if (result.error || !result.contratoId) {
-      setError(result.error ?? "No se pudo guardar el contrato.");
+      pushToast(result.error ?? "No se pudo guardar el contrato.", "error");
       return;
     }
     setEditando(null);
+    pushToast("Contrato actualizado.");
     router.refresh();
     const descarga = await descargarContratoWord(relacionId, result.contratoId);
-    if (descarga.error) setError(descarga.error);
+    if (descarga.error) pushToast(descarga.error, "error");
   }
 
   async function onEliminar() {
     if (!eliminando) return;
     setPending(`del-${eliminando.id}`);
-    setError(null);
     const result = await eliminarContratoGenerado(relacionId, eliminando.id);
     setPending(null);
     if (result.error) {
-      setError(result.error);
+      pushToast(result.error, "error");
       return;
     }
     if (editando?.id === eliminando.id) setEditando(null);
     setEliminando(null);
     if (contratos.length <= 1) setMostrarGenerar(true);
+    pushToast("Contrato eliminado.");
     router.refresh();
   }
 
   async function onDescargar(contratoId: string) {
     setPending(`word-${contratoId}`);
-    setError(null);
     const descarga = await descargarContratoWord(relacionId, contratoId);
     setPending(null);
-    if (descarga.error) setError(descarga.error);
+    if (descarga.error) pushToast(descarga.error, "error");
   }
 
   async function onConfirmar(contratoId: string, formData: FormData) {
     setPending("confirmar");
-    setError(null);
     const result = await confirmarContratoFirmado(relacionId, contratoId, formData);
     setPending(null);
-    if (result.error) setError(result.error);
-    else router.refresh();
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    setMostrarConfirmar(false);
+    pushToast("Contrato guardado.");
+    router.refresh();
   }
 
   async function onRecoger(contratoId: string) {
     setPending(contratoId);
-    setError(null);
     const result = await marcarContratoRecogido(relacionId, contratoId);
     setPending(null);
-    if (result.error) setError(result.error);
-    else router.refresh();
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    pushToast("Contrato marcado como recogido.");
+    router.refresh();
   }
 
   return (
@@ -253,8 +258,6 @@ export function FichaContratos({
         </FormSection>
       ) : null}
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
       <div className={`${panelCardClass} overflow-x-auto p-0`}>
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead className="border-b bg-muted/40 text-muted-foreground">
@@ -304,7 +307,6 @@ export function FichaContratos({
                             onClick={() => {
                               setMostrarGenerar(false);
                               setEditando(c);
-                              setError(null);
                             }}
                           >
                             Editar
@@ -314,10 +316,7 @@ export function FichaContratos({
                             size="sm"
                             variant="outline"
                             disabled={pending === `del-${c.id}`}
-                            onClick={() => {
-                              setEliminando(c);
-                              setError(null);
-                            }}
+                            onClick={() => setEliminando(c)}
                           >
                             Eliminar
                           </Button>

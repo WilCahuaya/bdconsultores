@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { addTRegistro, type TRegistroRow } from "@/lib/actions/ficha";
 import { TIPO_T_REGISTRO_LABEL, formatFechaPlanilla } from "@/lib/planillas-labels";
@@ -18,16 +18,21 @@ export function FichaTRegistro({
   canWrite: boolean;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
+  const [mostrarForm, setMostrarForm] = useState(items.length === 0);
 
   async function onSubmit(formData: FormData) {
     setPending(true);
-    setError(null);
     const result = await addTRegistro(relacionId, formData);
     setPending(false);
-    if (result.error) setError(result.error);
-    else router.refresh();
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    setMostrarForm(false);
+    pushToast("Registro guardado.");
+    router.refresh();
   }
 
   return (
@@ -47,7 +52,12 @@ export function FichaTRegistro({
           ))
         )}
       </ul>
-      {canWrite ? (
+      {canWrite && !mostrarForm ? (
+        <Button type="button" variant="outline" onClick={() => setMostrarForm(true)}>
+          Registrar alta o baja
+        </Button>
+      ) : null}
+      {canWrite && mostrarForm ? (
         <form action={onSubmit} key={items.length} className={`${panelCardClass} space-y-4 p-5`}>
           <p className="text-sm font-medium">Registrar alta o baja</p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -63,10 +73,16 @@ export function FichaTRegistro({
               Ya se realizó en T-Registro
             </label>
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <Button type="submit" disabled={pending}>
-            {pending ? "Guardando…" : "Agregar"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Agregar"}
+            </Button>
+            {items.length > 0 ? (
+              <Button type="button" variant="outline" disabled={pending} onClick={() => setMostrarForm(false)}>
+                Cancelar
+              </Button>
+            ) : null}
+          </div>
         </form>
       ) : null}
     </div>

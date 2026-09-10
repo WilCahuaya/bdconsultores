@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
 import { savePension, type PensionRow } from "@/lib/actions/ficha";
 import { TIPO_PENSION_LABEL, TRAMITE_PENSION_LABEL } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
@@ -17,21 +17,19 @@ export function FichaPensiones({
   canWrite: boolean;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [ok, setOk] = useState(false);
+  const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
 
   async function onSubmit(formData: FormData) {
     setPending(true);
-    setError(null);
-    setOk(false);
     const result = await savePension(relacionId, formData);
     setPending(false);
-    if (result.error) setError(result.error);
-    else {
-      setOk(true);
-      router.refresh();
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
     }
+    pushToast("Pensiones guardadas.");
+    router.refresh();
   }
 
   return (
@@ -56,8 +54,6 @@ export function FichaPensiones({
         />
         <DateField label="Fecha de trámite" name="fecha_tramite" defaultValue={pension?.fecha_tramite} readOnly={!canWrite} />
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      {ok ? <p className="text-sm text-primary">Pensiones guardadas.</p> : null}
       {canWrite ? (
         <Button type="submit" disabled={pending}>
           {pending ? "Guardando…" : "Guardar pensiones"}

@@ -2,15 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
 import type { Entidad } from "@inventario/types";
 import { consultarDni, consultarRuc, createEntidadPlanillas, updateEntidadPlanillas } from "@/lib/actions/entidades";
 import { Field, FormSection } from "@/components/fields";
 
 export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
   const router = useRouter();
+  const { pushToast } = useToast();
   const isEdit = Boolean(entidad);
-  const [error, setError] = useState<string | null>(null);
   const [lookupMsg, setLookupMsg] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [buscando, setBuscando] = useState(false);
@@ -29,12 +29,11 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
 
   async function buscarPorRuc() {
     setBuscando(true);
-    setError(null);
     setLookupMsg(null);
     const result = await consultarRuc(ruc);
     setBuscando(false);
     if (result.error) {
-      setError(result.error);
+      pushToast(result.error, "error");
       return;
     }
     if (result.ruc) setRuc(result.ruc);
@@ -47,12 +46,11 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
 
   async function buscarPorDni() {
     setBuscandoDni(true);
-    setError(null);
     setDniMsg(null);
     const result = await consultarDni(adminDni);
     setBuscandoDni(false);
     if (result.error) {
-      setError(result.error);
+      pushToast(result.error, "error");
       return;
     }
     if (result.dni) setAdminDni(result.dni);
@@ -62,12 +60,11 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
 
   async function buscarRepresentantePorDni() {
     setBuscandoRl(true);
-    setError(null);
     setRlMsg(null);
     const result = await consultarDni(rlDni);
     setBuscandoRl(false);
     if (result.error) {
-      setError(result.error);
+      pushToast(result.error, "error");
       return;
     }
     if (result.dni) setRlDni(result.dni);
@@ -77,15 +74,15 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
 
   async function onSubmit(formData: FormData) {
     setPending(true);
-    setError(null);
     const result = isEdit && entidad
       ? await updateEntidadPlanillas(entidad.id, formData)
       : await createEntidadPlanillas(formData);
     setPending(false);
     if (result.error || !result.entidadId) {
-      setError(result.error ?? (isEdit ? "No se pudo guardar la empresa." : "No se pudo crear la empresa."));
+      pushToast(result.error ?? (isEdit ? "No se pudo guardar la empresa." : "No se pudo crear la empresa."), "error");
       return;
     }
+    pushToast(isEdit ? "Empresa guardada." : "Empresa creada.");
     const aviso = result.inviteMessage ? `&aviso=${encodeURIComponent(result.inviteMessage)}` : "";
     router.push(`/?entidadId=${result.entidadId}${aviso}`);
   }
@@ -224,7 +221,6 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
         </div>
         {dniMsg ? <p className="text-sm text-muted-foreground">{dniMsg}</p> : null}
       </FormSection>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <Button type="submit" disabled={pending || buscando || buscandoDni || buscandoRl}>
         {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear empresa"}
       </Button>
