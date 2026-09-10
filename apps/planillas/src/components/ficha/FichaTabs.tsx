@@ -22,7 +22,7 @@ export function FichaFlujoNav({
 }) {
   return (
     <div className="space-y-4">
-      <ol className="grid grid-cols-3 gap-2">
+      <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {PASOS_ALTA.map((paso) => {
           const active = tab === paso.id;
           const done = completados[paso.id];
@@ -82,7 +82,8 @@ export function FichaFlujoNav({
 }
 
 const TABS: FichaTab[] = [
-  "datos",
+  "persona",
+  "puesto",
   "documentos",
   "contratos",
   "firma",
@@ -92,10 +93,11 @@ const TABS: FichaTab[] = [
 ];
 
 export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab {
-  if (!value) return "datos";
+  if (!value) return "documentos";
+  if (value === "datos") return "persona";
   if (value === "firma") return "contratos";
   if (!esEstudio && (value === "pensiones" || value === "t-registro" || value === "vida-ley")) {
-    return "datos";
+    return "documentos";
   }
-  return TABS.includes(value as FichaTab) ? (value as FichaTab) : "datos";
+  return TABS.includes(value as FichaTab) ? (value as FichaTab) : "documentos";
 }

@@ -30,10 +30,12 @@ export default async function NuevoTrabajadorPage({
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">Nuevo trabajador</h1>
           {esUsuarioEntidad(profile.rol) ? (
             <p className="mt-1 text-sm text-muted-foreground">
-              El estudio (contador o asistente) validará el alta antes de continuar el trámite.
+              Empiece por el DNI escaneado. Luego se suben ficha y AFP/ONP. El estudio (contador o asistente) validará el alta.
             </p>
           ) : (
-            <p className="mt-1 text-sm text-muted-foreground">El alta queda aceptada al registrarla desde el estudio.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Empiece por el DNI escaneado. Luego ficha y AFP/ONP. El alta queda aceptada al registrarla desde el estudio.
+            </p>
           )}
         </div>
         {entidades.length === 0 ? (

@@ -10,6 +10,11 @@ const nextConfig = {
     serverComponentsExternalPackages: ["docx"],
   },
   webpack: (config) => {
+    config.resolve = config.resolve ?? {};
+    config.resolve.alias = {
+      ...(config.resolve.alias ?? {}),
+      canvas: false,
+    };
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
       { module: /@supabase\/supabase-js/, message: /process\.version/ },

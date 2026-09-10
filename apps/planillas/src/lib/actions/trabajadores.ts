@@ -7,7 +7,7 @@ import type {
   EstadoValidacionAltaPlanilla,
   JornadaLaboral,
 } from "@inventario/types";
-import { CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS, esPersonalEstudio } from "@inventario/types";
+import { TIPOS_DOCUMENTO_ALTA_INICIALES, esPersonalEstudio } from "@inventario/types";
 import {
   entidadAlcance,
   puedeCrearTrabajador,
@@ -42,6 +42,7 @@ export type RelacionRow = {
   horario: string | null;
   fecha_ingreso: string | null;
   fecha_cese: string | null;
+  recibe_asignacion_familiar: boolean | null;
   estado: EstadoRelacionLaboral;
   validacion: EstadoValidacionAltaPlanilla;
 };
@@ -91,7 +92,7 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
     )
     .eq("entidad_id", entidadId)
     .order("fecha_ingreso", { ascending: false, nullsFirst: false });
@@ -122,7 +123,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
     )
     .eq("id", relacionId)
     .maybeSingle();
@@ -147,7 +148,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   };
 }
 
-export async function createTrabajador(formData: FormData): Promise<{ error?: string; relacionId?: string }> {
+export async function createTrabajador(formData: FormData): Promise<{ error?: string; relacionId?: string; dniDocumentoId?: string }> {
   const profile = await requirePlanillasProfile();
   if (!puedeCrearTrabajador(profile)) return { error: "No tiene permiso para registrar trabajadores." };
 
@@ -231,17 +232,24 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   revalidatePath(`/trabajadores/${relacion.id}`);
 
   await db.from("documentos").insert(
-    CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.map((tipo) => ({
+    TIPOS_DOCUMENTO_ALTA_INICIALES.map((tipo) => ({
       relacion_id: relacion.id,
       tipo,
       estado: "PENDIENTE",
     })),
   );
 
-  return { relacionId: relacion.id };
+  const { data: dniDoc } = await db
+    .from("documentos")
+    .select("id")
+    .eq("relacion_id", relacion.id)
+    .eq("tipo", "DNI")
+    .maybeSingle();
+
+  return { relacionId: relacion.id, dniDocumentoId: dniDoc?.id as string | undefined };
 }
 
-export async function updateDatosTrabajador(
+export async function updatePersonaTrabajador(
   relacionId: string,
   formData: FormData,
 ): Promise<{ error?: string }> {
@@ -251,20 +259,16 @@ export async function updateDatosTrabajador(
   const actual = await getTrabajador(relacionId);
   if (!actual) return { error: "Trabajador no encontrado." };
 
+  const nombres = String(formData.get("nombres") ?? "").trim();
+  if (!nombres) return { error: "El nombre es obligatorio." };
   const nacimiento = parseFechaCampo(String(formData.get("fecha_nacimiento") ?? ""), "Fecha de nacimiento");
   if (nacimiento.error) return { error: nacimiento.error };
-  const ingreso = parseFechaCampo(String(formData.get("fecha_ingreso") ?? ""), "Fecha de ingreso");
-  if (ingreso.error) return { error: ingreso.error };
-  const cese = parseFechaCampo(String(formData.get("fecha_cese") ?? ""), "Fecha de cese");
-  if (cese.error) return { error: cese.error };
-  const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""), actual.cargo);
-  if (cargo.error) return { error: cargo.error };
 
   const db = await planillasDb();
-  const { error: pError } = await db
+  const { error } = await db
     .from("personas")
     .update({
-      nombres: String(formData.get("nombres") ?? "").trim(),
+      nombres,
       apellido_paterno: String(formData.get("apellido_paterno") ?? "").trim() || null,
       apellido_materno: String(formData.get("apellido_materno") ?? "").trim() || null,
       fecha_nacimiento: nacimiento.value,
@@ -273,9 +277,33 @@ export async function updateDatosTrabajador(
       direccion: String(formData.get("direccion") ?? "").trim() || null,
     })
     .eq("id", actual.persona.id);
-  if (pError) return { error: pError.message };
+  if (error) return { error: error.message };
 
-  const { error: rError } = await db
+  revalidatePath("/");
+  revalidatePath("/pendientes");
+  revalidatePath(`/trabajadores/${relacionId}`);
+  return {};
+}
+
+export async function updatePuestoTrabajador(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para editar." };
+
+  const actual = await getTrabajador(relacionId);
+  if (!actual) return { error: "Trabajador no encontrado." };
+
+  const ingreso = parseFechaCampo(String(formData.get("fecha_ingreso") ?? ""), "Fecha de ingreso");
+  if (ingreso.error) return { error: ingreso.error };
+  const cese = parseFechaCampo(String(formData.get("fecha_cese") ?? ""), "Fecha de cese");
+  if (cese.error) return { error: cese.error };
+  const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""), actual.cargo);
+  if (cargo.error) return { error: cargo.error };
+
+  const db = await planillasDb();
+  const { error } = await db
     .from("relaciones_laborales")
     .update({
       cargo: cargo.value,
@@ -287,7 +315,7 @@ export async function updateDatosTrabajador(
       estado: cese.value ? "CESADA" : "ACTIVA",
     })
     .eq("id", relacionId);
-  if (rError) return { error: rError.message };
+  if (error) return { error: error.message };
 
   revalidatePath("/");
   revalidatePath("/pendientes");

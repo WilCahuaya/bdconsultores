@@ -1,12 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { FichaFlujoNav, parseFichaTab } from "@/components/ficha/FichaTabs";
-import { FichaDatosForm } from "@/components/ficha/FichaDatosForm";
+import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
-import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
+import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
@@ -19,7 +18,7 @@ import {
   requirePlanillasProfile,
 } from "@/lib/auth/access";
 import { getTrabajador } from "@/lib/actions/trabajadores";
-import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro } from "@/lib/actions/ficha";
+import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta } from "@/lib/actions/ficha";
 import {
   claseBadgePaso,
   estadoPasosAlta,
@@ -47,10 +46,13 @@ export default async function FichaTrabajadorPage({
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const canWriteTramite = esEstudio;
   const porValidar = trabajador.validacion === "PENDIENTE";
+  if (tab === "documentos" && canEditFicha) {
+    await asegurarDocumentosAlta(params.relacionId);
+  }
   const [contratos, documentos, pension, vidaLey, tRegistro] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
-    tab === "pensiones" ? getPension(params.relacionId) : Promise.resolve(null),
+    tab === "pensiones" || tab === "documentos" ? getPension(params.relacionId) : Promise.resolve(null),
     tab === "vida-ley" ? getVidaLey(params.relacionId) : Promise.resolve(null),
     tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
   ]);
@@ -97,7 +99,8 @@ export default async function FichaTrabajadorPage({
           completados={completados}
           esEstudio={esEstudio}
         />
-        {tab === "datos" ? <FichaDatosForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
+        {tab === "persona" ? <FichaPersonaForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
+        {tab === "puesto" ? <FichaPuestoForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {tab === "contratos" ? (
           <FichaContratos
             relacionId={params.relacionId}
@@ -110,16 +113,13 @@ export default async function FichaTrabajadorPage({
           />
         ) : null}
         {tab === "documentos" ? (
-          <FichaDocumentos
+          <FichaAltaDocumentos
             relacionId={params.relacionId}
             entidadId={trabajador.entidad_id}
+            trabajador={trabajador}
             documentos={documentos}
+            pension={pension}
             canWrite={canEditFicha}
-            tiposFiltro={[...CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS]}
-            permitirAgregar={CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.some(
-              (tipo) => !documentos.some((d) => d.tipo === tipo),
-            )}
-            hint="Suba DNI, ficha de datos y asignación familiar. PDF, JPG, PNG o WEBP. Máximo 10 MB."
           />
         ) : null}
         {esEstudio && tab === "pensiones" ? (

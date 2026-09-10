@@ -1,5 +1,5 @@
 import {
-  CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS,
+  tiposDocumentosAltaRequeridos,
   type EstadoContratoPlanilla,
   type EstadoDocumentoPlanilla,
   type EstadoValidacionAltaPlanilla,
@@ -8,9 +8,10 @@ import {
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 
 export const PASOS_ALTA = [
-  { id: "datos", n: 1, label: "Persona y puesto" },
-  { id: "documentos", n: 2, label: "Documentos" },
-  { id: "contratos", n: 3, label: "Contrato" },
+  { id: "documentos", n: 1, label: "Documentos" },
+  { id: "persona", n: 2, label: "Persona" },
+  { id: "puesto", n: 3, label: "Puesto" },
+  { id: "contratos", n: 4, label: "Contrato" },
 ] as const;
 
 export type PasoAltaId = (typeof PASOS_ALTA)[number]["id"];
@@ -31,9 +32,11 @@ export type FlujoContrato = {
 };
 
 export type FlujoFichaInput = {
+  nombres: string | null;
   cargo: string | null;
   horario: string | null;
   direccion: string | null;
+  recibeAsignacionFamiliar: boolean | null;
   validacion: EstadoValidacionAltaPlanilla;
   contratos: FlujoContrato[];
   documentos: FlujoDocumento[];
@@ -73,8 +76,11 @@ export function contratoConfirmado(contratos: FlujoContrato[]): FlujoContrato | 
 
 export function estadoPasosAlta(input: FlujoFichaInput): Record<PasoAltaId, boolean> {
   return {
-    datos: Boolean(input.cargo?.trim() && horarioEstaCompleto(input.horario) && input.direccion?.trim()),
-    documentos: CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS.every((tipo) => documentoCargado(input.documentos, tipo)),
+    persona: Boolean(input.nombres?.trim() && input.direccion?.trim()),
+    puesto: Boolean(input.cargo?.trim() && horarioEstaCompleto(input.horario)),
+    documentos: tiposDocumentosAltaRequeridos(input.recibeAsignacionFamiliar).every((tipo) =>
+      documentoCargado(input.documentos, tipo),
+    ),
     contratos: Boolean(contratoConfirmado(input.contratos)),
   };
 }
@@ -86,11 +92,14 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   const firmado = documentoCargado(input.documentos, "CONTRATO_FIRMADO");
   const pasos = estadoPasosAlta(input);
 
-  if (!pasos.datos) {
-    return { paso: "datos", tab: "datos", etiqueta: "Completar puesto", rol: "empresa" };
-  }
   if (!pasos.documentos) {
     return { paso: "documentos", tab: "documentos", etiqueta: "Subir documentos", rol: "empresa" };
+  }
+  if (!pasos.persona) {
+    return { paso: "persona", tab: "persona", etiqueta: "Completar persona", rol: "empresa" };
+  }
+  if (!pasos.puesto) {
+    return { paso: "puesto", tab: "puesto", etiqueta: "Completar puesto", rol: "empresa" };
   }
   if (!borrador && !confirmado) {
     return { paso: "contratos", tab: "contratos", etiqueta: "Generar contrato", rol: "empresa" };
@@ -103,7 +112,7 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   }
   if (input.validacion === "PENDIENTE") {
     return esEstudio
-      ? { paso: "datos", tab: "datos", etiqueta: "Validar alta", rol: "estudio" }
+      ? { paso: "persona", tab: "persona", etiqueta: "Validar alta", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
   if (vigente?.estado === "ELABORADO" && firmado) {
@@ -126,15 +135,18 @@ export function claseBadgePaso(rol: SiguientePaso["rol"]): string {
 export function flujoDesdeTrabajador(input: {
   cargo: string | null;
   horario: string | null;
-  persona: { direccion: string | null };
+  recibe_asignacion_familiar?: boolean | null;
+  persona: { nombres: string; direccion: string | null };
   validacion: EstadoValidacionAltaPlanilla;
   contratos: FlujoContrato[];
   documentos: FlujoDocumento[];
 }): FlujoFichaInput {
   return {
+    nombres: input.persona.nombres,
     cargo: input.cargo,
     horario: input.horario,
     direccion: input.persona.direccion,
+    recibeAsignacionFamiliar: input.recibe_asignacion_familiar ?? null,
     validacion: input.validacion,
     contratos: input.contratos,
     documentos: input.documentos,

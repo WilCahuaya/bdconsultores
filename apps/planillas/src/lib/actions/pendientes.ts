@@ -102,7 +102,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
         id: `${relacion.id}:validacion`,
         tipo: "validacion",
         detalle: "Alta pendiente de validación del estudio",
-        tab: "datos",
+        tab: "persona",
       });
     }
 

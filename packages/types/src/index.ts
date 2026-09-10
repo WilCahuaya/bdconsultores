@@ -2054,12 +2054,28 @@ export type TipoPension = "AFP" | "ONP";
 export type EstadoTramitePension = "PENDIENTE" | "TRAMITADO" | "NO_APLICA";
 export type TipoTRegistro = "ALTA" | "BAJA";
 
-/** Documentos que pide la empresa al trabajador para armar el contrato. */
+/** Documentos que se piden al inicio del alta (la asignación familiar solo si la ficha dice que la recibe). */
 export const CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS: TipoDocumentoPlanilla[] = [
   "DNI",
   "FICHA_DATOS",
+  "PENSIONES_FIRMADO",
+];
+
+export const TIPOS_DOCUMENTO_ALTA_INICIALES: TipoDocumentoPlanilla[] = [
+  "DNI",
+  "FICHA_DATOS",
+  "PENSIONES_FIRMADO",
   "ASIGNACION_FAMILIAR",
 ];
+
+export function tiposDocumentosAltaRequeridos(
+  recibeAsignacionFamiliar: boolean | null | undefined,
+): TipoDocumentoPlanilla[] {
+  if (recibeAsignacionFamiliar) {
+    return [...CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS, "ASIGNACION_FAMILIAR"];
+  }
+  return [...CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS];
+}
 
 
 export type UsuarioGestionResumen = Pick<Profile, "id" | "rol" | "activo" | "nombre" | "email">;

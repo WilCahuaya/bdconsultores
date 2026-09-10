@@ -10,6 +10,7 @@ import type {
   TipoPension,
   TipoTRegistro,
 } from "@inventario/types";
+import { TIPOS_DOCUMENTO_ALTA_INICIALES } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
@@ -104,10 +105,10 @@ function parseSnapshotContrato(formData: FormData, cargoActual: string | null) {
   const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""), cargoActual);
   if (cargo.error) return { error: cargo.error };
   if (!cargo.value) return { error: "Elija el cargo del contrato." };
-  const fechaInicio = parseFechaCampo(String(formData.get("fecha_inicio") ?? ""), "Fecha de inicio");
+  const fechaInicio = parseFechaCampo(String(formData.get("fecha_inicio") ?? ""), "Fecha de inicio de contrato");
   if (fechaInicio.error) return { error: fechaInicio.error };
-  if (!fechaInicio.value) return { error: "La fecha de inicio es obligatoria." };
-  const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de fin");
+  if (!fechaInicio.value) return { error: "La fecha de inicio de contrato es obligatoria." };
+  const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de cese de contrato");
   if (fechaFin.error) return { error: fechaFin.error };
   const jornada = String(formData.get("jornada") ?? "").trim();
   if (jornada !== "TIEMPO_COMPLETO" && jornada !== "TIEMPO_PARCIAL") {
@@ -328,7 +329,6 @@ export async function confirmarContratoFirmado(
       cargo: snapshot.cargo,
       horario: snapshot.horario,
       jornada: snapshot.jornada,
-      fecha_ingreso: snapshot.fecha_inicio,
     })
     .eq("id", relacionId);
   if (relError) return { error: relError.message };
@@ -391,6 +391,113 @@ export async function listDocumentos(relacionId: string): Promise<DocumentoRow[]
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []) as DocumentoRow[];
+}
+
+export async function asegurarDocumentosAlta(relacionId: string): Promise<void> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return;
+  const db = await planillasDb();
+  const { data: existentes } = await db.from("documentos").select("tipo").eq("relacion_id", relacionId);
+  const ya = new Set((existentes ?? []).map((d) => d.tipo as TipoDocumentoPlanilla));
+  const faltan = TIPOS_DOCUMENTO_ALTA_INICIALES.filter((tipo) => !ya.has(tipo));
+  if (faltan.length === 0) return;
+  await db.from("documentos").insert(
+    faltan.map((tipo) => ({
+      relacion_id: relacionId,
+      tipo,
+      estado: "PENDIENTE",
+    })),
+  );
+}
+
+export async function guardarDatosDniEscaneo(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const nombres = String(formData.get("nombres") ?? "").trim();
+  if (!nombres) return { error: "El nombre es obligatorio." };
+  const nacimiento = parseFechaCampo(String(formData.get("fecha_nacimiento") ?? ""), "Fecha de nacimiento");
+  if (nacimiento.error) return { error: nacimiento.error };
+
+  const db = await planillasDb();
+  const { error } = await db
+    .from("personas")
+    .update({
+      nombres,
+      apellido_paterno: String(formData.get("apellido_paterno") ?? "").trim() || null,
+      apellido_materno: String(formData.get("apellido_materno") ?? "").trim() || null,
+      fecha_nacimiento: nacimiento.value,
+    })
+    .eq("id", gate.trabajador.persona.id);
+  if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  return {};
+}
+
+export async function guardarDatosFichaEscaneo(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const recibeRaw = String(formData.get("recibe_asignacion_familiar") ?? "").trim();
+  const recibe = recibeRaw === "si" ? true : recibeRaw === "no" ? false : null;
+
+  const db = await planillasDb();
+  const { error: pError } = await db
+    .from("personas")
+    .update({
+      celular: String(formData.get("celular") ?? "").trim() || null,
+      correo: String(formData.get("correo") ?? "").trim() || null,
+      direccion: String(formData.get("direccion") ?? "").trim() || null,
+    })
+    .eq("id", gate.trabajador.persona.id);
+  if (pError) return { error: pError.message };
+
+  const { error: rError } = await db
+    .from("relaciones_laborales")
+    .update({ recibe_asignacion_familiar: recibe })
+    .eq("id", relacionId);
+  if (rError) return { error: rError.message };
+
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return {};
+}
+
+export async function guardarTipoPensionAlta(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const tipo = String(formData.get("tipo") ?? "").trim();
+  if (tipo !== "AFP" && tipo !== "ONP") return { error: "Indique si es AFP u ONP." };
+
+  const db = await planillasDb();
+  const { data: actual } = await db
+    .from("pensiones")
+    .select("afp_nombre, cuspp, tramite_estado, fecha_tramite")
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+
+  const { error } = await db.from("pensiones").upsert(
+    {
+      relacion_id: relacionId,
+      tipo,
+      afp_nombre: tipo === "ONP" ? null : actual?.afp_nombre ?? null,
+      cuspp: actual?.cuspp ?? null,
+      tramite_estado: tipo === "ONP" ? "NO_APLICA" : actual?.tramite_estado ?? "PENDIENTE",
+      fecha_tramite: actual?.fecha_tramite ?? null,
+    },
+    { onConflict: "relacion_id" },
+  );
+  if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return {};
 }
 
 export async function addDocumento(

@@ -120,7 +120,7 @@ export type PendienteItem = {
   nombre: string;
   tipo: PendienteTipo;
   detalle: string;
-  tab: "datos" | "contratos" | "documentos" | "pensiones" | "t-registro" | "vida-ley";
+  tab: "persona" | "puesto" | "contratos" | "documentos" | "pensiones" | "t-registro" | "vida-ley";
 };
 
 export const PENDIENTE_TIPO_LABEL: Record<PendienteTipo, string> = {

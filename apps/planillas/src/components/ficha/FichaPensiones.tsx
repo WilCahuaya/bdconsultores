@@ -34,7 +34,7 @@ export function FichaPensiones({
 
   return (
     <form action={onSubmit} className="space-y-4">
-      <FormSection title="AFP / ONP" hint="El sistema de pensiones del trabajador, no va en el contrato.">
+      <FormSection title="AFP / ONP" hint="El tipo (AFP u ONP) se marca en Documentos. Aquí el estudio registra el alta de AFP (nombre, CUSPP y trámite).">
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField
           label="Sistema"

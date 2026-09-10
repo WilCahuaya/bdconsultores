@@ -86,8 +86,8 @@ export default async function ContratoDocumentoPage({
           <p>Jornada y horario</p>
           <HorarioContratoVista className="mt-1" value={horario} />
         </div>
-        <p>Inicio: {formatFechaPlanilla(contrato.fecha_inicio)}</p>
-        <p>Fin: {formatFechaPlanilla(contrato.fecha_fin)}</p>
+        <p>Inicio de contrato: {formatFechaPlanilla(contrato.fecha_inicio)}</p>
+        <p>Cese de contrato: {formatFechaPlanilla(contrato.fecha_fin)}</p>
         <p>Remuneración: {formatRemuneracion(contrato.remuneracion)}</p>
       </section>
       {funciones.length > 0 ? (
