@@ -14,7 +14,7 @@ import { TIPOS_DOCUMENTO_ALTA_INICIALES } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
-import { parseFechaCampo, parseCargoCampo } from "@/lib/planillas-labels";
+import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { planillasDb } from "@/lib/supabase/planillas";
 
@@ -445,13 +445,38 @@ export async function guardarDatosFichaEscaneo(
   const recibeRaw = String(formData.get("recibe_asignacion_familiar") ?? "").trim();
   const recibe = recibeRaw === "si" ? true : recibeRaw === "no" ? false : null;
 
+  const tipoVia = String(formData.get("tipo_via") ?? "").trim() || null;
+  const viaNombre = String(formData.get("via_nombre") ?? "").trim() || null;
+  const viaNumero = String(formData.get("via_numero") ?? "").trim() || null;
+  const referencia = String(formData.get("referencia") ?? "").trim() || null;
+  const distrito = String(formData.get("distrito") ?? "").trim() || null;
+  const provincia = String(formData.get("provincia") ?? "").trim() || null;
+  const region = String(formData.get("region") ?? "").trim() || null;
+  const direccion = armarDireccionPersona({
+    tipo_via: tipoVia,
+    via_nombre: viaNombre,
+    via_numero: viaNumero,
+    referencia,
+    distrito,
+    provincia,
+    region,
+    direccion: String(formData.get("direccion") ?? "").trim() || null,
+  });
+
   const db = await planillasDb();
   const { error: pError } = await db
     .from("personas")
     .update({
       celular: String(formData.get("celular") ?? "").trim() || null,
       correo: String(formData.get("correo") ?? "").trim() || null,
-      direccion: String(formData.get("direccion") ?? "").trim() || null,
+      direccion,
+      tipo_via: tipoVia,
+      via_nombre: viaNombre,
+      via_numero: viaNumero,
+      referencia,
+      distrito,
+      provincia,
+      region,
     })
     .eq("id", gate.trabajador.persona.id);
   if (pError) return { error: pError.message };

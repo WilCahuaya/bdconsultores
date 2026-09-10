@@ -17,7 +17,7 @@ import {
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { Field, DateField, SelectField } from "@/components/fields";
-import { TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import { AFPNET_URL, TIPO_DOCUMENTO_LABEL, opcionesTipoVia } from "@/lib/planillas-labels";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
@@ -248,7 +248,13 @@ function CapturaFicha({
   const [pending, setPending] = useState(false);
   const [celular, setCelular] = useState(p.celular ?? "");
   const [correo, setCorreo] = useState(p.correo ?? "");
-  const [direccion, setDireccion] = useState(p.direccion ?? "");
+  const [tipoVia, setTipoVia] = useState(p.tipo_via ?? "");
+  const [viaNombre, setViaNombre] = useState(p.via_nombre ?? "");
+  const [viaNumero, setViaNumero] = useState(p.via_numero ?? "");
+  const [referencia, setReferencia] = useState(p.referencia ?? "");
+  const [distrito, setDistrito] = useState(p.distrito ?? "");
+  const [provincia, setProvincia] = useState(p.provincia ?? "");
+  const [region, setRegion] = useState(p.region ?? "");
   const [recibe, setRecibe] = useState(
     trabajador.recibe_asignacion_familiar === true ? "si" : trabajador.recibe_asignacion_familiar === false ? "no" : "",
   );
@@ -283,7 +289,14 @@ function CapturaFicha({
     const form = new FormData();
     form.set("celular", celular);
     form.set("correo", correo);
-    form.set("direccion", direccion);
+    form.set("tipo_via", tipoVia);
+    form.set("via_nombre", viaNombre);
+    form.set("via_numero", viaNumero);
+    form.set("referencia", referencia);
+    form.set("distrito", distrito);
+    form.set("provincia", provincia);
+    form.set("region", region);
+    form.set("direccion", p.direccion ?? "");
     form.set("recibe_asignacion_familiar", recibe);
     const saved = await guardarDatosFichaEscaneo(relacionId, form);
     setPending(false);
@@ -301,7 +314,7 @@ function CapturaFicha({
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.FICHA_DATOS}</p>
         <p className="text-sm text-muted-foreground">
-          Suba el escaneo y complete dirección, celular, correo y si recibe asignación familiar. La dirección entra al contrato; si recibe asignación, después se pide el sustento.
+          Suba el escaneo y complete tipo de vía, nombre, número (o referencia si no hay número), distrito, provincia, región, celular, correo y si recibe asignación familiar. Eso se copia en AFPNet y la dirección armada entra al contrato.
         </p>
       </div>
       <div className="space-y-4">
@@ -317,11 +330,42 @@ function CapturaFicha({
           />
         ) : null}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Celular" name="celular" value={celular} onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
+          <Field label="Celular" name="celular" value={celular} inputMode="tel" onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
           <Field label="Correo" name="correo" type="email" value={correo} onChange={(event) => setCorreo(event.target.value)} readOnly={!canWrite} />
-          <div className="sm:col-span-2">
-            <Field label="Dirección" name="direccion" value={direccion} onChange={(event) => setDireccion(event.target.value)} readOnly={!canWrite} />
-          </div>
+          <SelectField
+            label="Tipo de vía"
+            name="tipo_via"
+            value={tipoVia}
+            allowEmpty
+            disabled={!canWrite}
+            options={opcionesTipoVia(tipoVia)}
+            onChange={(event) => setTipoVia(event.target.value)}
+          />
+          <Field
+            label="Nombre de avenida, calle o jirón"
+            name="via_nombre"
+            value={viaNombre}
+            onChange={(event) => setViaNombre(event.target.value)}
+            readOnly={!canWrite}
+          />
+          <Field
+            label="Número de casa"
+            name="via_numero"
+            value={viaNumero}
+            onChange={(event) => setViaNumero(event.target.value)}
+            readOnly={!canWrite}
+          />
+          <Field
+            label="Referencia"
+            name="referencia"
+            value={referencia}
+            placeholder="Si no tiene número de casa"
+            onChange={(event) => setReferencia(event.target.value)}
+            readOnly={!canWrite}
+          />
+          <Field label="Distrito" name="distrito" value={distrito} onChange={(event) => setDistrito(event.target.value)} readOnly={!canWrite} />
+          <Field label="Provincia" name="provincia" value={provincia} onChange={(event) => setProvincia(event.target.value)} readOnly={!canWrite} />
+          <Field label="Región" name="region" value={region} onChange={(event) => setRegion(event.target.value)} readOnly={!canWrite} />
           <SelectField
             label="¿Recibe asignación familiar?"
             name="recibe_asignacion_familiar"
@@ -437,6 +481,16 @@ function CapturaPension({
           ]}
           onChange={(event) => setTipo(event.target.value as TipoPension | "")}
         />
+        {tipo === "AFP" ? (
+          <a
+            href={AFPNET_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            Abrir AFPNet
+          </a>
+        ) : null}
       </div>
       {canWrite ? (
         <Button type="button" disabled={pending} onClick={() => void guardar()}>

@@ -96,6 +96,60 @@ export const TIPO_PENSION_LABEL: Record<TipoPension, string> = {
 
 export const AFP_NOMBRES = ["Habitat", "Integra", "Prima", "Profuturo"] as const;
 
+export const AFP_PORTAL_URL: Record<(typeof AFP_NOMBRES)[number], string> = {
+  Habitat: "https://www.afphabitat.com.pe/",
+  Integra: "https://www.integra.com.pe/",
+  Prima: "https://www.prima.com.pe/",
+  Profuturo: "https://www.profuturo.com.pe/",
+};
+
+export const AFPNET_URL = "https://www.afpnet.com.pe/";
+
+export const TIPOS_VIA_AFPNET = [
+  { value: "Av.", label: "Av." },
+  { value: "Jr.", label: "Jr." },
+  { value: "Calle", label: "Calle" },
+  { value: "Psje.", label: "Psje." },
+  { value: "Urb.", label: "Urb." },
+  { value: "Carretera", label: "Carretera" },
+  { value: "Mz.", label: "Mz." },
+  { value: "Otro", label: "Otro" },
+] as const;
+
+export function opcionesTipoVia(actual?: string | null) {
+  const lista = TIPOS_VIA_AFPNET.map((item) => ({ value: item.value, label: item.label }));
+  if (actual && !lista.some((item) => item.value === actual)) {
+    lista.unshift({ value: actual, label: actual });
+  }
+  return lista;
+}
+
+export function urlPortalAfp(nombre: string | null | undefined): string | null {
+  if (!nombre) return null;
+  if ((AFP_NOMBRES as readonly string[]).includes(nombre)) {
+    return AFP_PORTAL_URL[nombre as (typeof AFP_NOMBRES)[number]];
+  }
+  return null;
+}
+
+export function armarDireccionPersona(input: {
+  tipo_via?: string | null;
+  via_nombre?: string | null;
+  via_numero?: string | null;
+  referencia?: string | null;
+  distrito?: string | null;
+  provincia?: string | null;
+  region?: string | null;
+  direccion?: string | null;
+}): string | null {
+  const via = [input.tipo_via, input.via_nombre, input.via_numero].map((p) => p?.trim()).filter(Boolean).join(" ");
+  const ref = input.referencia?.trim();
+  const ubigeo = [input.distrito, input.provincia, input.region].map((p) => p?.trim()).filter(Boolean).join(", ");
+  const partes = [via, ref ? `Ref: ${ref}` : "", ubigeo].filter(Boolean);
+  if (partes.length) return partes.join(". ");
+  return input.direccion?.trim() || null;
+}
+
 export const TRAMITE_PENSION_LABEL: Record<EstadoTramitePension, string> = {
   PENDIENTE: "Pendiente",
   TRAMITADO: "Tramitado",

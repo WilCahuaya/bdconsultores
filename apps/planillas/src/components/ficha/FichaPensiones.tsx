@@ -9,15 +9,15 @@ import type { Entidad, TipoPension } from "@inventario/types";
 import { savePension, type PensionRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import {
+  AFPNET_URL,
   AFP_NOMBRES,
   TIPO_PENSION_LABEL,
   TRAMITE_PENSION_LABEL,
   formatFechaPlanilla,
   nombreCompleto,
+  urlPortalAfp,
 } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
-
-const AFPNET_URL = "https://www.afpnet.com.pe/";
 
 function Copiar({ value }: { value: string }) {
   const { pushToast } = useToast();
@@ -51,6 +51,32 @@ function DatoAlta({ label, value }: { label: string; value: string }) {
   );
 }
 
+function EnlaceAfpnet({ afpNombre }: { afpNombre?: string | null }) {
+  const portal = urlPortalAfp(afpNombre);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <a
+        href={AFPNET_URL}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+      >
+        Abrir AFPNet
+      </a>
+      {portal && afpNombre ? (
+        <a
+          href={portal}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex h-10 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent"
+        >
+          Abrir {afpNombre}
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 export function FichaPensiones({
   relacionId,
   pension,
@@ -73,6 +99,7 @@ export function FichaPensiones({
   const tramitado = esAfp && pension?.tramite_estado === "TRAMITADO";
   const persona = trabajador.persona;
   const nombre = nombreCompleto(persona);
+  const fechaInicioLabor = trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : "";
 
   async function onSubmit(formData: FormData) {
     setPending(true);
@@ -88,6 +115,18 @@ export function FichaPensiones({
 
   return (
     <div className="space-y-4">
+      {esOnp ? null : (
+        <section className={`${panelCardClass} space-y-3 p-5`}>
+          <div>
+            <p className="text-sm font-medium">Portal AFPNet</p>
+            <p className="text-sm text-muted-foreground">
+              Planillas no entra sola. Abra AFPNet, copie los datos de abajo y péguelos en el alta.
+            </p>
+          </div>
+          <EnlaceAfpnet afpNombre={pension?.afp_nombre} />
+        </section>
+      )}
+
       <ol className="grid gap-2 sm:grid-cols-3">
         <li className={`${panelCardClass} p-4 text-sm`}>
           <p className="text-xs text-muted-foreground">1. Tipo</p>
@@ -116,9 +155,9 @@ export function FichaPensiones({
       {esAfp ? (
         <section className={`${panelCardClass} space-y-4 p-5`}>
           <div>
-            <p className="text-sm font-medium">Datos para el alta en la AFP</p>
+            <p className="text-sm font-medium">Datos para pegar en AFPNet</p>
             <p className="text-sm text-muted-foreground">
-              Planillas no entra sola al portal. Copie estos datos, dé de alta en AFPNet y luego pegue el CUSPP aquí.
+              Tipo de vía, nombre, número o referencia, distrito, provincia, región, teléfono, correo e inicio de labor. Si falta alguno, complételo en Ficha o Persona.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -126,17 +165,25 @@ export function FichaPensiones({
             <DatoAlta label="RUC" value={entidad?.ruc ?? ""} />
             <DatoAlta label="DNI" value={persona.dni} />
             <DatoAlta label="Nombres y apellidos" value={nombre} />
-            <DatoAlta label="Fecha de nacimiento" value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""} />
-            <DatoAlta label="Fecha de ingreso a la empresa" value={trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : ""} />
+            <DatoAlta
+              label="Fecha de nacimiento"
+              value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
+            />
+            <DatoAlta label="Tipo de vía" value={persona.tipo_via ?? ""} />
+            <DatoAlta label="Nombre de avenida, calle o jirón" value={persona.via_nombre ?? ""} />
+            <DatoAlta label="Número de casa" value={persona.via_numero ?? ""} />
+            <DatoAlta label="Referencia" value={persona.referencia ?? ""} />
+            <DatoAlta label="Distrito" value={persona.distrito ?? ""} />
+            <DatoAlta label="Provincia" value={persona.provincia ?? ""} />
+            <DatoAlta label="Región" value={persona.region ?? ""} />
+            {!persona.tipo_via && !persona.via_nombre && persona.direccion ? (
+              <DatoAlta label="Dirección (aún no partida)" value={persona.direccion} />
+            ) : null}
+            <DatoAlta label="Teléfono" value={persona.celular ?? ""} />
+            <DatoAlta label="Correo" value={persona.correo ?? ""} />
+            <DatoAlta label="Fecha de inicio de labor" value={fechaInicioLabor} />
           </div>
-          <a
-            href={AFPNET_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
-          >
-            Abrir AFPNet
-          </a>
+          <EnlaceAfpnet afpNombre={pension?.afp_nombre} />
         </section>
       ) : null}
 

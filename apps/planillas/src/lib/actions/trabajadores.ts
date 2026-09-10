@@ -15,7 +15,7 @@ import {
   puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
-import { parseFechaCampo, parseCargoCampo } from "@/lib/planillas-labels";
+import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
 import type { FlujoContrato, FlujoDocumento } from "@/lib/flujo-ficha";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { planillasDb } from "@/lib/supabase/planillas";
@@ -30,6 +30,13 @@ export type PersonaRow = {
   celular: string | null;
   correo: string | null;
   direccion: string | null;
+  tipo_via: string | null;
+  via_nombre: string | null;
+  via_numero: string | null;
+  referencia: string | null;
+  distrito: string | null;
+  provincia: string | null;
+  region: string | null;
 };
 
 export type RelacionRow = {
@@ -92,7 +99,7 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
     )
     .eq("entidad_id", entidadId)
     .order("fecha_ingreso", { ascending: false, nullsFirst: false });
@@ -123,7 +130,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const { data, error } = await db
     .from("relaciones_laborales")
     .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
+      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, datos_confirmados), documentos (tipo, estado, storage_path)",
     )
     .eq("id", relacionId)
     .maybeSingle();
@@ -264,6 +271,25 @@ export async function updatePersonaTrabajador(
   const nacimiento = parseFechaCampo(String(formData.get("fecha_nacimiento") ?? ""), "Fecha de nacimiento");
   if (nacimiento.error) return { error: nacimiento.error };
 
+  const tipoVia = String(formData.get("tipo_via") ?? "").trim() || null;
+  const viaNombre = String(formData.get("via_nombre") ?? "").trim() || null;
+  const viaNumero = String(formData.get("via_numero") ?? "").trim() || null;
+  const referencia = String(formData.get("referencia") ?? "").trim() || null;
+  const distrito = String(formData.get("distrito") ?? "").trim() || null;
+  const provincia = String(formData.get("provincia") ?? "").trim() || null;
+  const region = String(formData.get("region") ?? "").trim() || null;
+  const direccion =
+    armarDireccionPersona({
+      tipo_via: tipoVia,
+      via_nombre: viaNombre,
+      via_numero: viaNumero,
+      referencia,
+      distrito,
+      provincia,
+      region,
+      direccion: String(formData.get("direccion") ?? "").trim() || null,
+    });
+
   const db = await planillasDb();
   const { error } = await db
     .from("personas")
@@ -274,7 +300,14 @@ export async function updatePersonaTrabajador(
       fecha_nacimiento: nacimiento.value,
       celular: String(formData.get("celular") ?? "").trim() || null,
       correo: String(formData.get("correo") ?? "").trim() || null,
-      direccion: String(formData.get("direccion") ?? "").trim() || null,
+      direccion,
+      tipo_via: tipoVia,
+      via_nombre: viaNombre,
+      via_numero: viaNumero,
+      referencia,
+      distrito,
+      provincia,
+      region,
     })
     .eq("id", actual.persona.id);
   if (error) return { error: error.message };

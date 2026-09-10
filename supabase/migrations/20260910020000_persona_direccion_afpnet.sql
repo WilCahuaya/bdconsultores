@@ -1,0 +1,5 @@
+ALTER TABLE planillas.personas
+  ADD COLUMN IF NOT EXISTS tipo_via TEXT,
+  ADD COLUMN IF NOT EXISTS via_nombre TEXT,
+  ADD COLUMN IF NOT EXISTS via_numero TEXT,
+  ADD COLUMN IF NOT EXISTS referencia TEXT;

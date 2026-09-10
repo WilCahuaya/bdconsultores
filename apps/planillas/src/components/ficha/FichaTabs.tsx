@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PASOS_ALTA, type FlujoTab, type PasoAltaId } from "@/lib/flujo-ficha";
+import { AFPNET_URL } from "@/lib/planillas-labels";
 
 const TRAMITES = [
   { id: "pensiones", label: "Pensiones" },
@@ -112,6 +113,14 @@ export function FichaFlujoNav({
               </Link>
             );
           })}
+          <a
+            href={AFPNET_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-md px-2 py-1 font-medium text-primary underline underline-offset-2 hover:opacity-80"
+          >
+            AFPNet
+          </a>
         </nav>
       ) : null}
     </div>

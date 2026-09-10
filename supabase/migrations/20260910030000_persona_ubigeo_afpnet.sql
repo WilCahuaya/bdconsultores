@@ -1,0 +1,4 @@
+ALTER TABLE planillas.personas
+  ADD COLUMN IF NOT EXISTS distrito TEXT,
+  ADD COLUMN IF NOT EXISTS provincia TEXT,
+  ADD COLUMN IF NOT EXISTS region TEXT;

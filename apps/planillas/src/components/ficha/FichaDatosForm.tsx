@@ -9,7 +9,14 @@ import {
   updatePuestoTrabajador,
   type TrabajadorListItem,
 } from "@/lib/actions/trabajadores";
-import { CLASIFICACION_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, opcionesCargo } from "@/lib/planillas-labels";
+import {
+  CLASIFICACION_LABEL,
+  JORNADA_LABEL,
+  cargoCanonico,
+  formatFechaPlanilla,
+  opcionesCargo,
+  opcionesTipoVia,
+} from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 
@@ -39,16 +46,36 @@ export function FichaPersonaForm({
 
   return (
     <form action={onSubmit} className="space-y-4">
-      <FormSection title="Persona" hint="Revise lo capturado en Documentos. El DNI no se cambia. La dirección sí va en el contrato.">
+      <FormSection title="Persona" hint="Revise lo capturado en Documentos. El DNI no se cambia. Tipo de vía, nombre, número, referencia, distrito, provincia y región salen en AFPNet y la dirección armada entra al contrato.">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="DNI" name="dni" defaultValue={p.dni} readOnly />
           <Field label="Nombres" name="nombres" defaultValue={p.nombres} required readOnly={!canWrite} />
           <Field label="Apellido paterno" name="apellido_paterno" defaultValue={p.apellido_paterno} readOnly={!canWrite} />
           <Field label="Apellido materno" name="apellido_materno" defaultValue={p.apellido_materno} readOnly={!canWrite} />
           <DateField label="Fecha de nacimiento" name="fecha_nacimiento" defaultValue={p.fecha_nacimiento} readOnly={!canWrite} />
-          <Field label="Celular" name="celular" defaultValue={p.celular} readOnly={!canWrite} />
+          <Field label="Celular" name="celular" defaultValue={p.celular} inputMode="tel" readOnly={!canWrite} />
           <Field label="Correo" name="correo" type="email" defaultValue={p.correo} readOnly={!canWrite} />
-          <Field label="Dirección" name="direccion" defaultValue={p.direccion} readOnly={!canWrite} />
+          <SelectField
+            label="Tipo de vía"
+            name="tipo_via"
+            defaultValue={p.tipo_via}
+            allowEmpty
+            disabled={!canWrite}
+            options={opcionesTipoVia(p.tipo_via)}
+          />
+          <Field label="Nombre de avenida, calle o jirón" name="via_nombre" defaultValue={p.via_nombre} readOnly={!canWrite} />
+          <Field label="Número de casa" name="via_numero" defaultValue={p.via_numero} readOnly={!canWrite} />
+          <Field
+            label="Referencia"
+            name="referencia"
+            defaultValue={p.referencia}
+            placeholder="Si no tiene número de casa"
+            readOnly={!canWrite}
+          />
+          <Field label="Distrito" name="distrito" defaultValue={p.distrito} readOnly={!canWrite} />
+          <Field label="Provincia" name="provincia" defaultValue={p.provincia} readOnly={!canWrite} />
+          <Field label="Región" name="region" defaultValue={p.region} readOnly={!canWrite} />
+          <input type="hidden" name="direccion" defaultValue={p.direccion ?? ""} />
           <Field
             label="Asignación familiar (según ficha)"
             name="recibe_asignacion_familiar_vista"
