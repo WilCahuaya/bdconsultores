@@ -14,7 +14,7 @@ import {
 } from "docx";
 import type { JornadaLaboral } from "@inventario/types";
 import { cargoCanonico, funcionesDeCargo } from "@/lib/cargos-funciones";
-import { formatHorarioContrato } from "@/lib/horario-laboral";
+import { estructuraHorarioParcial, formatHorarioContrato, parseHorario } from "@/lib/horario-laboral";
 import { formatRemuneracion, nombreCompleto } from "@/lib/planillas-labels";
 import { solesEnLetras } from "@/lib/soles-letras";
 
@@ -324,21 +324,38 @@ function plazoParcial(d: ContratoWordDatos): string {
 }
 
 function parrafosHorario(d: ContratoWordDatos, g: Genero): Paragraph[] {
-  const horario = formatHorarioContrato(d.horario);
   if (d.jornada === "TIEMPO_COMPLETO") {
     return [
       parrafo(
-        `${g.parte} cumplirá una jornada de trabajo ${horario}, conforme a las necesidades operativas del Programa y a la naturaleza del cargo.`,
+        `${g.parte} cumplirá una jornada de trabajo ${formatHorarioContrato(d.horario)}, conforme a las necesidades operativas del Programa y a la naturaleza del cargo.`,
       ),
     ];
   }
+  const parsed = parseHorario(d.horario);
+  if (parsed?.tipo === "PARCIAL") {
+    const data = estructuraHorarioParcial(parsed);
+    const out: Paragraph[] = [
+      parrafo(`${g.parte} prestará sus servicios bajo el régimen de tiempo parcial, ${data.intro}`),
+    ];
+    for (const bloque of data.bloques) {
+      out.push(parrafo(bloque.titulo, { justify: false, after: 80, numbering: { reference: "horario", level: 0 } }));
+      for (const item of bloque.items) {
+        out.push(parrafo(item, { justify: false, after: 40, numbering: { reference: "horario", level: 1 } }));
+      }
+    }
+    if (data.total) {
+      out.push(parrafo(data.total, { justify: false, after: 80, numbering: { reference: "horario", level: 0 } }));
+    }
+    return out;
+  }
+  const horario = formatHorarioContrato(d.horario);
   const lineas = horario.split("\n").map((l) => l.trim()).filter(Boolean);
   const [primera, ...resto] = lineas;
   const out: Paragraph[] = [
     parrafo(`${g.parte} prestará sus servicios bajo el régimen de tiempo parcial, ${primera ?? horario}`),
   ];
   for (const linea of resto) {
-    out.push(parrafo(`• ${linea}`, { justify: false, after: 80 }));
+    out.push(parrafo(linea.replace(/^[•◦]\s*/, ""), { justify: false, after: 80, numbering: { reference: "horario", level: 0 } }));
   }
   return out;
 }
@@ -500,6 +517,33 @@ export function construirDocumentoContrato(d: ContratoWordDatos): Document {
               style: {
                 paragraph: {
                   indent: { left: convertMillimetersToTwip(12), hanging: convertMillimetersToTwip(7) },
+                },
+              },
+            },
+          ],
+        },
+        {
+          reference: "horario",
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.BULLET,
+              text: "•",
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: {
+                  indent: { left: convertMillimetersToTwip(12), hanging: convertMillimetersToTwip(7) },
+                },
+              },
+            },
+            {
+              level: 1,
+              format: LevelFormat.BULLET,
+              text: "◦",
+              alignment: AlignmentType.LEFT,
+              style: {
+                paragraph: {
+                  indent: { left: convertMillimetersToTwip(22), hanging: convertMillimetersToTwip(7) },
                 },
               },
             },

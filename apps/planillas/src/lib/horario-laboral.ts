@@ -301,6 +301,59 @@ export function formatHorarioContrato(raw: string | null | undefined): string {
   return formatClausulaParcial(parsed);
 }
 
+export type BloqueHorarioTexto = {
+  titulo: string;
+  items: string[];
+};
+
+export type HorarioParcialTexto = {
+  intro: string;
+  bloques: BloqueHorarioTexto[];
+  total: string | null;
+};
+
+export function estructuraHorarioParcial(horario: HorarioParcial): HorarioParcialTexto {
+  const semana = horasEfectivasSemanaParcial(horario);
+  const intro =
+    semana != null
+      ? `con una jornada que no excederá de ${horasSemanalesEnLetras(semana)} semanales, distribuidas de la siguiente manera:`
+      : "distribuidas de la siguiente manera:";
+  const bloques: BloqueHorarioTexto[] = [];
+  for (const bloque of horario.bloques) {
+    const porDia = horasEfectivasBloque(bloque);
+    if (!bloque.dias.length || porDia == null) continue;
+    bloques.push({
+      titulo: formatListaDias(bloque.dias),
+      items: [
+        ...lineasTramosYRefrigerio(bloque.tramos),
+        `Horas efectivas de trabajo por día: ${formatoDuracion(porDia)}`,
+      ],
+    });
+  }
+  return {
+    intro,
+    bloques,
+    total: semana != null ? `Total de horas efectivas de trabajo por semana: ${formatoDuracion(semana)}` : null,
+  };
+}
+
+export function formatClausulaParcial(horario: HorarioParcial): string {
+  const data = estructuraHorarioParcial(horario);
+  const partes = [data.intro];
+  for (const bloque of data.bloques) {
+    partes.push("");
+    partes.push(`• ${bloque.titulo}`);
+    for (const item of bloque.items) {
+      partes.push(`    ◦ ${item}`);
+    }
+  }
+  if (data.total) {
+    partes.push("");
+    partes.push(`• ${data.total}`);
+  }
+  return partes.join("\n").trim();
+}
+
 export function formatClausulaCompleto(horario: HorarioCompleto): string {
   const rangoDias =
     horario.diaInicio === horario.diaFin
@@ -314,28 +367,6 @@ export function formatClausulaCompleto(horario: HorarioCompleto): string {
     texto += `, con ${duracion} de ${formatoHoraContrato(horario.refrigerioDesde)} a ${formatoHoraContrato(horario.refrigerioHasta)}`;
   }
   return texto;
-}
-
-export function formatClausulaParcial(horario: HorarioParcial): string {
-  const semana = horasEfectivasSemanaParcial(horario);
-  const partes: string[] = [];
-  if (semana != null) {
-    partes.push(
-      `con una jornada que no excederá de ${horasSemanalesEnLetras(semana)} semanales, distribuidas de la siguiente manera:`,
-    );
-  }
-  for (const bloque of horario.bloques) {
-    const porDia = horasEfectivasBloque(bloque);
-    if (!bloque.dias.length || porDia == null) continue;
-    partes.push("");
-    partes.push(formatListaDias(bloque.dias));
-    partes.push(...lineasTramosYRefrigerio(bloque.tramos));
-    partes.push(`Horas efectivas de trabajo por día: ${formatoDuracion(porDia)}`);
-  }
-  if (semana != null) {
-    partes.push(`Total de horas efectivas de trabajo por semana: ${formatoDuracion(semana)}`);
-  }
-  return partes.join("\n").trim();
 }
 
 export function serializeHorario(horario: HorarioLaboral): string {
