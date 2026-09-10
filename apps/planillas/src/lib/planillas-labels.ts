@@ -116,8 +116,11 @@ export const TIPOS_VIA_AFPNET = [
   { value: "Otro", label: "Otro" },
 ] as const;
 
-export function opcionesTipoVia(actual?: string | null) {
-  const lista = TIPOS_VIA_AFPNET.map((item) => ({ value: item.value, label: item.label }));
+export function opcionesTipoVia(actual?: string | null): { value: string; label: string }[] {
+  const lista: { value: string; label: string }[] = TIPOS_VIA_AFPNET.map((item) => ({
+    value: item.value,
+    label: item.label,
+  }));
   if (actual && !lista.some((item) => item.value === actual)) {
     lista.unshift({ value: actual, label: actual });
   }
