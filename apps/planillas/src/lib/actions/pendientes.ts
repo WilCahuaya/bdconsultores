@@ -262,7 +262,8 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
           tipo === "VIDA_LEY" ||
           tipo === "VIDA_LEY_CONSTANCIA" ||
           tipo === "VIDA_LEY_FACTURA" ||
-          tipo === "VIDA_LEY_COMPROBANTE"
+          tipo === "VIDA_LEY_COMPROBANTE" ||
+          tipo === "ASISTENCIA"
         ) {
           continue;
         }

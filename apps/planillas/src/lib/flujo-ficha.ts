@@ -15,7 +15,7 @@ export const PASOS_ALTA = [
 ] as const;
 
 export type PasoAltaId = (typeof PASOS_ALTA)[number]["id"];
-export type FlujoTab = PasoAltaId | "firma" | "pensiones" | "t-registro" | "vida-ley";
+export type FlujoTab = PasoAltaId | "firma" | "pensiones" | "t-registro" | "vida-ley" | "asistencia";
 
 export type FlujoDocumento = {
   tipo: TipoDocumentoPlanilla;

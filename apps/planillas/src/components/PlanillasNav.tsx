@@ -8,6 +8,7 @@ export function PlanillasNav({ entidadId }: { entidadId?: string }) {
   const query = entidadId ? `?entidadId=${entidadId}` : "";
   const trabajadoresActive = pathname === "/" || pathname.startsWith("/trabajadores");
   const pendientesActive = pathname.startsWith("/pendientes");
+  const asistenciasActive = pathname.startsWith("/asistencias");
 
   const linkClass = (active: boolean) =>
     active
@@ -21,6 +22,9 @@ export function PlanillasNav({ entidadId }: { entidadId?: string }) {
       </Link>
       <Link href={`/pendientes${query}`} className={linkClass(pendientesActive)}>
         Pendientes
+      </Link>
+      <Link href={`/asistencias${query}`} className={linkClass(asistenciasActive)}>
+        Asistencias
       </Link>
     </nav>
   );

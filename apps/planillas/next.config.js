@@ -7,7 +7,7 @@ const nextConfig = {
   basePath: app.basePath,
   transpilePackages: ["@bd/auth", "@bd/config", "@inventario/ui", "@inventario/types", "@inventario/auth-invite"],
   experimental: {
-    serverComponentsExternalPackages: ["docx"],
+    serverComponentsExternalPackages: ["docx", "xlsx-js-style"],
   },
   webpack: (config) => {
     config.resolve = config.resolve ?? {};

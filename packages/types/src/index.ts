@@ -2052,6 +2052,7 @@ export type TipoDocumentoPlanilla =
   | "VIDA_LEY_FACTURA"
   | "VIDA_LEY_COMPROBANTE"
   | "TRAMITE_AFP"
+  | "ASISTENCIA"
   | "OTRO";
 export type EstadoDocumentoPlanilla = "SI" | "NO" | "NA" | "PENDIENTE";
 export type TipoPension = "AFP" | "ONP";

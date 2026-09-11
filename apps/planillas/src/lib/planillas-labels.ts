@@ -91,6 +91,7 @@ export const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoPlanilla, string> = {
   VIDA_LEY_FACTURA: "Factura electrónica Vida Ley",
   VIDA_LEY_COMPROBANTE: "Comprobante de envío Vida Ley",
   TRAMITE_AFP: "Documento de alta AFP",
+  ASISTENCIA: "Asistencia del mes",
   OTRO: "Otro",
 };
 

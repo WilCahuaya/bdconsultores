@@ -1,0 +1,1 @@
+ALTER TYPE planillas.tipo_documento ADD VALUE IF NOT EXISTS 'ASISTENCIA';

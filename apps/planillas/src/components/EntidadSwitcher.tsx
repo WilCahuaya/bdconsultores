@@ -8,11 +8,13 @@ export function EntidadSwitcher({
   selectedId,
   locked,
   hrefBase = "/",
+  queryExtra,
 }: {
   entidades: Entidad[];
   selectedId: string;
   locked?: boolean;
   hrefBase?: string;
+  queryExtra?: string;
 }) {
   const router = useRouter();
 
@@ -24,7 +26,8 @@ export function EntidadSwitcher({
         value={selectedId}
         disabled={locked || entidades.length === 0}
         onChange={(event) => {
-          router.push(`${hrefBase}?entidadId=${event.target.value}`);
+          const extra = queryExtra ? `&${queryExtra.replace(/^&/, "")}` : "";
+          router.push(`${hrefBase}?entidadId=${event.target.value}${extra}`);
         }}
       >
         {entidades.map((entidad) => (

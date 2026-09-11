@@ -90,30 +90,43 @@ export function FichaFlujoNav({
   esEstudio: boolean;
 }) {
   const pasoAlta = PASOS_ALTA.find((paso) => paso.id === tab)?.id;
+  const asistenciaActive = tab === "asistencia";
   return (
     <div className="space-y-4">
       <AltaPasosNav tab={pasoAlta} completados={completados} relacionId={relacionId} />
-      {esEstudio ? (
-        <nav className="flex flex-wrap items-center gap-1 text-sm">
-          <span className="mr-1 text-xs text-muted-foreground">Trámites del estudio</span>
-          {TRAMITES.map((item) => {
-            const active = tab === item.id;
-            return (
-              <Link
-                key={item.id}
-                href={`/trabajadores/${relacionId}?tab=${item.id}`}
-                className={
-                  active
-                    ? "rounded-md px-2 py-1 font-medium text-primary"
-                    : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
-                }
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-      ) : null}
+      <nav className="flex flex-wrap items-center gap-1 text-sm">
+        <Link
+          href={`/trabajadores/${relacionId}?tab=asistencia`}
+          className={
+            asistenciaActive
+              ? "rounded-md px-2 py-1 font-medium text-primary"
+              : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
+          }
+        >
+          Asistencia
+        </Link>
+        {esEstudio ? (
+          <>
+            <span className="mx-1 text-xs text-muted-foreground">Trámites del estudio</span>
+            {TRAMITES.map((item) => {
+              const active = tab === item.id;
+              return (
+                <Link
+                  key={item.id}
+                  href={`/trabajadores/${relacionId}?tab=${item.id}`}
+                  className={
+                    active
+                      ? "rounded-md px-2 py-1 font-medium text-primary"
+                      : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
+                  }
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </>
+        ) : null}
+      </nav>
     </div>
   );
 }
@@ -127,6 +140,7 @@ const TABS: FichaTab[] = [
   "pensiones",
   "t-registro",
   "vida-ley",
+  "asistencia",
 ];
 
 export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab {

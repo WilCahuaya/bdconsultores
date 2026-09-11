@@ -625,6 +625,7 @@ export async function setDocumentoArchivo(
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
+  revalidatePath("/asistencias");
   return {};
 }
 

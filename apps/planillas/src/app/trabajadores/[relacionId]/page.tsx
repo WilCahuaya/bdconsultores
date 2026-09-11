@@ -9,6 +9,7 @@ import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
+import { FichaAsistencia } from "@/components/ficha/FichaAsistencia";
 import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
 import {
   puedeEditarFichaLaboral,
@@ -168,6 +169,14 @@ export default async function FichaTrabajadorPage({
             documentoFactura={documentos.find((d) => d.tipo === "VIDA_LEY_FACTURA") ?? null}
             documentoComprobante={documentos.find((d) => d.tipo === "VIDA_LEY_COMPROBANTE") ?? null}
             canWrite={canWriteTramite}
+          />
+        ) : null}
+        {tab === "asistencia" ? (
+          <FichaAsistencia
+            relacionId={params.relacionId}
+            entidadId={trabajador.entidad_id}
+            documentos={documentos}
+            canWrite={canEditFicha}
           />
         ) : null}
         {continuar ? (
