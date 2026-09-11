@@ -2050,6 +2050,7 @@ export type TipoDocumentoPlanilla =
   | "VIDA_LEY"
   | "VIDA_LEY_CONSTANCIA"
   | "VIDA_LEY_FACTURA"
+  | "VIDA_LEY_COMPROBANTE"
   | "TRAMITE_AFP"
   | "OTRO";
 export type EstadoDocumentoPlanilla = "SI" | "NO" | "NA" | "PENDIENTE";

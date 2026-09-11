@@ -20,6 +20,8 @@ import {
   etiquetaCodigoOcupacion,
   formatFechaPlanilla,
   LEYENDA_CODIGO_OCUPACION,
+  montoAsignacionFamiliar,
+  remuneracionBruta,
 } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField } from "@/components/fields";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
@@ -143,7 +145,7 @@ export function FichaTRegistro({
         <div>
           <p className="text-sm font-medium">Datos para pegar en T-Registro</p>
           <p className="text-sm text-muted-foreground">
-            Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta.
+            Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta. La remuneración bruta es la remuneración más S/ 113 si tiene asignación familiar.
           </p>
         </div>
         <a
@@ -168,6 +170,14 @@ export function FichaTRegistro({
           />
           <DatoAlta label={etiquetaCodigoOcupacion(trabajador.cargo)} value={codigoOcupacion} />
           <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
+          <DatoAlta
+            label="Asignación familiar"
+            value={trabajador.recibe_asignacion_familiar === true ? remuneracionCopia(montoAsignacionFamiliar(true)) : ""}
+          />
+          <DatoAlta
+            label="Remuneración bruta"
+            value={remuneracionCopia(remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar))}
+          />
           <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
           <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
         </div>

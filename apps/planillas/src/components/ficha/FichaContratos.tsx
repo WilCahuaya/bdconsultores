@@ -14,7 +14,7 @@ import {
   type DocumentoRow,
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
-import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, formatRemuneracion, opcionesCargo } from "@/lib/planillas-labels";
+import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, formatRemuneracion, montoAsignacionFamiliar, opcionesCargo, remuneracionBruta } from "@/lib/planillas-labels";
 import { descargarContratoWord } from "@/lib/descargar-contrato-word";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
@@ -268,6 +268,7 @@ export function FichaContratos({
               <th className="px-4 py-2 font-medium">Fin contrato</th>
               <th className="px-4 py-2 font-medium">Estado</th>
               <th className="px-4 py-2 font-medium">Remuneración</th>
+              <th className="px-4 py-2 font-medium">Rem. bruta</th>
               <th className="px-4 py-2 font-medium">Guardado</th>
               <th className="px-4 py-2 font-medium">Acciones</th>
             </tr>
@@ -275,7 +276,7 @@ export function FichaContratos({
           <tbody>
             {contratos.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-muted-foreground" colSpan={7}>
+                <td className="px-4 py-6 text-muted-foreground" colSpan={8}>
                   Aún no hay contratos. Genere el Word para firmar.
                 </td>
               </tr>
@@ -287,6 +288,9 @@ export function FichaContratos({
                   <td className="px-4 py-2">{formatFechaPlanilla(c.fecha_fin)}</td>
                   <td className="px-4 py-2">{ESTADO_CONTRATO_LABEL[c.estado]}</td>
                   <td className="px-4 py-2">{formatRemuneracion(c.remuneracion)}</td>
+                  <td className="px-4 py-2">
+                    {formatRemuneracion(remuneracionBruta(c.remuneracion, trabajador.recibe_asignacion_familiar))}
+                  </td>
                   <td className="px-4 py-2">{c.datos_confirmados ? "Sí" : "No"}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap gap-2">
@@ -371,6 +375,13 @@ function DatosContratoFields({
   contrato: ContratoRow | null;
 }) {
   const [jornada, setJornada] = useState(contrato?.jornada ?? trabajador.jornada ?? "");
+  const [remuneracion, setRemuneracion] = useState(
+    String(contrato?.remuneracion ?? trabajador.remuneracion ?? ""),
+  );
+  const remNum = Number(remuneracion);
+  const remValida = remuneracion.trim() !== "" && Number.isFinite(remNum);
+  const asignacion = montoAsignacionFamiliar(trabajador.recibe_asignacion_familiar);
+  const bruta = remValida ? remuneracionBruta(remNum, trabajador.recibe_asignacion_familiar) : null;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <SelectField
@@ -398,7 +409,26 @@ function DatosContratoFields({
         label="Remuneración"
         name="remuneracion"
         type="number"
-        defaultValue={contrato?.remuneracion ?? trabajador.remuneracion ?? ""}
+        value={remuneracion}
+        onChange={(event) => setRemuneracion(event.target.value)}
+      />
+      <Field
+        label="Asignación familiar"
+        name="asignacion_familiar_vista"
+        readOnly
+        value={
+          trabajador.recibe_asignacion_familiar === true
+            ? formatRemuneracion(asignacion)
+            : trabajador.recibe_asignacion_familiar === false
+              ? "No corresponde"
+              : "Indíquelo en la ficha"
+        }
+      />
+      <Field
+        label="Remuneración bruta"
+        name="remuneracion_bruta_vista"
+        readOnly
+        value={bruta == null ? "" : formatRemuneracion(bruta)}
       />
       <HorarioLaboralField jornada={jornada} defaultValue={contrato?.horario ?? trabajador.horario} />
     </div>

@@ -344,7 +344,7 @@ function CapturaFicha({
             allowEmpty
             disabled={!canWrite}
             options={[
-              { value: "si", label: "Sí" },
+              { value: "si", label: "Sí · S/ 113.00" },
               { value: "no", label: "No" },
             ]}
             onChange={(event) => setRecibe(event.target.value)}

@@ -12,7 +12,9 @@ import {
   JORNADA_LABEL,
   formatFechaPlanilla,
   formatRemuneracion,
+  montoAsignacionFamiliar,
   nombreCompleto,
+  remuneracionBruta,
 } from "@/lib/planillas-labels";
 
 export default async function ContratoDocumentoPage({
@@ -89,6 +91,18 @@ export default async function ContratoDocumentoPage({
         <p>Inicio de contrato: {formatFechaPlanilla(contrato.fecha_inicio)}</p>
         <p>Fin de contrato: {formatFechaPlanilla(contrato.fecha_fin)}</p>
         <p>Remuneración: {formatRemuneracion(contrato.remuneracion)}</p>
+        <p>
+          Asignación familiar:{" "}
+          {trabajador.recibe_asignacion_familiar === true
+            ? formatRemuneracion(montoAsignacionFamiliar(true))
+            : trabajador.recibe_asignacion_familiar === false
+              ? "No corresponde"
+              : "Aún no indicado"}
+        </p>
+        <p>
+          Remuneración bruta:{" "}
+          {formatRemuneracion(remuneracionBruta(contrato.remuneracion, trabajador.recibe_asignacion_familiar))}
+        </p>
       </section>
       {funciones.length > 0 ? (
         <section className="space-y-2 text-sm">

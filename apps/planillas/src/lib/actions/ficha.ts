@@ -14,7 +14,7 @@ import { TIPOS_DOCUMENTO_ALTA_INICIALES } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
-import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
+import { parseFechaCampo, parseCargoCampo, armarDireccionPersona, montoAsignacionFamiliar } from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { fechaFinPeriodoVidaLey } from "@/lib/vida-ley-word";
 import { planillasDb } from "@/lib/supabase/planillas";
@@ -173,6 +173,7 @@ export async function generarContratoParaFirma(
   const parsed = parseSnapshotContrato(formData, gate.trabajador.cargo);
   if (parsed.error || !parsed.value) return { error: parsed.error ?? "Datos incompletos." };
   const snapshot = parsed.value;
+  const asignacionFamiliar = montoAsignacionFamiliar(gate.trabajador.recibe_asignacion_familiar);
 
   const db = await planillasDb();
   const { data: existentes, error: listError } = await db
@@ -195,6 +196,7 @@ export async function generarContratoParaFirma(
     fecha_inicio: snapshot.fecha_inicio,
     fecha_fin: snapshot.fecha_fin,
     remuneracion: snapshot.remuneracion,
+    asignacion_familiar: asignacionFamiliar,
     datos_confirmados: false,
     es_vigente: false,
   };
@@ -219,7 +221,6 @@ export async function generarContratoParaFirma(
         relacion_id: relacionId,
         version,
         numero_contrato: null,
-        asignacion_familiar: null,
         estado: "PENDIENTE_DOCS" as EstadoContratoPlanilla,
         ...campos,
       })
@@ -317,6 +318,7 @@ export async function confirmarContratoFirmado(
       fecha_inicio: snapshot.fecha_inicio,
       fecha_fin: snapshot.fecha_fin,
       remuneracion: snapshot.remuneracion,
+      asignacion_familiar: montoAsignacionFamiliar(gate.trabajador.recibe_asignacion_familiar),
       datos_confirmados: true,
       es_vigente: true,
     })
@@ -423,13 +425,19 @@ export async function asegurarDocumentosVidaLey(relacionId: string): Promise<voi
   await asegurarDocumentoTramite(relacionId, "VIDA_LEY");
   await asegurarDocumentoTramite(relacionId, "VIDA_LEY_CONSTANCIA");
   await asegurarDocumentoTramite(relacionId, "VIDA_LEY_FACTURA");
+  await asegurarDocumentoTramite(relacionId, "VIDA_LEY_COMPROBANTE");
 }
 
 async function asegurarDocumentoTramite(
   relacionId: string,
   tipo: Extract<
     TipoDocumentoPlanilla,
-    "TRAMITE_AFP" | "TR_ALTA" | "VIDA_LEY" | "VIDA_LEY_CONSTANCIA" | "VIDA_LEY_FACTURA"
+    | "TRAMITE_AFP"
+    | "TR_ALTA"
+    | "VIDA_LEY"
+    | "VIDA_LEY_CONSTANCIA"
+    | "VIDA_LEY_FACTURA"
+    | "VIDA_LEY_COMPROBANTE"
   >,
 ): Promise<void> {
   const gate = await assertEscrituraTramite(relacionId);
@@ -682,15 +690,21 @@ export async function saveVidaLey(relacionId: string, formData: FormData): Promi
   if (fechaInicio.error) return { error: fechaInicio.error };
   const fechaFin = parseFechaCampo(String(formData.get("fecha_fin") ?? ""), "Fecha de fin");
   if (fechaFin.error) return { error: fechaFin.error };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("vida_ley")
+    .select("estado")
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
   const payload = {
     relacion_id: relacionId,
     entidad_id: gate.trabajador.entidad_id,
-    estado: String(formData.get("estado") ?? "").trim() || null,
+    estado: actual?.estado ?? null,
     numero_poliza: String(formData.get("numero_poliza") ?? "").trim() || null,
     fecha_inicio: fechaInicio.value,
     fecha_fin: fechaFin.value,
   };
-  const db = await planillasDb();
   const { error } = await db.from("vida_ley").upsert(payload, { onConflict: "relacion_id" });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
@@ -727,21 +741,26 @@ export async function marcarDocumentoNoAplica(
   return {};
 }
 
-export async function marcarVidaLeyTramitado(relacionId: string): Promise<{ error?: string }> {
+export async function setEstadoVidaLey(
+  relacionId: string,
+  estado: "Recepcionado" | "Registrado",
+): Promise<{ error?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
   const db = await planillasDb();
   const { data: actual, error: loadError } = await db
     .from("vida_ley")
-    .select("numero_poliza, fecha_inicio, fecha_fin")
+    .select("estado, numero_poliza, fecha_inicio, fecha_fin")
     .eq("relacion_id", relacionId)
     .maybeSingle();
   if (loadError) return { error: loadError.message };
+  const estadoActual = actual?.estado?.trim() ?? "";
+  if (estado === "Recepcionado" && estadoActual === "Registrado") return {};
   const { error } = await db.from("vida_ley").upsert(
     {
       relacion_id: relacionId,
       entidad_id: gate.trabajador.entidad_id,
-      estado: "Tramitado",
+      estado,
       numero_poliza: actual?.numero_poliza ?? null,
       fecha_inicio: actual?.fecha_inicio ?? null,
       fecha_fin: actual?.fecha_fin ?? null,
@@ -786,7 +805,7 @@ async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promi
   const ids = trabajadores.map((t) => t.id);
   const { data: existentes, error: loadError } = await db
     .from("vida_ley")
-    .select("relacion_id, numero_poliza, fecha_inicio, fecha_fin")
+    .select("relacion_id, estado, numero_poliza, fecha_inicio, fecha_fin")
     .in("relacion_id", ids);
   if (loadError) return { error: loadError.message };
   const actualPorId = new Map((existentes ?? []).map((row) => [row.relacion_id as string, row]));
@@ -794,10 +813,11 @@ async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promi
   const payload = trabajadores.map((t) => {
     const actual = actualPorId.get(t.id);
     const inicio = actual?.fecha_inicio ?? t.fecha_ingreso ?? hoy;
+    const estadoActual = String(actual?.estado ?? "").trim();
     return {
       relacion_id: t.id,
       entidad_id: t.entidad_id,
-      estado: "Elaborado",
+      estado: estadoActual || "Elaborado",
       numero_poliza: actual?.numero_poliza ?? null,
       fecha_inicio: inicio,
       fecha_fin: actual?.fecha_fin ?? fechaFinPeriodoVidaLey(t.fecha_ingreso ?? inicio),

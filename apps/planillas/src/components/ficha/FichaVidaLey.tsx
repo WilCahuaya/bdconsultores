@@ -7,15 +7,15 @@ import { panelCardClass } from "@inventario/ui/panel";
 import {
   generarVidaLey,
   marcarDocumentoNoAplica,
-  marcarVidaLeyTramitado,
   saveVidaLey,
   setDocumentoArchivo,
+  setEstadoVidaLey,
   type DocumentoRow,
   type VidaLeyRow,
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
-import { Field, DateField, SelectField } from "@/components/fields";
-import { opcionesEstadoVidaLey, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import { Field, DateField } from "@/components/fields";
+import { etiquetaEstadoVidaLey, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
@@ -28,6 +28,7 @@ export function FichaVidaLey({
   documentoCertificado,
   documentoConstancia,
   documentoFactura,
+  documentoComprobante,
   canWrite,
 }: {
   relacionId: string;
@@ -36,6 +37,7 @@ export function FichaVidaLey({
   documentoCertificado: DocumentoRow | null;
   documentoConstancia: DocumentoRow | null;
   documentoFactura: DocumentoRow | null;
+  documentoComprobante: DocumentoRow | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -43,10 +45,12 @@ export function FichaVidaLey({
   const [pending, setPending] = useState(false);
   const [generando, setGenerando] = useState(false);
   const [guardandoDocs, setGuardandoDocs] = useState(false);
+  const [guardandoComprobante, setGuardandoComprobante] = useState(false);
   const [marcandoFactura, setMarcandoFactura] = useState(false);
   const [fileCertificado, setFileCertificado] = useState<File | null>(null);
   const [fileConstancia, setFileConstancia] = useState<File | null>(null);
   const [fileFactura, setFileFactura] = useState<File | null>(null);
+  const [fileComprobante, setFileComprobante] = useState<File | null>(null);
 
   async function onGenerar() {
     setGenerando(true);
@@ -74,7 +78,7 @@ export function FichaVidaLey({
       pushToast(result.error, "error");
       return;
     }
-    pushToast("Vida Ley guardada.");
+    pushToast("Datos de Vida Ley guardados.");
     router.refresh();
   }
 
@@ -127,19 +131,45 @@ export function FichaVidaLey({
       pushToast(errorFactura, "error");
       return;
     }
-    if (fileCertificado) {
-      const tramitado = await marcarVidaLeyTramitado(relacionId);
-      if (tramitado.error) {
-        setGuardandoDocs(false);
-        pushToast(tramitado.error, "error");
-        return;
-      }
+    const recepcionado = await setEstadoVidaLey(relacionId, "Recepcionado");
+    if (recepcionado.error) {
+      setGuardandoDocs(false);
+      pushToast(recepcionado.error, "error");
+      return;
     }
     setFileCertificado(null);
     setFileConstancia(null);
     setFileFactura(null);
     setGuardandoDocs(false);
-    pushToast("Documentos de la aseguradora guardados.");
+    pushToast("Documentos recepcionados.");
+    router.refresh();
+  }
+
+  async function onGuardarComprobante() {
+    if (!fileComprobante && !documentoComprobante?.storage_path) {
+      pushToast("Suba el comprobante de envío.", "error");
+      return;
+    }
+    setGuardandoComprobante(true);
+    const errorComprobante = await subirAdjunto(
+      fileComprobante,
+      documentoComprobante,
+      TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE,
+    );
+    if (errorComprobante) {
+      setGuardandoComprobante(false);
+      pushToast(errorComprobante, "error");
+      return;
+    }
+    const registrado = await setEstadoVidaLey(relacionId, "Registrado");
+    if (registrado.error) {
+      setGuardandoComprobante(false);
+      pushToast(registrado.error, "error");
+      return;
+    }
+    setFileComprobante(null);
+    setGuardandoComprobante(false);
+    pushToast("Vida Ley registrada.");
     router.refresh();
   }
 
@@ -159,8 +189,9 @@ export function FichaVidaLey({
     router.refresh();
   }
 
-  const ocupado = pending || generando || guardandoDocs || marcandoFactura;
+  const ocupado = pending || generando || guardandoDocs || guardandoComprobante || marcandoFactura;
   const facturaNoEnviada = documentoFactura?.estado === "NA" && !documentoFactura.storage_path && !fileFactura;
+  const yaGenerado = Boolean(vidaLey?.estado);
 
   return (
     <div className="space-y-4">
@@ -174,27 +205,33 @@ export function FichaVidaLey({
         </div>
         {canWrite ? (
           <Button type="button" disabled={ocupado} onClick={() => void onGenerar()}>
-            {generando ? "Generando…" : vidaLey?.estado === "Elaborado" ? "Descargar Word" : "Generar Word"}
+            {generando ? "Generando…" : yaGenerado ? "Descargar Word" : "Generar Word"}
           </Button>
         ) : null}
       </section>
       <form action={onSubmit} className={`${panelCardClass} space-y-4 p-5`}>
+        <p className="text-sm">
+          <span className="text-muted-foreground">Estado: </span>
+          <span className="font-medium">{etiquetaEstadoVidaLey(vidaLey?.estado)}</span>
+        </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
-            label="Estado"
-            name="estado"
-            defaultValue={vidaLey?.estado}
-            allowEmpty
-            disabled={!canWrite}
-            options={opcionesEstadoVidaLey(vidaLey?.estado)}
+          <Field label="Póliza" name="numero_poliza" defaultValue={vidaLey?.numero_poliza} readOnly={!canWrite} />
+          <DateField
+            label="Inicio del seguro"
+            name="fecha_inicio"
+            defaultValue={vidaLey?.fecha_inicio}
+            readOnly={!canWrite}
           />
-          <Field label="N° póliza" name="numero_poliza" defaultValue={vidaLey?.numero_poliza} readOnly={!canWrite} />
-          <DateField label="Inicio" name="fecha_inicio" defaultValue={vidaLey?.fecha_inicio} readOnly={!canWrite} />
-          <DateField label="Fin" name="fecha_fin" defaultValue={vidaLey?.fecha_fin} readOnly={!canWrite} />
+          <DateField
+            label="Fin del seguro"
+            name="fecha_fin"
+            defaultValue={vidaLey?.fecha_fin}
+            readOnly={!canWrite}
+          />
         </div>
         {canWrite ? (
           <Button type="submit" disabled={ocupado}>
-            {pending ? "Guardando…" : "Guardar Vida Ley"}
+            {pending ? "Guardando…" : "Guardar datos de Vida Ley"}
           </Button>
         ) : (
           <p className="text-sm text-muted-foreground">Solo consulta.</p>
@@ -204,7 +241,8 @@ export function FichaVidaLey({
         <div className={`${panelCardClass} space-y-1 p-5`}>
           <p className="text-sm font-medium">Respuesta de la aseguradora</p>
           <p className="text-sm text-muted-foreground">
-            Guarde la constancia de asegurados, el certificado de este trabajador y, si llega, la factura electrónica.
+            Guarde la constancia de asegurados, el certificado de este trabajador y, si llega, la factura electrónica. Al
+            guardar, el estado pasa a Recepcionado.
           </p>
         </div>
         <DocumentoPrevisualizacion
@@ -292,6 +330,41 @@ export function FichaVidaLey({
         {canWrite ? (
           <Button type="button" disabled={ocupado} onClick={() => void onGuardarRespuesta()}>
             {guardandoDocs ? "Guardando…" : "Guardar documentos de la aseguradora"}
+          </Button>
+        ) : null}
+      </section>
+      <section className="space-y-4">
+        <div className={`${panelCardClass} space-y-1 p-5`}>
+          <p className="text-sm font-medium">Registro de Vida Ley</p>
+          <p className="text-sm text-muted-foreground">
+            Después de tramitar Vida Ley, suba el comprobante de envío. Al guardar, el estado pasa a Registrado.
+          </p>
+        </div>
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE}
+          storagePath={fileComprobante ? null : documentoComprobante?.storage_path}
+          file={fileComprobante}
+          vacio="Suba el comprobante de envío."
+          extra={
+            canWrite ? (
+              <FileInput
+                accept={DOCUMENTO_ACCEPT}
+                disabled={ocupado}
+                file={fileComprobante}
+                buttonLabel={
+                  fileComprobante || documentoComprobante?.storage_path
+                    ? "Cambiar comprobante de envío"
+                    : "Subir comprobante de envío"
+                }
+                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                onFileChange={setFileComprobante}
+              />
+            ) : null
+          }
+        />
+        {canWrite ? (
+          <Button type="button" disabled={ocupado} onClick={() => void onGuardarComprobante()}>
+            {guardandoComprobante ? "Guardando…" : "Guardar comprobante de envío"}
           </Button>
         ) : null}
       </section>

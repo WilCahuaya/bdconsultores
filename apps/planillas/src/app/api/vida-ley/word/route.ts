@@ -4,6 +4,7 @@ import { listTrabajadoresSinVidaLey } from "@/lib/actions/ficha";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { getProfile } from "@/lib/auth/profile";
 import { puedeEscribirPlanillas } from "@/lib/auth/access";
+import { remuneracionBruta } from "@/lib/planillas-labels";
 import {
   bufferVidaLeyWord,
   nombreArchivoVidaLey,
@@ -21,7 +22,7 @@ function filaDe(t: TrabajadorListItem): VidaLeyTrabajadorWord {
     apellidoMaterno: t.persona.apellido_materno,
     dni: t.persona.dni,
     fechaIngreso: t.fecha_ingreso,
-    remuneracion: t.remuneracion,
+    remuneracion: remuneracionBruta(t.remuneracion, t.recibe_asignacion_familiar),
     cargo: t.cargo,
     fechaNacimiento: t.persona.fecha_nacimiento,
   };

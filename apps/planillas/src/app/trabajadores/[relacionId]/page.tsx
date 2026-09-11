@@ -166,6 +166,7 @@ export default async function FichaTrabajadorPage({
             documentoCertificado={documentos.find((d) => d.tipo === "VIDA_LEY") ?? null}
             documentoConstancia={documentos.find((d) => d.tipo === "VIDA_LEY_CONSTANCIA") ?? null}
             documentoFactura={documentos.find((d) => d.tipo === "VIDA_LEY_FACTURA") ?? null}
+            documentoComprobante={documentos.find((d) => d.tipo === "VIDA_LEY_COMPROBANTE") ?? null}
             canWrite={canWriteTramite}
           />
         ) : null}

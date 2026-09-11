@@ -14,6 +14,8 @@ import {
   JORNADA_LABEL,
   cargoCanonico,
   formatFechaPlanilla,
+  formatRemuneracion,
+  montoAsignacionFamiliar,
   opcionesCargo,
 } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
@@ -62,7 +64,7 @@ export function FichaPersonaForm({
             name="recibe_asignacion_familiar_vista"
             defaultValue={
               trabajador.recibe_asignacion_familiar === true
-                ? "Sí"
+                ? `Sí · S/ ${formatRemuneracion(montoAsignacionFamiliar(true))}`
                 : trabajador.recibe_asignacion_familiar === false
                   ? "No"
                   : "Aún no indicado en la ficha"

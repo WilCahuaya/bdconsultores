@@ -205,32 +205,25 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
             detalle: "Vida Ley sin estado",
             tab: "vida-ley",
           });
-        } else if (estadoVida === "Elaborado") {
+        } else if (estadoVida === "Elaborado" || estadoVida === "Enviado") {
           items.push({
             ...base,
-            id: `${relacion.id}:vidaley:enviar`,
+            id: `${relacion.id}:vidaley:docs`,
             tipo: "vida-ley",
-            detalle: "Vida Ley elaborado: falta enviar a la aseguradora",
+            detalle: "Falta documentos de la aseguradora",
             tab: "vida-ley",
           });
-        } else if (estadoVida === "Enviado") {
-          const certificado = documentos.find((d) => d.tipo === "VIDA_LEY");
-          const constancia = documentos.find((d) => d.tipo === "VIDA_LEY_CONSTANCIA");
-          if (!certificado || DOC_PENDIENTE.has(certificado.estado as EstadoDocumentoPlanilla)) {
+        } else if (
+          estadoVida === "Recepcionado" ||
+          estadoVida === "Tramitado"
+        ) {
+          const comprobante = documentos.find((d) => d.tipo === "VIDA_LEY_COMPROBANTE");
+          if (!comprobante || DOC_PENDIENTE.has(comprobante.estado as EstadoDocumentoPlanilla)) {
             items.push({
               ...base,
-              id: `${relacion.id}:vidaley:certificado`,
+              id: `${relacion.id}:vidaley:comprobante`,
               tipo: "vida-ley",
-              detalle: "Falta certificado de seguro Vida Ley",
-              tab: "vida-ley",
-            });
-          }
-          if (!constancia || DOC_PENDIENTE.has(constancia.estado as EstadoDocumentoPlanilla)) {
-            items.push({
-              ...base,
-              id: `${relacion.id}:vidaley:constancia`,
-              tipo: "vida-ley",
-              detalle: "Falta constancia de asegurados",
+              detalle: "Falta comprobante de envío de Vida Ley",
               tab: "vida-ley",
             });
           }
@@ -268,7 +261,8 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
           tipo === "TR_BAJA" ||
           tipo === "VIDA_LEY" ||
           tipo === "VIDA_LEY_CONSTANCIA" ||
-          tipo === "VIDA_LEY_FACTURA"
+          tipo === "VIDA_LEY_FACTURA" ||
+          tipo === "VIDA_LEY_COMPROBANTE"
         ) {
           continue;
         }

@@ -89,6 +89,7 @@ export const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoPlanilla, string> = {
   VIDA_LEY: "Certificado de seguro Vida Ley",
   VIDA_LEY_CONSTANCIA: "Constancia de asegurados",
   VIDA_LEY_FACTURA: "Factura electrónica Vida Ley",
+  VIDA_LEY_COMPROBANTE: "Comprobante de envío Vida Ley",
   TRAMITE_AFP: "Documento de alta AFP",
   OTRO: "Otro",
 };
@@ -176,11 +177,27 @@ export const TIPO_T_REGISTRO_LABEL: Record<TipoTRegistro, string> = {
   BAJA: "Baja",
 };
 
-export const VIDA_LEY_ESTADOS = ["Elaborado", "Enviado", "Tramitado"] as const;
+export const VIDA_LEY_ESTADOS = ["Elaborado", "Enviado", "Recepcionado", "Registrado"] as const;
 export type VidaLeyEstado = (typeof VIDA_LEY_ESTADOS)[number];
 
+export const VIDA_LEY_ESTADO_LABEL: Record<VidaLeyEstado, string> = {
+  Elaborado: "Elaborado",
+  Enviado: "Enviado",
+  Recepcionado: "Recepcionado",
+  Registrado: "Registrado",
+};
+
+export function etiquetaEstadoVidaLey(estado?: string | null): string {
+  const value = estado?.trim();
+  if (!value) return "Sin estado";
+  if (VIDA_LEY_ESTADOS.includes(value as VidaLeyEstado)) {
+    return VIDA_LEY_ESTADO_LABEL[value as VidaLeyEstado];
+  }
+  return value;
+}
+
 export function opcionesEstadoVidaLey(actual?: string | null): { value: string; label: string }[] {
-  const options = VIDA_LEY_ESTADOS.map((estado) => ({ value: estado, label: estado }));
+  const options = VIDA_LEY_ESTADOS.map((estado) => ({ value: estado, label: VIDA_LEY_ESTADO_LABEL[estado] }));
   const extra = actual?.trim();
   if (extra && !VIDA_LEY_ESTADOS.includes(extra as VidaLeyEstado)) {
     return [{ value: extra, label: extra }, ...options];
@@ -254,4 +271,19 @@ export function formatRemuneracion(value: number | null | undefined): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+/** 10 % de la RMV vigente. */
+export const ASIGNACION_FAMILIAR_SOLES = 113;
+
+export function montoAsignacionFamiliar(recibe: boolean | null | undefined): number {
+  return recibe === true ? ASIGNACION_FAMILIAR_SOLES : 0;
+}
+
+export function remuneracionBruta(
+  remuneracion: number | null | undefined,
+  recibeAsignacion: boolean | null | undefined,
+): number | null {
+  if (remuneracion == null || Number.isNaN(Number(remuneracion))) return null;
+  return Number(remuneracion) + montoAsignacionFamiliar(recibeAsignacion);
 }
