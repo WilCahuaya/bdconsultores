@@ -196,7 +196,8 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
           tab: "vida-ley",
         });
       } else {
-        if (!vidaLey.estado?.trim()) {
+        const estadoVida = vidaLey.estado?.trim();
+        if (!estadoVida) {
           items.push({
             ...base,
             id: `${relacion.id}:vidaley:estado`,
@@ -204,6 +205,35 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
             detalle: "Vida Ley sin estado",
             tab: "vida-ley",
           });
+        } else if (estadoVida === "Elaborado") {
+          items.push({
+            ...base,
+            id: `${relacion.id}:vidaley:enviar`,
+            tipo: "vida-ley",
+            detalle: "Vida Ley elaborado: falta enviar a la aseguradora",
+            tab: "vida-ley",
+          });
+        } else if (estadoVida === "Enviado") {
+          const certificado = documentos.find((d) => d.tipo === "VIDA_LEY");
+          const constancia = documentos.find((d) => d.tipo === "VIDA_LEY_CONSTANCIA");
+          if (!certificado || DOC_PENDIENTE.has(certificado.estado as EstadoDocumentoPlanilla)) {
+            items.push({
+              ...base,
+              id: `${relacion.id}:vidaley:certificado`,
+              tipo: "vida-ley",
+              detalle: "Falta certificado de seguro Vida Ley",
+              tab: "vida-ley",
+            });
+          }
+          if (!constancia || DOC_PENDIENTE.has(constancia.estado as EstadoDocumentoPlanilla)) {
+            items.push({
+              ...base,
+              id: `${relacion.id}:vidaley:constancia`,
+              tipo: "vida-ley",
+              detalle: "Falta constancia de asegurados",
+              tab: "vida-ley",
+            });
+          }
         }
         if (!vidaLey.fecha_fin) {
           items.push({
@@ -232,7 +262,16 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
         const estado = doc.estado as EstadoDocumentoPlanilla;
         if (!DOC_PENDIENTE.has(estado)) continue;
         const tipo = doc.tipo as TipoDocumentoPlanilla;
-        if (tipo === "TRAMITE_AFP" || tipo === "TR_ALTA" || tipo === "TR_BAJA") continue;
+        if (
+          tipo === "TRAMITE_AFP" ||
+          tipo === "TR_ALTA" ||
+          tipo === "TR_BAJA" ||
+          tipo === "VIDA_LEY" ||
+          tipo === "VIDA_LEY_CONSTANCIA" ||
+          tipo === "VIDA_LEY_FACTURA"
+        ) {
+          continue;
+        }
         items.push({
           ...base,
           id: `${relacion.id}:doc:${doc.id}`,

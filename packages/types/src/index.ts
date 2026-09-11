@@ -2048,6 +2048,8 @@ export type TipoDocumentoPlanilla =
   | "TR_BAJA"
   | "CARTA_RENUNCIA"
   | "VIDA_LEY"
+  | "VIDA_LEY_CONSTANCIA"
+  | "VIDA_LEY_FACTURA"
   | "TRAMITE_AFP"
   | "OTRO";
 export type EstadoDocumentoPlanilla = "SI" | "NO" | "NA" | "PENDIENTE";

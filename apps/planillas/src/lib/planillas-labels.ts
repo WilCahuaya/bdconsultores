@@ -86,7 +86,9 @@ export const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoPlanilla, string> = {
   TR_ALTA: "T-Registro alta",
   TR_BAJA: "T-Registro baja",
   CARTA_RENUNCIA: "Carta de renuncia",
-  VIDA_LEY: "Vida Ley",
+  VIDA_LEY: "Certificado de seguro Vida Ley",
+  VIDA_LEY_CONSTANCIA: "Constancia de asegurados",
+  VIDA_LEY_FACTURA: "Factura electrónica Vida Ley",
   TRAMITE_AFP: "Documento de alta AFP",
   OTRO: "Otro",
 };

@@ -2,29 +2,51 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, useToast } from "@inventario/ui";
+import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
-import { generarVidaLey, saveVidaLey, type VidaLeyRow } from "@/lib/actions/ficha";
+import {
+  generarVidaLey,
+  marcarDocumentoNoAplica,
+  marcarVidaLeyTramitado,
+  saveVidaLey,
+  setDocumentoArchivo,
+  type DocumentoRow,
+  type VidaLeyRow,
+} from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { Field, DateField, SelectField } from "@/components/fields";
-import { opcionesEstadoVidaLey } from "@/lib/planillas-labels";
+import { opcionesEstadoVidaLey, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
+import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
+import { uploadDocumentoFile } from "@/lib/upload-documento";
 
 export function FichaVidaLey({
   relacionId,
   trabajador,
   vidaLey,
+  documentoCertificado,
+  documentoConstancia,
+  documentoFactura,
   canWrite,
 }: {
   relacionId: string;
   trabajador: TrabajadorListItem;
   vidaLey: VidaLeyRow | null;
+  documentoCertificado: DocumentoRow | null;
+  documentoConstancia: DocumentoRow | null;
+  documentoFactura: DocumentoRow | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
   const [generando, setGenerando] = useState(false);
+  const [guardandoDocs, setGuardandoDocs] = useState(false);
+  const [marcandoFactura, setMarcandoFactura] = useState(false);
+  const [fileCertificado, setFileCertificado] = useState<File | null>(null);
+  const [fileConstancia, setFileConstancia] = useState<File | null>(null);
+  const [fileFactura, setFileFactura] = useState<File | null>(null);
 
   async function onGenerar() {
     setGenerando(true);
@@ -56,6 +78,90 @@ export function FichaVidaLey({
     router.refresh();
   }
 
+  async function subirAdjunto(file: File | null, documento: DocumentoRow | null, etiqueta: string) {
+    if (!file) return null;
+    if (!documento) return `No se pudo registrar ${etiqueta}. Recargue la página.`;
+    const upload = await uploadDocumentoFile(
+      trabajador.entidad_id,
+      relacionId,
+      documento.id,
+      file,
+      documento.storage_path,
+    );
+    if (upload.error || !upload.path) {
+      return upload.error ?? `No se pudo subir ${etiqueta}.`;
+    }
+    const saved = await setDocumentoArchivo(relacionId, documento.id, upload.path);
+    return saved.error ?? null;
+  }
+
+  async function onGuardarRespuesta() {
+    if (!fileCertificado && !fileConstancia && !fileFactura) {
+      pushToast("Elija al menos un archivo para guardar.", "error");
+      return;
+    }
+    setGuardandoDocs(true);
+    const errorConstancia = await subirAdjunto(
+      fileConstancia,
+      documentoConstancia,
+      TIPO_DOCUMENTO_LABEL.VIDA_LEY_CONSTANCIA,
+    );
+    if (errorConstancia) {
+      setGuardandoDocs(false);
+      pushToast(errorConstancia, "error");
+      return;
+    }
+    const errorCertificado = await subirAdjunto(
+      fileCertificado,
+      documentoCertificado,
+      TIPO_DOCUMENTO_LABEL.VIDA_LEY,
+    );
+    if (errorCertificado) {
+      setGuardandoDocs(false);
+      pushToast(errorCertificado, "error");
+      return;
+    }
+    const errorFactura = await subirAdjunto(fileFactura, documentoFactura, TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA);
+    if (errorFactura) {
+      setGuardandoDocs(false);
+      pushToast(errorFactura, "error");
+      return;
+    }
+    if (fileCertificado) {
+      const tramitado = await marcarVidaLeyTramitado(relacionId);
+      if (tramitado.error) {
+        setGuardandoDocs(false);
+        pushToast(tramitado.error, "error");
+        return;
+      }
+    }
+    setFileCertificado(null);
+    setFileConstancia(null);
+    setFileFactura(null);
+    setGuardandoDocs(false);
+    pushToast("Documentos de la aseguradora guardados.");
+    router.refresh();
+  }
+
+  async function onNoEnviaronFactura() {
+    if (!documentoFactura) {
+      pushToast("No se pudo registrar la factura. Recargue la página.", "error");
+      return;
+    }
+    setMarcandoFactura(true);
+    const result = await marcarDocumentoNoAplica(relacionId, documentoFactura.id);
+    setMarcandoFactura(false);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    pushToast("Factura marcada como no enviada.");
+    router.refresh();
+  }
+
+  const ocupado = pending || generando || guardandoDocs || marcandoFactura;
+  const facturaNoEnviada = documentoFactura?.estado === "NA" && !documentoFactura.storage_path && !fileFactura;
+
   return (
     <div className="space-y-4">
       <section className={`${panelCardClass} space-y-3 p-5`}>
@@ -67,7 +173,7 @@ export function FichaVidaLey({
           </p>
         </div>
         {canWrite ? (
-          <Button type="button" disabled={generando} onClick={() => void onGenerar()}>
+          <Button type="button" disabled={ocupado} onClick={() => void onGenerar()}>
             {generando ? "Generando…" : vidaLey?.estado === "Elaborado" ? "Descargar Word" : "Generar Word"}
           </Button>
         ) : null}
@@ -87,13 +193,108 @@ export function FichaVidaLey({
           <DateField label="Fin" name="fecha_fin" defaultValue={vidaLey?.fecha_fin} readOnly={!canWrite} />
         </div>
         {canWrite ? (
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={ocupado}>
             {pending ? "Guardando…" : "Guardar Vida Ley"}
           </Button>
         ) : (
           <p className="text-sm text-muted-foreground">Solo consulta.</p>
         )}
       </form>
+      <section className="space-y-4">
+        <div className={`${panelCardClass} space-y-1 p-5`}>
+          <p className="text-sm font-medium">Respuesta de la aseguradora</p>
+          <p className="text-sm text-muted-foreground">
+            Guarde la constancia de asegurados, el certificado de este trabajador y, si llega, la factura electrónica.
+          </p>
+        </div>
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_CONSTANCIA}
+          storagePath={fileConstancia ? null : documentoConstancia?.storage_path}
+          file={fileConstancia}
+          vacio="Suba la constancia con la lista de asegurados."
+          extra={
+            canWrite ? (
+              <FileInput
+                accept={DOCUMENTO_ACCEPT}
+                disabled={ocupado}
+                file={fileConstancia}
+                buttonLabel={
+                  fileConstancia || documentoConstancia?.storage_path
+                    ? "Cambiar constancia de asegurados"
+                    : "Subir constancia de asegurados"
+                }
+                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                onFileChange={setFileConstancia}
+              />
+            ) : null
+          }
+        />
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY}
+          storagePath={fileCertificado ? null : documentoCertificado?.storage_path}
+          file={fileCertificado}
+          vacio="Suba el certificado de seguro Vida Ley de este trabajador."
+          extra={
+            canWrite ? (
+              <FileInput
+                accept={DOCUMENTO_ACCEPT}
+                disabled={ocupado}
+                file={fileCertificado}
+                buttonLabel={
+                  fileCertificado || documentoCertificado?.storage_path
+                    ? "Cambiar certificado de seguro"
+                    : "Subir certificado de seguro"
+                }
+                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                onFileChange={setFileCertificado}
+              />
+            ) : null
+          }
+        />
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA}
+          storagePath={fileFactura ? null : documentoFactura?.storage_path}
+          file={fileFactura}
+          vacio={
+            facturaNoEnviada
+              ? "Marcaste que no enviaron factura. Si llega después, súbala aquí."
+              : "Suba la factura electrónica si la enviaron."
+          }
+          extra={
+            canWrite ? (
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <FileInput
+                  accept={DOCUMENTO_ACCEPT}
+                  disabled={ocupado}
+                  file={fileFactura}
+                  buttonLabel={
+                    fileFactura || documentoFactura?.storage_path
+                      ? "Cambiar factura electrónica"
+                      : "Subir factura electrónica"
+                  }
+                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  onFileChange={setFileFactura}
+                />
+                {documentoFactura && documentoFactura.estado !== "NA" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={ocupado}
+                    onClick={() => void onNoEnviaronFactura()}
+                  >
+                    {marcandoFactura ? "Guardando…" : "No enviaron factura"}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null
+          }
+        />
+        {canWrite ? (
+          <Button type="button" disabled={ocupado} onClick={() => void onGuardarRespuesta()}>
+            {guardandoDocs ? "Guardando…" : "Guardar documentos de la aseguradora"}
+          </Button>
+        ) : null}
+      </section>
     </div>
   );
 }

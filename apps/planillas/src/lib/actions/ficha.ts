@@ -419,9 +419,18 @@ export async function asegurarDocumentoTrAlta(relacionId: string): Promise<void>
   await asegurarDocumentoTramite(relacionId, "TR_ALTA");
 }
 
+export async function asegurarDocumentosVidaLey(relacionId: string): Promise<void> {
+  await asegurarDocumentoTramite(relacionId, "VIDA_LEY");
+  await asegurarDocumentoTramite(relacionId, "VIDA_LEY_CONSTANCIA");
+  await asegurarDocumentoTramite(relacionId, "VIDA_LEY_FACTURA");
+}
+
 async function asegurarDocumentoTramite(
   relacionId: string,
-  tipo: Extract<TipoDocumentoPlanilla, "TRAMITE_AFP" | "TR_ALTA">,
+  tipo: Extract<
+    TipoDocumentoPlanilla,
+    "TRAMITE_AFP" | "TR_ALTA" | "VIDA_LEY" | "VIDA_LEY_CONSTANCIA" | "VIDA_LEY_FACTURA"
+  >,
 ): Promise<void> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return;
@@ -683,6 +692,62 @@ export async function saveVidaLey(relacionId: string, formData: FormData): Promi
   };
   const db = await planillasDb();
   const { error } = await db.from("vida_ley").upsert(payload, { onConflict: "relacion_id" });
+  if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return {};
+}
+
+export async function marcarDocumentoNoAplica(
+  relacionId: string,
+  documentoId: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("documentos")
+    .select("id, tipo")
+    .eq("id", documentoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!actual) return { error: "Documento no encontrado." };
+  if (actual.tipo !== "VIDA_LEY_FACTURA") {
+    return { error: "Solo la factura electrónica se puede marcar como no enviada." };
+  }
+  const { error } = await db
+    .from("documentos")
+    .update({ estado: "NA" })
+    .eq("id", documentoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  return {};
+}
+
+export async function marcarVidaLeyTramitado(relacionId: string): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("vida_ley")
+    .select("numero_poliza, fecha_inicio, fecha_fin")
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  const { error } = await db.from("vida_ley").upsert(
+    {
+      relacion_id: relacionId,
+      entidad_id: gate.trabajador.entidad_id,
+      estado: "Tramitado",
+      numero_poliza: actual?.numero_poliza ?? null,
+      fecha_inicio: actual?.fecha_inicio ?? null,
+      fecha_fin: actual?.fecha_fin ?? null,
+    },
+    { onConflict: "relacion_id" },
+  );
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");

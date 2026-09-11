@@ -19,7 +19,7 @@ import {
 } from "@/lib/auth/access";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
-import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp, asegurarDocumentoTrAlta } from "@/lib/actions/ficha";
+import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp, asegurarDocumentoTrAlta, asegurarDocumentosVidaLey } from "@/lib/actions/ficha";
 import {
   claseBadgePaso,
   estadoPasosAlta,
@@ -55,6 +55,9 @@ export default async function FichaTrabajadorPage({
   }
   if (esEstudio && tab === "t-registro") {
     await asegurarDocumentoTrAlta(params.relacionId);
+  }
+  if (esEstudio && tab === "vida-ley") {
+    await asegurarDocumentosVidaLey(params.relacionId);
   }
   const [contratos, documentos, pension, vidaLey, tRegistro, entidad] = await Promise.all([
     listContratos(params.relacionId),
@@ -160,6 +163,9 @@ export default async function FichaTrabajadorPage({
             relacionId={params.relacionId}
             trabajador={trabajador}
             vidaLey={vidaLey}
+            documentoCertificado={documentos.find((d) => d.tipo === "VIDA_LEY") ?? null}
+            documentoConstancia={documentos.find((d) => d.tipo === "VIDA_LEY_CONSTANCIA") ?? null}
+            documentoFactura={documentos.find((d) => d.tipo === "VIDA_LEY_FACTURA") ?? null}
             canWrite={canWriteTramite}
           />
         ) : null}
