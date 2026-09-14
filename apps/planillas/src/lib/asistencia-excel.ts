@@ -6,7 +6,6 @@ import {
   diasIsoDelMes,
   diaSemanaDeIso,
   etiquetaDia,
-  formatoFechaAsistencia,
   formatoHorasTotales,
   partesMes,
   trabajadorActivoEnFecha,
@@ -28,11 +27,29 @@ export type AsistenciaExcelEmpresa = {
   direccion: string | null;
 };
 
-const COLS = 8;
+const COLS = 11;
 const BLACK = { style: "thin", color: { rgb: "000000" } };
 const BORDER = { top: BLACK, bottom: BLACK, left: BLACK, right: BLACK };
 const GREEN = "C6E0B4";
-const FONT = { name: "Calibri", sz: 10, color: { rgb: "000000" } };
+const GRAY_TARDE = "F0F0F0";
+const FONT = { name: "Tahoma", sz: 11, color: { rgb: "000000" } };
+const FONT_HEADER = { name: "Tahoma", sz: 8, bold: true, color: { rgb: "000000" } };
+const FONT_FECHA = { name: "Arial Narrow", sz: 8, color: { rgb: "FF0000" } };
+
+/** Anchos del Excel de Herederos (A–K). */
+const COL_WIDTHS = [
+  { wch: 3.17 },
+  { wch: 8.67 },
+  { wch: 4 },
+  { wch: 4 },
+  { wch: 4.17 },
+  { wch: 4.17 },
+  { wch: 21.17 },
+  { wch: 4.17 },
+  { wch: 4.17 },
+  { wch: 21.17 },
+  { wch: 11.67 },
+];
 
 function slugNombre(text: string): string {
   return text
@@ -72,11 +89,14 @@ function setCell(
   c: number,
   value: string | number,
   style?: Record<string, unknown>,
+  extras?: { z?: string; t?: "s" | "n" },
 ): void {
-  const cell: { v: string | number; t: "s" | "n"; s?: Record<string, unknown> } = {
+  const t = extras?.t ?? (typeof value === "number" ? "n" : "s");
+  const cell: { v: string | number; t: "s" | "n"; z?: string; s?: Record<string, unknown> } = {
     v: value,
-    t: typeof value === "number" ? "n" : "s",
+    t,
   };
+  if (extras?.z) cell.z = extras.z;
   if (style) cell.s = style;
   ws[encodeCell(r, c)] = cell;
 }
@@ -94,26 +114,37 @@ function styleBase(extra?: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
-function diagonalRoja(): Record<string, unknown> {
+function diagonalRoja(extra?: Record<string, unknown>): Record<string, unknown> {
   return styleBase({
     border: {
       ...BORDER,
       diagonal: { style: "thin", color: { rgb: "FF0000" } },
-      diagonalUp: true,
+      diagonalDown: true,
     },
+    ...extra,
   });
 }
 
-function sheetName(nombre: string, dni: string, usados: Set<string>): string {
-  const base = slugNombre(nombre).slice(0, 28) || dni.slice(-8) || "Hoja";
+function excelSerial(iso: string): number {
+  const [year, month, day] = iso.split("-").map(Number);
+  return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(1899, 11, 30)) / 86400000);
+}
+
+function sheetName(nombre: string, dni: string, index: number, usados: Set<string>): string {
+  const primero = slugNombre(nombre).split(" ")[0] || dni.slice(-8) || "Hoja";
+  const base = `${String(index + 1).padStart(2, "0")} ${primero}`.slice(0, 31);
   let name = base;
   let n = 2;
   while (usados.has(name.toLowerCase())) {
-    name = `${base.slice(0, 24)} ${n}`;
+    name = `${base.slice(0, 27)} ${n}`;
     n += 1;
   }
   usados.add(name.toLowerCase());
   return name;
+}
+
+function paint(ws: WorkSheet, r: number, c1: number, c2: number, style: Record<string, unknown>): void {
+  for (let c = c1; c <= c2; c += 1) setCell(ws, r, c, "", style);
 }
 
 function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcelTrabajador, mes: string): WorkSheet {
@@ -122,109 +153,185 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   const monthName = partes ? MES_NOMBRE[partes.month - 1] : mes;
   const ws: WorkSheet = {};
   const merges: Range[] = [];
-  const rows: { hpt: number }[] = [
-    { hpt: 18 },
-    { hpt: 16 },
-    { hpt: 16 },
-    { hpt: 8 },
-    { hpt: 24 },
-    { hpt: 20 },
-    { hpt: 20 },
-    { hpt: 22 },
-  ];
-
-  setCell(ws, 0, 0, "ASOCIACION:", { font: { ...FONT, bold: true }, alignment: { vertical: "center" } });
-  setCell(ws, 0, 1, empresa.nombre.toUpperCase(), {
-    font: { ...FONT, bold: true, italic: true },
-    alignment: { vertical: "center" },
+  const rows: { hpt: number }[] = [];
+  const greenHead = styleBase({
+    font: FONT_HEADER,
+    fill: { fgColor: { rgb: GREEN }, patternType: "solid" },
   });
-  merge(merges, 0, 1, 0, 7);
-  setCell(ws, 1, 0, `RUC: ${empresa.ruc?.trim() || "—"}`, { font: FONT, alignment: { vertical: "center" } });
-  merge(merges, 1, 0, 1, 7);
-  setCell(ws, 2, 0, `Dirección: ${empresa.direccion?.trim() || "—"}`, { font: FONT, alignment: { vertical: "center" } });
-  merge(merges, 2, 0, 2, 7);
+  const greenName = styleBase({
+    font: { name: "Tahoma", sz: 10, bold: true, color: { rgb: "000000" } },
+    fill: { fgColor: { rgb: GREEN }, patternType: "solid" },
+  });
 
-  setCell(ws, 4, 0, "REGISTRO DE ASISTENCIA", {
-    font: { ...FONT, sz: 14, bold: true },
+  setCell(ws, 0, 0, "REGISTRO DE ASISTENCIA", {
+    font: { name: "Calibri", sz: 16, bold: true, color: { rgb: "000000" } },
     alignment: { horizontal: "center", vertical: "center" },
     border: BORDER,
   });
-  merge(merges, 4, 0, 4, 7);
-  for (let c = 1; c < COLS; c += 1) setCell(ws, 4, c, "", styleBase());
+  merge(merges, 0, 0, 0, COLS - 1);
+  paint(ws, 0, 1, COLS - 1, styleBase({ font: { name: "Calibri", sz: 16, bold: true } }));
+  rows[0] = { hpt: 23.25 };
 
-  const greenHead = styleBase({
-    font: { ...FONT, bold: true },
-    fill: { fgColor: { rgb: GREEN }, patternType: "solid" },
+  setCell(ws, 1, 0, "Año", greenHead);
+  merge(merges, 1, 0, 1, 1);
+  setCell(ws, 1, 1, "", greenHead);
+  setCell(ws, 1, 2, year, styleBase({ font: { ...FONT, bold: true } }));
+  merge(merges, 1, 2, 1, 3);
+  setCell(ws, 1, 3, "", styleBase());
+  setCell(ws, 1, 4, "Nombre del Trabajador", greenName);
+  merge(merges, 1, 4, 2, 6);
+  paint(ws, 1, 5, 6, greenName);
+  paint(ws, 2, 4, 6, greenName);
+  setCell(ws, 1, 7, trabajador.nombre.toUpperCase(), greenName);
+  merge(merges, 1, 7, 2, 10);
+  paint(ws, 1, 8, 10, greenName);
+  paint(ws, 2, 7, 10, greenName);
+  rows[1] = { hpt: 15.75 };
+
+  setCell(ws, 2, 0, "Mes", greenHead);
+  merge(merges, 2, 0, 2, 1);
+  setCell(ws, 2, 1, "", greenHead);
+  setCell(ws, 2, 2, monthName, styleBase({ font: { ...FONT, bold: true } }));
+  merge(merges, 2, 2, 2, 3);
+  setCell(ws, 2, 3, "", styleBase());
+  rows[2] = { hpt: 15 };
+
+  const headers: Array<{ c1: number; c2: number; label: string }> = [
+    { c1: 0, c2: 1, label: "Día" },
+    { c1: 2, c2: 3, label: "Turno" },
+    { c1: 4, c2: 5, label: "Hora de Ingreso" },
+    { c1: 6, c2: 6, label: "Firma" },
+    { c1: 7, c2: 8, label: "Hora de Salida" },
+    { c1: 9, c2: 9, label: "Firma" },
+    { c1: 10, c2: 10, label: "Horas Totales" },
+  ];
+  headers.forEach(({ c1, c2, label }) => {
+    setCell(ws, 3, c1, label, greenHead);
+    if (c2 > c1) {
+      merge(merges, 3, c1, 3, c2);
+      paint(ws, 3, c1 + 1, c2, greenHead);
+    }
   });
-  setCell(ws, 5, 0, "Año", styleBase({ font: { ...FONT, bold: true } }));
-  setCell(ws, 5, 1, String(year), styleBase({ font: { ...FONT, bold: true } }));
-  setCell(ws, 5, 2, "Nombre del Trabajador", greenHead);
-  merge(merges, 5, 2, 6, 3);
-  setCell(ws, 5, 3, "", greenHead);
-  setCell(ws, 6, 2, "", greenHead);
-  setCell(ws, 6, 3, "", greenHead);
-  setCell(ws, 5, 4, trabajador.nombre.toUpperCase(), greenHead);
-  merge(merges, 5, 4, 6, 7);
-  for (let c = 5; c < COLS; c += 1) setCell(ws, 5, c, "", greenHead);
-  for (let c = 4; c < COLS; c += 1) setCell(ws, 6, c, "", greenHead);
-  setCell(ws, 6, 0, "Mes", styleBase({ font: { ...FONT, bold: true } }));
-  setCell(ws, 6, 1, monthName, styleBase({ font: { ...FONT, bold: true } }));
-
-  const headers = ["Día", "", "Turno", "Hora de Ingreso", "Firma", "Hora de Salida", "Firma", "Horas Totales"];
-  headers.forEach((label, c) => setCell(ws, 7, c, label, greenHead));
-  merge(merges, 7, 0, 7, 1);
+  rows[3] = { hpt: 15.75 };
 
   const dias = diasIsoDelMes(mes);
   const turnos: TurnoAsistencia[] = ["Mañana", "Tarde"];
-  let r = 8;
+  let r = 4;
   for (const iso of dias) {
     const dia = diaSemanaDeIso(iso);
     const activo = trabajadorActivoEnFecha(iso, trabajador.fechaIngreso, trabajador.fechaCese);
     const tramos = activo ? tramosDelDia(trabajador.horario, dia) : [];
     const laborables = tramos ?? [];
-    setCell(ws, r, 0, formatoFechaAsistencia(iso), styleBase({
+    const fechaStyle = styleBase({
+      font: FONT_FECHA,
       alignment: { horizontal: "center", vertical: "center", textRotation: 90, wrapText: true },
-    }));
+    });
+    setCell(ws, r, 0, excelSerial(iso), fechaStyle, { t: "n", z: "dd/mmm/yyyy" });
     merge(merges, r, 0, r + 1, 0);
-    setCell(ws, r + 1, 0, "", styleBase());
+    setCell(ws, r + 1, 0, "", fechaStyle);
 
     const tachaManana = tramos !== null && !laborables.some((item) => item.turno === "Mañana");
     const tachaTarde = tramos !== null && !laborables.some((item) => item.turno === "Tarde");
-    if (tachaManana && tachaTarde) merge(merges, r, 3, r + 1, 7);
+    const tachaDia = tachaManana && tachaTarde;
+    if (tachaDia) merge(merges, r, 4, r + 1, 10);
+
     for (let i = 0; i < 2; i += 1) {
       const row = r + i;
       const turno = turnos[i];
       const tramo = laborables.find((item) => item.turno === turno) ?? null;
       const tacha = turno === "Mañana" ? tachaManana : tachaTarde;
-      const tachado = tacha ? diagonalRoja() : styleBase();
-      setCell(ws, row, 1, etiquetaDia(dia), styleBase());
-      setCell(ws, row, 2, turno, styleBase());
-      setCell(ws, row, 3, tramo && !tacha ? formatoHoraContrato(tramo.ingreso) : "", tachado);
-      setCell(ws, row, 4, "", tachado);
-      setCell(ws, row, 5, tramo && !tacha ? formatoHoraContrato(tramo.salida) : "", tachado);
-      setCell(ws, row, 6, "", tachado);
-      setCell(ws, row, 7, tramo && !tacha ? formatoHorasTotales(tramo.minutos) : "", tachado);
+      const fill =
+        turno === "Tarde" ? { fgColor: { rgb: GRAY_TARDE }, patternType: "solid" } : undefined;
+      const base = styleBase(fill ? { fill } : undefined);
+      const tachado = tacha ? diagonalRoja(fill ? { fill } : undefined) : base;
+      setCell(ws, row, 1, etiquetaDia(dia), base);
+      setCell(ws, row, 2, turno, base);
+      merge(merges, row, 2, row, 3);
+      setCell(ws, row, 3, "", base);
+
+      const horaIn = tramo && !tacha ? formatoHoraContrato(tramo.ingreso) : "";
+      const horaOut = tramo && !tacha ? formatoHoraContrato(tramo.salida) : "";
+      const totales = tramo && !tacha ? formatoHorasTotales(tramo.minutos) : "";
+      if (tachaDia) {
+        setCell(ws, row, 4, "", tachado);
+        paint(ws, row, 5, 10, tachado);
+      } else {
+        setCell(ws, row, 4, horaIn, tachado);
+        merge(merges, row, 4, row, 5);
+        setCell(ws, row, 5, "", tachado);
+        setCell(ws, row, 6, "", tachado);
+        setCell(ws, row, 7, horaOut, tachado);
+        merge(merges, row, 7, row, 8);
+        setCell(ws, row, 8, "", tachado);
+        setCell(ws, row, 9, "", tachado);
+        setCell(ws, row, 10, totales, tachado);
+      }
+      rows[row] = { hpt: 24 };
     }
-    rows[r] = { hpt: 22 };
-    rows[r + 1] = { hpt: 22 };
     r += 2;
   }
 
+  r += 3;
+  setCell(ws, r, 6, "Firma del Administrador", {
+    font: { name: "Tahoma", sz: 8, color: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" },
+  });
+  setCell(ws, r, 9, "Firma del Rep. Legal", {
+    font: { name: "Tahoma", sz: 8, color: { rgb: "000000" } },
+    alignment: { horizontal: "center", vertical: "center" },
+  });
+  rows[r] = { hpt: 15.75 };
+
   ws["!merges"] = merges;
-  ws["!cols"] = [
-    { wch: 6 },
-    { wch: 12 },
-    { wch: 10 },
-    { wch: 16 },
-    { wch: 18 },
-    { wch: 16 },
-    { wch: 18 },
-    { wch: 14 },
-  ];
+  ws["!cols"] = COL_WIDTHS;
   ws["!rows"] = rows;
-  ws["!ref"] = `A1:${encodeCell(r - 1, COLS - 1)}`;
-  ws["!pageSetup"] = { orientation: "landscape", fitToWidth: 1, fitToHeight: 1, paperSize: 9 };
+  ws["!ref"] = `A1:${encodeCell(r, COLS - 1)}`;
+  ws["!margins"] = {
+    left: 0.71,
+    right: 0.51,
+    top: 0.94,
+    bottom: 0.75,
+    header: 0.31,
+    footer: 0.31,
+  };
   return ws;
+}
+
+function xmlAttr(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function bloqueImpresion(empresa: AsistenciaExcelEmpresa): string {
+  const nombre = xmlAttr(empresa.nombre.toUpperCase());
+  const ruc = xmlAttr(empresa.ruc?.trim() || "—");
+  const direccion = xmlAttr(empresa.direccion?.trim() || "—");
+  const header =
+    `&amp;L&amp;"Tahoma,Negrita"&amp;12ASOCIACION:&amp;"-,Normal"&amp;11 &amp;"-,Negrita Cursiva" ${nombre}&amp;"-,Normal"\n` +
+    `RUC: ${ruc}\n` +
+    `Dirección: ${direccion}`;
+  return (
+    `<printOptions horizontalCentered="1"/>` +
+    `<pageSetup paperSize="9" scale="85" orientation="portrait"/>` +
+    `<headerFooter><oddHeader>${header}</oddHeader><oddFooter>&amp;C&amp;P</oddFooter></headerFooter>`
+  );
+}
+
+async function aplicarImpresionHerederos(buffer: Buffer, empresa: AsistenciaExcelEmpresa): Promise<Buffer> {
+  const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
+  const unzipped = unzipSync(new Uint8Array(buffer));
+  const extra = bloqueImpresion(empresa);
+  for (const name of Object.keys(unzipped)) {
+    if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
+    let xml = strFromU8(unzipped[name]);
+    if (xml.includes("<headerFooter")) continue;
+    if (xml.includes("</pageMargins>")) {
+      xml = xml.replace("</pageMargins>", `</pageMargins>${extra}`);
+    } else {
+      xml = xml.replace("</worksheet>", `${extra}</worksheet>`);
+    }
+    unzipped[name] = strToU8(xml);
+  }
+  return Buffer.from(zipSync(unzipped, { level: 6 }));
 }
 
 export async function bufferAsistenciaExcel(
@@ -235,9 +342,10 @@ export async function bufferAsistenciaExcel(
   const XLSX = await import("xlsx-js-style");
   const wb = XLSX.utils.book_new();
   const usados = new Set<string>();
-  for (const trabajador of trabajadores) {
+  trabajadores.forEach((trabajador, index) => {
     const ws = buildSheet(empresa, trabajador, mes);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador.nombre, trabajador.dni, usados));
-  }
-  return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador.nombre, trabajador.dni, index, usados));
+  });
+  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
+  return aplicarImpresionHerederos(buffer, empresa);
 }

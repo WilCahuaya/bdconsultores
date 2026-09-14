@@ -88,6 +88,12 @@ export function fechaVidaLeyDoc(value: string | null | undefined): string {
   return `${day}/${month}/${year}`;
 }
 
+function anioFinPeriodoVidaLey(year: string, month: string): string {
+  const mes = Number(month);
+  if (!Number.isFinite(mes) || mes <= 7) return year;
+  return String(Number(year) + 1);
+}
+
 export function periodoVidaLey(fechaIngreso: string | null | undefined): string {
   const iso = fechaIngreso?.slice(0, 10);
   const [year, month] = iso ? iso.split("-") : new Date().toISOString().slice(0, 10).split("-");
@@ -95,14 +101,16 @@ export function periodoVidaLey(fechaIngreso: string | null | undefined): string 
   const mes = (MESES[mesIdx] ?? "").toUpperCase();
   const anio = year ?? "";
   if (!mes || !anio) return "";
-  if (mesIdx >= 11) return `DICIEMBRE ${anio}`;
-  return `${mes} – DICIEMBRE ${anio}`;
+  const anioFin = anioFinPeriodoVidaLey(anio, month ?? "");
+  if (mesIdx === 6) return `JULIO ${anio}`;
+  return `${mes} – JULIO ${anioFin}`;
 }
 
 export function fechaFinPeriodoVidaLey(fechaIngreso: string | null | undefined): string {
   const iso = fechaIngreso?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
   const year = iso.slice(0, 4);
-  return `${year}-12-31`;
+  const month = iso.slice(5, 7);
+  return `${anioFinPeriodoVidaLey(year, month)}-07-31`;
 }
 
 function remuneracionDoc(value: number | null | undefined): string {
@@ -126,29 +134,32 @@ function nombreDoc(t: VidaLeyTrabajadorWord): string {
 
 function celda(
   text: string,
-  opts?: { bold?: boolean; header?: boolean; width: number; center?: boolean },
+  opts?: { bold?: boolean; header?: boolean; width: number; center?: boolean; lineas?: string[] },
 ): TableCell {
+  const lineas = opts?.lineas?.length ? opts.lineas : [text];
   return new TableCell({
     width: { size: opts?.width ?? 10, type: WidthType.PERCENTAGE },
     borders: BORDES,
     verticalAlign: VerticalAlign.CENTER,
     shading: opts?.header ? { type: ShadingType.CLEAR, fill: "D9D9D9" } : undefined,
     margins: { top: 40, bottom: 40, left: 60, right: 60 },
-    children: [
-      new Paragraph({
-        alignment: opts?.center ? AlignmentType.CENTER : AlignmentType.LEFT,
-        spacing: { after: 0, before: 0 },
-        children: [run(text, { bold: opts?.bold || opts?.header, size: SIZE_TABLA })],
-      }),
-    ],
+    children: lineas.map(
+      (linea, i) =>
+        new Paragraph({
+          alignment: opts?.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+          spacing: { after: 0, before: i === 0 ? 0 : 80 },
+          children: [run(linea, { bold: opts?.bold || opts?.header, size: SIZE_TABLA })],
+        }),
+    ),
   });
 }
 
-function filaDato(label: string, value: string): TableRow {
+function filaDato(label: string, value: string, extraValue?: string): TableRow {
   return new TableRow({
     children: [
       celda(label, { bold: true, width: 28 }),
-      celda(value, { width: 72 }),
+      celda(":", { bold: true, width: 5, center: true }),
+      celda(value, { width: 67, lineas: extraValue ? [value, extraValue] : undefined }),
     ],
   });
 }
@@ -160,7 +171,7 @@ function tablaEmpresa(d: VidaLeyWordDatos): Table {
       filaDato("Razón Social", d.entidadNombre),
       filaDato("RUC", d.ruc?.trim() || ""),
       filaDato("Dirección", d.direccion?.trim() || ""),
-      filaDato("Actividad Económica", ACTIVIDAD_ECONOMICA),
+      filaDato("Actividad Económica", ACTIVIDAD_ECONOMICA, OBJETO_ASOCIACION),
     ],
   });
 }
@@ -176,28 +187,33 @@ const COLS: { key: string; label: string; width: number; center: boolean }[] = [
   { key: "periodo", label: "PERIODO", width: 11, center: true },
 ];
 
+const FILAS_TRABAJADORES = 8;
+
+function filaTrabajador(t: VidaLeyTrabajadorWord | null, n: number): TableRow {
+  const vals = t
+    ? [
+        String(n),
+        nombreDoc(t),
+        t.dni,
+        fechaVidaLeyDoc(t.fechaIngreso),
+        remuneracionDoc(t.remuneracion),
+        cargoDoc(t.cargo),
+        fechaVidaLeyDoc(t.fechaNacimiento),
+        periodoVidaLey(t.fechaIngreso),
+      ]
+    : [String(n), "", "", "", "", "", "", ""];
+  return new TableRow({
+    children: COLS.map((col, idx) => celda(vals[idx] ?? "", { width: col.width, center: col.center })),
+  });
+}
+
 function tablaTrabajadores(trabajadores: VidaLeyTrabajadorWord[]): Table {
   const header = new TableRow({
     tableHeader: true,
     children: COLS.map((col) => celda(col.label, { header: true, width: col.width, center: true })),
   });
-  const body = trabajadores.map((t, i) => {
-    const vals = [
-      String(i + 1),
-      nombreDoc(t),
-      t.dni,
-      fechaVidaLeyDoc(t.fechaIngreso),
-      remuneracionDoc(t.remuneracion),
-      cargoDoc(t.cargo),
-      fechaVidaLeyDoc(t.fechaNacimiento),
-      periodoVidaLey(t.fechaIngreso),
-    ];
-    return new TableRow({
-      children: COLS.map((col, idx) =>
-        celda(vals[idx] ?? "", { width: col.width, center: col.center }),
-      ),
-    });
-  });
+  const total = Math.max(FILAS_TRABAJADORES, trabajadores.length);
+  const body = Array.from({ length: total }, (_, i) => filaTrabajador(trabajadores[i] ?? null, i + 1));
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
     rows: [header, ...body],
@@ -226,8 +242,8 @@ export function construirDocumentoVidaLey(d: VidaLeyWordDatos): Document {
           page: {
             size: { orientation: PageOrientation.LANDSCAPE },
             margin: {
-              top: convertMillimetersToTwip(15),
-              bottom: convertMillimetersToTwip(15),
+              top: convertMillimetersToTwip(10),
+              bottom: convertMillimetersToTwip(10),
               left: convertMillimetersToTwip(15),
               right: convertMillimetersToTwip(15),
             },
@@ -238,8 +254,7 @@ export function construirDocumentoVidaLey(d: VidaLeyWordDatos): Document {
           parrafo(d.entidadNombre.toUpperCase(), { center: true, bold: true, after: 280, size: 28 }),
           parrafo("DATOS DE LA EMPRESA", { bold: true, after: 80 }),
           tablaEmpresa(d),
-          parrafo(OBJETO_ASOCIACION, { before: 80, after: 280 }),
-          parrafo("DATOS DE LOS TRABAJADORES", { bold: true, after: 80 }),
+          parrafo("DATOS DE LOS  TRABAJADORES", { bold: true, before: 280, after: 80 }),
           tablaTrabajadores(d.trabajadores),
         ],
       },
