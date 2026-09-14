@@ -178,15 +178,19 @@ export const TIPO_T_REGISTRO_LABEL: Record<TipoTRegistro, string> = {
   BAJA: "Baja",
 };
 
-export const VIDA_LEY_ESTADOS = ["Elaborado", "Enviado", "Recepcionado", "Registrado"] as const;
+export const VIDA_LEY_ESTADOS = ["Elaborado", "Recepcionado", "Registrado"] as const;
 export type VidaLeyEstado = (typeof VIDA_LEY_ESTADOS)[number];
 
 export const VIDA_LEY_ESTADO_LABEL: Record<VidaLeyEstado, string> = {
   Elaborado: "Elaborado",
-  Enviado: "Enviado",
   Recepcionado: "Recepcionado",
   Registrado: "Registrado",
 };
+
+export function vidaLeyPendienteRecepcion(estado?: string | null): boolean {
+  const value = estado?.trim();
+  return value !== "Recepcionado" && value !== "Registrado" && value !== "Tramitado";
+}
 
 export function etiquetaEstadoVidaLey(estado?: string | null): string {
   const value = estado?.trim();

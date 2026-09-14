@@ -8,6 +8,7 @@ import {
   ESTADO_DOCUMENTO_LABEL,
   TIPO_DOCUMENTO_LABEL,
   nombreCompleto,
+  vidaLeyPendienteRecepcion,
   type PendienteItem,
   type PendienteTipo,
 } from "@/lib/planillas-labels";
@@ -205,7 +206,7 @@ export async function listPendientes(entidadId: string): Promise<PendienteItem[]
             detalle: "Vida Ley sin estado",
             tab: "vida-ley",
           });
-        } else if (estadoVida === "Elaborado" || estadoVida === "Enviado") {
+        } else if (vidaLeyPendienteRecepcion(estadoVida)) {
           items.push({
             ...base,
             id: `${relacion.id}:vidaley:docs`,

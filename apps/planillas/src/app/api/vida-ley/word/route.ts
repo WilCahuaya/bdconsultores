@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
-import { listTrabajadoresSinVidaLey } from "@/lib/actions/ficha";
+import { listTrabajadoresVidaLeyPendienteRecepcion } from "@/lib/actions/ficha";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { getProfile } from "@/lib/auth/profile";
 import { puedeEscribirPlanillas } from "@/lib/auth/access";
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       const pedido = new Set(ids);
       trabajadores = todos.filter((t) => pedido.has(t.id) && t.estado === "ACTIVA");
     } else {
-      trabajadores = await listTrabajadoresSinVidaLey(entidadId);
+      trabajadores = await listTrabajadoresVidaLeyPendienteRecepcion(entidadId);
     }
   } else {
     return NextResponse.json({ error: "Indique el trabajador o la empresa." }, { status: 400 });

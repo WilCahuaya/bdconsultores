@@ -14,7 +14,7 @@ import { TIPOS_DOCUMENTO_ALTA_INICIALES } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
-import { parseFechaCampo, parseCargoCampo, armarDireccionPersona, montoAsignacionFamiliar } from "@/lib/planillas-labels";
+import { parseFechaCampo, parseCargoCampo, armarDireccionPersona, montoAsignacionFamiliar, vidaLeyPendienteRecepcion } from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { fechaFinPeriodoVidaLey } from "@/lib/vida-ley-word";
 import { planillasDb } from "@/lib/supabase/planillas";
@@ -775,11 +775,9 @@ export async function setEstadoVidaLey(
   return {};
 }
 
-function sinTramiteVidaLey(estado: string | null | undefined): boolean {
-  return !estado?.trim();
-}
-
-export async function listTrabajadoresSinVidaLey(entidadId: string): Promise<TrabajadorListItem[]> {
+export async function listTrabajadoresVidaLeyPendienteRecepcion(
+  entidadId: string,
+): Promise<TrabajadorListItem[]> {
   const profile = await requirePlanillasProfile();
   if (!puedeEscribirPlanillas(profile)) return [];
   const trabajadores = (await listTrabajadores(entidadId)).filter(
@@ -795,10 +793,10 @@ export async function listTrabajadoresSinVidaLey(entidadId: string): Promise<Tra
       trabajadores.map((t) => t.id),
     );
   if (error) throw new Error(error.message);
-  const conTramite = new Set(
-    (data ?? []).filter((row) => !sinTramiteVidaLey(row.estado)).map((row) => row.relacion_id as string),
+  const estadoPorRelacion = new Map(
+    (data ?? []).map((row) => [row.relacion_id as string, row.estado as string | null]),
   );
-  return trabajadores.filter((t) => !conTramite.has(t.id));
+  return trabajadores.filter((t) => vidaLeyPendienteRecepcion(estadoPorRelacion.get(t.id)));
 }
 
 async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promise<{ error?: string }> {
@@ -819,7 +817,7 @@ async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promi
     return {
       relacion_id: t.id,
       entidad_id: t.entidad_id,
-      estado: estadoActual || "Elaborado",
+      estado: vidaLeyPendienteRecepcion(estadoActual) ? "Elaborado" : estadoActual,
       numero_poliza: actual?.numero_poliza ?? null,
       fecha_inicio: inicio,
       fecha_fin: actual?.fecha_fin ?? fechaFinPeriodoVidaLey(t.fecha_ingreso ?? inicio),
@@ -845,8 +843,10 @@ export async function generarVidaLeyGrupo(
 ): Promise<{ error?: string; ids?: string[]; count?: number }> {
   const profile = await requirePlanillasProfile();
   if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para editar." };
-  const pendientes = await listTrabajadoresSinVidaLey(entidadId);
-  if (pendientes.length === 0) return { error: "No hay trabajadores sin Vida Ley en esta empresa." };
+  const pendientes = await listTrabajadoresVidaLeyPendienteRecepcion(entidadId);
+  if (pendientes.length === 0) {
+    return { error: "No hay trabajadores pendientes de recepción de Vida Ley." };
+  }
   const marked = await marcarVidaLeyElaborado(pendientes);
   if (marked.error) return { error: marked.error };
   return { ids: pendientes.map((t) => t.id), count: pendientes.length };

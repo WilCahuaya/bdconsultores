@@ -7,6 +7,7 @@ import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } fr
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listPendientes } from "@/lib/actions/pendientes";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
+import { listTrabajadoresVidaLeyPendienteRecepcion } from "@/lib/actions/ficha";
 import { claseBadgePaso, flujoDesdeTrabajador, resolverSiguientePaso } from "@/lib/flujo-ficha";
 import { PENDIENTE_TIPO_LABEL, nombreCompleto } from "@/lib/planillas-labels";
 import { GenerarVidaLeyGrupoButton } from "@/components/ficha/GenerarVidaLeyGrupoButton";
@@ -26,9 +27,13 @@ export default async function PendientesPage({
     searchParams.entidadId && entidades.some((e) => e.id === searchParams.entidadId)
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
-  const [trabajadores, pendientes] = selectedId
-    ? await Promise.all([listTrabajadores(selectedId), listPendientes(selectedId)])
-    : [[], []];
+  const [trabajadores, pendientes, vidaLeyPendientes] = selectedId
+    ? await Promise.all([
+        listTrabajadores(selectedId),
+        listPendientes(selectedId),
+        esEstudio ? listTrabajadoresVidaLeyPendienteRecepcion(selectedId) : Promise.resolve([]),
+      ])
+    : [[], [], []];
   const bandeja = trabajadores
     .map((t) => ({
       trabajador: t,
@@ -36,9 +41,7 @@ export default async function PendientesPage({
     }))
     .filter(({ siguiente }) => (esEstudio ? siguiente.rol !== "hecho" : siguiente.rol === "empresa"));
   const tramites = esEstudio ? pendientes.filter((p) => TIPOS_TRAMITE.has(p.tipo)) : [];
-  const sinVidaLey = tramites.filter(
-    (p) => p.tipo === "vida-ley" && (p.detalle === "Sin Vida Ley" || p.detalle === "Vida Ley sin estado"),
-  ).length;
+  const cantidadVidaLeyGrupo = vidaLeyPendientes.length;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -123,7 +126,7 @@ export default async function PendientesPage({
               <section className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <h2 className="text-sm font-medium text-foreground">Trámites</h2>
-                  {selectedId ? <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={sinVidaLey} /> : null}
+                  {selectedId ? <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadVidaLeyGrupo} /> : null}
                 </div>
                 <div className={`${panelCardClass} overflow-x-auto p-0`}>
                   <table className="w-full min-w-[640px] text-left text-sm">

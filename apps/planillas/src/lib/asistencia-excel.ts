@@ -272,14 +272,13 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   }
 
   r += 3;
-  setCell(ws, r, 6, "Firma del Administrador", {
+  const firmaPie = {
     font: { name: "Tahoma", sz: 8, color: { rgb: "000000" } },
     alignment: { horizontal: "center", vertical: "center" },
-  });
-  setCell(ws, r, 9, "Firma del Rep. Legal", {
-    font: { name: "Tahoma", sz: 8, color: { rgb: "000000" } },
-    alignment: { horizontal: "center", vertical: "center" },
-  });
+    border: { top: { style: "thin", color: { rgb: "000000" } } },
+  };
+  setCell(ws, r, 6, "Firma del Administrador", firmaPie);
+  setCell(ws, r, 9, "Firma del Rep. Legal", firmaPie);
   rows[r] = { hpt: 15.75 };
 
   ws["!merges"] = merges;
@@ -307,18 +306,23 @@ function bloqueEncabezado(empresa: AsistenciaExcelEmpresa): string {
   const direccion = xmlAttr(empresa.direccion?.trim() || "-");
   return (
     `&amp;L&amp;"Tahoma,Negrita"&amp;12ASOCIACION:&amp;"-,Normal"&amp;11 &amp;"-,Negrita Cursiva" ${nombre}&amp;"-,Normal"` +
-    `&#10;RUC: ${ruc}` +
-    `&#10;Dirección: ${direccion}`
+    `\nRUC: ${ruc}` +
+    `\nDirección: ${direccion}`
   );
+}
+
+function conVistaPagina(xml: string): string {
+  if (/<sheetView\b[^>]*\bview=/.test(xml)) return xml;
+  return xml.replace(/<sheetView\b/, `<sheetView view="pageLayout" zoomScalePageLayoutView="100"`);
 }
 
 function insertarImpresion(xml: string, empresa: AsistenciaExcelEmpresa): string {
   const printOptions = `<printOptions horizontalCentered="1"/>`;
   const pageSetup = `<pageSetup paperSize="9" scale="85" orientation="portrait"/>`;
   const headerFooter =
-    `<headerFooter><oddHeader>${bloqueEncabezado(empresa)}</oddHeader>` +
+    `<headerFooter><oddHeader xml:space="preserve">${bloqueEncabezado(empresa)}</oddHeader>` +
     `<oddFooter>&amp;C&amp;P</oddFooter></headerFooter>`;
-  let next = xml
+  let next = conVistaPagina(xml)
     .replace(/<printOptions\b[^>]*\/>/g, "")
     .replace(/<printOptions\b[\s\S]*?<\/printOptions>/g, "")
     .replace(/<pageSetup\b[^>]*\/>/g, "")

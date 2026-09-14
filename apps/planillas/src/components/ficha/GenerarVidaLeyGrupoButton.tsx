@@ -22,7 +22,7 @@ export function GenerarVidaLeyGrupoButton({
     const result = await generarVidaLeyGrupo(entidadId);
     if (result.error || !result.ids?.length) {
       setPending(false);
-      pushToast(result.error ?? "No hay trabajadores sin Vida Ley.", "error");
+      pushToast(result.error ?? "No hay trabajadores pendientes de recepción de Vida Ley.", "error");
       return;
     }
     const descarga = await descargarVidaLeyWord({ entidadId, ids: result.ids });
@@ -44,8 +44,8 @@ export function GenerarVidaLeyGrupoButton({
       {pending
         ? "Generando…"
         : cantidad === 0
-          ? "Sin pendientes de Vida Ley"
-          : `Generar Vida Ley del grupo (${cantidad})`}
+          ? "Sin pendientes de recepción"
+          : `Elaborar Vida Ley de la empresa (${cantidad})`}
     </Button>
   );
 }
