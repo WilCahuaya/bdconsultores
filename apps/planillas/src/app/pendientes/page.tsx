@@ -7,6 +7,7 @@ import { ProcesoResumenCard, SinEmpresasPlanillas } from "@/components/ProcesoRe
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listControlEmpresa } from "@/lib/actions/pendientes";
+import { hrefPasoTrabajador } from "@/lib/flujo-ficha";
 import type { PendienteItem } from "@/lib/planillas-labels";
 
 function ApartadoTabla({
@@ -39,7 +40,7 @@ function ApartadoTabla({
                 <td className="px-4 py-2 font-mono">{item.dni}</td>
                 <td className="px-4 py-2">
                   <Link
-                    href={`/trabajadores/${item.relacionId}?tab=${item.tab}`}
+                    href={hrefPasoTrabajador(item.relacionId, item.tab)}
                     className="font-medium text-primary hover:underline"
                   >
                     {item.nombre}

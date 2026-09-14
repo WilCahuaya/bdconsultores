@@ -238,6 +238,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   revalidatePath("/");
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacion.id}`);
   revalidatePath(`/trabajadores/${relacion.id}`);
 
   await db.from("documentos").insert(
@@ -317,6 +318,7 @@ export async function updatePersonaTrabajador(
   revalidatePath("/");
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }
@@ -352,6 +354,7 @@ export async function updatePuestoTrabajador(
   revalidatePath("/");
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }
@@ -387,6 +390,7 @@ export async function darDeBajaTrabajador(
   revalidatePath("/");
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }
@@ -409,6 +413,7 @@ export async function aceptarAltaTrabajador(relacionId: string): Promise<{ error
   revalidatePath("/");
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }

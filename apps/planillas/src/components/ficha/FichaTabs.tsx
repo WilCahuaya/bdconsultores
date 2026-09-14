@@ -64,7 +64,7 @@ export function AltaPasosNav({
         return (
           <li key={paso.id}>
             <Link
-              href={`/trabajadores/${relacionId}?tab=${paso.id}`}
+              href={paso.id === "contratos" ? `/contratos/${relacionId}` : `/trabajadores/${relacionId}?tab=${paso.id}`}
               aria-current={active ? "page" : undefined}
               className={className}
             >

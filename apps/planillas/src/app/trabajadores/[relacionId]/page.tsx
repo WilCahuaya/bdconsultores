@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { FichaFlujoNav, parseFichaTab } from "@/components/ficha/FichaTabs";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
-import { FichaContratos } from "@/components/ficha/FichaContratos";
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
@@ -15,19 +14,19 @@ import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
 import {
   puedeEditarFichaLaboral,
   puedeEscribirPlanillas,
-  puedeMarcarContratoRecogido,
   puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
-import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp, asegurarDocumentoTrAlta, asegurarDocumentosVidaLey } from "@/lib/actions/ficha";
+import { getPension, getVidaLey, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp, asegurarDocumentoTrAlta, asegurarDocumentosVidaLey } from "@/lib/actions/ficha";
 import { listVacaciones } from "@/lib/actions/vacaciones";
 import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
 import {
   claseBadgePaso,
   estadoPasosAlta,
   flujoDesdeTrabajador,
+  hrefPasoTrabajador,
   resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
@@ -48,6 +47,7 @@ export default async function FichaTrabajadorPage({
   const completados = estadoPasosAlta(flujo);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
   const tab = searchParams.tab ? parseFichaTab(searchParams.tab, esEstudio) : siguiente.tab;
+  if (tab === "contratos") redirect(`/contratos/${params.relacionId}`);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const canWriteTramite = esEstudio;
@@ -64,8 +64,7 @@ export default async function FichaTrabajadorPage({
   if (esEstudio && tab === "vida-ley") {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [contratos, documentos, pension, vidaLey, tRegistro, entidad, vacaciones] = await Promise.all([
-    listContratos(params.relacionId),
+  const [documentos, pension, vidaLey, tRegistro, entidad, vacaciones] = await Promise.all([
     listDocumentos(params.relacionId),
     tab === "pensiones" || tab === "documentos" || tab === "t-registro"
       ? getPension(params.relacionId)
@@ -78,7 +77,7 @@ export default async function FichaTrabajadorPage({
   const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodoVacacion);
   const continuar =
     siguiente.paso !== "listo" && siguiente.tab !== tab
-      ? { href: `/trabajadores/${params.relacionId}?tab=${siguiente.tab}`, etiqueta: siguiente.etiqueta }
+      ? { href: hrefPasoTrabajador(params.relacionId, siguiente.tab), etiqueta: siguiente.etiqueta }
       : null;
 
   return (
@@ -121,17 +120,6 @@ export default async function FichaTrabajadorPage({
         />
         {tab === "persona" ? <FichaPersonaForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {tab === "puesto" ? <FichaPuestoForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
-        {tab === "contratos" ? (
-          <FichaContratos
-            relacionId={params.relacionId}
-            entidadId={trabajador.entidad_id}
-            trabajador={trabajador}
-            contratos={contratos}
-            documentos={documentos}
-            canWrite={canEditFicha}
-            canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
-          />
-        ) : null}
         {tab === "documentos" ? (
           <FichaAltaDocumentos
             relacionId={params.relacionId}

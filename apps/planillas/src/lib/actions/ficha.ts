@@ -241,6 +241,7 @@ export async function generarContratoParaFirma(
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   return { contratoId: idGuardado };
 }
 
@@ -278,6 +279,7 @@ export async function eliminarContratoGenerado(
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   revalidatePath("/");
   return {};
 }
@@ -342,6 +344,7 @@ export async function confirmarContratoFirmado(
   revalidatePath("/");
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }
@@ -386,6 +389,7 @@ export async function marcarContratoRecogido(
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
   return {};
 }
 
@@ -629,6 +633,8 @@ export async function setDocumentoArchivo(
     .eq("relacion_id", relacionId);
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath(`/contratos/${relacionId}`);
+  revalidatePath("/contratos");
   revalidatePath("/pendientes");
   revalidatePath("/asistencias");
   return {};

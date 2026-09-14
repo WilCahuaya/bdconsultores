@@ -18,7 +18,7 @@ import {
   resolverEtapaContrato,
   type EtapaContratoId,
 } from "@/lib/flujo-ficha";
-import { formatFechaPlanilla, nombreCompleto } from "@/lib/planillas-labels";
+import { ESTADO_RELACION_LABEL, formatFechaPlanilla, nombreCompleto } from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -50,7 +50,6 @@ export default async function ContratosPage({
   const limite = plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS);
   const trabajadores = selectedId ? await listTrabajadores(selectedId) : [];
   const filas = trabajadores
-    .filter((t) => t.estado === "ACTIVA")
     .map((trabajador) => {
       const flujo = flujoDesdeTrabajador(trabajador);
       const vigente = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
@@ -62,6 +61,7 @@ export default async function ContratosPage({
     })
     .sort((a, b) => {
       if (a.etapa.pendiente !== b.etapa.pendiente) return a.etapa.pendiente ? -1 : 1;
+      if (a.trabajador.estado !== b.trabajador.estado) return a.trabajador.estado === "ACTIVA" ? -1 : 1;
       return nombreCompleto(a.trabajador.persona).localeCompare(nombreCompleto(b.trabajador.persona), "es");
     });
   const conteo = filas.reduce(
@@ -112,8 +112,8 @@ export default async function ContratosPage({
         <div>
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Contratos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Proceso por empresa: generar el Word, subir el firmado, confirmar datos y recoger. Entre a la ficha para
-            avanzar cada paso.
+            Proceso por empresa: genere el Word, suba el firmado, confirme los datos y márquelo recogido. El nombre abre
+            el trámite de esa persona.
           </p>
         </div>
 
@@ -166,6 +166,7 @@ export default async function ContratosPage({
                   <tr>
                     <th className="px-4 py-2 font-medium">DNI</th>
                     <th className="px-4 py-2 font-medium">Nombre</th>
+                    <th className="px-4 py-2 font-medium">Estado</th>
                     <th className="px-4 py-2 font-medium">Paso</th>
                     <th className="px-4 py-2 font-medium">Inicio</th>
                     <th className="px-4 py-2 font-medium">Fin</th>
@@ -175,9 +176,9 @@ export default async function ContratosPage({
                 <tbody>
                   {visibles.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={6}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={7}>
                         {filas.length === 0
-                          ? "No hay trabajadores activos en esta empresa."
+                          ? "No hay trabajadores en esta empresa."
                           : "No hay contratos en este paso."}
                       </td>
                     </tr>
@@ -187,12 +188,13 @@ export default async function ContratosPage({
                         <td className="px-4 py-2 font-mono">{trabajador.persona.dni}</td>
                         <td className="px-4 py-2">
                           <Link
-                            href={`/trabajadores/${trabajador.id}?tab=${etapa.tab}`}
+                            href={`/contratos/${trabajador.id}`}
                             className="font-medium text-primary hover:underline"
                           >
                             {nombreCompleto(trabajador.persona)}
                           </Link>
                         </td>
+                        <td className="px-4 py-2">{ESTADO_RELACION_LABEL[trabajador.estado]}</td>
                         <td className="px-4 py-2">
                           <span
                             className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseBadgePaso(etapa.rol)}`}

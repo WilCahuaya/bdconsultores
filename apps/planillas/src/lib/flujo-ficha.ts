@@ -128,6 +128,11 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   return { paso: "contratos", tab: "contratos", etiqueta: "Revisar contrato", rol: "empresa" };
 }
 
+export function hrefPasoTrabajador(relacionId: string, tab: FlujoTab): string {
+  if (tab === "contratos" || tab === "firma") return `/contratos/${relacionId}`;
+  return `/trabajadores/${relacionId}?tab=${tab}`;
+}
+
 export const HORIZONTE_VENCIMIENTO_DIAS = 30;
 
 export const ETAPAS_CONTRATO = [

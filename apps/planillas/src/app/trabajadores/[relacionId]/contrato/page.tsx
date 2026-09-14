@@ -50,8 +50,8 @@ export default async function ContratoDocumentoPage({
   return (
     <div className="mx-auto max-w-3xl space-y-8 bg-background p-8 text-foreground print:p-0">
       <div className="flex items-center justify-between print:hidden">
-        <Link href={`/trabajadores/${params.relacionId}?tab=contratos`} className="text-sm text-primary hover:underline">
-          ← Volver a la ficha
+        <Link href={`/contratos/${params.relacionId}`} className="text-sm text-primary hover:underline">
+          ← Volver al contrato
         </Link>
         <div className="flex gap-4">
           <a href={wordHref} className="text-sm text-primary hover:underline">
@@ -116,7 +116,7 @@ export default async function ContratoDocumentoPage({
       ) : null}
       <p className="text-xs text-muted-foreground print:hidden">
         El documento para firmar es el Word. Esta vista es solo una referencia. Haga firmar el Word (o su PDF) y súbalo
-        en el paso Contrato.
+        en Contratos.
       </p>
     </div>
   );
