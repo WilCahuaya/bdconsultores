@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { PASOS_ALTA, type FlujoTab, type PasoAltaId } from "@/lib/flujo-ficha";
 
+const CONTROL = [
+  { id: "asistencia", label: "Asistencia" },
+  { id: "vacaciones", label: "Vacaciones" },
+] as const;
+
 const TRAMITES = [
-  { id: "pensiones", label: "Sistema de pensión" },
-  { id: "t-registro", label: "T-Registro" },
   { id: "vida-ley", label: "Vida Ley" },
+  { id: "t-registro", label: "T-Registro" },
+  { id: "pensiones", label: "Sistema de pensión" },
 ] as const;
 
 export type FichaTab = FlujoTab;
@@ -78,6 +83,12 @@ export function AltaPasosNav({
   );
 }
 
+function fichaTabClass(active: boolean) {
+  return active
+    ? "rounded-md px-2 py-1 font-medium text-primary"
+    : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground";
+}
+
 export function FichaFlujoNav({
   relacionId,
   tab,
@@ -90,52 +101,41 @@ export function FichaFlujoNav({
   esEstudio: boolean;
 }) {
   const pasoAlta = PASOS_ALTA.find((paso) => paso.id === tab)?.id;
-  const asistenciaActive = tab === "asistencia";
-  const vacacionesActive = tab === "vacaciones";
   return (
     <div className="space-y-4">
       <AltaPasosNav tab={pasoAlta} completados={completados} relacionId={relacionId} />
-      <nav className="flex flex-wrap items-center gap-1 text-sm">
-        <Link
-          href={`/trabajadores/${relacionId}?tab=asistencia`}
-          className={
-            asistenciaActive
-              ? "rounded-md px-2 py-1 font-medium text-primary"
-              : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
-          }
-        >
-          Asistencia
-        </Link>
-        <Link
-          href={`/trabajadores/${relacionId}?tab=vacaciones`}
-          className={
-            vacacionesActive
-              ? "rounded-md px-2 py-1 font-medium text-primary"
-              : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
-          }
-        >
-          Vacaciones
-        </Link>
+      <nav className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Control</p>
+          <div className="flex flex-wrap gap-1 text-sm">
+            {CONTROL.map((item) => (
+              <Link
+                key={item.id}
+                href={`/trabajadores/${relacionId}?tab=${item.id}`}
+                aria-current={tab === item.id ? "page" : undefined}
+                className={fichaTabClass(tab === item.id)}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
         {esEstudio ? (
-          <>
-            <span className="mx-1 text-xs text-muted-foreground">Trámites del estudio</span>
-            {TRAMITES.map((item) => {
-              const active = tab === item.id;
-              return (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Trámites del estudio</p>
+            <div className="flex flex-wrap gap-1 text-sm">
+              {TRAMITES.map((item) => (
                 <Link
                   key={item.id}
                   href={`/trabajadores/${relacionId}?tab=${item.id}`}
-                  className={
-                    active
-                      ? "rounded-md px-2 py-1 font-medium text-primary"
-                      : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
-                  }
+                  aria-current={tab === item.id ? "page" : undefined}
+                  className={fichaTabClass(tab === item.id)}
                 >
                   {item.label}
                 </Link>
-              );
-            })}
-          </>
+              ))}
+            </div>
+          </div>
         ) : null}
       </nav>
     </div>
