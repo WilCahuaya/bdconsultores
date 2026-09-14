@@ -9,6 +9,7 @@ import { setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { descargarAsistenciaExcel } from "@/lib/descargar-asistencia-excel";
 import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
@@ -98,6 +99,27 @@ export function FichaAsistencia({
             </Button>
           </div>
         ) : null}
+      </section>
+      <section className={`${panelCardClass} space-y-3 p-5`}>
+        <div>
+          <p className="text-sm font-medium">Observación · {etiquetaMesAsistencia(mes)}</p>
+          <p className="text-sm text-muted-foreground">
+            Anote si falta firma, está de vacaciones u otra novedad de este mes.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {documento?.storage_path ? (
+              <span className="font-medium text-emerald-700">PDF firmado: subido.</span>
+            ) : (
+              <span>PDF firmado: pendiente.</span>
+            )}
+          </p>
+        </div>
+        <AsistenciaNotaField
+          relacionId={relacionId}
+          mes={mes}
+          nota={documento?.nota ?? null}
+          canWrite={canWrite}
+        />
       </section>
       <DocumentoPrevisualizacion
         titulo={`Horario firmado · ${etiquetaMesAsistencia(mes)}`}

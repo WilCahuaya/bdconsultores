@@ -301,35 +301,49 @@ function xmlAttr(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function bloqueImpresion(empresa: AsistenciaExcelEmpresa): string {
+function bloqueEncabezado(empresa: AsistenciaExcelEmpresa): string {
   const nombre = xmlAttr(empresa.nombre.toUpperCase());
-  const ruc = xmlAttr(empresa.ruc?.trim() || "—");
-  const direccion = xmlAttr(empresa.direccion?.trim() || "—");
-  const header =
-    `&amp;L&amp;"Tahoma,Negrita"&amp;12ASOCIACION:&amp;"-,Normal"&amp;11 &amp;"-,Negrita Cursiva" ${nombre}&amp;"-,Normal"\n` +
-    `RUC: ${ruc}\n` +
-    `Dirección: ${direccion}`;
+  const ruc = xmlAttr(empresa.ruc?.trim() || "-");
+  const direccion = xmlAttr(empresa.direccion?.trim() || "-");
   return (
-    `<printOptions horizontalCentered="1"/>` +
-    `<pageSetup paperSize="9" scale="85" orientation="portrait"/>` +
-    `<headerFooter><oddHeader>${header}</oddHeader><oddFooter>&amp;C&amp;P</oddFooter></headerFooter>`
+    `&amp;L&amp;"Tahoma,Negrita"&amp;12ASOCIACION:&amp;"-,Normal"&amp;11 &amp;"-,Negrita Cursiva" ${nombre}&amp;"-,Normal"` +
+    `&#10;RUC: ${ruc}` +
+    `&#10;Dirección: ${direccion}`
   );
+}
+
+function insertarImpresion(xml: string, empresa: AsistenciaExcelEmpresa): string {
+  const printOptions = `<printOptions horizontalCentered="1"/>`;
+  const pageSetup = `<pageSetup paperSize="9" scale="85" orientation="portrait"/>`;
+  const headerFooter =
+    `<headerFooter><oddHeader>${bloqueEncabezado(empresa)}</oddHeader>` +
+    `<oddFooter>&amp;C&amp;P</oddFooter></headerFooter>`;
+  let next = xml
+    .replace(/<printOptions\b[^>]*\/>/g, "")
+    .replace(/<printOptions\b[\s\S]*?<\/printOptions>/g, "")
+    .replace(/<pageSetup\b[^>]*\/>/g, "")
+    .replace(/<pageSetup\b[\s\S]*?<\/pageSetup>/g, "")
+    .replace(/<headerFooter\b[\s\S]*?<\/headerFooter>/g, "");
+  if (/<pageMargins\b/.test(next)) {
+    next = next.replace(/<pageMargins\b/, `${printOptions}<pageMargins`);
+    if (/<pageMargins\b[^>]*\/>/.test(next)) {
+      return next.replace(/<pageMargins\b[^>]*\/>/, (tag) => `${tag}${pageSetup}${headerFooter}`);
+    }
+    return next.replace("</pageMargins>", `</pageMargins>${pageSetup}${headerFooter}`);
+  }
+  const bloque = `${printOptions}${pageSetup}${headerFooter}`;
+  if (next.includes("<ignoredErrors")) {
+    return next.replace("<ignoredErrors", `${bloque}<ignoredErrors`);
+  }
+  return next.replace("</worksheet>", `${bloque}</worksheet>`);
 }
 
 async function aplicarImpresionHerederos(buffer: Buffer, empresa: AsistenciaExcelEmpresa): Promise<Buffer> {
   const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
   const unzipped = unzipSync(new Uint8Array(buffer));
-  const extra = bloqueImpresion(empresa);
   for (const name of Object.keys(unzipped)) {
     if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
-    let xml = strFromU8(unzipped[name]);
-    if (xml.includes("<headerFooter")) continue;
-    if (xml.includes("</pageMargins>")) {
-      xml = xml.replace("</pageMargins>", `</pageMargins>${extra}`);
-    } else {
-      xml = xml.replace("</worksheet>", `${extra}</worksheet>`);
-    }
-    unzipped[name] = strToU8(xml);
+    unzipped[name] = strToU8(insertarImpresion(strFromU8(unzipped[name]), empresa));
   }
   return Buffer.from(zipSync(unzipped, { level: 6 }));
 }

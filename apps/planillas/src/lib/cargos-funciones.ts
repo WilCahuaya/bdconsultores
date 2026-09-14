@@ -216,3 +216,9 @@ export function etiquetaCodigoOcupacion(cargo: string | null | undefined): strin
   const canon = cargoCanonico(cargo);
   return canon ? `Código · ${CARGO_OCUPACION_CORTO[canon]}` : "Código";
 }
+
+export function cargoCorto(cargo: string | null | undefined): string {
+  const canon = cargoCanonico(cargo);
+  if (canon) return CARGO_OCUPACION_CORTO[canon];
+  return cargo?.trim() || "";
+}

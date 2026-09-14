@@ -106,7 +106,7 @@ export async function datosAsistenciaTrabajador(
 export async function listDocumentosAsistenciaMes(
   entidadId: string,
   mes: string,
-): Promise<{ relacion_id: string; id: string; storage_path: string | null; estado: string }[]> {
+): Promise<{ relacion_id: string; id: string; storage_path: string | null; estado: string; nota: string | null }[]> {
   await requirePlanillasProfile();
   const trabajadores = await listTrabajadores(entidadId);
   const ids = trabajadores.map((t) => t.id);
@@ -114,12 +114,18 @@ export async function listDocumentosAsistenciaMes(
   const db = await planillasDb();
   const { data, error } = await db
     .from("documentos")
-    .select("id, storage_path, estado, relacion_id")
+    .select("id, storage_path, estado, relacion_id, nota")
     .eq("tipo", "ASISTENCIA")
     .eq("observaciones", mes)
     .in("relacion_id", ids);
   if (error) throw new Error(error.message);
-  return (data ?? []) as { relacion_id: string; id: string; storage_path: string | null; estado: string }[];
+  return (data ?? []) as {
+    relacion_id: string;
+    id: string;
+    storage_path: string | null;
+    estado: string;
+    nota: string | null;
+  }[];
 }
 
 export async function asegurarDocumentoAsistenciaMes(
@@ -155,4 +161,25 @@ export async function asegurarDocumentoAsistenciaMes(
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/asistencias");
   return { documentoId: creado.id };
+}
+
+export async function guardarNotaAsistenciaMes(
+  relacionId: string,
+  mes: string,
+  nota: string,
+): Promise<{ error?: string }> {
+  const asegurado = await asegurarDocumentoAsistenciaMes(relacionId, mes);
+  if (asegurado.error || !asegurado.documentoId) {
+    return { error: asegurado.error ?? "No se pudo registrar el mes." };
+  }
+  const db = await planillasDb();
+  const { error } = await db
+    .from("documentos")
+    .update({ nota: nota.trim() || null })
+    .eq("id", asegurado.documentoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/asistencias");
+  return {};
 }

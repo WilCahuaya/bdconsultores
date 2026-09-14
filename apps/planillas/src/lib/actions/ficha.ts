@@ -60,6 +60,7 @@ export type DocumentoRow = {
   tipo: TipoDocumentoPlanilla;
   estado: EstadoDocumentoPlanilla;
   observaciones: string | null;
+  nota: string | null;
   storage_path: string | null;
   created_at: string;
 };
@@ -389,7 +390,7 @@ export async function listDocumentos(relacionId: string): Promise<DocumentoRow[]
   const db = await planillasDb();
   const { data, error } = await db
     .from("documentos")
-    .select("id, tipo, estado, observaciones, storage_path, created_at")
+    .select("id, tipo, estado, observaciones, nota, storage_path, created_at")
     .eq("relacion_id", relacionId)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);

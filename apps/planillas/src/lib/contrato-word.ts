@@ -13,7 +13,8 @@ import {
   WidthType,
 } from "docx";
 import type { JornadaLaboral } from "@inventario/types";
-import { cargoCanonico, funcionesDeCargo } from "@/lib/cargos-funciones";
+import { cargoCanonico, cargoCorto, funcionesDeCargo } from "@/lib/cargos-funciones";
+import { MES_ABREV } from "@/lib/horario-asistencia";
 import { estructuraHorarioParcial, formatHorarioContrato, parseHorario } from "@/lib/horario-laboral";
 import { formatRemuneracion, nombreCompleto } from "@/lib/planillas-labels";
 import { solesEnLetras } from "@/lib/soles-letras";
@@ -374,18 +375,35 @@ function tablaFirmas(d: ContratoWordDatos, g: Genero, nombreTrab: string): Table
   });
 }
 
+function tokenNombreArchivo(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\\/:*?"<>|]/g, " ")
+    .replace(/[^A-Za-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toUpperCase();
+}
+
+function nombreCortoArchivo(nombres: string, apellidoPaterno: string | null): string {
+  const nombre = nombres.trim().split(/\s+/)[0] ?? "";
+  const apellido = apellidoPaterno?.trim() ?? "";
+  return tokenNombreArchivo([nombre, apellido].filter(Boolean).join(" "));
+}
+
+function fechaArchivoContrato(iso: string): string {
+  const [year, month, day] = iso.slice(0, 10).split("-");
+  const abrev = MES_ABREV[Number(month) - 1] ?? month ?? "";
+  return `${day ?? ""} ${abrev.toUpperCase()} ${year ?? ""}`.replace(/\s+/g, " ").trim();
+}
+
 export function nombreArchivoContrato(d: ContratoWordDatos): string {
   const jornada = d.jornada === "TIEMPO_PARCIAL" ? "TP" : "TC";
-  const cargo = (cargoCanonico(d.cargo) ?? d.cargo).replace(/[\\/:*?"<>|]/g, " ").slice(0, 60).trim();
-  const persona = nombreCompleto({
-    nombres: d.personaNombres,
-    apellido_paterno: d.apellidoPaterno,
-    apellido_materno: d.apellidoMaterno,
-  })
-    .replace(/[\\/:*?"<>|]/g, " ")
-    .slice(0, 50)
-    .trim();
-  return `Contrato ${jornada} - ${cargo} - ${persona}.docx`;
+  const cargo = tokenNombreArchivo(cargoCorto(d.cargo) || d.cargo).slice(0, 40);
+  const persona = nombreCortoArchivo(d.personaNombres, d.apellidoPaterno).slice(0, 50);
+  const fecha = fechaArchivoContrato(d.fechaInicio);
+  return `CONT ${jornada} - ${cargo} - ${persona} - ${fecha}.docx`;
 }
 
 export function construirDocumentoContrato(d: ContratoWordDatos): Document {
