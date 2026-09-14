@@ -192,6 +192,53 @@ export function vidaLeyPendienteRecepcion(estado?: string | null): boolean {
   return value !== "Recepcionado" && value !== "Registrado" && value !== "Tramitado";
 }
 
+export const ETAPAS_VIDA_LEY = ["sin", "elaborado", "recepcionado", "vence", "registrado"] as const;
+export type EtapaVidaLeyId = (typeof ETAPAS_VIDA_LEY)[number];
+
+export const ETAPA_VIDA_LEY_FILTRO_LABEL: Record<EtapaVidaLeyId | "pendientes", string> = {
+  pendientes: "Pendientes",
+  sin: "Sin trámite",
+  elaborado: "Elaborado",
+  recepcionado: "Recepcionado",
+  vence: "Por vencer",
+  registrado: "Registrado",
+};
+
+export function parseEtapaVidaLeyFiltro(value: string | undefined): EtapaVidaLeyId | "pendientes" | "todos" {
+  if (value === "pendientes") return "pendientes";
+  return ETAPAS_VIDA_LEY.some((etapa) => etapa === value) ? (value as EtapaVidaLeyId) : "todos";
+}
+
+export function resolverEtapaVidaLey(
+  registro: { estado?: string | null; fecha_fin?: string | null } | null | undefined,
+  opts: { hoy: string; limite: string },
+): { id: EtapaVidaLeyId; etiqueta: string; pendiente: boolean } {
+  if (!registro) {
+    return { id: "sin", etiqueta: "Sin Vida Ley", pendiente: true };
+  }
+  if (vidaLeyPendienteRecepcion(registro.estado)) {
+    return {
+      id: "elaborado",
+      etiqueta: registro.estado?.trim() ? "Falta documentos de la aseguradora" : "Vida Ley sin estado",
+      pendiente: true,
+    };
+  }
+  if (registro.estado?.trim() === "Recepcionado") {
+    return { id: "recepcionado", etiqueta: "Falta comprobante de envío", pendiente: true };
+  }
+  if (registro.fecha_fin && registro.fecha_fin <= opts.limite) {
+    return {
+      id: "vence",
+      etiqueta:
+        registro.fecha_fin < opts.hoy
+          ? `Vida Ley vencida el ${registro.fecha_fin}`
+          : `Vida Ley vence el ${registro.fecha_fin}`,
+      pendiente: true,
+    };
+  }
+  return { id: "registrado", etiqueta: etiquetaEstadoVidaLey(registro.estado), pendiente: false };
+}
+
 export function etiquetaEstadoVidaLey(estado?: string | null): string {
   const value = estado?.trim();
   if (!value) return "Sin estado";

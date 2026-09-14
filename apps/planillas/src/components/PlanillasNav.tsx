@@ -3,11 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function PlanillasNav({ entidadId }: { entidadId?: string }) {
+export function PlanillasNav({
+  entidadId,
+  esEstudio,
+}: {
+  entidadId?: string;
+  esEstudio?: boolean;
+}) {
   const pathname = usePathname();
   const query = entidadId ? `?entidadId=${entidadId}` : "";
   const trabajadoresActive = pathname === "/" || pathname.startsWith("/trabajadores");
   const pendientesActive = pathname.startsWith("/pendientes");
+  const contratosActive = pathname.startsWith("/contratos");
+  const vidaLeyActive = pathname.startsWith("/vida-ley");
   const asistenciasActive = pathname.startsWith("/asistencias");
   const vacacionesActive = pathname.startsWith("/vacaciones");
 
@@ -24,6 +32,14 @@ export function PlanillasNav({ entidadId }: { entidadId?: string }) {
       <Link href={`/pendientes${query}`} className={linkClass(pendientesActive)}>
         Pendientes
       </Link>
+      <Link href={`/contratos${query}`} className={linkClass(contratosActive)}>
+        Contratos
+      </Link>
+      {esEstudio ? (
+        <Link href={`/vida-ley${query}`} className={linkClass(vidaLeyActive)}>
+          Vida Ley
+        </Link>
+      ) : null}
       <Link href={`/asistencias${query}`} className={linkClass(asistenciasActive)}>
         Asistencias
       </Link>

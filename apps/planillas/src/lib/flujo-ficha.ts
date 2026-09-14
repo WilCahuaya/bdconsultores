@@ -6,6 +6,7 @@ import {
   type TipoDocumentoPlanilla,
 } from "@inventario/types";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
+import { ESTADO_CONTRATO_LABEL } from "@/lib/planillas-labels";
 
 export const PASOS_ALTA = [
   { id: "documentos", n: 1, label: "Documentos" },
@@ -125,6 +126,111 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
     return { paso: "listo", tab: "contratos", etiqueta: "Recogido", rol: "hecho" };
   }
   return { paso: "contratos", tab: "contratos", etiqueta: "Revisar contrato", rol: "empresa" };
+}
+
+export const HORIZONTE_VENCIMIENTO_DIAS = 30;
+
+export const ETAPAS_CONTRATO = [
+  "alta",
+  "generar",
+  "firmar",
+  "confirmar",
+  "validar",
+  "recoger",
+  "vence",
+  "revisar",
+  "listo",
+] as const;
+
+export type EtapaContratoId = (typeof ETAPAS_CONTRATO)[number];
+
+export type EtapaContrato = {
+  id: EtapaContratoId;
+  etiqueta: string;
+  tab: FlujoTab;
+  rol: SiguientePaso["rol"];
+  pendiente: boolean;
+};
+
+export const ETAPA_CONTRATO_FILTRO_LABEL: Record<EtapaContratoId | "pendientes", string> = {
+  pendientes: "Pendientes",
+  alta: "Alta incompleta",
+  generar: "Generar",
+  firmar: "Subir firmado",
+  confirmar: "Confirmar datos",
+  validar: "Validar alta",
+  recoger: "Marcar recogido",
+  vence: "Por vencer",
+  revisar: "Revisar",
+  listo: "Recogido",
+};
+
+export function parseEtapaContratoFiltro(value: string | undefined): EtapaContratoId | "pendientes" | "todos" {
+  if (value === "pendientes") return "pendientes";
+  return ETAPAS_CONTRATO.some((etapa) => etapa === value) ? (value as EtapaContratoId) : "todos";
+}
+
+export function resolverEtapaContrato(
+  trabajador: Parameters<typeof flujoDesdeTrabajador>[0],
+  esEstudio: boolean,
+  opts?: { hoy?: string; limite?: string },
+): EtapaContrato {
+  const flujo = flujoDesdeTrabajador(trabajador);
+  const pasos = estadoPasosAlta(flujo);
+  const borrador = contratoBorrador(flujo.contratos);
+  const confirmado = contratoConfirmado(flujo.contratos);
+  const vigente = confirmado ?? contratoVigente(flujo.contratos);
+  const firmado = documentoCargado(flujo.documentos, "CONTRATO_FIRMADO");
+
+  if (!pasos.documentos) {
+    return { id: "alta", etiqueta: "Falta documentos para generar el contrato", tab: "documentos", rol: "empresa", pendiente: true };
+  }
+  if (!pasos.persona) {
+    return { id: "alta", etiqueta: "Falta completar persona para generar el contrato", tab: "persona", rol: "empresa", pendiente: true };
+  }
+  if (!pasos.puesto) {
+    return { id: "alta", etiqueta: "Falta completar puesto para generar el contrato", tab: "puesto", rol: "empresa", pendiente: true };
+  }
+  if (!borrador && !confirmado) {
+    return { id: "generar", etiqueta: "Falta generar el documento de contrato", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+  if (borrador && !firmado) {
+    return { id: "firmar", etiqueta: "Contrato generado: falta subir el firmado", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+  if (borrador && firmado) {
+    return { id: "confirmar", etiqueta: "Falta confirmar datos del contrato firmado", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+  if (flujo.validacion === "PENDIENTE") {
+    return esEstudio
+      ? { id: "validar", etiqueta: "Alta pendiente de validación", tab: "persona", rol: "estudio", pendiente: true }
+      : { id: "validar", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+  if (vigente?.estado === "ELABORADO" && firmado) {
+    return esEstudio
+      ? { id: "recoger", etiqueta: "Contrato firmado: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
+      : { id: "recoger", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+
+  const hoy = opts?.hoy ?? new Date().toISOString().slice(0, 10);
+  if (vigente?.fecha_fin && opts?.limite && vigente.fecha_fin <= opts.limite && vigente.estado !== "BAJA") {
+    return {
+      id: "vence",
+      etiqueta: vigente.fecha_fin < hoy ? `Contrato vencido el ${vigente.fecha_fin}` : `Contrato vence el ${vigente.fecha_fin}`,
+      tab: "contratos",
+      rol: "empresa",
+      pendiente: true,
+    };
+  }
+  if (vigente && vigente.estado !== "RECOGIDO" && vigente.estado !== "COMPLETO") {
+    return {
+      id: "revisar",
+      etiqueta: `Contrato: ${ESTADO_CONTRATO_LABEL[vigente.estado]}`,
+      tab: "contratos",
+      rol: "empresa",
+      pendiente: true,
+    };
+  }
+  return { id: "listo", etiqueta: "Recogido", tab: "contratos", rol: "hecho", pendiente: false };
 }
 
 export function claseBadgePaso(rol: SiguientePaso["rol"]): string {

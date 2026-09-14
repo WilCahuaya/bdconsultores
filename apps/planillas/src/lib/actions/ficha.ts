@@ -240,6 +240,7 @@ export async function generarContratoParaFirma(
   await asegurarDocumentoFirmado(relacionId);
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
+  revalidatePath("/contratos");
   return { contratoId: idGuardado };
 }
 
@@ -276,6 +277,7 @@ export async function eliminarContratoGenerado(
 
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
+  revalidatePath("/contratos");
   revalidatePath("/");
   return {};
 }
@@ -339,6 +341,7 @@ export async function confirmarContratoFirmado(
 
   revalidatePath("/");
   revalidatePath("/pendientes");
+  revalidatePath("/contratos");
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
 }
@@ -382,6 +385,7 @@ export async function marcarContratoRecogido(
 
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
+  revalidatePath("/contratos");
   return {};
 }
 
@@ -711,6 +715,7 @@ export async function saveVidaLey(relacionId: string, formData: FormData): Promi
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
+  revalidatePath("/vida-ley");
   return {};
 }
 
@@ -740,6 +745,7 @@ export async function marcarDocumentoNoAplica(
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
+  revalidatePath("/vida-ley");
   return {};
 }
 
@@ -772,12 +778,21 @@ export async function setEstadoVidaLey(
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
+  revalidatePath("/vida-ley");
   return {};
 }
 
-export async function listTrabajadoresVidaLeyPendienteRecepcion(
-  entidadId: string,
-): Promise<TrabajadorListItem[]> {
+export async function listVidaLeyEmpresa(entidadId: string): Promise<
+  {
+    trabajador: TrabajadorListItem;
+    registro: {
+      estado: string | null;
+      numero_poliza: string | null;
+      fecha_inicio: string | null;
+      fecha_fin: string | null;
+    } | null;
+  }[]
+> {
   const profile = await requirePlanillasProfile();
   if (!puedeEscribirPlanillas(profile)) return [];
   const trabajadores = (await listTrabajadores(entidadId)).filter(
@@ -787,16 +802,34 @@ export async function listTrabajadoresVidaLeyPendienteRecepcion(
   const db = await planillasDb();
   const { data, error } = await db
     .from("vida_ley")
-    .select("relacion_id, estado")
+    .select("relacion_id, estado, numero_poliza, fecha_inicio, fecha_fin")
     .in(
       "relacion_id",
       trabajadores.map((t) => t.id),
     );
   if (error) throw new Error(error.message);
-  const estadoPorRelacion = new Map(
-    (data ?? []).map((row) => [row.relacion_id as string, row.estado as string | null]),
+  const registroPorRelacion = new Map(
+    (data ?? []).map((row) => [
+      row.relacion_id as string,
+      {
+        estado: (row.estado as string | null) ?? null,
+        numero_poliza: (row.numero_poliza as string | null) ?? null,
+        fecha_inicio: (row.fecha_inicio as string | null) ?? null,
+        fecha_fin: (row.fecha_fin as string | null) ?? null,
+      },
+    ]),
   );
-  return trabajadores.filter((t) => vidaLeyPendienteRecepcion(estadoPorRelacion.get(t.id)));
+  return trabajadores.map((trabajador) => ({
+    trabajador,
+    registro: registroPorRelacion.get(trabajador.id) ?? null,
+  }));
+}
+
+export async function listTrabajadoresVidaLeyPendienteRecepcion(
+  entidadId: string,
+): Promise<TrabajadorListItem[]> {
+  const items = await listVidaLeyEmpresa(entidadId);
+  return items.filter((item) => vidaLeyPendienteRecepcion(item.registro?.estado)).map((item) => item.trabajador);
 }
 
 async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promise<{ error?: string }> {
@@ -829,6 +862,7 @@ async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promi
     revalidatePath(`/trabajadores/${t.id}`);
   }
   revalidatePath("/pendientes");
+  revalidatePath("/vida-ley");
   return {};
 }
 

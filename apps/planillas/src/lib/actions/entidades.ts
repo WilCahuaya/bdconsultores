@@ -210,6 +210,10 @@ export async function createEntidadPlanillas(formData: FormData): Promise<{
 
   revalidatePath("/");
   revalidatePath("/pendientes");
+  revalidatePath("/contratos");
+  revalidatePath("/vida-ley");
+  revalidatePath("/asistencias");
+  revalidatePath("/vacaciones");
   return {
     entidadId: data.id,
     inviteMessage: synced.inviteMessage,
@@ -259,6 +263,10 @@ export async function updateEntidadPlanillas(
 
   revalidatePath("/");
   revalidatePath("/pendientes");
+  revalidatePath("/contratos");
+  revalidatePath("/vida-ley");
+  revalidatePath("/asistencias");
+  revalidatePath("/vacaciones");
   revalidatePath(`/empresas/${entidadId}/editar`);
   return {
     entidadId: data.id,

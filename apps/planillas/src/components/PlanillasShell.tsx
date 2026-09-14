@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { portalOrigin } from "@bd/config";
-import { MODULE_PLANILLAS, PLATFORM_NAME, plataformaModulosPath, type Profile } from "@inventario/types";
+import { esPersonalEstudio, MODULE_PLANILLAS, PLATFORM_NAME, plataformaModulosPath, type Profile } from "@inventario/types";
 import { ThemeToggle } from "@/components/public/ThemeToggle";
 import { LogoutButton } from "@/components/shared/LogoutButton";
 import { PlanillasNav } from "@/components/PlanillasNav";
@@ -38,7 +38,7 @@ export function PlanillasShell({
           </div>
         </header>
         <main className="mx-auto w-full max-w-5xl flex-1 space-y-6 p-4 sm:p-6 lg:p-8">
-          <PlanillasNav entidadId={entidadId} />
+          <PlanillasNav entidadId={entidadId} esEstudio={esPersonalEstudio(profile.rol)} />
           {children}
         </main>
       </div>
