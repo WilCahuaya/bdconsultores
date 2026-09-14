@@ -15,8 +15,6 @@ import { listPendientes } from "@/lib/actions/pendientes";
 import { claseBadgePaso, flujoDesdeTrabajador, resolverSiguientePaso } from "@/lib/flujo-ficha";
 import { nombreCompleto } from "@/lib/planillas-labels";
 
-const TIPOS_TRAMITE = new Set(["afp", "t-registro", "vida-ley", "vencimiento"]);
-
 export default async function PlanillasHomePage({
   searchParams,
 }: {
@@ -36,9 +34,7 @@ export default async function PlanillasHomePage({
   const canCreate = puedeCrearEntidad(profile);
   const esEstudio = puedeEscribirPlanillas(profile);
   const aviso = searchParams.aviso?.trim() || null;
-  const pendientesVisibles = esEstudio
-    ? pendientes
-    : pendientes.filter((p) => !TIPOS_TRAMITE.has(p.tipo) && p.tipo !== "validacion");
+  const pendientesVisibles = pendientes;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>

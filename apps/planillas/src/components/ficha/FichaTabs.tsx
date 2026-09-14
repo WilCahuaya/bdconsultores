@@ -91,6 +91,7 @@ export function FichaFlujoNav({
 }) {
   const pasoAlta = PASOS_ALTA.find((paso) => paso.id === tab)?.id;
   const asistenciaActive = tab === "asistencia";
+  const vacacionesActive = tab === "vacaciones";
   return (
     <div className="space-y-4">
       <AltaPasosNav tab={pasoAlta} completados={completados} relacionId={relacionId} />
@@ -104,6 +105,16 @@ export function FichaFlujoNav({
           }
         >
           Asistencia
+        </Link>
+        <Link
+          href={`/trabajadores/${relacionId}?tab=vacaciones`}
+          className={
+            vacacionesActive
+              ? "rounded-md px-2 py-1 font-medium text-primary"
+              : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground"
+          }
+        >
+          Vacaciones
         </Link>
         {esEstudio ? (
           <>
@@ -141,6 +152,7 @@ const TABS: FichaTab[] = [
   "t-registro",
   "vida-ley",
   "asistencia",
+  "vacaciones",
 ];
 
 export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab {

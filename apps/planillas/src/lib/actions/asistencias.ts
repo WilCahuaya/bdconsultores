@@ -160,6 +160,7 @@ export async function asegurarDocumentoAsistenciaMes(
   if (error || !creado) return { error: error?.message ?? "No se pudo registrar la asistencia." };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/asistencias");
+  revalidatePath("/pendientes");
   return { documentoId: creado.id };
 }
 
@@ -181,5 +182,6 @@ export async function guardarNotaAsistenciaMes(
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/asistencias");
+  revalidatePath("/pendientes");
   return {};
 }

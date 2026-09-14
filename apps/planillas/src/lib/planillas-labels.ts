@@ -215,7 +215,7 @@ export const ESTADO_VALIDACION_ALTA_LABEL: Record<EstadoValidacionAltaPlanilla, 
   ACEPTADA: "Aceptada",
 };
 
-export const PENDIENTE_TIPOS = ["validacion", "contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"] as const;
+export const PENDIENTE_TIPOS = ["contrato", "vida-ley", "asistencia", "vacaciones"] as const;
 export type PendienteTipo = (typeof PENDIENTE_TIPOS)[number];
 
 export type PendienteItem = {
@@ -225,17 +225,14 @@ export type PendienteItem = {
   nombre: string;
   tipo: PendienteTipo;
   detalle: string;
-  tab: "persona" | "puesto" | "contratos" | "documentos" | "pensiones" | "t-registro" | "vida-ley";
+  tab: "persona" | "puesto" | "contratos" | "documentos" | "vida-ley" | "asistencia" | "vacaciones";
 };
 
 export const PENDIENTE_TIPO_LABEL: Record<PendienteTipo, string> = {
-  validacion: "Validación",
   contrato: "Contrato",
-  documento: "Documento",
-  afp: "AFP",
-  "t-registro": "T-Registro",
   "vida-ley": "Vida Ley",
-  vencimiento: "Vencimiento",
+  asistencia: "Asistencia",
+  vacaciones: "Vacaciones",
 };
 
 export function parsePendienteTipo(value: string | undefined): PendienteTipo | "todos" {

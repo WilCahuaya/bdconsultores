@@ -1,37 +1,33 @@
 "use server";
 
-import type { EstadoContratoPlanilla, EstadoDocumentoPlanilla, TipoDocumentoPlanilla } from "@inventario/types";
-import { entidadAlcance, requirePlanillasProfile } from "@/lib/auth/access";
-import { planillasDb } from "@/lib/supabase/planillas";
+import type { EstadoContratoPlanilla } from "@inventario/types";
+import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { listTrabajadores } from "@/lib/actions/trabajadores";
+import { esMesAsistencia, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import {
   ESTADO_CONTRATO_LABEL,
-  ESTADO_DOCUMENTO_LABEL,
-  TIPO_DOCUMENTO_LABEL,
   nombreCompleto,
   vidaLeyPendienteRecepcion,
   type PendienteItem,
-  type PendienteTipo,
 } from "@/lib/planillas-labels";
+import {
+  contratoBorrador,
+  contratoConfirmado,
+  contratoVigente,
+  documentoCargado,
+  estadoPasosAlta,
+  flujoDesdeTrabajador,
+} from "@/lib/flujo-ficha";
+import { planillasDb } from "@/lib/supabase/planillas";
+import { anioActualLima, saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
 
 const HORIZONTE_DIAS = 30;
 
-const CONTRATO_EN_TRAMITE = new Set<EstadoContratoPlanilla>([
-  "PENDIENTE_DOCS",
-  "ELABORADO",
-  "ENVIADO_FIRMA",
-  "FIRMADO",
-  "PRESENTADO_MTPE",
-  "RECEPCIONADO",
-  "NO_UBICADO",
-]);
-
-const DOC_PENDIENTE = new Set<EstadoDocumentoPlanilla>(["PENDIENTE", "NO"]);
-
-type PersonaEmbed = {
-  dni: string;
-  nombres: string;
-  apellido_paterno: string | null;
-  apellido_materno: string | null;
+export type ControlEmpresa = {
+  contratos: PendienteItem[];
+  vidaLey: PendienteItem[];
+  asistencia: PendienteItem[];
+  vacaciones: PendienteItem[];
 };
 
 function todayIso(): string {
@@ -44,257 +40,206 @@ function plusDays(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function personaDe(row: { personas?: PersonaEmbed | PersonaEmbed[] | null }): PersonaEmbed | null {
-  const raw = row.personas;
-  const persona = Array.isArray(raw) ? raw[0] : raw;
-  return persona ?? null;
+function baseDe(trabajador: { id: string; persona: { dni: string; nombres: string; apellido_paterno: string | null; apellido_materno: string | null } }) {
+  return {
+    relacionId: trabajador.id,
+    dni: trabajador.persona.dni,
+    nombre: nombreCompleto(trabajador.persona),
+  };
 }
 
-export async function listPendientes(entidadId: string): Promise<PendienteItem[]> {
+function detalleContrato(
+  trabajador: Parameters<typeof flujoDesdeTrabajador>[0],
+  esEstudio: boolean,
+): { detalle: string; tab: PendienteItem["tab"] } | null {
+  const flujo = flujoDesdeTrabajador(trabajador);
+  const pasos = estadoPasosAlta(flujo);
+  const borrador = contratoBorrador(flujo.contratos);
+  const confirmado = contratoConfirmado(flujo.contratos);
+  const vigente = confirmado ?? contratoVigente(flujo.contratos);
+  const firmado = documentoCargado(flujo.documentos, "CONTRATO_FIRMADO");
+
+  if (!pasos.documentos) return { detalle: "Falta documentos para generar el contrato", tab: "documentos" };
+  if (!pasos.persona) return { detalle: "Falta completar persona para generar el contrato", tab: "persona" };
+  if (!pasos.puesto) return { detalle: "Falta completar puesto para generar el contrato", tab: "puesto" };
+  if (!borrador && !confirmado) return { detalle: "Falta generar el documento de contrato", tab: "contratos" };
+  if (borrador && !firmado) return { detalle: "Contrato generado: falta subir el firmado", tab: "contratos" };
+  if (borrador && firmado) return { detalle: "Falta confirmar datos del contrato firmado", tab: "contratos" };
+  if (flujo.validacion === "PENDIENTE") {
+    return esEstudio
+      ? { detalle: "Alta pendiente de validación", tab: "persona" }
+      : { detalle: "Contrato en revisión del estudio", tab: "contratos" };
+  }
+  if (vigente?.estado === "ELABORADO" && firmado) {
+    return esEstudio
+      ? { detalle: "Contrato firmado: falta marcar recogido", tab: "contratos" }
+      : { detalle: "Contrato en revisión del estudio", tab: "contratos" };
+  }
+  return null;
+}
+
+export async function listControlEmpresa(entidadId: string): Promise<ControlEmpresa> {
   const profile = await requirePlanillasProfile();
   const alcance = entidadAlcance(profile);
-  if (alcance !== "todas" && alcance !== entidadId) return [];
+  const vacio: ControlEmpresa = { contratos: [], vidaLey: [], asistencia: [], vacaciones: [] };
+  if (alcance !== "todas" && alcance !== entidadId) return vacio;
 
+  const esEstudio = puedeEscribirPlanillas(profile);
+  const trabajadores = await listTrabajadores(entidadId);
+  if (trabajadores.length === 0) return vacio;
+
+  const ids = trabajadores.map((t) => t.id);
+  const mes = mesActualLima();
+  const periodo = anioActualLima();
+  const hoy = todayIso();
+  const limite = plusDays(hoy, HORIZONTE_DIAS);
   const db = await planillasDb();
-  const { data: relaciones, error } = await db
-    .from("relaciones_laborales")
-    .select(
-      "id, estado, validacion, personas!persona_id (dni, nombres, apellido_paterno, apellido_materno)",
-    )
-    .eq("entidad_id", entidadId);
 
-  if (error) throw new Error(error.message);
-  if (!relaciones?.length) return [];
-
-  const ids = relaciones.map((r) => r.id);
-  const [contratosRes, documentosRes, pensionesRes, vidaLeyRes, tRegistroRes] = await Promise.all([
-    db.from("contratos").select("relacion_id, es_vigente, estado, fecha_fin").in("relacion_id", ids),
-    db.from("documentos").select("id, relacion_id, tipo, estado").in("relacion_id", ids),
-    db.from("pensiones").select("relacion_id, tipo, cuspp, tramite_estado").in("relacion_id", ids),
+  const [vidaLeyRes, asistenciaRes, vacacionesRes] = await Promise.all([
     db.from("vida_ley").select("relacion_id, estado, fecha_fin").in("relacion_id", ids),
-    db.from("t_registro").select("relacion_id, tipo, realizado").in("relacion_id", ids),
+    esMesAsistencia(mes)
+      ? db
+          .from("documentos")
+          .select("relacion_id, storage_path")
+          .eq("tipo", "ASISTENCIA")
+          .eq("observaciones", mes)
+          .in("relacion_id", ids)
+      : Promise.resolve({ data: [] as { relacion_id: string; storage_path: string | null }[], error: null }),
+    db.from("vacaciones").select("relacion_id, dias").eq("periodo", periodo).in("relacion_id", ids),
   ]);
 
-  for (const res of [contratosRes, documentosRes, pensionesRes, vidaLeyRes, tRegistroRes]) {
+  for (const res of [vidaLeyRes, asistenciaRes, vacacionesRes]) {
     if (res.error) throw new Error(res.error.message);
   }
 
-  const hoy = todayIso();
-  const limite = plusDays(hoy, HORIZONTE_DIAS);
-  const items: PendienteItem[] = [];
+  const vidaLeyPorId = new Map((vidaLeyRes.data ?? []).map((row) => [row.relacion_id as string, row]));
+  const pdfAsistencia = new Set(
+    (asistenciaRes.data ?? [])
+      .filter((row) => Boolean(row.storage_path))
+      .map((row) => row.relacion_id as string),
+  );
+  const diasVacacion = new Map<string, number>();
+  for (const row of vacacionesRes.data ?? []) {
+    const id = row.relacion_id as string;
+    diasVacacion.set(id, (diasVacacion.get(id) ?? 0) + Number(row.dias ?? 0));
+  }
 
-  for (const relacion of relaciones) {
-    const persona = personaDe(relacion);
-    if (!persona) continue;
-    const nombre = nombreCompleto(persona);
-    const base = { relacionId: relacion.id, dni: persona.dni, nombre };
-    const activa = relacion.estado === "ACTIVA";
-    const pendienteValidacion = relacion.validacion === "PENDIENTE";
+  const contratos: PendienteItem[] = [];
+  const vidaLey: PendienteItem[] = [];
+  const asistencia: PendienteItem[] = [];
+  const vacaciones: PendienteItem[] = [];
 
-    const contratos = (contratosRes.data ?? []).filter((c) => c.relacion_id === relacion.id);
-    const documentos = (documentosRes.data ?? []).filter((d) => d.relacion_id === relacion.id);
-    const pension = (pensionesRes.data ?? []).find((p) => p.relacion_id === relacion.id);
-    const vidaLey = (vidaLeyRes.data ?? []).find((v) => v.relacion_id === relacion.id);
-    const tRegistros = (tRegistroRes.data ?? []).filter((t) => t.relacion_id === relacion.id);
-
-    if (pendienteValidacion) {
-      items.push({
-        ...base,
-        id: `${relacion.id}:validacion`,
-        tipo: "validacion",
-        detalle: "Alta pendiente de validación del estudio",
-        tab: "persona",
-      });
-    }
+  for (const trabajador of trabajadores) {
+    const base = baseDe(trabajador);
+    const activa = trabajador.estado === "ACTIVA";
 
     if (activa) {
-      const vigente = contratos.find((c) => c.es_vigente);
-      if (!vigente) {
-        items.push({
+      const contrato = detalleContrato(trabajador, esEstudio);
+      if (contrato) {
+        contratos.push({
           ...base,
-          id: `${relacion.id}:contrato:sin-vigente`,
+          id: `${trabajador.id}:contrato`,
           tipo: "contrato",
-          detalle: "Sin contrato vigente",
-          tab: "contratos",
+          detalle: contrato.detalle,
+          tab: contrato.tab,
         });
       } else {
-        const estado = vigente.estado as EstadoContratoPlanilla;
-        if (CONTRATO_EN_TRAMITE.has(estado)) {
-          const detalle =
-            estado === "PENDIENTE_DOCS"
-              ? "Contrato: falta generar el documento"
-              : estado === "ELABORADO"
-                ? "Contrato elaborado: falta recoger el firmado"
-                : `Contrato: ${ESTADO_CONTRATO_LABEL[estado]}`;
-          items.push({
+        const vigente = contratoVigente(flujoDesdeTrabajador(trabajador).contratos);
+        const estado = vigente?.estado as EstadoContratoPlanilla | undefined;
+        if (vigente?.fecha_fin && vigente.fecha_fin <= limite && estado !== "BAJA") {
+          contratos.push({
             ...base,
-            id: `${relacion.id}:contrato:${estado}`,
+            id: `${trabajador.id}:contrato:vence`,
             tipo: "contrato",
-            detalle,
-            tab: "contratos",
-          });
-        }
-        if (vigente.fecha_fin && vigente.fecha_fin <= limite) {
-          items.push({
-            ...base,
-            id: `${relacion.id}:vencimiento:contrato`,
-            tipo: "vencimiento",
             detalle:
               vigente.fecha_fin < hoy
                 ? `Contrato vencido el ${vigente.fecha_fin}`
                 : `Contrato vence el ${vigente.fecha_fin}`,
             tab: "contratos",
           });
-        }
-      }
-
-      if (!pendienteValidacion) {
-        if (!pension) {
-        items.push({
-          ...base,
-          id: `${relacion.id}:afp:sin`,
-          tipo: "afp",
-          detalle: "Sin sistema de pensiones",
-          tab: "pensiones",
-        });
-      } else if (pension.tipo === "AFP") {
-        if (pension.tramite_estado === "PENDIENTE") {
-          items.push({
+        } else if (vigente && estado && estado !== "RECOGIDO" && estado !== "COMPLETO") {
+          contratos.push({
             ...base,
-            id: `${relacion.id}:afp:tramite`,
-            tipo: "afp",
-            detalle: "Trámite AFP pendiente",
-            tab: "pensiones",
-          });
-        } else if (!pension.cuspp?.trim()) {
-          items.push({
-            ...base,
-            id: `${relacion.id}:afp:cuspp`,
-            tipo: "afp",
-            detalle: "AFP sin CUSPP",
-            tab: "pensiones",
+            id: `${trabajador.id}:contrato:${estado}`,
+            tipo: "contrato",
+            detalle: `Contrato: ${ESTADO_CONTRATO_LABEL[estado]}`,
+            tab: "contratos",
           });
         }
       }
 
-      const altaOk = tRegistros.some((t) => t.tipo === "ALTA" && t.realizado);
-      if (!altaOk) {
-        items.push({
-          ...base,
-          id: `${relacion.id}:tr:alta`,
-          tipo: "t-registro",
-          detalle: "Alta en T-Registro pendiente",
-          tab: "t-registro",
-        });
-      }
-
-      if (!vidaLey) {
-        items.push({
-          ...base,
-          id: `${relacion.id}:vidaley:sin`,
-          tipo: "vida-ley",
-          detalle: "Sin Vida Ley",
-          tab: "vida-ley",
-        });
-      } else {
-        const estadoVida = vidaLey.estado?.trim();
-        if (!estadoVida) {
-          items.push({
+      if (esEstudio && trabajador.validacion !== "PENDIENTE") {
+        const registro = vidaLeyPorId.get(trabajador.id);
+        if (!registro) {
+          vidaLey.push({
             ...base,
-            id: `${relacion.id}:vidaley:estado`,
+            id: `${trabajador.id}:vidaley:sin`,
             tipo: "vida-ley",
-            detalle: "Vida Ley sin estado",
+            detalle: "Sin Vida Ley",
             tab: "vida-ley",
           });
-        } else if (vidaLeyPendienteRecepcion(estadoVida)) {
-          items.push({
+        } else if (vidaLeyPendienteRecepcion(registro.estado)) {
+          vidaLey.push({
             ...base,
-            id: `${relacion.id}:vidaley:docs`,
+            id: `${trabajador.id}:vidaley:docs`,
             tipo: "vida-ley",
-            detalle: "Falta documentos de la aseguradora",
+            detalle: registro.estado?.trim()
+              ? "Falta documentos de la aseguradora"
+              : "Vida Ley sin estado",
             tab: "vida-ley",
           });
-        } else if (
-          estadoVida === "Recepcionado" ||
-          estadoVida === "Tramitado"
-        ) {
-          const comprobante = documentos.find((d) => d.tipo === "VIDA_LEY_COMPROBANTE");
-          if (!comprobante || DOC_PENDIENTE.has(comprobante.estado as EstadoDocumentoPlanilla)) {
-            items.push({
-              ...base,
-              id: `${relacion.id}:vidaley:comprobante`,
-              tipo: "vida-ley",
-              detalle: "Falta comprobante de envío de Vida Ley",
-              tab: "vida-ley",
-            });
-          }
-        }
-        if (!vidaLey.fecha_fin) {
-          items.push({
+        } else if (registro.fecha_fin && registro.fecha_fin <= limite) {
+          vidaLey.push({
             ...base,
-            id: `${relacion.id}:vidaley:sin-fin`,
+            id: `${trabajador.id}:vidaley:vence`,
             tipo: "vida-ley",
-            detalle: "Vida Ley sin fecha de fin",
-            tab: "vida-ley",
-          });
-        } else if (vidaLey.fecha_fin <= limite) {
-          items.push({
-            ...base,
-            id: `${relacion.id}:vencimiento:vidaley`,
-            tipo: "vencimiento",
             detalle:
-              vidaLey.fecha_fin < hoy
-                ? `Vida Ley vencida el ${vidaLey.fecha_fin}`
-                : `Vida Ley vence el ${vidaLey.fecha_fin}`,
+              registro.fecha_fin < hoy
+                ? `Vida Ley vencida el ${registro.fecha_fin}`
+                : `Vida Ley vence el ${registro.fecha_fin}`,
             tab: "vida-ley",
           });
         }
       }
+
+      if (trabajadorActivoEnMes(mes, trabajador.fecha_ingreso, trabajador.fecha_cese) && !pdfAsistencia.has(trabajador.id)) {
+        asistencia.push({
+          ...base,
+          id: `${trabajador.id}:asistencia:${mes}`,
+          tipo: "asistencia",
+          detalle: "Falta PDF firmado del mes",
+          tab: "asistencia",
+        });
       }
 
-      for (const doc of documentos) {
-        const estado = doc.estado as EstadoDocumentoPlanilla;
-        if (!DOC_PENDIENTE.has(estado)) continue;
-        const tipo = doc.tipo as TipoDocumentoPlanilla;
-        if (
-          tipo === "TRAMITE_AFP" ||
-          tipo === "TR_ALTA" ||
-          tipo === "TR_BAJA" ||
-          tipo === "VIDA_LEY" ||
-          tipo === "VIDA_LEY_CONSTANCIA" ||
-          tipo === "VIDA_LEY_FACTURA" ||
-          tipo === "VIDA_LEY_COMPROBANTE" ||
-          tipo === "ASISTENCIA"
-        ) {
-          continue;
+      if (tieneDerechoVacaciones(trabajador.fecha_ingreso)) {
+        const tomados = diasVacacion.get(trabajador.id) ?? 0;
+        const saldo = saldoVacaciones(tomados);
+        if (saldo > 0) {
+          vacaciones.push({
+            ...base,
+            id: `${trabajador.id}:vacaciones:${periodo}`,
+            tipo: "vacaciones",
+            detalle:
+              tomados === 0
+                ? `Sin vacaciones registradas en ${periodo}`
+                : `Quedan ${saldo} día${saldo === 1 ? "" : "s"} de goce en ${periodo}`,
+            tab: "vacaciones",
+          });
         }
-        items.push({
-          ...base,
-          id: `${relacion.id}:doc:${doc.id}`,
-          tipo: "documento",
-          detalle: `${TIPO_DOCUMENTO_LABEL[tipo]}: ${ESTADO_DOCUMENTO_LABEL[estado]}`,
-          tab: "contratos",
-        });
-      }
-    } else {
-      const bajaOk = tRegistros.some((t) => t.tipo === "BAJA" && t.realizado);
-      if (!bajaOk) {
-        items.push({
-          ...base,
-          id: `${relacion.id}:tr:baja`,
-          tipo: "t-registro",
-          detalle: "Baja en T-Registro pendiente",
-          tab: "t-registro",
-        });
       }
     }
   }
 
-  const ordenTipo: PendienteTipo[] = ["validacion", "contrato", "documento", "afp", "t-registro", "vida-ley", "vencimiento"];
-  items.sort((a, b) => {
-    const tipo = ordenTipo.indexOf(a.tipo) - ordenTipo.indexOf(b.tipo);
-    if (tipo !== 0) return tipo;
-    return a.nombre.localeCompare(b.nombre, "es");
-  });
-  return items;
+  const porNombre = (a: PendienteItem, b: PendienteItem) => a.nombre.localeCompare(b.nombre, "es");
+  contratos.sort(porNombre);
+  vidaLey.sort(porNombre);
+  asistencia.sort(porNombre);
+  vacaciones.sort(porNombre);
+  return { contratos, vidaLey, asistencia, vacaciones };
+}
+
+export async function listPendientes(entidadId: string): Promise<PendienteItem[]> {
+  const control = await listControlEmpresa(entidadId);
+  return [...control.contratos, ...control.vidaLey, ...control.asistencia, ...control.vacaciones];
 }

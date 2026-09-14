@@ -9,6 +9,7 @@ export function PlanillasNav({ entidadId }: { entidadId?: string }) {
   const trabajadoresActive = pathname === "/" || pathname.startsWith("/trabajadores");
   const pendientesActive = pathname.startsWith("/pendientes");
   const asistenciasActive = pathname.startsWith("/asistencias");
+  const vacacionesActive = pathname.startsWith("/vacaciones");
 
   const linkClass = (active: boolean) =>
     active
@@ -16,7 +17,7 @@ export function PlanillasNav({ entidadId }: { entidadId?: string }) {
       : "px-1 pb-2 text-sm text-muted-foreground hover:text-foreground";
 
   return (
-    <nav className="flex gap-4 border-b border-border">
+    <nav className="flex flex-wrap gap-4 border-b border-border">
       <Link href={`/${query}`} className={linkClass(trabajadoresActive)}>
         Trabajadores
       </Link>
@@ -25,6 +26,9 @@ export function PlanillasNav({ entidadId }: { entidadId?: string }) {
       </Link>
       <Link href={`/asistencias${query}`} className={linkClass(asistenciasActive)}>
         Asistencias
+      </Link>
+      <Link href={`/vacaciones${query}`} className={linkClass(vacacionesActive)}>
+        Vacaciones
       </Link>
     </nav>
   );

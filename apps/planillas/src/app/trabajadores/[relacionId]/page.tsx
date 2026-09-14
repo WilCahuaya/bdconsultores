@@ -10,6 +10,7 @@ import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
 import { FichaAsistencia } from "@/components/ficha/FichaAsistencia";
+import { FichaVacaciones } from "@/components/ficha/FichaVacaciones";
 import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
 import {
   puedeEditarFichaLaboral,
@@ -21,6 +22,8 @@ import {
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { getPension, getVidaLey, listContratos, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp, asegurarDocumentoTrAlta, asegurarDocumentosVidaLey } from "@/lib/actions/ficha";
+import { listVacaciones } from "@/lib/actions/vacaciones";
+import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
 import {
   claseBadgePaso,
   estadoPasosAlta,
@@ -34,7 +37,7 @@ export default async function FichaTrabajadorPage({
   searchParams,
 }: {
   params: { relacionId: string };
-  searchParams: { tab?: string };
+  searchParams: { tab?: string; periodo?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const trabajador = await getTrabajador(params.relacionId);
@@ -45,6 +48,7 @@ export default async function FichaTrabajadorPage({
   const completados = estadoPasosAlta(flujo);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
   const tab = searchParams.tab ? parseFichaTab(searchParams.tab, esEstudio) : siguiente.tab;
+  const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const canWriteTramite = esEstudio;
   const porValidar = trabajador.validacion === "PENDIENTE";
@@ -60,7 +64,7 @@ export default async function FichaTrabajadorPage({
   if (esEstudio && tab === "vida-ley") {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [contratos, documentos, pension, vidaLey, tRegistro, entidad] = await Promise.all([
+  const [contratos, documentos, pension, vidaLey, tRegistro, entidad, vacaciones] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
     tab === "pensiones" || tab === "documentos" || tab === "t-registro"
@@ -69,7 +73,9 @@ export default async function FichaTrabajadorPage({
     tab === "vida-ley" ? getVidaLey(params.relacionId) : Promise.resolve(null),
     tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
     tab === "pensiones" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
+    tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
   ]);
+  const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodoVacacion);
   const continuar =
     siguiente.paso !== "listo" && siguiente.tab !== tab
       ? { href: `/trabajadores/${params.relacionId}?tab=${siguiente.tab}`, etiqueta: siguiente.etiqueta }
@@ -178,6 +184,34 @@ export default async function FichaTrabajadorPage({
             documentos={documentos}
             canWrite={canEditFicha}
           />
+        ) : null}
+        {tab === "vacaciones" ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2 text-sm">
+              <Link
+                href={`/trabajadores/${params.relacionId}?tab=vacaciones&periodo=${periodoVacacion - 1}`}
+                className="text-primary hover:underline"
+              >
+                {periodoVacacion - 1}
+              </Link>
+              <span className="font-medium text-foreground">{periodoVacacion}</span>
+              <Link
+                href={`/trabajadores/${params.relacionId}?tab=vacaciones&periodo=${periodoVacacion + 1}`}
+                className="text-primary hover:underline"
+              >
+                {periodoVacacion + 1}
+              </Link>
+            </div>
+            <FichaVacaciones
+              relacionId={params.relacionId}
+              periodo={periodoVacacion}
+              derecho={resumenVac.derecho}
+              diasTomados={resumenVac.diasTomados}
+              saldo={resumenVac.saldo}
+              registros={resumenVac.registros}
+              canWrite={canEditFicha}
+            />
+          </div>
         ) : null}
         {continuar ? (
           <Link
