@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { FichaFlujoNav, parseFichaTab } from "@/components/ficha/FichaTabs";
+import { FichaDatosNav, ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
@@ -10,11 +10,9 @@ import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
 import { FichaAsistencia } from "@/components/ficha/FichaAsistencia";
 import { FichaVacaciones } from "@/components/ficha/FichaVacaciones";
-import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
 import {
   puedeEditarFichaLaboral,
   puedeEscribirPlanillas,
-  puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
@@ -22,14 +20,24 @@ import { getTrabajador } from "@/lib/actions/trabajadores";
 import { getPension, getVidaLey, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp, asegurarDocumentoTrAlta, asegurarDocumentosVidaLey } from "@/lib/actions/ficha";
 import { listVacaciones } from "@/lib/actions/vacaciones";
 import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
+import { mesActualLima } from "@/lib/horario-asistencia";
 import {
-  claseBadgePaso,
+  HORIZONTE_VENCIMIENTO_DIAS,
+  enlaceProcesoOperativo,
+  enlaceProcesoPendiente,
+  esTabFicha,
   estadoPasosAlta,
   flujoDesdeTrabajador,
-  hrefPasoTrabajador,
   resolverSiguientePaso,
+  tabFichaInicial,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
+
+function plusDays(iso: string, days: number): string {
+  const date = new Date(`${iso}T12:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
 
 export default async function FichaTrabajadorPage({
   params,
@@ -46,12 +54,13 @@ export default async function FichaTrabajadorPage({
   const flujo = flujoDesdeTrabajador(trabajador);
   const completados = estadoPasosAlta(flujo);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
-  const tab = searchParams.tab ? parseFichaTab(searchParams.tab, esEstudio) : siguiente.tab;
+  const tab = searchParams.tab ? parseFichaTab(searchParams.tab, esEstudio) : tabFichaInicial(completados);
   if (tab === "contratos") redirect(`/contratos/${params.relacionId}`);
+  const ficha = esTabFicha(tab);
+  const necesitaOperativo = ficha && siguiente.paso === "listo";
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const canWriteTramite = esEstudio;
-  const porValidar = trabajador.validacion === "PENDIENTE";
   if (tab === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
   }
@@ -69,16 +78,38 @@ export default async function FichaTrabajadorPage({
     tab === "pensiones" || tab === "documentos" || tab === "t-registro"
       ? getPension(params.relacionId)
       : Promise.resolve(null),
-    tab === "vida-ley" ? getVidaLey(params.relacionId) : Promise.resolve(null),
+    esEstudio && (tab === "vida-ley" || necesitaOperativo)
+      ? getVidaLey(params.relacionId)
+      : Promise.resolve(null),
     tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
     tab === "pensiones" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
-    tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
+    tab === "vacaciones" || necesitaOperativo ? listVacaciones(params.relacionId) : Promise.resolve([]),
   ]);
   const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodoVacacion);
-  const continuar =
-    siguiente.paso !== "listo" && siguiente.tab !== tab
-      ? { href: hrefPasoTrabajador(params.relacionId, siguiente.tab), etiqueta: siguiente.etiqueta }
-      : null;
+  const mes = mesActualLima();
+  const periodo = anioActualLima();
+  const hoy = new Date().toISOString().slice(0, 10);
+  const proceso =
+    enlaceProcesoPendiente(params.relacionId, siguiente) ??
+    (necesitaOperativo
+      ? enlaceProcesoOperativo({
+          entidadId: trabajador.entidad_id,
+          esEstudio,
+          estado: trabajador.estado,
+          validacion: trabajador.validacion,
+          fechaIngreso: trabajador.fecha_ingreso,
+          fechaCese: trabajador.fecha_cese,
+          vidaLey,
+          pdfAsistenciaMes: documentos.some(
+            (d) => d.tipo === "ASISTENCIA" && d.observaciones === mes && Boolean(d.storage_path),
+          ),
+          diasVacacionPeriodo: vacaciones.filter((row) => row.periodo === periodo).reduce((sum, row) => sum + row.dias, 0),
+          mes,
+          periodo,
+          hoy,
+          limite: plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS),
+        })
+      : null);
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
@@ -94,30 +125,25 @@ export default async function FichaTrabajadorPage({
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
         </div>
-        <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
-          <span className="text-muted-foreground">Siguiente paso</span>
-          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}>
-            {siguiente.etiqueta}
-          </span>
-        </p>
-        {porValidar ? (
-          <div className={`${panelCardClass} space-y-3 p-5`}>
-            <p className="text-sm text-foreground">
-              {esEstudio
-                ? "Alta pendiente de validación. Revise documentos y contrato, y acepte el alta cuando corresponda."
-                : "Alta pendiente de validación. Complete documentos y contrato; el estudio aceptará el alta."}
-            </p>
-            {puedeValidarAlta(profile) ? <AceptarAltaButton relacionId={params.relacionId} /> : (
-              <p className="text-sm text-muted-foreground">El contador o el asistente deben aceptar este alta.</p>
-            )}
-          </div>
-        ) : null}
-        <FichaFlujoNav
-          relacionId={params.relacionId}
-          tab={tab}
-          completados={completados}
-          esEstudio={esEstudio}
-        />
+        {esTabFicha(tab) ? (
+          <>
+            {proceso ? (
+              <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
+                <span className="text-muted-foreground">Proceso pendiente</span>
+                <Link href={proceso.href} className="font-medium text-primary hover:underline">
+                  {proceso.etiqueta}
+                </Link>
+              </p>
+            ) : null}
+            <FichaDatosNav relacionId={params.relacionId} tab={tab} completados={completados} />
+          </>
+        ) : (
+          <ProcesoDesdeFichaHeader
+            relacionId={params.relacionId}
+            entidadId={trabajador.entidad_id}
+            tab={tab}
+          />
+        )}
         {tab === "persona" ? <FichaPersonaForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {tab === "puesto" ? <FichaPuestoForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {tab === "documentos" ? (
@@ -200,14 +226,6 @@ export default async function FichaTrabajadorPage({
               canWrite={canEditFicha}
             />
           </div>
-        ) : null}
-        {continuar ? (
-          <Link
-            href={continuar.href}
-            className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            Continuar: {continuar.etiqueta}
-          </Link>
         ) : null}
       </div>
     </PlanillasShell>

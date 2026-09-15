@@ -6,7 +6,9 @@ import {
   type TipoDocumentoPlanilla,
 } from "@inventario/types";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
-import { ESTADO_CONTRATO_LABEL } from "@/lib/planillas-labels";
+import { trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import { ESTADO_CONTRATO_LABEL, resolverEtapaVidaLey } from "@/lib/planillas-labels";
+import { saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
 
 export const PASOS_ALTA = [
   { id: "documentos", n: 1, label: "Documentos" },
@@ -16,7 +18,21 @@ export const PASOS_ALTA = [
 ] as const;
 
 export type PasoAltaId = (typeof PASOS_ALTA)[number]["id"];
+export type PasoFichaId = Exclude<PasoAltaId, "contratos">;
+export const PASOS_FICHA = [PASOS_ALTA[0], PASOS_ALTA[1], PASOS_ALTA[2]] as const;
 export type FlujoTab = PasoAltaId | "firma" | "pensiones" | "t-registro" | "vida-ley" | "asistencia" | "vacaciones";
+export type EnlaceProceso = { href: string; etiqueta: string };
+
+export function esTabFicha(tab: FlujoTab): tab is PasoFichaId {
+  return tab === "documentos" || tab === "persona" || tab === "puesto";
+}
+
+export function tabFichaInicial(completados: Record<PasoAltaId, boolean>): PasoFichaId {
+  if (!completados.documentos) return "documentos";
+  if (!completados.persona) return "persona";
+  if (!completados.puesto) return "puesto";
+  return "documentos";
+}
 
 export type FlujoDocumento = {
   tipo: TipoDocumentoPlanilla;
@@ -114,7 +130,7 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   }
   if (input.validacion === "PENDIENTE") {
     return esEstudio
-      ? { paso: "persona", tab: "persona", etiqueta: "Validar alta", rol: "estudio" }
+      ? { paso: "contratos", tab: "contratos", etiqueta: "Validar alta", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
   if (vigente?.estado === "ELABORADO" && firmado) {
@@ -128,9 +144,78 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   return { paso: "contratos", tab: "contratos", etiqueta: "Revisar contrato", rol: "empresa" };
 }
 
+export function hrefFichaTrabajador(relacionId: string, tab?: PasoFichaId): string {
+  return tab ? `/trabajadores/${relacionId}?tab=${tab}` : `/trabajadores/${relacionId}`;
+}
+
 export function hrefPasoTrabajador(relacionId: string, tab: FlujoTab): string {
   if (tab === "contratos" || tab === "firma") return `/contratos/${relacionId}`;
   return `/trabajadores/${relacionId}?tab=${tab}`;
+}
+
+export function hrefSiguientePaso(relacionId: string, siguiente: SiguientePaso): string {
+  if (siguiente.paso === "contratos" || siguiente.tab === "contratos" || siguiente.tab === "firma") {
+    return `/contratos/${relacionId}`;
+  }
+  if (siguiente.paso === "listo") return hrefFichaTrabajador(relacionId);
+  if (esTabFicha(siguiente.tab)) return hrefFichaTrabajador(relacionId, siguiente.tab);
+  return hrefPasoTrabajador(relacionId, siguiente.tab);
+}
+
+export function hrefListaProceso(tab: FlujoTab, entidadId: string): string | null {
+  if (tab === "vida-ley") return `/vida-ley?entidadId=${entidadId}`;
+  if (tab === "asistencia") return `/asistencias?entidadId=${entidadId}`;
+  if (tab === "vacaciones") return `/vacaciones?entidadId=${entidadId}`;
+  if (tab === "contratos" || tab === "firma") return `/contratos?entidadId=${entidadId}`;
+  return null;
+}
+
+export function enlaceProcesoPendiente(relacionId: string, siguiente: SiguientePaso): EnlaceProceso | null {
+  if (siguiente.paso === "listo") return null;
+  if (siguiente.paso === "contratos" || siguiente.tab === "contratos" || siguiente.tab === "firma") {
+    return { href: `/contratos/${relacionId}`, etiqueta: siguiente.etiqueta };
+  }
+  return null;
+}
+
+export function enlaceProcesoOperativo(input: {
+  entidadId: string;
+  esEstudio: boolean;
+  estado: string;
+  validacion: EstadoValidacionAltaPlanilla;
+  fechaIngreso: string | null;
+  fechaCese: string | null;
+  vidaLey: { estado?: string | null; fecha_fin?: string | null } | null;
+  pdfAsistenciaMes: boolean;
+  diasVacacionPeriodo: number;
+  mes: string;
+  periodo: number;
+  hoy: string;
+  limite: string;
+}): EnlaceProceso | null {
+  if (input.estado !== "ACTIVA") return null;
+  if (input.esEstudio && input.validacion !== "PENDIENTE") {
+    const etapa = resolverEtapaVidaLey(input.vidaLey, { hoy: input.hoy, limite: input.limite });
+    if (etapa.pendiente) {
+      return { href: `/vida-ley?entidadId=${input.entidadId}`, etiqueta: etapa.etiqueta };
+    }
+  }
+  if (trabajadorActivoEnMes(input.mes, input.fechaIngreso, input.fechaCese) && !input.pdfAsistenciaMes) {
+    return { href: `/asistencias?entidadId=${input.entidadId}`, etiqueta: "Falta PDF firmado del mes" };
+  }
+  if (tieneDerechoVacaciones(input.fechaIngreso)) {
+    const saldo = saldoVacaciones(input.diasVacacionPeriodo);
+    if (saldo > 0) {
+      return {
+        href: `/vacaciones?entidadId=${input.entidadId}`,
+        etiqueta:
+          input.diasVacacionPeriodo === 0
+            ? `Sin vacaciones registradas en ${input.periodo}`
+            : `Quedan ${saldo} día${saldo === 1 ? "" : "s"} de goce en ${input.periodo}`,
+      };
+    }
+  }
+  return null;
 }
 
 export const HORIZONTE_VENCIMIENTO_DIAS = 30;
@@ -207,7 +292,7 @@ export function resolverEtapaContrato(
   }
   if (flujo.validacion === "PENDIENTE") {
     return esEstudio
-      ? { id: "validar", etiqueta: "Alta pendiente de validación", tab: "persona", rol: "estudio", pendiente: true }
+      ? { id: "validar", etiqueta: "Alta pendiente de validación", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "validar", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (vigente?.estado === "ELABORADO" && firmado) {

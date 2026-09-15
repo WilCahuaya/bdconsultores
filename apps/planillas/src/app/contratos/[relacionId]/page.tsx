@@ -54,7 +54,7 @@ export default async function ContratoProcesoPage({
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
           <Link
-            href={`/trabajadores/${params.relacionId}?tab=documentos`}
+            href={`/trabajadores/${params.relacionId}`}
             className="mt-2 inline-block text-sm text-primary hover:underline"
           >
             Ver ficha

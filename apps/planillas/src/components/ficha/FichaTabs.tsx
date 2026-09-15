@@ -1,16 +1,13 @@
 import Link from "next/link";
-import { PASOS_ALTA, type FlujoTab, type PasoAltaId } from "@/lib/flujo-ficha";
-
-const CONTROL = [
-  { id: "asistencia", label: "Asistencia" },
-  { id: "vacaciones", label: "Vacaciones" },
-] as const;
-
-const TRAMITES = [
-  { id: "vida-ley", label: "Vida Ley" },
-  { id: "t-registro", label: "T-Registro" },
-  { id: "pensiones", label: "Sistema de pensión" },
-] as const;
+import {
+  PASOS_ALTA,
+  PASOS_FICHA,
+  hrefFichaTrabajador,
+  hrefListaProceso,
+  type FlujoTab,
+  type PasoAltaId,
+  type PasoFichaId,
+} from "@/lib/flujo-ficha";
 
 export type FichaTab = FlujoTab;
 
@@ -28,6 +25,30 @@ function clasePaso(active: boolean, done: boolean, clickable: boolean) {
   return "border-border text-muted-foreground";
 }
 
+function PasoBadge({
+  active,
+  done,
+  n,
+}: {
+  active: boolean;
+  done: boolean;
+  n: number;
+}) {
+  return (
+    <span
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
+        active
+          ? "bg-primary text-primary-foreground"
+          : done
+            ? "bg-primary/80 text-primary-foreground"
+            : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {done && !active ? "✓" : n}
+    </span>
+  );
+}
+
 export function AltaPasosNav({
   tab,
   completados = PASOS_VACIOS,
@@ -43,19 +64,7 @@ export function AltaPasosNav({
         const active = tab === paso.id;
         const done = completados[paso.id];
         const className = `flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${clasePaso(active, done, Boolean(relacionId))}`;
-        const badge = (
-          <span
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-              active
-                ? "bg-primary text-primary-foreground"
-                : done
-                  ? "bg-primary/80 text-primary-foreground"
-                  : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {done && !active ? "✓" : paso.n}
-          </span>
-        );
+        const badge = <PasoBadge active={active} done={done} n={paso.n} />;
         if (!relacionId) {
           return (
             <li key={paso.id}>
@@ -69,7 +78,7 @@ export function AltaPasosNav({
         return (
           <li key={paso.id}>
             <Link
-              href={paso.id === "contratos" ? `/contratos/${relacionId}` : `/trabajadores/${relacionId}?tab=${paso.id}`}
+              href={paso.id === "contratos" ? `/contratos/${relacionId}` : hrefFichaTrabajador(relacionId, paso.id)}
               aria-current={active ? "page" : undefined}
               className={className}
             >
@@ -83,61 +92,70 @@ export function AltaPasosNav({
   );
 }
 
-function fichaTabClass(active: boolean) {
-  return active
-    ? "rounded-md px-2 py-1 font-medium text-primary"
-    : "rounded-md px-2 py-1 text-muted-foreground hover:text-foreground";
-}
-
-export function FichaFlujoNav({
+export function FichaDatosNav({
   relacionId,
   tab,
   completados,
-  esEstudio,
 }: {
   relacionId: string;
-  tab: FichaTab;
+  tab: PasoFichaId;
   completados: Record<PasoAltaId, boolean>;
-  esEstudio: boolean;
 }) {
-  const pasoAlta = PASOS_ALTA.find((paso) => paso.id === tab)?.id;
   return (
-    <div className="space-y-4">
-      <AltaPasosNav tab={pasoAlta} completados={completados} relacionId={relacionId} />
-      <nav className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Control</p>
-          <div className="flex flex-wrap gap-1 text-sm">
-            {CONTROL.map((item) => (
+    <nav aria-label="Ficha del trabajador">
+      <ol className="grid grid-cols-3 gap-2">
+        {PASOS_FICHA.map((paso) => {
+          const active = tab === paso.id;
+          const done = completados[paso.id];
+          return (
+            <li key={paso.id}>
               <Link
-                key={item.id}
-                href={`/trabajadores/${relacionId}?tab=${item.id}`}
-                aria-current={tab === item.id ? "page" : undefined}
-                className={fichaTabClass(tab === item.id)}
+                href={hrefFichaTrabajador(relacionId, paso.id)}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${clasePaso(active, done, true)}`}
               >
-                {item.label}
+                <PasoBadge active={active} done={done} n={paso.n} />
+                <span className="leading-tight">{paso.label}</span>
               </Link>
-            ))}
-          </div>
-        </div>
-        {esEstudio ? (
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Trámites del estudio</p>
-            <div className="flex flex-wrap gap-1 text-sm">
-              {TRAMITES.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/trabajadores/${relacionId}?tab=${item.id}`}
-                  aria-current={tab === item.id ? "page" : undefined}
-                  className={fichaTabClass(tab === item.id)}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        ) : null}
-      </nav>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+const PROCESO_LABEL: Partial<Record<FlujoTab, string>> = {
+  "vida-ley": "Vida Ley",
+  asistencia: "Asistencias",
+  vacaciones: "Vacaciones",
+  pensiones: "Sistema de pensión",
+  "t-registro": "T-Registro",
+};
+
+export function ProcesoDesdeFichaHeader({
+  relacionId,
+  entidadId,
+  tab,
+}: {
+  relacionId: string;
+  entidadId: string;
+  tab: FlujoTab;
+}) {
+  const lista = hrefListaProceso(tab, entidadId);
+  const label = PROCESO_LABEL[tab] ?? "Proceso";
+  return (
+    <div className="flex flex-wrap items-center gap-3 text-sm">
+      {lista ? (
+        <Link href={lista} className="text-primary hover:underline">
+          ← {label}
+        </Link>
+      ) : (
+        <span className="text-muted-foreground">{label}</span>
+      )}
+      <Link href={hrefFichaTrabajador(relacionId)} className="text-primary hover:underline">
+        Ver ficha
+      </Link>
     </div>
   );
 }

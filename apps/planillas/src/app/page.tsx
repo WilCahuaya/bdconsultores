@@ -12,7 +12,13 @@ import {
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listPendientes } from "@/lib/actions/pendientes";
-import { claseBadgePaso, flujoDesdeTrabajador, hrefPasoTrabajador, resolverSiguientePaso } from "@/lib/flujo-ficha";
+import {
+  claseBadgePaso,
+  flujoDesdeTrabajador,
+  hrefFichaTrabajador,
+  hrefSiguientePaso,
+  resolverSiguientePaso,
+} from "@/lib/flujo-ficha";
 import { nombreCompleto } from "@/lib/planillas-labels";
 
 export default async function PlanillasHomePage({
@@ -43,7 +49,7 @@ export default async function PlanillasHomePage({
           <div>
             <h1 className="text-xl font-bold text-primary sm:text-2xl">Trabajadores</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Hola, {profile.nombre}. El clic entra al siguiente paso: ficha o trámite de contrato.
+              Hola, {profile.nombre}. El nombre abre la ficha. El paso pendiente lleva al proceso.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -127,18 +133,17 @@ export default async function PlanillasHomePage({
                   ) : (
                     trabajadores.map((t) => {
                       const siguiente = resolverSiguientePaso(flujoDesdeTrabajador(t), esEstudio);
-                      const href = hrefPasoTrabajador(t.id, siguiente.tab);
                       return (
                         <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
                           <td className="px-4 py-2 font-mono">{t.persona.dni}</td>
                           <td className="px-4 py-2">
-                            <Link href={href} className="font-medium text-primary hover:underline">
+                            <Link href={hrefFichaTrabajador(t.id)} className="font-medium text-primary hover:underline">
                               {nombreCompleto(t.persona)}
                             </Link>
                           </td>
                           <td className="px-4 py-2">{t.cargo ?? "—"}</td>
                           <td className="px-4 py-2">
-                            <Link href={href}>
+                            <Link href={hrefSiguientePaso(t.id, siguiente)}>
                               <span
                                 className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}
                               >
