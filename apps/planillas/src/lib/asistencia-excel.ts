@@ -36,20 +36,29 @@ const FONT = { name: "Tahoma", sz: 11, color: { rgb: "000000" } };
 const FONT_HEADER = { name: "Tahoma", sz: 8, bold: true, color: { rgb: "000000" } };
 const FONT_FECHA = { name: "Arial Narrow", sz: 8, color: { rgb: "FF0000" } };
 
-/** Anchos del Excel de Herederos (A–K). */
+/** Anchos del Excel de Herederos (A–K). E–F y H–I caben "12:50 p.m." en una línea. */
 const COL_WIDTHS = [
   { wch: 3.17 },
   { wch: 8.67 },
   { wch: 4 },
   { wch: 4 },
-  { wch: 4.17 },
-  { wch: 4.17 },
-  { wch: 21.17 },
-  { wch: 4.17 },
-  { wch: 4.17 },
-  { wch: 21.17 },
+  { wch: 7 },
+  { wch: 7 },
+  { wch: 15.51 },
+  { wch: 7 },
+  { wch: 7 },
+  { wch: 15.51 },
   { wch: 11.67 },
 ];
+
+const H_TITULO = 23.25;
+const H_ANIO = 15.75;
+const H_MES = 15;
+const H_ENCABEZADO = 32;
+const H_TURNO = 24;
+const FILAS_ENCABEZADO = 4;
+/** Con el encabezado original (15.75 pt) cabían 33 filas de datos en la 1.ª hoja. */
+const DATOS_CALIBRE_PAGINA1 = 33;
 
 function slugNombre(text: string): string {
   return text
@@ -170,7 +179,7 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   });
   merge(merges, 0, 0, 0, COLS - 1);
   paint(ws, 0, 1, COLS - 1, styleBase({ font: { name: "Calibri", sz: 16, bold: true } }));
-  rows[0] = { hpt: 23.25 };
+  rows[0] = { hpt: H_TITULO };
 
   setCell(ws, 1, 0, "Año", greenHead);
   merge(merges, 1, 0, 1, 1);
@@ -186,7 +195,7 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   merge(merges, 1, 7, 2, 10);
   paint(ws, 1, 8, 10, greenName);
   paint(ws, 2, 7, 10, greenName);
-  rows[1] = { hpt: 15.75 };
+  rows[1] = { hpt: H_ANIO };
 
   setCell(ws, 2, 0, "Mes", greenHead);
   merge(merges, 2, 0, 2, 1);
@@ -194,7 +203,7 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   setCell(ws, 2, 2, monthName, styleBase({ font: { ...FONT, bold: true } }));
   merge(merges, 2, 2, 2, 3);
   setCell(ws, 2, 3, "", styleBase());
-  rows[2] = { hpt: 15 };
+  rows[2] = { hpt: H_MES };
 
   const headers: Array<{ c1: number; c2: number; label: string }> = [
     { c1: 0, c2: 1, label: "Día" },
@@ -212,7 +221,7 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
       paint(ws, 3, c1 + 1, c2, greenHead);
     }
   });
-  rows[3] = { hpt: 15.75 };
+  rows[3] = { hpt: H_ENCABEZADO };
 
   const dias = diasIsoDelMes(mes);
   const turnos: TurnoAsistencia[] = ["Mañana", "Tarde"];
@@ -252,21 +261,25 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
       const horaIn = tramo && !tacha ? formatoHoraContrato(tramo.ingreso) : "";
       const horaOut = tramo && !tacha ? formatoHoraContrato(tramo.salida) : "";
       const totales = tramo && !tacha ? formatoHorasTotales(tramo.minutos) : "";
+      const horaStyle = {
+        ...tachado,
+        alignment: { horizontal: "center", vertical: "center", wrapText: false },
+      };
       if (tachaDia) {
         setCell(ws, row, 4, "", tachado);
         paint(ws, row, 5, 10, tachado);
       } else {
-        setCell(ws, row, 4, horaIn, tachado);
+        setCell(ws, row, 4, horaIn, horaStyle);
         merge(merges, row, 4, row, 5);
-        setCell(ws, row, 5, "", tachado);
+        setCell(ws, row, 5, "", horaStyle);
         setCell(ws, row, 6, "", tachado);
-        setCell(ws, row, 7, horaOut, tachado);
+        setCell(ws, row, 7, horaOut, horaStyle);
         merge(merges, row, 7, row, 8);
-        setCell(ws, row, 8, "", tachado);
+        setCell(ws, row, 8, "", horaStyle);
         setCell(ws, row, 9, "", tachado);
         setCell(ws, row, 10, totales, tachado);
       }
-      rows[row] = { hpt: 24 };
+      rows[row] = { hpt: H_TURNO };
     }
     r += 2;
   }
@@ -316,38 +329,75 @@ function conVistaPagina(xml: string): string {
   return xml.replace(/<sheetView\b/, `<sheetView view="pageLayout" zoomScalePageLayoutView="100"`);
 }
 
-function insertarImpresion(xml: string, empresa: AsistenciaExcelEmpresa): string {
+function filasParesQueCaben(puntos: number): number {
+  const n = Math.floor(puntos / H_TURNO);
+  return Math.max(2, n - (n % 2));
+}
+
+/** Saltos después de un día completo (mañana+tarde), para que no se partan entre hojas. */
+function idsSaltoTrasDiaCompleto(cantidadDias: number): number[] {
+  const headerPt = H_TITULO + H_ANIO + H_MES + H_ENCABEZADO;
+  const ptPagina = H_TITULO + H_ANIO + H_MES + 15.75 + DATOS_CALIBRE_PAGINA1 * H_TURNO;
+  const page1 = filasParesQueCaben(ptPagina - headerPt);
+  const pageN = filasParesQueCaben(ptPagina);
+  const totalData = cantidadDias * 2;
+  const ids: number[] = [];
+  let usados = 0;
+  let cupo = page1;
+  while (usados + cupo < totalData) {
+    usados += cupo;
+    ids.push(FILAS_ENCABEZADO + usados);
+    cupo = pageN;
+  }
+  return ids;
+}
+
+function xmlSaltosPagina(ids: number[]): string {
+  if (ids.length === 0) return "";
+  const brks = ids.map((id) => `<brk id="${id}" max="16383" man="1"/>`).join("");
+  return `<rowBreaks count="${ids.length}" manualBreakCount="${ids.length}">${brks}</rowBreaks>`;
+}
+
+function insertarImpresion(xml: string, empresa: AsistenciaExcelEmpresa, saltos: number[]): string {
   const printOptions = `<printOptions horizontalCentered="1"/>`;
   const pageSetup = `<pageSetup paperSize="9" scale="85" orientation="portrait"/>`;
   const headerFooter =
     `<headerFooter><oddHeader xml:space="preserve">${bloqueEncabezado(empresa)}</oddHeader>` +
     `<oddFooter>&amp;C&amp;P</oddFooter></headerFooter>`;
+  const rowBreaks = xmlSaltosPagina(saltos);
   let next = conVistaPagina(xml)
     .replace(/<printOptions\b[^>]*\/>/g, "")
     .replace(/<printOptions\b[\s\S]*?<\/printOptions>/g, "")
     .replace(/<pageSetup\b[^>]*\/>/g, "")
     .replace(/<pageSetup\b[\s\S]*?<\/pageSetup>/g, "")
-    .replace(/<headerFooter\b[\s\S]*?<\/headerFooter>/g, "");
+    .replace(/<headerFooter\b[\s\S]*?<\/headerFooter>/g, "")
+    .replace(/<rowBreaks\b[\s\S]*?<\/rowBreaks>/g, "");
+  const cola = `${pageSetup}${headerFooter}${rowBreaks}`;
   if (/<pageMargins\b/.test(next)) {
     next = next.replace(/<pageMargins\b/, `${printOptions}<pageMargins`);
     if (/<pageMargins\b[^>]*\/>/.test(next)) {
-      return next.replace(/<pageMargins\b[^>]*\/>/, (tag) => `${tag}${pageSetup}${headerFooter}`);
+      return next.replace(/<pageMargins\b[^>]*\/>/, (tag) => `${tag}${cola}`);
     }
-    return next.replace("</pageMargins>", `</pageMargins>${pageSetup}${headerFooter}`);
+    return next.replace("</pageMargins>", `</pageMargins>${cola}`);
   }
-  const bloque = `${printOptions}${pageSetup}${headerFooter}`;
+  const bloque = `${printOptions}${cola}`;
   if (next.includes("<ignoredErrors")) {
     return next.replace("<ignoredErrors", `${bloque}<ignoredErrors`);
   }
   return next.replace("</worksheet>", `${bloque}</worksheet>`);
 }
 
-async function aplicarImpresionHerederos(buffer: Buffer, empresa: AsistenciaExcelEmpresa): Promise<Buffer> {
+async function aplicarImpresionHerederos(
+  buffer: Buffer,
+  empresa: AsistenciaExcelEmpresa,
+  mes: string,
+): Promise<Buffer> {
   const { unzipSync, zipSync, strFromU8, strToU8 } = await import("fflate");
   const unzipped = unzipSync(new Uint8Array(buffer));
+  const saltos = idsSaltoTrasDiaCompleto(diasIsoDelMes(mes).length);
   for (const name of Object.keys(unzipped)) {
     if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
-    unzipped[name] = strToU8(insertarImpresion(strFromU8(unzipped[name]), empresa));
+    unzipped[name] = strToU8(insertarImpresion(strFromU8(unzipped[name]), empresa, saltos));
   }
   return Buffer.from(zipSync(unzipped, { level: 6 }));
 }
@@ -365,5 +415,5 @@ export async function bufferAsistenciaExcel(
     XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador.nombre, trabajador.dni, index, usados));
   });
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
-  return aplicarImpresionHerederos(buffer, empresa);
+  return aplicarImpresionHerederos(buffer, empresa, mes);
 }
