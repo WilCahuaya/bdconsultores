@@ -30,8 +30,8 @@ export default async function NuevoTrabajadorPage({
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">Nuevo trabajador</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {esUsuarioEntidad(profile.rol)
-              ? "Empiece por Documentos. Luego Persona, Puesto y Contrato. El estudio validará el alta."
-              : "Empiece por Documentos. Luego Persona, Puesto y Contrato. El alta queda aceptada al registrarla desde el estudio."}
+              ? "Empiece por el DNI. El alta (documentos, persona, puesto y contrato) continúa en Contratos. El estudio validará el alta."
+              : "Empiece por el DNI. El alta (documentos, persona, puesto y contrato) continúa en Contratos."}
           </p>
         </div>
         {entidades.length === 0 ? (

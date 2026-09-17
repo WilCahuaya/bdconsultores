@@ -34,6 +34,18 @@ export function tabFichaInicial(completados: Record<PasoAltaId, boolean>): PasoF
   return "documentos";
 }
 
+export function pasoAltaInicial(completados: Record<PasoAltaId, boolean>): PasoAltaId {
+  if (!completados.documentos) return "documentos";
+  if (!completados.persona) return "persona";
+  if (!completados.puesto) return "puesto";
+  return "contratos";
+}
+
+export function parseContratoPaso(value: string | undefined): PasoAltaId {
+  if (value === "documentos" || value === "persona" || value === "puesto" || value === "contratos") return value;
+  return "contratos";
+}
+
 export type FlujoDocumento = {
   tipo: TipoDocumentoPlanilla;
   estado: EstadoDocumentoPlanilla;
@@ -144,21 +156,27 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   return { paso: "contratos", tab: "contratos", etiqueta: "Revisar contrato", rol: "empresa" };
 }
 
-export function hrefFichaTrabajador(relacionId: string, tab?: PasoFichaId): string {
-  return tab ? `/trabajadores/${relacionId}?tab=${tab}` : `/trabajadores/${relacionId}`;
+export function hrefFichaTrabajador(relacionId: string): string {
+  return `/trabajadores/${relacionId}`;
+}
+
+export function hrefAltaTrabajador(relacionId: string, paso?: PasoAltaId): string {
+  if (!paso || paso === "contratos") return `/contratos/${relacionId}`;
+  return `/contratos/${relacionId}?paso=${paso}`;
 }
 
 export function hrefPasoTrabajador(relacionId: string, tab: FlujoTab): string {
-  if (tab === "contratos" || tab === "firma") return `/contratos/${relacionId}`;
+  if (tab === "contratos" || tab === "firma") return hrefAltaTrabajador(relacionId);
+  if (tab === "documentos" || tab === "persona" || tab === "puesto") return hrefAltaTrabajador(relacionId, tab);
   return `/trabajadores/${relacionId}?tab=${tab}`;
 }
 
 export function hrefSiguientePaso(relacionId: string, siguiente: SiguientePaso): string {
-  if (siguiente.paso === "contratos" || siguiente.tab === "contratos" || siguiente.tab === "firma") {
-    return `/contratos/${relacionId}`;
-  }
   if (siguiente.paso === "listo") return hrefFichaTrabajador(relacionId);
-  if (esTabFicha(siguiente.tab)) return hrefFichaTrabajador(relacionId, siguiente.tab);
+  if (siguiente.paso === "contratos" || siguiente.tab === "contratos" || siguiente.tab === "firma") {
+    return hrefAltaTrabajador(relacionId);
+  }
+  if (esTabFicha(siguiente.tab)) return hrefAltaTrabajador(relacionId, siguiente.tab);
   return hrefPasoTrabajador(relacionId, siguiente.tab);
 }
 
@@ -172,10 +190,7 @@ export function hrefListaProceso(tab: FlujoTab, entidadId: string): string | nul
 
 export function enlaceProcesoPendiente(relacionId: string, siguiente: SiguientePaso): EnlaceProceso | null {
   if (siguiente.paso === "listo") return null;
-  if (siguiente.paso === "contratos" || siguiente.tab === "contratos" || siguiente.tab === "firma") {
-    return { href: `/contratos/${relacionId}`, etiqueta: siguiente.etiqueta };
-  }
-  return null;
+  return { href: hrefSiguientePaso(relacionId, siguiente), etiqueta: siguiente.etiqueta };
 }
 
 export function enlaceProcesoOperativo(input: {

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { AltaPasosNav } from "@/components/ficha/FichaTabs";
+import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
+import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
 import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
 import {
@@ -13,14 +15,24 @@ import {
   requirePlanillasProfile,
 } from "@/lib/auth/access";
 import { getTrabajador } from "@/lib/actions/trabajadores";
-import { listContratos, listDocumentos } from "@/lib/actions/ficha";
-import { claseBadgePaso, estadoPasosAlta, flujoDesdeTrabajador, resolverSiguientePaso } from "@/lib/flujo-ficha";
+import { asegurarDocumentosAlta, getPension, listContratos, listDocumentos } from "@/lib/actions/ficha";
+import {
+  claseBadgePaso,
+  estadoPasosAlta,
+  flujoDesdeTrabajador,
+  hrefAltaTrabajador,
+  parseContratoPaso,
+  pasoAltaInicial,
+  resolverSiguientePaso,
+} from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
 
 export default async function ContratoProcesoPage({
   params,
+  searchParams,
 }: {
   params: { relacionId: string };
+  searchParams: { paso?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const trabajador = await getTrabajador(params.relacionId);
@@ -32,9 +44,14 @@ export default async function ContratoProcesoPage({
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const porValidar = trabajador.validacion === "PENDIENTE";
-  const [contratos, documentos] = await Promise.all([
+  const paso = searchParams.paso ? parseContratoPaso(searchParams.paso) : pasoAltaInicial(completados);
+  if (paso === "documentos" && canEditFicha) {
+    await asegurarDocumentosAlta(params.relacionId);
+  }
+  const [contratos, documentos, pension] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
+    paso === "documentos" ? getPension(params.relacionId) : Promise.resolve(null),
   ]);
 
   return (
@@ -80,29 +97,46 @@ export default async function ContratoProcesoPage({
             )}
           </div>
         ) : null}
-        <AltaPasosNav tab="contratos" completados={completados} relacionId={params.relacionId} />
-        {!completados.documentos || !completados.persona || !completados.puesto ? (
-          <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
-            Falta completar el alta (documentos, persona o puesto) para generar el contrato.{" "}
-            <Link
-              href={`/trabajadores/${params.relacionId}?tab=${
-                !completados.documentos ? "documentos" : !completados.persona ? "persona" : "puesto"
-              }`}
-              className="font-medium text-primary hover:underline"
-            >
-              Ir a la ficha
-            </Link>
-          </p>
+        <AltaPasosNav tab={paso} completados={completados} relacionId={params.relacionId} />
+        {paso === "documentos" ? (
+          <FichaAltaDocumentos
+            relacionId={params.relacionId}
+            entidadId={trabajador.entidad_id}
+            trabajador={trabajador}
+            documentos={documentos}
+            pension={pension}
+            canWrite={canEditFicha}
+          />
         ) : null}
-        <FichaContratos
-          relacionId={params.relacionId}
-          entidadId={trabajador.entidad_id}
-          trabajador={trabajador}
-          contratos={contratos}
-          documentos={documentos}
-          canWrite={canEditFicha}
-          canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
-        />
+        {paso === "persona" ? <FichaPersonaForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
+        {paso === "puesto" ? <FichaPuestoForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
+        {paso === "contratos" ? (
+          <>
+            {!completados.documentos || !completados.persona || !completados.puesto ? (
+              <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
+                Falta completar el alta (documentos, persona o puesto) para generar el contrato.{" "}
+                <Link
+                  href={hrefAltaTrabajador(
+                    params.relacionId,
+                    !completados.documentos ? "documentos" : !completados.persona ? "persona" : "puesto",
+                  )}
+                  className="font-medium text-primary hover:underline"
+                >
+                  Completar alta
+                </Link>
+              </p>
+            ) : null}
+            <FichaContratos
+              relacionId={params.relacionId}
+              entidadId={trabajador.entidad_id}
+              trabajador={trabajador}
+              contratos={contratos}
+              documentos={documentos}
+              canWrite={canEditFicha}
+              canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
+            />
+          </>
+        ) : null}
       </div>
     </PlanillasShell>
   );

@@ -1,12 +1,11 @@
 import Link from "next/link";
 import {
   PASOS_ALTA,
-  PASOS_FICHA,
+  hrefAltaTrabajador,
   hrefFichaTrabajador,
   hrefListaProceso,
   type FlujoTab,
   type PasoAltaId,
-  type PasoFichaId,
 } from "@/lib/flujo-ficha";
 
 export type FichaTab = FlujoTab;
@@ -78,7 +77,7 @@ export function AltaPasosNav({
         return (
           <li key={paso.id}>
             <Link
-              href={paso.id === "contratos" ? `/contratos/${relacionId}` : hrefFichaTrabajador(relacionId, paso.id)}
+              href={hrefAltaTrabajador(relacionId, paso.id)}
               aria-current={active ? "page" : undefined}
               className={className}
             >
@@ -89,39 +88,6 @@ export function AltaPasosNav({
         );
       })}
     </ol>
-  );
-}
-
-export function FichaDatosNav({
-  relacionId,
-  tab,
-  completados,
-}: {
-  relacionId: string;
-  tab: PasoFichaId;
-  completados: Record<PasoAltaId, boolean>;
-}) {
-  return (
-    <nav aria-label="Ficha del trabajador">
-      <ol className="grid grid-cols-3 gap-2">
-        {PASOS_FICHA.map((paso) => {
-          const active = tab === paso.id;
-          const done = completados[paso.id];
-          return (
-            <li key={paso.id}>
-              <Link
-                href={hrefFichaTrabajador(relacionId, paso.id)}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${clasePaso(active, done, true)}`}
-              >
-                <PasoBadge active={active} done={done} n={paso.n} />
-                <span className="leading-tight">{paso.label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
   );
 }
 
@@ -160,25 +126,15 @@ export function ProcesoDesdeFichaHeader({
   );
 }
 
-const TABS: FichaTab[] = [
-  "persona",
-  "puesto",
-  "documentos",
-  "contratos",
-  "firma",
-  "pensiones",
-  "t-registro",
-  "vida-ley",
-  "asistencia",
-  "vacaciones",
-];
+const TABS_PROCESO: FichaTab[] = ["pensiones", "t-registro", "vida-ley", "asistencia", "vacaciones"];
 
-export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab {
-  if (!value) return "documentos";
-  if (value === "datos") return "persona";
-  if (value === "firma") return "contratos";
-  if (!esEstudio && (value === "pensiones" || value === "t-registro" || value === "vida-ley")) {
-    return "documentos";
+export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab | null {
+  if (!value || value === "datos" || value === "persona" || value === "puesto" || value === "documentos") {
+    return null;
   }
-  return TABS.includes(value as FichaTab) ? (value as FichaTab) : "documentos";
+  if (value === "firma" || value === "contratos") return "contratos";
+  if (!esEstudio && (value === "pensiones" || value === "t-registro" || value === "vida-ley")) {
+    return null;
+  }
+  return TABS_PROCESO.includes(value as FichaTab) ? (value as FichaTab) : null;
 }

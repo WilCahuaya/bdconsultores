@@ -2,9 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { FichaDatosNav, ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
-import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
-import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
+import { ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
+import { FichaResumen } from "@/components/ficha/FichaResumen";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
@@ -17,7 +16,16 @@ import {
 } from "@/lib/auth/access";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
-import { getPension, getVidaLey, listDocumentos, listTRegistro, asegurarDocumentosAlta, asegurarDocumentoTramiteAfp, asegurarDocumentoTrAlta, asegurarDocumentosVidaLey } from "@/lib/actions/ficha";
+import {
+  getPension,
+  getVidaLey,
+  listContratos,
+  listDocumentos,
+  listTRegistro,
+  asegurarDocumentoTramiteAfp,
+  asegurarDocumentoTrAlta,
+  asegurarDocumentosVidaLey,
+} from "@/lib/actions/ficha";
 import { listVacaciones } from "@/lib/actions/vacaciones";
 import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
 import { mesActualLima } from "@/lib/horario-asistencia";
@@ -25,11 +33,8 @@ import {
   HORIZONTE_VENCIMIENTO_DIAS,
   enlaceProcesoOperativo,
   enlaceProcesoPendiente,
-  esTabFicha,
-  estadoPasosAlta,
   flujoDesdeTrabajador,
   resolverSiguientePaso,
-  tabFichaInicial,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
 
@@ -51,19 +56,20 @@ export default async function FichaTrabajadorPage({
   if (!trabajador) notFound();
 
   const esEstudio = puedeEscribirPlanillas(profile);
+  const tabRaw = searchParams.tab;
+  if (tabRaw === "documentos" || tabRaw === "persona" || tabRaw === "puesto") {
+    redirect(`/contratos/${params.relacionId}?paso=${tabRaw}`);
+  }
+  if (tabRaw === "contratos" || tabRaw === "firma") {
+    redirect(`/contratos/${params.relacionId}`);
+  }
+
   const flujo = flujoDesdeTrabajador(trabajador);
-  const completados = estadoPasosAlta(flujo);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
-  const tab = searchParams.tab ? parseFichaTab(searchParams.tab, esEstudio) : tabFichaInicial(completados);
-  if (tab === "contratos") redirect(`/contratos/${params.relacionId}`);
-  const ficha = esTabFicha(tab);
-  const necesitaOperativo = ficha && siguiente.paso === "listo";
+  const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const canWriteTramite = esEstudio;
-  if (tab === "documentos" && canEditFicha) {
-    await asegurarDocumentosAlta(params.relacionId);
-  }
   if (esEstudio && tab === "pensiones") {
     await asegurarDocumentoTramiteAfp(params.relacionId);
   }
@@ -73,17 +79,16 @@ export default async function FichaTrabajadorPage({
   if (esEstudio && tab === "vida-ley") {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [documentos, pension, vidaLey, tRegistro, entidad, vacaciones] = await Promise.all([
+  const [documentos, pension, vidaLey, tRegistro, entidad, vacaciones, contratos] = await Promise.all([
     listDocumentos(params.relacionId),
-    tab === "pensiones" || tab === "documentos" || tab === "t-registro"
-      ? getPension(params.relacionId)
-      : Promise.resolve(null),
-    esEstudio && (tab === "vida-ley" || necesitaOperativo)
+    tab === "pensiones" || tab === "t-registro" ? getPension(params.relacionId) : Promise.resolve(null),
+    esEstudio && (tab === "vida-ley" || !tab)
       ? getVidaLey(params.relacionId)
       : Promise.resolve(null),
     tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
     tab === "pensiones" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
-    tab === "vacaciones" || necesitaOperativo ? listVacaciones(params.relacionId) : Promise.resolve([]),
+    !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
+    !tab ? listContratos(params.relacionId) : Promise.resolve([]),
   ]);
   const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodoVacacion);
   const mes = mesActualLima();
@@ -91,7 +96,7 @@ export default async function FichaTrabajadorPage({
   const hoy = new Date().toISOString().slice(0, 10);
   const proceso =
     enlaceProcesoPendiente(params.relacionId, siguiente) ??
-    (necesitaOperativo
+    (!tab
       ? enlaceProcesoOperativo({
           entidadId: trabajador.entidad_id,
           esEstudio,
@@ -125,35 +130,28 @@ export default async function FichaTrabajadorPage({
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
         </div>
-        {esTabFicha(tab) ? (
-          <>
-            {proceso ? (
-              <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
-                <span className="text-muted-foreground">Proceso pendiente</span>
-                <Link href={proceso.href} className="font-medium text-primary hover:underline">
-                  {proceso.etiqueta}
-                </Link>
-              </p>
-            ) : null}
-            <FichaDatosNav relacionId={params.relacionId} tab={tab} completados={completados} />
-          </>
-        ) : (
+        {tab ? (
           <ProcesoDesdeFichaHeader
             relacionId={params.relacionId}
             entidadId={trabajador.entidad_id}
             tab={tab}
           />
-        )}
-        {tab === "persona" ? <FichaPersonaForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
-        {tab === "puesto" ? <FichaPuestoForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
-        {tab === "documentos" ? (
-          <FichaAltaDocumentos
+        ) : proceso ? (
+          <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
+            <span className="text-muted-foreground">Proceso pendiente</span>
+            <Link href={proceso.href} className="font-medium text-primary hover:underline">
+              {proceso.etiqueta}
+            </Link>
+          </p>
+        ) : null}
+        {!tab ? (
+          <FichaResumen
             relacionId={params.relacionId}
             entidadId={trabajador.entidad_id}
             trabajador={trabajador}
+            contratos={contratos}
             documentos={documentos}
-            pension={pension}
-            canWrite={canEditFicha}
+            vacaciones={vacaciones}
           />
         ) : null}
         {esEstudio && tab === "pensiones" ? (

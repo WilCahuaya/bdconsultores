@@ -74,7 +74,7 @@ export function NuevoTrabajadorForm({
     }
     if (result.error && result.relacionId) {
       pushToast(result.error, "error");
-      router.push(`/trabajadores/${result.relacionId}?tab=documentos`);
+      router.push(`/contratos/${result.relacionId}?paso=documentos`);
       return;
     }
     if (result.relacionId && result.dniDocumentoId && dniFile) {
@@ -90,8 +90,8 @@ export function NuevoTrabajadorForm({
       }
     }
     setPending(false);
-    pushToast("Ficha abierta. Siga con ficha y sistema de pensión.");
-    if (result.relacionId) router.push(`/trabajadores/${result.relacionId}?tab=documentos`);
+    pushToast("Siga con documentos, persona y puesto en Contratos.");
+    if (result.relacionId) router.push(`/contratos/${result.relacionId}?paso=documentos`);
   }
 
   const esPdf = Boolean(

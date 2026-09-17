@@ -49,7 +49,7 @@ export default async function PlanillasHomePage({
           <div>
             <h1 className="text-xl font-bold text-primary sm:text-2xl">Trabajadores</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Hola, {profile.nombre}. El nombre abre la ficha. El paso pendiente lleva al proceso.
+              Hola, {profile.nombre}. El nombre abre sus datos. El paso pendiente lleva al trámite.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
