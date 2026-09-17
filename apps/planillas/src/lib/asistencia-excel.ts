@@ -33,7 +33,10 @@ const BORDER = { top: BLACK, bottom: BLACK, left: BLACK, right: BLACK };
 const GREEN = "C6E0B4";
 const GRAY_TARDE = "F0F0F0";
 const FONT = { name: "Tahoma", sz: 11, color: { rgb: "000000" } };
-const FONT_HEADER = { name: "Tahoma", sz: 8, bold: true, color: { rgb: "000000" } };
+const FONT_TAHOMA_10 = { name: "Tahoma", sz: 10, color: { rgb: "000000" } };
+const FONT_TAHOMA_10_BOLD = { name: "Tahoma", sz: 10, bold: true, color: { rgb: "000000" } };
+const FONT_COL_HEAD = { name: "Tahoma", sz: 8, color: { rgb: "000000" } };
+const FONT_HORA_HEAD = { name: "Tahoma", sz: 7, color: { rgb: "000000" } };
 const FONT_FECHA = { name: "Arial Narrow", sz: 8, color: { rgb: "FF0000" } };
 
 /** Anchos del Excel de Herederos (A–K). */
@@ -164,13 +167,26 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   const ws: WorkSheet = {};
   const merges: Range[] = [];
   const rows: { hpt: number }[] = [];
-  const greenHead = styleBase({
-    font: FONT_HEADER,
-    fill: { fgColor: { rgb: GREEN }, patternType: "solid" },
+  const greenFill = { fgColor: { rgb: GREEN }, patternType: "solid" };
+  const greenLabel = styleBase({
+    font: FONT_TAHOMA_10,
+    fill: greenFill,
   });
   const greenName = styleBase({
-    font: { name: "Tahoma", sz: 10, bold: true, color: { rgb: "000000" } },
-    fill: { fgColor: { rgb: GREEN }, patternType: "solid" },
+    font: FONT_TAHOMA_10_BOLD,
+    fill: greenFill,
+  });
+  const greenColHead = styleBase({
+    font: FONT_COL_HEAD,
+    fill: greenFill,
+  });
+  const greenHoraHead = styleBase({
+    font: FONT_HORA_HEAD,
+    fill: greenFill,
+  });
+  const mesAnioValor = styleBase({
+    font: FONT_TAHOMA_10_BOLD,
+    alignment: { horizontal: "center", vertical: "center", wrapText: true, shrinkToFit: true },
   });
 
   setCell(ws, 0, 0, "REGISTRO DE ASISTENCIA", {
@@ -182,12 +198,12 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   paint(ws, 0, 1, COLS - 1, styleBase({ font: { name: "Calibri", sz: 16, bold: true } }));
   rows[0] = { hpt: H_TITULO };
 
-  setCell(ws, 1, 0, "Año", greenHead);
+  setCell(ws, 1, 0, "Año", greenLabel);
   merge(merges, 1, 0, 1, 1);
-  setCell(ws, 1, 1, "", greenHead);
-  setCell(ws, 1, 2, year, styleBase({ font: { ...FONT, bold: true } }));
+  setCell(ws, 1, 1, "", greenLabel);
+  setCell(ws, 1, 2, year, mesAnioValor);
   merge(merges, 1, 2, 1, 3);
-  setCell(ws, 1, 3, "", styleBase());
+  setCell(ws, 1, 3, "", mesAnioValor);
   setCell(ws, 1, 4, "Nombre del Trabajador", greenName);
   merge(merges, 1, 4, 2, 6);
   paint(ws, 1, 5, 6, greenName);
@@ -198,28 +214,28 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   paint(ws, 2, 7, 10, greenName);
   rows[1] = { hpt: H_ANIO };
 
-  setCell(ws, 2, 0, "Mes", greenHead);
+  setCell(ws, 2, 0, "Mes", greenLabel);
   merge(merges, 2, 0, 2, 1);
-  setCell(ws, 2, 1, "", greenHead);
-  setCell(ws, 2, 2, monthName, styleBase({ font: { ...FONT, bold: true } }));
+  setCell(ws, 2, 1, "", greenLabel);
+  setCell(ws, 2, 2, monthName, mesAnioValor);
   merge(merges, 2, 2, 2, 3);
-  setCell(ws, 2, 3, "", styleBase());
+  setCell(ws, 2, 3, "", mesAnioValor);
   rows[2] = { hpt: H_MES };
 
-  const headers: Array<{ c1: number; c2: number; label: string }> = [
-    { c1: 0, c2: 1, label: "Día" },
-    { c1: 2, c2: 3, label: "Turno" },
-    { c1: 4, c2: 5, label: "Hora de Ingreso" },
-    { c1: 6, c2: 6, label: "Firma" },
-    { c1: 7, c2: 8, label: "Hora de Salida" },
-    { c1: 9, c2: 9, label: "Firma" },
-    { c1: 10, c2: 10, label: "Horas Totales" },
+  const headers: Array<{ c1: number; c2: number; label: string; style: Record<string, unknown> }> = [
+    { c1: 0, c2: 1, label: "Día", style: greenColHead },
+    { c1: 2, c2: 3, label: "Turno", style: greenColHead },
+    { c1: 4, c2: 5, label: "Hora de Ingreso", style: greenHoraHead },
+    { c1: 6, c2: 6, label: "Firma", style: greenColHead },
+    { c1: 7, c2: 8, label: "Hora de Salida", style: greenHoraHead },
+    { c1: 9, c2: 9, label: "Firma", style: greenColHead },
+    { c1: 10, c2: 10, label: "Horas Totales", style: greenColHead },
   ];
-  headers.forEach(({ c1, c2, label }) => {
-    setCell(ws, 3, c1, label, greenHead);
+  headers.forEach(({ c1, c2, label, style }) => {
+    setCell(ws, 3, c1, label, style);
     if (c2 > c1) {
       merge(merges, 3, c1, 3, c2);
-      paint(ws, 3, c1 + 1, c2, greenHead);
+      paint(ws, 3, c1 + 1, c2, style);
     }
   });
   rows[3] = { hpt: H_ENCABEZADO };
