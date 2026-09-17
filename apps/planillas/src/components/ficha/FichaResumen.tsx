@@ -32,11 +32,19 @@ function Dato({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-function Grupo({ title, children }: { title: string; children: ReactNode }) {
+function Grupo({
+  title,
+  wide,
+  children,
+}: {
+  title: string;
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${wide ? "ficha-datos-grupo--wide" : ""}`}>
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+      <div className="ficha-datos-campos">{children}</div>
     </div>
   );
 }
@@ -117,51 +125,56 @@ export function FichaResumen({
 
   return (
     <div className="space-y-4">
-      <section className={`${panelCardClass} space-y-5 p-5`}>
+      <section className={`${panelCardClass} ficha-datos space-y-5 p-5`}>
         <p className="text-sm font-medium text-foreground">Datos generales</p>
-        <Grupo title="Persona">
-          <div className="sm:col-span-2">
-            <Dato label="Nombre completo" value={nombreCompleto(p)} />
-          </div>
-          <Dato label="DNI" value={<span className="font-mono">{p.dni}</span>} />
-          <Dato label="Fecha de nacimiento" value={formatFechaPlanilla(p.fecha_nacimiento)} />
-        </Grupo>
-        <Grupo title="Contacto">
-          <Dato label="Celular" value={p.celular} />
-          <Dato label="Correo" value={p.correo} />
-          <div className="sm:col-span-2">
-            <Dato label="Dirección" value={p.direccion} />
-          </div>
-        </Grupo>
-        <Grupo title="En la empresa">
-          <Dato label="Cargo" value={trabajador.cargo} />
-          <Dato
-            label="Clasificación"
-            value={trabajador.clasificacion ? CLASIFICACION_LABEL[trabajador.clasificacion] : null}
-          />
-          <Dato label="Jornada" value={trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : null} />
-          <Dato label="Fecha de ingreso" value={formatFechaPlanilla(trabajador.fecha_ingreso)} />
-          {trabajador.fecha_cese ? (
-            <Dato label="Fecha de cese" value={formatFechaPlanilla(trabajador.fecha_cese)} />
-          ) : null}
-          <div className="sm:col-span-2">
-            <Dato label="Horario" value={<HorarioContratoVista value={trabajador.horario} className="text-sm font-medium" />} />
-          </div>
-          <Dato
-            label="Remuneración"
-            value={trabajador.remuneracion != null ? `S/ ${formatRemuneracion(trabajador.remuneracion)}` : null}
-          />
-          <Dato
-            label="Asignación familiar"
-            value={
-              trabajador.recibe_asignacion_familiar === true
-                ? `Sí · S/ ${formatRemuneracion(montoAsignacionFamiliar(true))}`
-                : trabajador.recibe_asignacion_familiar === false
-                  ? "No"
-                  : "No indicado"
-            }
-          />
-        </Grupo>
+        <div className="ficha-datos-grupos">
+          <Grupo title="Persona">
+            <div className="ficha-datos-span">
+              <Dato label="Nombre completo" value={nombreCompleto(p)} />
+            </div>
+            <Dato label="DNI" value={<span className="font-mono">{p.dni}</span>} />
+            <Dato label="Fecha de nacimiento" value={formatFechaPlanilla(p.fecha_nacimiento)} />
+          </Grupo>
+          <Grupo title="Contacto">
+            <Dato label="Celular" value={p.celular} />
+            <Dato label="Correo" value={p.correo} />
+            <div className="ficha-datos-span">
+              <Dato label="Dirección" value={p.direccion} />
+            </div>
+          </Grupo>
+          <Grupo title="En la empresa" wide>
+            <Dato label="Cargo" value={trabajador.cargo} />
+            <Dato
+              label="Clasificación"
+              value={trabajador.clasificacion ? CLASIFICACION_LABEL[trabajador.clasificacion] : null}
+            />
+            <Dato label="Jornada" value={trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : null} />
+            <Dato label="Fecha de ingreso" value={formatFechaPlanilla(trabajador.fecha_ingreso)} />
+            {trabajador.fecha_cese ? (
+              <Dato label="Fecha de cese" value={formatFechaPlanilla(trabajador.fecha_cese)} />
+            ) : null}
+            <div className="ficha-datos-span">
+              <Dato
+                label="Horario"
+                value={<HorarioContratoVista value={trabajador.horario} className="text-sm font-medium" />}
+              />
+            </div>
+            <Dato
+              label="Remuneración"
+              value={trabajador.remuneracion != null ? `S/ ${formatRemuneracion(trabajador.remuneracion)}` : null}
+            />
+            <Dato
+              label="Asignación familiar"
+              value={
+                trabajador.recibe_asignacion_familiar === true
+                  ? `Sí · S/ ${formatRemuneracion(montoAsignacionFamiliar(true))}`
+                  : trabajador.recibe_asignacion_familiar === false
+                    ? "No"
+                    : "No indicado"
+              }
+            />
+          </Grupo>
+        </div>
       </section>
 
       <Apartado
