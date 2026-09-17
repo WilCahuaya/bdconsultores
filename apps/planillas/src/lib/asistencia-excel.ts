@@ -1,12 +1,10 @@
 import type { Range, WorkSheet } from "xlsx-js-style";
-import { formatoHoraContrato } from "@/lib/horario-laboral";
 import {
   MES_ABREV,
   MES_NOMBRE,
   diasIsoDelMes,
   diaSemanaDeIso,
   etiquetaDia,
-  formatoHorasTotales,
   partesMes,
   trabajadorActivoEnFecha,
   tramosDelDia,
@@ -243,7 +241,6 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   const dias = diasIsoDelMes(mes);
   const turnos: TurnoAsistencia[] = ["Mañana", "Tarde"];
   let r = 4;
-  let minutosMes = 0;
   for (const iso of dias) {
     const dia = diaSemanaDeIso(iso);
     const activo = trabajadorActivoEnFecha(iso, trabajador.fechaIngreso, trabajador.fechaCese);
@@ -265,7 +262,6 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
     for (let i = 0; i < 2; i += 1) {
       const row = r + i;
       const turno = turnos[i];
-      const tramo = laborables.find((item) => item.turno === turno) ?? null;
       const tacha = turno === "Mañana" ? tachaManana : tachaTarde;
       const fill =
         turno === "Tarde" ? { fgColor: { rgb: GRAY_TARDE }, patternType: "solid" } : undefined;
@@ -276,27 +272,19 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
       merge(merges, row, 2, row, 3);
       setCell(ws, row, 3, "", base);
 
-      const horaIn = tramo && !tacha ? formatoHoraContrato(tramo.ingreso) : "";
-      const horaOut = tramo && !tacha ? formatoHoraContrato(tramo.salida) : "";
-      const totales = tramo && !tacha ? formatoHorasTotales(tramo.minutos) : "";
-      if (tramo && !tacha) minutosMes += tramo.minutos;
-      const horaStyle = {
-        ...tachado,
-        alignment: { horizontal: "center", vertical: "center", wrapText: false },
-      };
       if (tachaDia) {
         setCell(ws, row, 4, "", tachado);
         paint(ws, row, 5, 10, tachado);
       } else {
-        setCell(ws, row, 4, horaIn, horaStyle);
+        setCell(ws, row, 4, "", tachado);
         merge(merges, row, 4, row, 5);
-        setCell(ws, row, 5, "", horaStyle);
+        setCell(ws, row, 5, "", tachado);
         setCell(ws, row, 6, "", tachado);
-        setCell(ws, row, 7, horaOut, horaStyle);
+        setCell(ws, row, 7, "", tachado);
         merge(merges, row, 7, row, 8);
-        setCell(ws, row, 8, "", horaStyle);
+        setCell(ws, row, 8, "", tachado);
         setCell(ws, row, 9, "", tachado);
-        setCell(ws, row, 10, totales, tachado);
+        setCell(ws, row, 10, "", tachado);
       }
       rows[row] = { hpt: H_TURNO };
     }
@@ -308,7 +296,7 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
     fill: { fgColor: { rgb: GRAY_TARDE }, patternType: "solid" },
   });
   setCell(ws, r, 9, "Total", totalStyle);
-  setCell(ws, r, 10, formatoHorasTotales(minutosMes), totalStyle);
+  setCell(ws, r, 10, "", totalStyle);
   rows[r] = { hpt: H_TOTAL };
   r += 3;
   const firmaPie = {
