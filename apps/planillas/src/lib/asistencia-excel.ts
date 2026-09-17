@@ -387,12 +387,9 @@ function insertarTitulosImpresion(workbookXml: string): string {
 function insertarImpresion(xml: string, empresa: AsistenciaExcelEmpresa, saltos: number[]): string {
   const printOptions = `<printOptions horizontalCentered="1"/>`;
   const pageSetup = `<pageSetup paperSize="9" scale="85" orientation="portrait"/>`;
-  const encabezado = bloqueEncabezado(empresa);
   const headerFooter =
-    `<headerFooter><oddHeader xml:space="preserve">${encabezado}</oddHeader>` +
-    `<evenHeader xml:space="preserve">${encabezado}</evenHeader>` +
-    `<oddFooter>&amp;C&amp;P</oddFooter>` +
-    `<evenFooter>&amp;C&amp;P</evenFooter></headerFooter>`;
+    `<headerFooter><oddHeader xml:space="preserve">${bloqueEncabezado(empresa)}</oddHeader>` +
+    `<oddFooter>&amp;C&amp;P</oddFooter></headerFooter>`;
   const rowBreaks = xmlSaltosPagina(saltos);
   let next = conVistaPagina(xml)
     .replace(/<printOptions\b[^>]*\/>/g, "")
