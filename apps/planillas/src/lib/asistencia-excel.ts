@@ -36,29 +36,30 @@ const FONT = { name: "Tahoma", sz: 11, color: { rgb: "000000" } };
 const FONT_HEADER = { name: "Tahoma", sz: 8, bold: true, color: { rgb: "000000" } };
 const FONT_FECHA = { name: "Arial Narrow", sz: 8, color: { rgb: "FF0000" } };
 
-/** Anchos del Excel de Herederos (A–K). E–F y H–I caben "12:50 p.m." en una línea. */
+/** Anchos del Excel de Herederos (A–K). */
 const COL_WIDTHS = [
   { wch: 3.17 },
   { wch: 8.67 },
   { wch: 4 },
   { wch: 4 },
-  { wch: 7 },
-  { wch: 7 },
-  { wch: 15.51 },
-  { wch: 7 },
-  { wch: 7 },
-  { wch: 15.51 },
+  { wch: 4.17 },
+  { wch: 4.17 },
+  { wch: 21.17 },
+  { wch: 4.17 },
+  { wch: 4.17 },
+  { wch: 21.17 },
   { wch: 11.67 },
 ];
 
 const H_TITULO = 23.25;
 const H_ANIO = 15.75;
 const H_MES = 15;
-const H_ENCABEZADO = 32;
+const H_ENCABEZADO = 15.75;
 const H_TURNO = 24;
+const H_TOTAL = 16.5;
 const FILAS_ENCABEZADO = 4;
-/** Con el encabezado original (15.75 pt) cabían 33 filas de datos en la 1.ª hoja. */
-const DATOS_CALIBRE_PAGINA1 = 33;
+/** Con el encabezado de Herederos cabían 32 filas de datos (16 días) en la 1.ª hoja. */
+const DATOS_CALIBRE_PAGINA1 = 32;
 
 function slugNombre(text: string): string {
   return text
@@ -226,6 +227,7 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
   const dias = diasIsoDelMes(mes);
   const turnos: TurnoAsistencia[] = ["Mañana", "Tarde"];
   let r = 4;
+  let minutosMes = 0;
   for (const iso of dias) {
     const dia = diaSemanaDeIso(iso);
     const activo = trabajadorActivoEnFecha(iso, trabajador.fechaIngreso, trabajador.fechaCese);
@@ -261,6 +263,7 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
       const horaIn = tramo && !tacha ? formatoHoraContrato(tramo.ingreso) : "";
       const horaOut = tramo && !tacha ? formatoHoraContrato(tramo.salida) : "";
       const totales = tramo && !tacha ? formatoHorasTotales(tramo.minutos) : "";
+      if (tramo && !tacha) minutosMes += tramo.minutos;
       const horaStyle = {
         ...tachado,
         alignment: { horizontal: "center", vertical: "center", wrapText: false },
@@ -284,6 +287,13 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
     r += 2;
   }
 
+  const totalStyle = styleBase({
+    font: { ...FONT, sz: 10, bold: true },
+    fill: { fgColor: { rgb: GRAY_TARDE }, patternType: "solid" },
+  });
+  setCell(ws, r, 9, "Total", totalStyle);
+  setCell(ws, r, 10, formatoHorasTotales(minutosMes), totalStyle);
+  rows[r] = { hpt: H_TOTAL };
   r += 3;
   const firmaPie = {
     font: { name: "Tahoma", sz: 8, color: { rgb: "000000" } },
@@ -334,20 +344,17 @@ function filasParesQueCaben(puntos: number): number {
   return Math.max(2, n - (n % 2));
 }
 
-/** Saltos después de un día completo (mañana+tarde), para que no se partan entre hojas. */
+/** Saltos después de un día completo. Las filas 1–4 se repiten en cada hoja, como en Herederos. */
 function idsSaltoTrasDiaCompleto(cantidadDias: number): number[] {
   const headerPt = H_TITULO + H_ANIO + H_MES + H_ENCABEZADO;
-  const ptPagina = H_TITULO + H_ANIO + H_MES + 15.75 + DATOS_CALIBRE_PAGINA1 * H_TURNO;
-  const page1 = filasParesQueCaben(ptPagina - headerPt);
-  const pageN = filasParesQueCaben(ptPagina);
+  const ptPagina = headerPt + DATOS_CALIBRE_PAGINA1 * H_TURNO;
+  const pageData = filasParesQueCaben(ptPagina - headerPt);
   const totalData = cantidadDias * 2;
   const ids: number[] = [];
   let usados = 0;
-  let cupo = page1;
-  while (usados + cupo < totalData) {
-    usados += cupo;
+  while (usados + pageData < totalData) {
+    usados += pageData;
     ids.push(FILAS_ENCABEZADO + usados);
-    cupo = pageN;
   }
   return ids;
 }
@@ -358,12 +365,34 @@ function xmlSaltosPagina(ids: number[]): string {
   return `<rowBreaks count="${ids.length}" manualBreakCount="${ids.length}">${brks}</rowBreaks>`;
 }
 
+function insertarTitulosImpresion(workbookXml: string): string {
+  const sheets = [...workbookXml.matchAll(/<sheet\b[^>]*\bname="([^"]+)"/g)].map((m) => m[1]);
+  if (sheets.length === 0) return workbookXml;
+  const names = sheets
+    .map((name, i) => {
+      const quoted = `'${name.replace(/'/g, "''")}'`;
+      return `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${quoted}!$1:$4</definedName>`;
+    })
+    .join("");
+  const block = `<definedNames>${names}</definedNames>`;
+  if (/<definedNames[\s\S]*?<\/definedNames>/.test(workbookXml)) {
+    return workbookXml.replace(/<definedNames[\s\S]*?<\/definedNames>/, block);
+  }
+  if (/<\/sheets>/.test(workbookXml)) {
+    return workbookXml.replace("</sheets>", `</sheets>${block}`);
+  }
+  return workbookXml.replace("</workbook>", `${block}</workbook>`);
+}
+
 function insertarImpresion(xml: string, empresa: AsistenciaExcelEmpresa, saltos: number[]): string {
   const printOptions = `<printOptions horizontalCentered="1"/>`;
   const pageSetup = `<pageSetup paperSize="9" scale="85" orientation="portrait"/>`;
+  const encabezado = bloqueEncabezado(empresa);
   const headerFooter =
-    `<headerFooter><oddHeader xml:space="preserve">${bloqueEncabezado(empresa)}</oddHeader>` +
-    `<oddFooter>&amp;C&amp;P</oddFooter></headerFooter>`;
+    `<headerFooter><oddHeader xml:space="preserve">${encabezado}</oddHeader>` +
+    `<evenHeader xml:space="preserve">${encabezado}</evenHeader>` +
+    `<oddFooter>&amp;C&amp;P</oddFooter>` +
+    `<evenFooter>&amp;C&amp;P</evenFooter></headerFooter>`;
   const rowBreaks = xmlSaltosPagina(saltos);
   let next = conVistaPagina(xml)
     .replace(/<printOptions\b[^>]*\/>/g, "")
@@ -396,8 +425,12 @@ async function aplicarImpresionHerederos(
   const unzipped = unzipSync(new Uint8Array(buffer));
   const saltos = idsSaltoTrasDiaCompleto(diasIsoDelMes(mes).length);
   for (const name of Object.keys(unzipped)) {
-    if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) continue;
-    unzipped[name] = strToU8(insertarImpresion(strFromU8(unzipped[name]), empresa, saltos));
+    if (/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) {
+      unzipped[name] = strToU8(insertarImpresion(strFromU8(unzipped[name]), empresa, saltos));
+    }
+    if (name === "xl/workbook.xml") {
+      unzipped[name] = strToU8(insertarTitulosImpresion(strFromU8(unzipped[name])));
+    }
   }
   return Buffer.from(zipSync(unzipped, { level: 6 }));
 }
