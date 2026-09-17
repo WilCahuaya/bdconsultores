@@ -14,6 +14,7 @@ import {
   formatFechaPlanilla,
   formatRemuneracion,
   montoAsignacionFamiliar,
+  nombreCompleto,
 } from "@/lib/planillas-labels";
 import {
   DIAS_VACACIONES_ANUALES,
@@ -26,7 +27,16 @@ function Dato({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="text-sm text-foreground">{value || "—"}</div>
+      <div className="text-sm font-medium text-foreground">{value || "—"}</div>
+    </div>
+  );
+}
+
+function Grupo({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
     </div>
   );
 }
@@ -107,32 +117,40 @@ export function FichaResumen({
 
   return (
     <div className="space-y-4">
-      <section className={`${panelCardClass} space-y-4 p-5`}>
+      <section className={`${panelCardClass} space-y-5 p-5`}>
         <p className="text-sm font-medium text-foreground">Datos generales</p>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <Grupo title="Persona">
+          <div className="sm:col-span-2">
+            <Dato label="Nombre completo" value={nombreCompleto(p)} />
+          </div>
           <Dato label="DNI" value={<span className="font-mono">{p.dni}</span>} />
-          <Dato label="Nombres" value={p.nombres} />
-          <Dato label="Apellido paterno" value={p.apellido_paterno} />
-          <Dato label="Apellido materno" value={p.apellido_materno} />
           <Dato label="Fecha de nacimiento" value={formatFechaPlanilla(p.fecha_nacimiento)} />
+        </Grupo>
+        <Grupo title="Contacto">
           <Dato label="Celular" value={p.celular} />
           <Dato label="Correo" value={p.correo} />
           <div className="sm:col-span-2">
             <Dato label="Dirección" value={p.direccion} />
           </div>
+        </Grupo>
+        <Grupo title="En la empresa">
           <Dato label="Cargo" value={trabajador.cargo} />
           <Dato
             label="Clasificación"
             value={trabajador.clasificacion ? CLASIFICACION_LABEL[trabajador.clasificacion] : null}
           />
           <Dato label="Jornada" value={trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : null} />
-          <div className="sm:col-span-2">
-            <Dato label="Horario" value={<HorarioContratoVista value={trabajador.horario} className="text-sm" />} />
-          </div>
           <Dato label="Fecha de ingreso" value={formatFechaPlanilla(trabajador.fecha_ingreso)} />
           {trabajador.fecha_cese ? (
             <Dato label="Fecha de cese" value={formatFechaPlanilla(trabajador.fecha_cese)} />
           ) : null}
+          <div className="sm:col-span-2">
+            <Dato label="Horario" value={<HorarioContratoVista value={trabajador.horario} className="text-sm font-medium" />} />
+          </div>
+          <Dato
+            label="Remuneración"
+            value={trabajador.remuneracion != null ? `S/ ${formatRemuneracion(trabajador.remuneracion)}` : null}
+          />
           <Dato
             label="Asignación familiar"
             value={
@@ -143,11 +161,7 @@ export function FichaResumen({
                   : "No indicado"
             }
           />
-          <Dato
-            label="Remuneración"
-            value={trabajador.remuneracion != null ? `S/ ${formatRemuneracion(trabajador.remuneracion)}` : null}
-          />
-        </div>
+        </Grupo>
       </section>
 
       <Apartado
