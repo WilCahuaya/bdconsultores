@@ -4,13 +4,9 @@ import { panelCardClass } from "@inventario/ui/panel";
 import type { ContratoRow, DocumentoRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import type { VacacionRow } from "@/lib/actions/vacaciones";
+import { VerHorario } from "@/components/ficha/VerHorario";
 import { contratoConfirmado, contratoVigente, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
 import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
-import {
-  estructuraHorarioParcial,
-  formatClausulaCompleto,
-  parseHorario,
-} from "@/lib/horario-laboral";
 import {
   CLASIFICACION_LABEL,
   ESTADO_CONTRATO_LABEL,
@@ -99,31 +95,18 @@ function IconVacaciones() {
   );
 }
 
-function lineasHorario(raw: string | null | undefined): string[] {
-  const parsed = parseHorario(raw);
-  if (!parsed) return [];
-  if (parsed.tipo === "TEXTO") return parsed.texto ? [parsed.texto] : [];
-  if (parsed.tipo === "COMPLETO") return [formatClausulaCompleto(parsed)];
-  const data = estructuraHorarioParcial(parsed);
-  const lineas: string[] = [];
-  for (const bloque of data.bloques) {
-    lineas.push(bloque.titulo);
-    lineas.push(...bloque.items);
-  }
-  if (data.total) lineas.push(data.total);
-  return lineas;
-}
-
 function Grupo({
   icon,
   title,
   lineas,
+  extra,
 }: {
   icon: ReactNode;
   title: string;
   lineas: Linea[];
+  extra?: ReactNode;
 }) {
-  if (lineas.length === 0) return null;
+  if (lineas.length === 0 && !extra) return null;
   return (
     <section className={`${panelCardClass} mb-4 break-inside-avoid p-4`}>
       <h2 className="flex items-center gap-2 text-[15px] font-bold text-foreground">
@@ -142,6 +125,7 @@ function Grupo({
             )}
           </li>
         ))}
+        {extra}
       </ul>
     </section>
   );
@@ -200,7 +184,8 @@ export function FichaResumen({
     ...(trabajador.jornada ? [{ texto: JORNADA_LABEL[trabajador.jornada] }] : []),
     ...(trabajador.fecha_ingreso ? [{ texto: formatFechaPlanilla(trabajador.fecha_ingreso) }] : []),
     ...(trabajador.fecha_cese ? [{ texto: `Cese ${formatFechaPlanilla(trabajador.fecha_cese)}` }] : []),
-    ...lineasHorario(trabajador.horario).map((texto) => ({ texto })),
+  ];
+  const puestoPago: Linea[] = [
     ...(trabajador.remuneracion != null ? [{ texto: `S/ ${formatRemuneracion(trabajador.remuneracion)}` }] : []),
     ...(trabajador.recibe_asignacion_familiar === true
       ? [{ texto: `Asignación familiar S/ ${formatRemuneracion(montoAsignacionFamiliar(true))}` }]
@@ -243,7 +228,21 @@ export function FichaResumen({
     <div className="columns-1 lg:columns-2 lg:gap-x-6">
       <Grupo icon={<IconPersona />} title="Persona" lineas={persona} />
       <Grupo icon={<IconContacto />} title="Contacto" lineas={contacto.length ? contacto : [{ texto: "Sin datos de contacto" }]} />
-      <Grupo icon={<IconPuesto />} title="Puesto" lineas={puesto} />
+      <Grupo
+        icon={<IconPuesto />}
+        title="Puesto"
+        lineas={puesto}
+        extra={
+          <>
+            <VerHorario value={trabajador.horario} />
+            {puestoPago.map((linea) => (
+              <li key={linea.texto} className="text-sm leading-6 text-muted-foreground">
+                {linea.texto}
+              </li>
+            ))}
+          </>
+        }
+      />
       <Grupo icon={<IconContrato />} title="Contrato" lineas={contratoLineas} />
       <Grupo icon={<IconAsistencia />} title="Asistencias" lineas={asistenciaLineas} />
       <Grupo icon={<IconVacaciones />} title="Vacaciones" lineas={vacacionLineas} />
