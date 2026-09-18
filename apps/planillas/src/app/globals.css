@@ -7,9 +7,3 @@
     font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
   }
 }
-
-@layer components {
-  .ficha-menu {
-    column-gap: 4rem;
-  }
-}

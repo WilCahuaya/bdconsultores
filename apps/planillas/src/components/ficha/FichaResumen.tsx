@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { panelCardClass } from "@inventario/ui/panel";
 import type { ContratoRow, DocumentoRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import type { VacacionRow } from "@/lib/actions/vacaciones";
@@ -124,12 +125,12 @@ function Grupo({
 }) {
   if (lineas.length === 0) return null;
   return (
-    <section className="break-inside-avoid">
+    <section className={`${panelCardClass} mb-4 break-inside-avoid p-4`}>
       <h2 className="flex items-center gap-2 text-[15px] font-bold text-foreground">
         {icon}
         {title}
       </h2>
-      <ul className="mt-0.5 pl-6">
+      <ul className="mt-1 pl-6">
         {lineas.map((linea, index) => (
           <li key={`${linea.texto}-${index}`} className="text-sm leading-6 text-muted-foreground">
             {linea.href ? (
@@ -239,17 +240,13 @@ export function FichaResumen({
   ];
 
   return (
-    <div className="ficha-menu columns-1 gap-x-16 lg:columns-2">
-      <div className="mb-6 break-inside-avoid space-y-5">
-        <Grupo icon={<IconPersona />} title="Persona" lineas={persona} />
-        <Grupo icon={<IconContacto />} title="Contacto" lineas={contacto.length ? contacto : [{ texto: "Sin datos de contacto" }]} />
-        <Grupo icon={<IconPuesto />} title="Puesto" lineas={puesto} />
-      </div>
-      <div className="space-y-5 break-inside-avoid">
-        <Grupo icon={<IconContrato />} title="Contrato" lineas={contratoLineas} />
-        <Grupo icon={<IconAsistencia />} title="Asistencias" lineas={asistenciaLineas} />
-        <Grupo icon={<IconVacaciones />} title="Vacaciones" lineas={vacacionLineas} />
-      </div>
+    <div className="columns-1 lg:columns-2 lg:gap-x-6">
+      <Grupo icon={<IconPersona />} title="Persona" lineas={persona} />
+      <Grupo icon={<IconContacto />} title="Contacto" lineas={contacto.length ? contacto : [{ texto: "Sin datos de contacto" }]} />
+      <Grupo icon={<IconPuesto />} title="Puesto" lineas={puesto} />
+      <Grupo icon={<IconContrato />} title="Contrato" lineas={contratoLineas} />
+      <Grupo icon={<IconAsistencia />} title="Asistencias" lineas={asistenciaLineas} />
+      <Grupo icon={<IconVacaciones />} title="Vacaciones" lineas={vacacionLineas} />
     </div>
   );
 }
