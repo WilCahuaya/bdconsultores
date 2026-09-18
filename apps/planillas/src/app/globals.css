@@ -10,18 +10,6 @@
 
 @layer components {
   .ficha-menu {
-    container-type: inline-size;
-    container-name: ficha-menu;
-  }
-
-  .ficha-menu-cols {
-    display: grid;
-    gap: 1.75rem 3rem;
-  }
-
-  @container ficha-menu (min-width: 40rem) {
-    .ficha-menu-cols {
-      grid-template-columns: 1fr 1fr;
-    }
+    column-gap: 4rem;
   }
 }
