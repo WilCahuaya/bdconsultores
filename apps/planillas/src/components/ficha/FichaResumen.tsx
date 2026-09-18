@@ -4,9 +4,9 @@ import { panelCardClass } from "@inventario/ui/panel";
 import type { ContratoRow, DocumentoRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import type { VacacionRow } from "@/lib/actions/vacaciones";
-import { HorarioContratoVista } from "@/components/ficha/HorarioContratoVista";
 import { contratoConfirmado, contratoVigente, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
 import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
+import { formatHorarioContrato } from "@/lib/horario-laboral";
 import {
   CLASIFICACION_LABEL,
   ESTADO_CONTRATO_LABEL,
@@ -23,64 +23,121 @@ import {
   resumenPeriodoVacacion,
 } from "@/lib/vacaciones";
 
-function Dato({ label, value }: { label: string; value: ReactNode }) {
+function IconPersona() {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="text-sm font-medium text-foreground">{value || "—"}</div>
-    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0" aria-hidden>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
   );
 }
 
-function Grupo({
-  title,
-  wide,
-  children,
-}: {
-  title: string;
-  wide?: boolean;
-  children: ReactNode;
-}) {
+function IconContacto() {
   return (
-    <div className={`space-y-3 ${wide ? "ficha-datos-grupo--wide" : ""}`}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
-      <div className="ficha-datos-campos">{children}</div>
-    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0" aria-hidden>
+      <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z" />
+    </svg>
   );
 }
 
-function Apartado({
-  title,
-  resumen,
+function IconPuesto() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0" aria-hidden>
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+    </svg>
+  );
+}
+
+function IconContrato() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0" aria-hidden>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 2v6h6" />
+      <path d="M8 13h8" />
+      <path d="M8 17h5" />
+    </svg>
+  );
+}
+
+function IconAsistencia() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0" aria-hidden>
+      <rect x="3" y="4" width="18" height="18" rx="2" />
+      <path d="M16 2v4" />
+      <path d="M8 2v4" />
+      <path d="M3 10h18" />
+    </svg>
+  );
+}
+
+function IconVacaciones() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 shrink-0" aria-hidden>
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.9 4.9 1.4 1.4" />
+      <path d="m17.7 17.7 1.4 1.4" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m4.9 19.1 1.4-1.4" />
+      <path d="m17.7 6.3 1.4-1.4" />
+    </svg>
+  );
+}
+
+function texto(value: ReactNode) {
+  if (value == null || value === "") return "—";
+  return value;
+}
+
+function MenuItem({
+  label,
+  value,
   href,
-  hrefLabel,
+}: {
+  label: string;
+  value?: ReactNode;
+  href?: string;
+}) {
+  const contenido = (
+    <>
+      <span className="text-muted-foreground">{label}</span>
+      {value != null && value !== "" ? <span className="text-foreground"> {texto(value)}</span> : null}
+    </>
+  );
+  if (href) {
+    return (
+      <li>
+        <Link href={href} className="text-sm text-primary hover:underline">
+          {contenido}
+        </Link>
+      </li>
+    );
+  }
+  return <li className="text-sm text-foreground/90">{contenido}</li>;
+}
+
+function MenuGrupo({
+  icon,
+  title,
   children,
 }: {
+  icon: ReactNode;
   title: string;
-  resumen: string;
-  href: string;
-  hrefLabel: string;
   children: ReactNode;
 }) {
   return (
-    <details className={`${panelCardClass} group p-0`}>
-      <summary className="cursor-pointer list-none px-5 py-4 marker:content-none [&::-webkit-details-marker]:hidden">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="text-sm font-medium text-foreground">{title}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{resumen}</p>
-          </div>
-          <span className="text-xs text-muted-foreground group-open:hidden">Ver</span>
-          <span className="hidden text-xs text-muted-foreground group-open:inline">Ocultar</span>
-        </div>
-      </summary>
-      <div className="space-y-3 border-t border-border px-5 py-4">
-        {children}
-        <Link href={href} className="inline-block text-sm font-medium text-primary hover:underline">
-          {hrefLabel}
-        </Link>
-      </div>
-    </details>
+    <section>
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <span className="text-muted-foreground">{icon}</span>
+        {title}
+      </h2>
+      <ul className="mt-1 space-y-0.5 pl-6">{children}</ul>
+    </section>
   );
 }
 
@@ -109,148 +166,118 @@ export function FichaResumen({
     .filter((d) => d.tipo === "ASISTENCIA")
     .slice()
     .sort((a, b) => String(b.observaciones ?? "").localeCompare(String(a.observaciones ?? "")));
-  const pdfMes = asistencias.find((d) => d.observaciones === mes && Boolean(d.storage_path));
   const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodo);
-  const contratoResumen = contrato
-    ? `${ESTADO_CONTRATO_LABEL[contrato.estado]}${contrato.fecha_inicio ? ` · ${formatFechaPlanilla(contrato.fecha_inicio)}` : ""}${contrato.fecha_fin ? ` – ${formatFechaPlanilla(contrato.fecha_fin)}` : ""}`
+  const contratoEstado = contrato
+    ? ESTADO_CONTRATO_LABEL[contrato.estado]
     : vigente
-      ? `${ESTADO_CONTRATO_LABEL[vigente.estado]}${vigente.fecha_inicio ? ` · ${formatFechaPlanilla(vigente.fecha_inicio)}` : ""}`
-      : "Sin contrato generado";
-  const asistenciaResumen = pdfMes
-    ? `PDF firmado de ${etiquetaMesAsistencia(mes)}`
-    : `Falta PDF firmado de ${etiquetaMesAsistencia(mes)}`;
-  const vacacionResumen = resumenVac.derecho
-    ? `${resumenVac.diasTomados} de ${DIAS_VACACIONES_ANUALES} días en ${periodo} · saldo ${resumenVac.saldo}`
-    : `Aún no genera derecho · ${resumenVac.registros.length} registro${resumenVac.registros.length === 1 ? "" : "s"} en ${periodo}`;
+      ? ESTADO_CONTRATO_LABEL[vigente.estado]
+      : "Sin contrato";
+  const contratoFechas = contrato
+    ? `${formatFechaPlanilla(contrato.fecha_inicio)} – ${formatFechaPlanilla(contrato.fecha_fin)}`
+    : vigente
+      ? `${formatFechaPlanilla(vigente.fecha_inicio)} – ${formatFechaPlanilla(vigente.fecha_fin)}`
+      : null;
 
   return (
-    <div className="space-y-4">
-      <section className={`${panelCardClass} ficha-datos space-y-5 p-5`}>
-        <p className="text-sm font-medium text-foreground">Datos generales</p>
-        <div className="ficha-datos-grupos">
-          <Grupo title="Persona">
-            <div className="ficha-datos-span">
-              <Dato label="Nombre completo" value={nombreCompleto(p)} />
-            </div>
-            <Dato label="DNI" value={<span className="font-mono">{p.dni}</span>} />
-            <Dato label="Fecha de nacimiento" value={formatFechaPlanilla(p.fecha_nacimiento)} />
-          </Grupo>
-          <Grupo title="Contacto">
-            <Dato label="Celular" value={p.celular} />
-            <Dato label="Correo" value={p.correo} />
-            <div className="ficha-datos-span">
-              <Dato label="Dirección" value={p.direccion} />
-            </div>
-          </Grupo>
-          <Grupo title="En la empresa" wide>
-            <Dato label="Cargo" value={trabajador.cargo} />
-            <Dato
+    <div className={`${panelCardClass} ficha-menu p-5 sm:p-6`}>
+      <div className="ficha-menu-cols">
+        <div className="space-y-5">
+          <MenuGrupo icon={<IconPersona />} title="Persona">
+            <MenuItem label="Nombre" value={nombreCompleto(p)} />
+            <MenuItem label="DNI" value={p.dni} />
+            <MenuItem label="Nacimiento" value={formatFechaPlanilla(p.fecha_nacimiento)} />
+          </MenuGrupo>
+
+          <MenuGrupo icon={<IconContacto />} title="Contacto">
+            <MenuItem label="Celular" value={p.celular} />
+            <MenuItem label="Correo" value={p.correo} />
+            <MenuItem label="Dirección" value={p.direccion} />
+          </MenuGrupo>
+
+          <MenuGrupo icon={<IconPuesto />} title="Puesto">
+            <MenuItem label="Cargo" value={trabajador.cargo} />
+            <MenuItem
               label="Clasificación"
               value={trabajador.clasificacion ? CLASIFICACION_LABEL[trabajador.clasificacion] : null}
             />
-            <Dato label="Jornada" value={trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : null} />
-            <Dato label="Fecha de ingreso" value={formatFechaPlanilla(trabajador.fecha_ingreso)} />
+            <MenuItem label="Jornada" value={trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : null} />
+            <MenuItem label="Ingreso" value={formatFechaPlanilla(trabajador.fecha_ingreso)} />
             {trabajador.fecha_cese ? (
-              <Dato label="Fecha de cese" value={formatFechaPlanilla(trabajador.fecha_cese)} />
+              <MenuItem label="Cese" value={formatFechaPlanilla(trabajador.fecha_cese)} />
             ) : null}
-            <div className="ficha-datos-span">
-              <Dato
-                label="Horario"
-                value={<HorarioContratoVista value={trabajador.horario} className="text-sm font-medium" />}
-              />
-            </div>
-            <Dato
+            <MenuItem label="Horario" value={formatHorarioContrato(trabajador.horario)} />
+            <MenuItem
               label="Remuneración"
               value={trabajador.remuneracion != null ? `S/ ${formatRemuneracion(trabajador.remuneracion)}` : null}
             />
-            <Dato
+            <MenuItem
               label="Asignación familiar"
               value={
                 trabajador.recibe_asignacion_familiar === true
                   ? `Sí · S/ ${formatRemuneracion(montoAsignacionFamiliar(true))}`
                   : trabajador.recibe_asignacion_familiar === false
                     ? "No"
-                    : "No indicado"
+                    : null
               }
             />
-          </Grupo>
+          </MenuGrupo>
         </div>
-      </section>
 
-      <Apartado
-        title="Contrato"
-        resumen={contratoResumen}
-        href={`/contratos/${relacionId}`}
-        hrefLabel="Ir al trámite de contrato"
-      >
-        {contratos.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Todavía no hay un contrato en esta ficha.</p>
-        ) : (
-          <ul className="space-y-3 text-sm">
-            {contratos.map((item) => (
-              <li key={item.id} className="rounded-md border border-border/70 px-3 py-2">
-                <p className="font-medium">
-                  Versión {item.version}
-                  {item.es_vigente ? " · vigente" : ""}
-                </p>
-                <p className="text-muted-foreground">
-                  {ESTADO_CONTRATO_LABEL[item.estado]} · {formatFechaPlanilla(item.fecha_inicio)} –{" "}
-                  {formatFechaPlanilla(item.fecha_fin)}
-                </p>
-                {item.cargo ? <p className="text-muted-foreground">{item.cargo}</p> : null}
-                {item.remuneracion != null ? (
-                  <p className="text-muted-foreground">S/ {formatRemuneracion(item.remuneracion)}</p>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Apartado>
+        <div className="space-y-5">
+          <MenuGrupo icon={<IconContrato />} title="Contrato">
+            <MenuItem label="Estado" value={contratoEstado} />
+            {contratoFechas ? <MenuItem label="Vigencia" value={contratoFechas} /> : null}
+            {contrato?.cargo ? <MenuItem label="Cargo" value={contrato.cargo} /> : null}
+            {contrato?.remuneracion != null ? (
+              <MenuItem label="Remuneración" value={`S/ ${formatRemuneracion(contrato.remuneracion)}`} />
+            ) : null}
+            {contratos.length > 1
+              ? contratos.map((item) => (
+                  <MenuItem
+                    key={item.id}
+                    label={`Versión ${item.version}${item.es_vigente ? " vigente" : ""}`}
+                    value={`${ESTADO_CONTRATO_LABEL[item.estado]} · ${formatFechaPlanilla(item.fecha_inicio)}`}
+                  />
+                ))
+              : null}
+            <MenuItem label="Ir al trámite" href={`/contratos/${relacionId}`} />
+          </MenuGrupo>
 
-      <Apartado
-        title="Asistencias"
-        resumen={asistenciaResumen}
-        href={`/asistencias?entidadId=${entidadId}`}
-        hrefLabel="Ir a Asistencias"
-      >
-        {asistencias.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay PDF de asistencia cargados.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {asistencias.map((item) => (
-              <li key={item.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span>{item.observaciones ? etiquetaMesAsistencia(item.observaciones) : "Mes"}</span>
-                <span className={item.storage_path ? "font-medium text-emerald-700" : "text-amber-800"}>
-                  {item.storage_path ? "PDF subido" : "Pendiente"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Apartado>
+          <MenuGrupo icon={<IconAsistencia />} title="Asistencias">
+            {asistencias.length === 0 ? (
+              <MenuItem label="Sin PDF cargados" />
+            ) : (
+              asistencias.map((item) => (
+                <MenuItem
+                  key={item.id}
+                  label={item.observaciones ? etiquetaMesAsistencia(item.observaciones) : "Mes"}
+                  value={item.storage_path ? "PDF subido" : "Pendiente"}
+                />
+              ))
+            )}
+            <MenuItem label="Ir al trámite" href={`/asistencias?entidadId=${entidadId}`} />
+          </MenuGrupo>
 
-      <Apartado
-        title="Vacaciones"
-        resumen={vacacionResumen}
-        href={`/vacaciones?entidadId=${entidadId}&periodo=${periodo}`}
-        hrefLabel="Ir a Vacaciones"
-      >
-        {resumenVac.registros.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay goce registrado en {periodo}.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
+          <MenuGrupo icon={<IconVacaciones />} title="Vacaciones">
+            <MenuItem
+              label={`Periodo ${periodo}`}
+              value={
+                resumenVac.derecho
+                  ? `${resumenVac.diasTomados} de ${DIAS_VACACIONES_ANUALES} días · saldo ${resumenVac.saldo}`
+                  : "Aún no genera derecho"
+              }
+            />
             {resumenVac.registros.map((item) => (
-              <li key={item.id} className="flex flex-wrap items-center justify-between gap-2">
-                <span>
-                  {formatFechaPlanilla(item.fecha_inicio)} – {formatFechaPlanilla(item.fecha_fin)} · {item.dias} día
-                  {item.dias === 1 ? "" : "s"}
-                </span>
-                <span className="text-muted-foreground">{ESTADO_VACACION_LABEL[item.estado]}</span>
-              </li>
+              <MenuItem
+                key={item.id}
+                label={`${formatFechaPlanilla(item.fecha_inicio)} – ${formatFechaPlanilla(item.fecha_fin)}`}
+                value={`${item.dias} día${item.dias === 1 ? "" : "s"} · ${ESTADO_VACACION_LABEL[item.estado]}`}
+              />
             ))}
-          </ul>
-        )}
-      </Apartado>
+            <MenuItem label="Ir al trámite" href={`/vacaciones?entidadId=${entidadId}&periodo=${periodo}`} />
+          </MenuGrupo>
+        </div>
+      </div>
     </div>
   );
 }

@@ -9,39 +9,19 @@
 }
 
 @layer components {
-  .ficha-datos {
+  .ficha-menu {
     container-type: inline-size;
-    container-name: ficha-datos;
+    container-name: ficha-menu;
   }
 
-  .ficha-datos-grupos {
+  .ficha-menu-cols {
     display: grid;
-    gap: 1.25rem;
+    gap: 1.75rem 3rem;
   }
 
-  .ficha-datos-campos {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: 1fr;
-  }
-
-  .ficha-datos-span {
-    grid-column: 1 / -1;
-  }
-
-  @container ficha-datos (min-width: 36rem) {
-    .ficha-datos-campos {
+  @container ficha-menu (min-width: 40rem) {
+    .ficha-menu-cols {
       grid-template-columns: 1fr 1fr;
-    }
-  }
-
-  @container ficha-datos (min-width: 48rem) {
-    .ficha-datos-grupos {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .ficha-datos-grupo--wide {
-      grid-column: 1 / -1;
     }
   }
 }
