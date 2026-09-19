@@ -373,9 +373,6 @@ export async function marcarContratoRecogido(
   if (!contrato.datos_confirmados) {
     return { error: "Confirme los datos del PDF firmado antes de marcarlo Recogido." };
   }
-  if (!altasAfiliacionListas(flujoDesdeTrabajador(gate.trabajador))) {
-    return { error: "Primero dé de alta AFP y T-Registro." };
-  }
 
   const pdf = await hayPdfFirmado(relacionId);
   if (pdf.error) return { error: pdf.error };

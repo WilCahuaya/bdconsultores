@@ -102,21 +102,22 @@ export default async function ContratosPage({
     { id: "vence", hint: "30 días" },
     { id: "listo", hint: "Vigentes" },
   ];
-  const extrasAlta: { id: EtapaContratoId; hint: string }[] = [];
   if (conteo.validar > 0) {
-    extrasAlta.push({ id: "validar", hint: esEstudio ? "Aceptar alta" : "En revisión" });
+    tarjetas.splice(5, 0, { id: "validar", hint: esEstudio ? "Aceptar alta" : "En revisión" });
   }
+  const extrasAlta: { id: EtapaContratoId; hint: string }[] = [];
   if (conteo.afp > 0) {
-    extrasAlta.push({ id: "afp", hint: esEstudio ? "Dar de alta AFP" : "Estudio" });
+    extrasAlta.push({ id: "afp", hint: esEstudio ? "AFP y T-Registro" : "Estudio" });
   }
   if (conteo["t-registro"] > 0) {
-    extrasAlta.push({ id: "t-registro", hint: esEstudio ? "Dar de alta T-Registro" : "Estudio" });
-  }
-  if (extrasAlta.length > 0) {
-    tarjetas.splice(5, 0, ...extrasAlta);
+    extrasAlta.push({ id: "t-registro", hint: esEstudio ? "T-Registro" : "Estudio" });
   }
   if (conteo.revisar > 0) {
-    tarjetas.splice(-2, 0, { id: "revisar", hint: "Otro estado" });
+    extrasAlta.push({ id: "revisar", hint: "Otro estado" });
+  }
+  if (extrasAlta.length > 0) {
+    const venceIdx = tarjetas.findIndex((tarjeta) => tarjeta.id === "vence");
+    tarjetas.splice(venceIdx === -1 ? tarjetas.length : venceIdx, 0, ...extrasAlta);
   }
 
   return (
@@ -125,8 +126,8 @@ export default async function ContratosPage({
         <div>
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Contratos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Proceso por empresa: genere el Word, suba el firmado, confirme los datos, dé de alta AFP y T-Registro y
-            márquelo recogido. El nombre abre el trámite de esa persona.
+            Proceso por empresa: genere el Word, suba el firmado, confirme los datos y márquelo recogido. Después, el
+            estudio da de alta AFP y T-Registro. El nombre abre el trámite de esa persona.
           </p>
         </div>
 

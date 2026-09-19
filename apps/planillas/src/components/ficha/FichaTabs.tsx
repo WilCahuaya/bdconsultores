@@ -52,13 +52,15 @@ export function AltaPasosNav({
   tab,
   completados = PASOS_VACIOS,
   relacionId,
+  altaSistemas,
 }: {
   tab?: PasoAltaId;
   completados?: Record<PasoAltaId, boolean>;
   relacionId?: string;
+  altaSistemas?: { done: boolean; href: string; active?: boolean };
 }) {
   return (
-    <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+    <ol className={`grid grid-cols-2 gap-2 ${altaSistemas ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
       {PASOS_ALTA.map((paso) => {
         const active = tab === paso.id;
         const done = completados[paso.id];
@@ -87,6 +89,18 @@ export function AltaPasosNav({
           </li>
         );
       })}
+      {altaSistemas ? (
+        <li>
+          <Link
+            href={altaSistemas.href}
+            aria-current={altaSistemas.active ? "page" : undefined}
+            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${clasePaso(Boolean(altaSistemas.active), altaSistemas.done, true)}`}
+          >
+            <PasoBadge active={Boolean(altaSistemas.active)} done={altaSistemas.done} n={5} />
+            <span className="leading-tight">Dar de alta</span>
+          </Link>
+        </li>
+      ) : null}
     </ol>
   );
 }

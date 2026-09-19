@@ -31,6 +31,8 @@ import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib
 import { mesActualLima } from "@/lib/horario-asistencia";
 import {
   HORIZONTE_VENCIMIENTO_DIAS,
+  contratoConfirmado,
+  contratoVigente,
   enlaceProcesoOperativo,
   enlaceProcesoPendiente,
   flujoDesdeTrabajador,
@@ -66,6 +68,7 @@ export default async function FichaTrabajadorPage({
 
   const flujo = flujoDesdeTrabajador(trabajador);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
+  const contratoVig = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
   const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const canEditFicha = puedeEditarFichaLaboral(profile);
@@ -108,6 +111,7 @@ export default async function FichaTrabajadorPage({
           pension: trabajador.pension,
           tRegistro: trabajador.tRegistro,
           documentos: trabajador.documentos,
+          contratoCerrado: contratoVig?.estado === "RECOGIDO" || contratoVig?.estado === "COMPLETO",
           vidaLey,
           pdfAsistenciaMes: documentos.some(
             (d) => d.tipo === "ASISTENCIA" && d.observaciones === mes && Boolean(d.storage_path),

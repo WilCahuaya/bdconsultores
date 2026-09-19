@@ -188,20 +188,20 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
       ? { paso: "contratos", tab: "contratos", etiqueta: "Validar alta", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
+  if (vigente?.estado === "ELABORADO" && firmado) {
+    return esEstudio
+      ? { paso: "contratos", tab: "contratos", etiqueta: "Marcar recogido", rol: "estudio" }
+      : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
+  }
   if (!pensionAltaLista(input)) {
     return esEstudio
-      ? { paso: "pensiones", tab: "pensiones", etiqueta: "Dar de alta AFP", rol: "estudio" }
-      : { paso: "pensiones", tab: "contratos", etiqueta: "En alta AFP del estudio", rol: "empresa" };
+      ? { paso: "pensiones", tab: "pensiones", etiqueta: "Dar de alta AFP y T-Registro", rol: "estudio" }
+      : { paso: "pensiones", tab: "contratos", etiqueta: "En alta AFP y T-Registro del estudio", rol: "empresa" };
   }
   if (!tRegistroAltaLista(input)) {
     return esEstudio
       ? { paso: "t-registro", tab: "t-registro", etiqueta: "Dar de alta T-Registro", rol: "estudio" }
       : { paso: "t-registro", tab: "contratos", etiqueta: "En alta T-Registro del estudio", rol: "empresa" };
-  }
-  if (vigente?.estado === "ELABORADO" && firmado) {
-    return esEstudio
-      ? { paso: "contratos", tab: "contratos", etiqueta: "Marcar recogido", rol: "estudio" }
-      : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
   if (vigente?.estado === "RECOGIDO" || vigente?.estado === "COMPLETO") {
     return { paso: "listo", tab: "contratos", etiqueta: "Recogido", rol: "hecho" };
@@ -260,6 +260,7 @@ export function enlaceProcesoOperativo(input: {
   pension?: FlujoPension | null;
   tRegistro?: FlujoTRegistro[];
   documentos?: FlujoDocumento[];
+  contratoCerrado?: boolean;
   vidaLey: { estado?: string | null; fecha_fin?: string | null } | null;
   pdfAsistenciaMes: boolean;
   diasVacacionPeriodo: number;
@@ -277,10 +278,10 @@ export function enlaceProcesoOperativo(input: {
       tRegistro: input.tRegistro ?? [],
       documentos: input.documentos ?? [],
     };
-    if (afiliacionCargada && input.relacionId && !pensionAltaLista(afiliacion)) {
-      return { href: hrefPasoTrabajador(input.relacionId, "pensiones"), etiqueta: "Dar de alta AFP" };
+    if (afiliacionCargada && input.contratoCerrado && input.relacionId && !pensionAltaLista(afiliacion)) {
+      return { href: hrefPasoTrabajador(input.relacionId, "pensiones"), etiqueta: "Dar de alta AFP y T-Registro" };
     }
-    if (afiliacionCargada && input.relacionId && !tRegistroAltaLista(afiliacion)) {
+    if (afiliacionCargada && input.contratoCerrado && input.relacionId && !tRegistroAltaLista(afiliacion)) {
       return { href: hrefPasoTrabajador(input.relacionId, "t-registro"), etiqueta: "Dar de alta T-Registro" };
     }
     if (!afiliacionCargada || altasAfiliacionListas(afiliacion)) {
@@ -316,9 +317,9 @@ export const ETAPAS_CONTRATO = [
   "firmar",
   "confirmar",
   "validar",
+  "recoger",
   "afp",
   "t-registro",
-  "recoger",
   "vence",
   "revisar",
   "listo",
@@ -341,9 +342,9 @@ export const ETAPA_CONTRATO_FILTRO_LABEL: Record<EtapaContratoId | "pendientes",
   firmar: "Subir firmado",
   confirmar: "Confirmar datos",
   validar: "Validar alta",
-  afp: "Alta AFP",
-  "t-registro": "Alta T-Registro",
   recoger: "Marcar recogido",
+  afp: "Dar de alta",
+  "t-registro": "Alta T-Registro",
   vence: "Por vencer",
   revisar: "Revisar",
   listo: "Recogido",
@@ -389,20 +390,20 @@ export function resolverEtapaContrato(
       ? { id: "validar", etiqueta: "Alta pendiente de validación", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "validar", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
+  if (vigente?.estado === "ELABORADO" && firmado) {
+    return esEstudio
+      ? { id: "recoger", etiqueta: "Contrato firmado: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
+      : { id: "recoger", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+  }
   if (!pensionAltaLista(flujo)) {
     return esEstudio
-      ? { id: "afp", etiqueta: "Falta dar de alta AFP", tab: "pensiones", rol: "estudio", pendiente: true }
-      : { id: "afp", etiqueta: "En alta AFP del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+      ? { id: "afp", etiqueta: "Falta dar de alta AFP y T-Registro", tab: "pensiones", rol: "estudio", pendiente: true }
+      : { id: "afp", etiqueta: "En alta AFP y T-Registro del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (!tRegistroAltaLista(flujo)) {
     return esEstudio
       ? { id: "t-registro", etiqueta: "Falta dar de alta T-Registro", tab: "t-registro", rol: "estudio", pendiente: true }
       : { id: "t-registro", etiqueta: "En alta T-Registro del estudio", tab: "contratos", rol: "empresa", pendiente: true };
-  }
-  if (vigente?.estado === "ELABORADO" && firmado) {
-    return esEstudio
-      ? { id: "recoger", etiqueta: "Contrato firmado: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
-      : { id: "recoger", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
 
   const hoy = opts?.hoy ?? new Date().toISOString().slice(0, 10);

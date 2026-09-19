@@ -17,10 +17,12 @@ import {
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { asegurarDocumentosAlta, getPension, listContratos, listDocumentos } from "@/lib/actions/ficha";
 import {
+  altasAfiliacionListas,
   claseBadgePaso,
   estadoPasosAlta,
   flujoDesdeTrabajador,
   hrefAltaTrabajador,
+  hrefPasoTrabajador,
   hrefSiguientePaso,
   parseContratoPaso,
   pasoAltaInicial,
@@ -107,7 +109,19 @@ export default async function ContratoProcesoPage({
             )}
           </div>
         ) : null}
-        <AltaPasosNav tab={paso} completados={completados} relacionId={params.relacionId} />
+        <AltaPasosNav
+          tab={paso}
+          completados={completados}
+          relacionId={params.relacionId}
+          altaSistemas={{
+            done: altasAfiliacionListas(flujo),
+            href:
+              siguiente.paso === "pensiones" || siguiente.paso === "t-registro"
+                ? hrefSiguientePaso(params.relacionId, siguiente)
+                : hrefPasoTrabajador(params.relacionId, "pensiones"),
+            active: siguiente.paso === "pensiones" || siguiente.paso === "t-registro",
+          }}
+        />
         {paso === "documentos" ? (
           <FichaAltaDocumentos
             relacionId={params.relacionId}
