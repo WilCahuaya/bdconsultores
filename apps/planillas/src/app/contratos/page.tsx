@@ -13,6 +13,7 @@ import {
   contratoVigente,
   ETAPA_CONTRATO_FILTRO_LABEL,
   flujoDesdeTrabajador,
+  hrefPasoTrabajador,
   HORIZONTE_VENCIMIENTO_DIAS,
   parseEtapaContratoFiltro,
   resolverEtapaContrato,
@@ -77,6 +78,8 @@ export default async function ContratosPage({
       firmar: 0,
       confirmar: 0,
       validar: 0,
+      afp: 0,
+      "t-registro": 0,
       recoger: 0,
       vence: 0,
       revisar: 0,
@@ -99,8 +102,18 @@ export default async function ContratosPage({
     { id: "vence", hint: "30 días" },
     { id: "listo", hint: "Vigentes" },
   ];
+  const extrasAlta: { id: EtapaContratoId; hint: string }[] = [];
   if (conteo.validar > 0) {
-    tarjetas.splice(5, 0, { id: "validar", hint: esEstudio ? "Aceptar alta" : "En revisión" });
+    extrasAlta.push({ id: "validar", hint: esEstudio ? "Aceptar alta" : "En revisión" });
+  }
+  if (conteo.afp > 0) {
+    extrasAlta.push({ id: "afp", hint: esEstudio ? "Dar de alta AFP" : "Estudio" });
+  }
+  if (conteo["t-registro"] > 0) {
+    extrasAlta.push({ id: "t-registro", hint: esEstudio ? "Dar de alta T-Registro" : "Estudio" });
+  }
+  if (extrasAlta.length > 0) {
+    tarjetas.splice(5, 0, ...extrasAlta);
   }
   if (conteo.revisar > 0) {
     tarjetas.splice(-2, 0, { id: "revisar", hint: "Otro estado" });
@@ -112,8 +125,8 @@ export default async function ContratosPage({
         <div>
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Contratos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Proceso por empresa: genere el Word, suba el firmado, confirme los datos y márquelo recogido. El nombre abre
-            el trámite de esa persona.
+            Proceso por empresa: genere el Word, suba el firmado, confirme los datos, dé de alta AFP y T-Registro y
+            márquelo recogido. El nombre abre el trámite de esa persona.
           </p>
         </div>
 
@@ -188,7 +201,7 @@ export default async function ContratosPage({
                         <td className="px-4 py-2 font-mono">{trabajador.persona.dni}</td>
                         <td className="px-4 py-2">
                           <Link
-                            href={`/contratos/${trabajador.id}`}
+                            href={hrefPasoTrabajador(trabajador.id, etapa.tab)}
                             className="font-medium text-primary hover:underline"
                           >
                             {nombreCompleto(trabajador.persona)}

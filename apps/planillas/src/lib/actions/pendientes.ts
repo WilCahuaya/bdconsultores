@@ -4,7 +4,12 @@ import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from 
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { esMesAsistencia, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import { nombreCompleto, resolverEtapaVidaLey, type PendienteItem } from "@/lib/planillas-labels";
-import { resolverEtapaContrato, HORIZONTE_VENCIMIENTO_DIAS } from "@/lib/flujo-ficha";
+import {
+  altasAfiliacionListas,
+  flujoDesdeTrabajador,
+  resolverEtapaContrato,
+  HORIZONTE_VENCIMIENTO_DIAS,
+} from "@/lib/flujo-ficha";
 import { planillasDb } from "@/lib/supabase/planillas";
 import { anioActualLima, saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
 
@@ -102,7 +107,11 @@ export async function listControlEmpresa(entidadId: string): Promise<ControlEmpr
         });
       }
 
-      if (esEstudio && trabajador.validacion !== "PENDIENTE") {
+      if (
+        esEstudio &&
+        trabajador.validacion !== "PENDIENTE" &&
+        altasAfiliacionListas(flujoDesdeTrabajador(trabajador))
+      ) {
         const etapa = resolverEtapaVidaLey(vidaLeyPorId.get(trabajador.id), { hoy, limite });
         if (etapa.pendiente) {
           vidaLey.push({

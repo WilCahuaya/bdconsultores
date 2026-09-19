@@ -18,8 +18,8 @@ export function AceptarAltaButton({ relacionId }: { relacionId: string }) {
       pushToast(result.error, "error");
       return;
     }
-    pushToast("Alta aceptada.");
-    router.refresh();
+    pushToast("Alta aceptada. Siga con el alta AFP.");
+    router.push(`/trabajadores/${relacionId}?tab=pensiones`);
   }
 
   return (

@@ -13,6 +13,7 @@ import type {
 import { TIPOS_DOCUMENTO_ALTA_INICIALES } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { altasAfiliacionListas, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { parseFechaCampo, parseCargoCampo, armarDireccionPersona, montoAsignacionFamiliar, vidaLeyPendienteRecepcion } from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
@@ -372,6 +373,9 @@ export async function marcarContratoRecogido(
   if (!contrato.datos_confirmados) {
     return { error: "Confirme los datos del PDF firmado antes de marcarlo Recogido." };
   }
+  if (!altasAfiliacionListas(flujoDesdeTrabajador(gate.trabajador))) {
+    return { error: "Primero dé de alta AFP y T-Registro." };
+  }
 
   const pdf = await hayPdfFirmado(relacionId);
   if (pdf.error) return { error: pdf.error };
@@ -577,6 +581,8 @@ export async function guardarTipoPensionAlta(
   );
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/");
+  revalidatePath("/contratos");
   revalidatePath("/pendientes");
   return {};
 }
@@ -634,6 +640,7 @@ export async function setDocumentoArchivo(
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath(`/contratos/${relacionId}`);
+  revalidatePath("/");
   revalidatePath("/contratos");
   revalidatePath("/pendientes");
   revalidatePath("/asistencias");
@@ -680,6 +687,8 @@ export async function savePension(relacionId: string, formData: FormData): Promi
   const { error } = await db.from("pensiones").upsert(payload, { onConflict: "relacion_id" });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/");
+  revalidatePath("/contratos");
   revalidatePath("/pendientes");
   return {};
 }
@@ -836,7 +845,13 @@ export async function listTrabajadoresVidaLeyPendienteRecepcion(
   entidadId: string,
 ): Promise<TrabajadorListItem[]> {
   const items = await listVidaLeyEmpresa(entidadId);
-  return items.filter((item) => vidaLeyPendienteRecepcion(item.registro?.estado)).map((item) => item.trabajador);
+  return items
+    .filter(
+      (item) =>
+        altasAfiliacionListas(flujoDesdeTrabajador(item.trabajador)) &&
+        vidaLeyPendienteRecepcion(item.registro?.estado),
+    )
+    .map((item) => item.trabajador);
 }
 
 async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promise<{ error?: string }> {
@@ -920,6 +935,8 @@ export async function addTRegistro(relacionId: string, formData: FormData): Prom
   });
   if (error) return { error: error.message };
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/");
+  revalidatePath("/contratos");
   revalidatePath("/pendientes");
   return {};
 }

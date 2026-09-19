@@ -99,11 +99,15 @@ export default async function FichaTrabajadorPage({
     (!tab
       ? enlaceProcesoOperativo({
           entidadId: trabajador.entidad_id,
+          relacionId: params.relacionId,
           esEstudio,
           estado: trabajador.estado,
           validacion: trabajador.validacion,
           fechaIngreso: trabajador.fecha_ingreso,
           fechaCese: trabajador.fecha_cese,
+          pension: trabajador.pension,
+          tRegistro: trabajador.tRegistro,
+          documentos: trabajador.documentos,
           vidaLey,
           pdfAsistenciaMes: documentos.some(
             (d) => d.tipo === "ASISTENCIA" && d.observaciones === mes && Boolean(d.storage_path),

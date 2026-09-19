@@ -2,8 +2,11 @@ import {
   tiposDocumentosAltaRequeridos,
   type EstadoContratoPlanilla,
   type EstadoDocumentoPlanilla,
+  type EstadoTramitePension,
   type EstadoValidacionAltaPlanilla,
   type TipoDocumentoPlanilla,
+  type TipoPension,
+  type TipoTRegistro,
 } from "@inventario/types";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { trabajadorActivoEnMes } from "@/lib/horario-asistencia";
@@ -61,6 +64,19 @@ export type FlujoContrato = {
   datos_confirmados?: boolean;
 };
 
+export type FlujoPension = {
+  tipo: TipoPension | null;
+  afp_nombre: string | null;
+  cuspp: string | null;
+  tramite_estado: EstadoTramitePension | null;
+  fecha_tramite: string | null;
+};
+
+export type FlujoTRegistro = {
+  tipo: TipoTRegistro;
+  realizado: boolean;
+};
+
 export type FlujoFichaInput = {
   nombres: string | null;
   cargo: string | null;
@@ -70,10 +86,12 @@ export type FlujoFichaInput = {
   validacion: EstadoValidacionAltaPlanilla;
   contratos: FlujoContrato[];
   documentos: FlujoDocumento[];
+  pension: FlujoPension | null;
+  tRegistro: FlujoTRegistro[];
 };
 
 export type SiguientePaso = {
-  paso: PasoAltaId | "listo";
+  paso: PasoAltaId | "listo" | "pensiones" | "t-registro";
   tab: FlujoTab;
   etiqueta: string;
   rol: "empresa" | "estudio" | "hecho";
@@ -81,6 +99,31 @@ export type SiguientePaso = {
 
 export function documentoCargado(docs: FlujoDocumento[], tipo: TipoDocumentoPlanilla): boolean {
   return docs.some((d) => d.tipo === tipo && d.estado === "SI" && Boolean(d.storage_path));
+}
+
+export function pensionAltaLista(input: Pick<FlujoFichaInput, "pension">): boolean {
+  const pension = input.pension;
+  if (pension?.tipo === "ONP") return true;
+  if (pension?.tipo !== "AFP") return false;
+  return (
+    pension.tramite_estado === "TRAMITADO" &&
+    Boolean(pension.afp_nombre?.trim()) &&
+    Boolean(pension.cuspp?.trim()) &&
+    Boolean(pension.fecha_tramite)
+  );
+}
+
+export function tRegistroAltaLista(input: Pick<FlujoFichaInput, "documentos" | "tRegistro">): boolean {
+  return (
+    input.tRegistro.some((item) => item.tipo === "ALTA" && item.realizado) &&
+    documentoCargado(input.documentos, "TR_ALTA")
+  );
+}
+
+export function altasAfiliacionListas(
+  input: Pick<FlujoFichaInput, "pension" | "tRegistro" | "documentos">,
+): boolean {
+  return pensionAltaLista(input) && tRegistroAltaLista(input);
 }
 
 export function contratoVigente(contratos: FlujoContrato[]): FlujoContrato | null {
@@ -145,6 +188,16 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
       ? { paso: "contratos", tab: "contratos", etiqueta: "Validar alta", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
+  if (!pensionAltaLista(input)) {
+    return esEstudio
+      ? { paso: "pensiones", tab: "pensiones", etiqueta: "Dar de alta AFP", rol: "estudio" }
+      : { paso: "pensiones", tab: "contratos", etiqueta: "En alta AFP del estudio", rol: "empresa" };
+  }
+  if (!tRegistroAltaLista(input)) {
+    return esEstudio
+      ? { paso: "t-registro", tab: "t-registro", etiqueta: "Dar de alta T-Registro", rol: "estudio" }
+      : { paso: "t-registro", tab: "contratos", etiqueta: "En alta T-Registro del estudio", rol: "empresa" };
+  }
   if (vigente?.estado === "ELABORADO" && firmado) {
     return esEstudio
       ? { paso: "contratos", tab: "contratos", etiqueta: "Marcar recogido", rol: "estudio" }
@@ -173,6 +226,9 @@ export function hrefPasoTrabajador(relacionId: string, tab: FlujoTab): string {
 
 export function hrefSiguientePaso(relacionId: string, siguiente: SiguientePaso): string {
   if (siguiente.paso === "listo") return hrefFichaTrabajador(relacionId);
+  if (siguiente.tab === "pensiones" || siguiente.tab === "t-registro") {
+    return hrefPasoTrabajador(relacionId, siguiente.tab);
+  }
   if (siguiente.paso === "contratos" || siguiente.tab === "contratos" || siguiente.tab === "firma") {
     return hrefAltaTrabajador(relacionId);
   }
@@ -195,11 +251,15 @@ export function enlaceProcesoPendiente(relacionId: string, siguiente: SiguienteP
 
 export function enlaceProcesoOperativo(input: {
   entidadId: string;
+  relacionId?: string;
   esEstudio: boolean;
   estado: string;
   validacion: EstadoValidacionAltaPlanilla;
   fechaIngreso: string | null;
   fechaCese: string | null;
+  pension?: FlujoPension | null;
+  tRegistro?: FlujoTRegistro[];
+  documentos?: FlujoDocumento[];
   vidaLey: { estado?: string | null; fecha_fin?: string | null } | null;
   pdfAsistenciaMes: boolean;
   diasVacacionPeriodo: number;
@@ -210,9 +270,24 @@ export function enlaceProcesoOperativo(input: {
 }): EnlaceProceso | null {
   if (input.estado !== "ACTIVA") return null;
   if (input.esEstudio && input.validacion !== "PENDIENTE") {
-    const etapa = resolverEtapaVidaLey(input.vidaLey, { hoy: input.hoy, limite: input.limite });
-    if (etapa.pendiente) {
-      return { href: `/vida-ley?entidadId=${input.entidadId}`, etiqueta: etapa.etiqueta };
+    const afiliacionCargada =
+      input.pension !== undefined || input.tRegistro !== undefined || input.documentos !== undefined;
+    const afiliacion = {
+      pension: input.pension ?? null,
+      tRegistro: input.tRegistro ?? [],
+      documentos: input.documentos ?? [],
+    };
+    if (afiliacionCargada && input.relacionId && !pensionAltaLista(afiliacion)) {
+      return { href: hrefPasoTrabajador(input.relacionId, "pensiones"), etiqueta: "Dar de alta AFP" };
+    }
+    if (afiliacionCargada && input.relacionId && !tRegistroAltaLista(afiliacion)) {
+      return { href: hrefPasoTrabajador(input.relacionId, "t-registro"), etiqueta: "Dar de alta T-Registro" };
+    }
+    if (!afiliacionCargada || altasAfiliacionListas(afiliacion)) {
+      const etapa = resolverEtapaVidaLey(input.vidaLey, { hoy: input.hoy, limite: input.limite });
+      if (etapa.pendiente) {
+        return { href: `/vida-ley?entidadId=${input.entidadId}`, etiqueta: etapa.etiqueta };
+      }
     }
   }
   if (trabajadorActivoEnMes(input.mes, input.fechaIngreso, input.fechaCese) && !input.pdfAsistenciaMes) {
@@ -241,6 +316,8 @@ export const ETAPAS_CONTRATO = [
   "firmar",
   "confirmar",
   "validar",
+  "afp",
+  "t-registro",
   "recoger",
   "vence",
   "revisar",
@@ -264,6 +341,8 @@ export const ETAPA_CONTRATO_FILTRO_LABEL: Record<EtapaContratoId | "pendientes",
   firmar: "Subir firmado",
   confirmar: "Confirmar datos",
   validar: "Validar alta",
+  afp: "Alta AFP",
+  "t-registro": "Alta T-Registro",
   recoger: "Marcar recogido",
   vence: "Por vencer",
   revisar: "Revisar",
@@ -310,6 +389,16 @@ export function resolverEtapaContrato(
       ? { id: "validar", etiqueta: "Alta pendiente de validación", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "validar", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
+  if (!pensionAltaLista(flujo)) {
+    return esEstudio
+      ? { id: "afp", etiqueta: "Falta dar de alta AFP", tab: "pensiones", rol: "estudio", pendiente: true }
+      : { id: "afp", etiqueta: "En alta AFP del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+  if (!tRegistroAltaLista(flujo)) {
+    return esEstudio
+      ? { id: "t-registro", etiqueta: "Falta dar de alta T-Registro", tab: "t-registro", rol: "estudio", pendiente: true }
+      : { id: "t-registro", etiqueta: "En alta T-Registro del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+  }
   if (vigente?.estado === "ELABORADO" && firmado) {
     return esEstudio
       ? { id: "recoger", etiqueta: "Contrato firmado: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
@@ -352,6 +441,8 @@ export function flujoDesdeTrabajador(input: {
   validacion: EstadoValidacionAltaPlanilla;
   contratos: FlujoContrato[];
   documentos: FlujoDocumento[];
+  pension?: FlujoPension | null;
+  tRegistro?: FlujoTRegistro[];
 }): FlujoFichaInput {
   return {
     nombres: input.persona.nombres,
@@ -362,5 +453,7 @@ export function flujoDesdeTrabajador(input: {
     validacion: input.validacion,
     contratos: input.contratos,
     documentos: input.documentos,
+    pension: input.pension ?? null,
+    tRegistro: input.tRegistro ?? [],
   };
 }

@@ -16,7 +16,7 @@ import {
   requirePlanillasProfile,
 } from "@/lib/auth/access";
 import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
-import type { FlujoContrato, FlujoDocumento } from "@/lib/flujo-ficha";
+import type { FlujoContrato, FlujoDocumento, FlujoPension, FlujoTRegistro } from "@/lib/flujo-ficha";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { planillasDb } from "@/lib/supabase/planillas";
 
@@ -59,6 +59,8 @@ export type TrabajadorListItem = RelacionRow & {
   remuneracion: number | null;
   contratos: FlujoContrato[];
   documentos: FlujoDocumento[];
+  pension: FlujoPension | null;
+  tRegistro: FlujoTRegistro[];
 };
 
 type ContratoEmbed = {
@@ -76,6 +78,26 @@ type DocumentoEmbed = {
   estado: string;
   storage_path: string | null;
 };
+
+const TRABAJADOR_SELECT =
+  "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados), documentos (tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
+
+function asList<T>(value: T | T[] | null | undefined): T[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function pensionDe(value: FlujoPension | FlujoPension[] | null | undefined): FlujoPension | null {
+  const row = asList(value)[0];
+  if (!row) return null;
+  return {
+    tipo: row.tipo ?? null,
+    afp_nombre: row.afp_nombre ?? null,
+    cuspp: row.cuspp ?? null,
+    tramite_estado: row.tramite_estado ?? null,
+    fecha_tramite: row.fecha_tramite ?? null,
+  };
+}
 
 function remuneracionDeContratos(contratos: ContratoEmbed[] | ContratoEmbed | null | undefined): number | null {
   const list = Array.isArray(contratos) ? contratos : contratos ? [contratos] : [];
@@ -99,29 +121,15 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
   const db = await planillasDb();
   const { data, error } = await db
     .from("relaciones_laborales")
-    .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados), documentos (tipo, estado, storage_path)",
-    )
+    .select(TRABAJADOR_SELECT)
     .eq("entidad_id", entidadId)
     .order("fecha_ingreso", { ascending: false, nullsFirst: false });
 
   if (error) throw new Error(error.message);
 
   return (data ?? []).flatMap((row) => {
-    const persona = Array.isArray(row.personas) ? row.personas[0] : row.personas;
-    if (!persona) return [];
-    const { personas: _p, contratos, documentos, ...relacion } = row;
-    const contratosList = (Array.isArray(contratos) ? contratos : contratos ? [contratos] : []) as FlujoContrato[];
-    const documentosList = (Array.isArray(documentos) ? documentos : documentos ? [documentos] : []) as FlujoDocumento[];
-    return [
-      {
-        ...(relacion as RelacionRow),
-        persona: persona as PersonaRow,
-        remuneracion: remuneracionDeContratos(contratos as ContratoEmbed[] | ContratoEmbed | null),
-        contratos: contratosList,
-        documentos: documentosList,
-      },
-    ];
+    const mapped = mapTrabajadorRow(row);
+    return mapped ? [mapped] : [];
   });
 }
 
@@ -130,9 +138,7 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const db = await planillasDb();
   const { data, error } = await db
     .from("relaciones_laborales")
-    .select(
-      "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados), documentos (tipo, estado, storage_path)",
-    )
+    .select(TRABAJADOR_SELECT)
     .eq("id", relacionId)
     .maybeSingle();
 
@@ -142,17 +148,30 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const alcance = entidadAlcance(profile);
   if (alcance !== "todas" && alcance !== data.entidad_id) return null;
 
-  const persona = Array.isArray(data.personas) ? data.personas[0] : data.personas;
+  return mapTrabajadorRow(data);
+}
+
+function mapTrabajadorRow(row: {
+  personas?: PersonaRow | PersonaRow[] | null;
+  contratos?: ContratoEmbed | ContratoEmbed[] | null;
+  documentos?: DocumentoEmbed | DocumentoEmbed[] | null;
+  pensiones?: FlujoPension | FlujoPension[] | null;
+  t_registro?: FlujoTRegistro | FlujoTRegistro[] | null;
+  [key: string]: unknown;
+}): TrabajadorListItem | null {
+  const persona = Array.isArray(row.personas) ? row.personas[0] : row.personas;
   if (!persona) return null;
-  const { personas: _p, contratos, documentos, ...relacion } = data;
-  const contratosList = (Array.isArray(contratos) ? contratos : contratos ? [contratos] : []) as FlujoContrato[];
-  const documentosList = (Array.isArray(documentos) ? documentos : documentos ? [documentos] : []) as FlujoDocumento[];
+  const { personas: _p, contratos, documentos, pensiones, t_registro, ...relacion } = row;
+  const contratosList = asList(contratos) as FlujoContrato[];
+  const documentosList = asList(documentos) as FlujoDocumento[];
   return {
     ...(relacion as RelacionRow),
     persona: persona as PersonaRow,
-    remuneracion: remuneracionDeContratos(contratos as ContratoEmbed[] | ContratoEmbed | null),
+    remuneracion: remuneracionDeContratos(contratos),
     contratos: contratosList,
     documentos: documentosList,
+    pension: pensionDe(pensiones),
+    tRegistro: asList(t_registro).map((item) => ({ tipo: item.tipo, realizado: Boolean(item.realizado) })),
   };
 }
 

@@ -21,6 +21,7 @@ import {
   estadoPasosAlta,
   flujoDesdeTrabajador,
   hrefAltaTrabajador,
+  hrefSiguientePaso,
   parseContratoPaso,
   pasoAltaInicial,
   resolverSiguientePaso,
@@ -79,9 +80,18 @@ export default async function ContratoProcesoPage({
         </div>
         <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
           <span className="text-muted-foreground">Siguiente paso</span>
-          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}>
-            {siguiente.etiqueta}
-          </span>
+          {siguiente.paso === "listo" ? (
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}>
+              {siguiente.etiqueta}
+            </span>
+          ) : (
+            <Link
+              href={hrefSiguientePaso(params.relacionId, siguiente)}
+              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}
+            >
+              {siguiente.etiqueta}
+            </Link>
+          )}
         </p>
         {porValidar ? (
           <div className={`${panelCardClass} space-y-3 p-5`}>

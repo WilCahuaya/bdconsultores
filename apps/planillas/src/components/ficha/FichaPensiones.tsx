@@ -121,6 +121,11 @@ export function FichaPensiones({
       return;
     }
     setFileAlta(null);
+    if (tieneDocumentoAlta || afiliacionCompleta) {
+      pushToast("Sistema de pensión guardado. Siga con T-Registro.");
+      router.push(`/trabajadores/${relacionId}?tab=t-registro`);
+      return;
+    }
     pushToast("Sistema de pensión guardado.");
     router.refresh();
   }
@@ -245,12 +250,14 @@ export function FichaPensiones({
         </>
       ) : null}
 
-      <Link
-        href={`/trabajadores/${relacionId}?tab=t-registro`}
-        className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-      >
-        Ir a T-Registro
-      </Link>
+      {esOnp || (esAfp && pension?.tramite_estado === "TRAMITADO") ? (
+        <Link
+          href={`/trabajadores/${relacionId}?tab=t-registro`}
+          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+        >
+          Ir a T-Registro
+        </Link>
+      ) : null}
     </div>
   );
 }

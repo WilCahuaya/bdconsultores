@@ -14,6 +14,7 @@ import {
   type DocumentoRow,
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { altasAfiliacionListas } from "@/lib/flujo-ficha";
 import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, formatRemuneracion, montoAsignacionFamiliar, opcionesCargo, remuneracionBruta } from "@/lib/planillas-labels";
 import { descargarContratoWord } from "@/lib/descargar-contrato-word";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
@@ -55,6 +56,11 @@ export function FichaContratos({
   const [eliminando, setEliminando] = useState<ContratoRow | null>(null);
   const [mostrarConfirmar, setMostrarConfirmar] = useState(!abierto?.datos_confirmados);
   const tieneFirmado = documentos.some((d) => d.tipo === "CONTRATO_FIRMADO" && Boolean(d.storage_path) && d.estado === "SI");
+  const altasListas = altasAfiliacionListas({
+    pension: trabajador.pension,
+    tRegistro: trabajador.tRegistro,
+    documentos,
+  });
   const base = abierto ?? contratos.find((c) => c.datos_confirmados) ?? null;
 
   async function onGenerar(formData: FormData) {
@@ -327,7 +333,7 @@ export function FichaContratos({
                           </Button>
                         </>
                       ) : null}
-                      {canMarcarRecogido && c.estado === "ELABORADO" && c.datos_confirmados ? (
+                      {canMarcarRecogido && altasListas && c.estado === "ELABORADO" && c.datos_confirmados ? (
                         <Button
                           type="button"
                           size="sm"

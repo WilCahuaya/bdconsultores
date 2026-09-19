@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -113,7 +114,7 @@ export function FichaTRegistro({
     setFileAlta(null);
     setPendingAlta(false);
     pushToast("Alta de T-Registro guardada.");
-    router.refresh();
+    router.push(`/trabajadores/${relacionId}`);
   }
 
   async function onSubmit(formData: FormData) {
@@ -239,6 +240,14 @@ export function FichaTRegistro({
           ))
         )}
       </ul>
+      {yaAlta ? (
+        <Link
+          href={`/trabajadores/${relacionId}`}
+          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+        >
+          Ver siguiente paso
+        </Link>
+      ) : null}
       {canWrite && !mostrarForm ? (
         <Button type="button" variant="outline" onClick={() => setMostrarForm(true)}>
           Registrar baja u otro movimiento
