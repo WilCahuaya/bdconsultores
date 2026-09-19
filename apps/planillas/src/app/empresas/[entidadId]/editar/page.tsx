@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { entidadEtiqueta } from "@inventario/types";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EmpresaForm } from "@/components/EmpresaForm";
 import { puedeCrearEntidad, requirePlanillasProfile } from "@/lib/auth/access";
@@ -24,7 +25,7 @@ export default async function EditarEmpresaPage({
             ← Trabajadores
           </Link>
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">Editar empresa</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{entidad.nombre}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{entidadEtiqueta(entidad)}</p>
         </div>
         <EmpresaForm entidad={entidad} />
       </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { EntidadConConteo } from "@inventario/types";
+import { entidadEtiqueta, sortEntidadesByNumero } from "@inventario/types";
 import {
   EntidadResumenPanel,
   PanelDataTable,
@@ -59,12 +60,16 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q) return entidades;
-    return entidades.filter(
-      (e) =>
-        e.nombre.toLowerCase().includes(q) ||
-        (e.ruc?.toLowerCase().includes(q) ?? false),
-    );
+    const base = !q
+      ? entidades
+      : entidades.filter(
+          (e) =>
+            entidadEtiqueta(e).toLowerCase().includes(q) ||
+            e.nombre.toLowerCase().includes(q) ||
+            (e.numero_interno?.toLowerCase().includes(q) ?? false) ||
+            (e.ruc?.toLowerCase().includes(q) ?? false),
+        );
+    return sortEntidadesByNumero(base);
   }, [entidades, busqueda]);
 
   const seleccionarEntidad = useCallback(
@@ -178,7 +183,7 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
                     role="link"
                     aria-current={selected ? "true" : undefined}
                   >
-                    <PanelTableTd className="font-medium text-primary">{entidad.nombre}</PanelTableTd>
+                    <PanelTableTd className="font-medium text-primary">{entidadEtiqueta(entidad)}</PanelTableTd>
                     <PanelTableTd className="font-mono text-xs text-muted-foreground">
                       {entidad.ruc ?? "—"}
                     </PanelTableTd>

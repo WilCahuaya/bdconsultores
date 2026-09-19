@@ -6,10 +6,14 @@ import type {
 } from "@inventario/types";
 import {
   buildAmbientePreregistroNombre,
+  mensajeErrorNumeroInterno,
+  normalizeNumeroInterno,
   normalizeResponsableDni,
   normalizeResponsableNombre,
   RESPONSABLE_CARGO_ADMIN,
+  sortEntidadesByNumero,
   validarAdminEntidadDni,
+  validarNumeroInterno,
 } from "@inventario/types";
 import {
   enqueueOfflineOp,
@@ -28,6 +32,7 @@ import { syncAdminResponsableForEntidad } from "./responsables-admin-sync";
 
 export interface CreateEntidadInput {
   nombre: string;
+  numero_interno?: string | null;
   nombre_etiqueta?: string | null;
   ruc?: string;
   direccion?: string;
@@ -125,16 +130,13 @@ export async function listEntidades(): Promise<EntidadConConteo[]> {
     try {
       const items = await fetchEntidadesRemote();
       await replaceMasterDomain("entidades", "", items);
-      return items;
+      return sortEntidadesByNumero(items);
     } catch {
       /* usar caché */
     }
   }
   const cached = await listMasterDomain<EntidadConConteo>("entidades", "");
-  return cached.sort((a, b) => {
-    if (a.activo !== b.activo) return a.activo ? -1 : 1;
-    return a.nombre.localeCompare(b.nombre, "es");
-  });
+  return sortEntidadesByNumero(cached);
 }
 
 export async function createEntidad(
@@ -146,10 +148,13 @@ export async function createEntidad(
   invitePendingOffline?: boolean;
 }> {
   const nombre = input.nombre.trim();
+  const numeroInterno = normalizeNumeroInterno(input.numero_interno);
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
 
   if (!nombre) return { error: "La razón social es obligatoria." };
+  const numeroError = validarNumeroInterno(numeroInterno);
+  if (numeroError) return { error: numeroError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -157,6 +162,10 @@ export async function createEntidad(
   if (dniError) return { error: dniError };
 
   if (!isOnline()) {
+    const existentes = await listMasterDomain<EntidadConConteo>("entidades", "");
+    if (existentes.some((item) => item.numero_interno === numeroInterno)) {
+      return { error: "Ya existe un proyecto con ese número." };
+    }
     const id = newLocalId();
     const sedeId = newLocalId();
     const preregistroId = newLocalId();
@@ -166,6 +175,7 @@ export async function createEntidad(
     const entidad: EntidadConConteo = {
       id,
       nombre,
+      numero_interno: numeroInterno,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -173,6 +183,8 @@ export async function createEntidad(
       admin_email: adminEmail,
       admin_dni: adminDni,
       admin_telefono: input.admin_telefono?.trim() || null,
+      usa_inventarios: true,
+      usa_planillas: false,
       activo: true,
       created_at: now,
       updated_at: now,
@@ -237,6 +249,7 @@ export async function createEntidad(
       responsableId,
       input: {
         nombre,
+        numero_interno: numeroInterno,
         nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
         ruc: input.ruc?.trim() || null,
         direccion: input.direccion?.trim() || null,
@@ -260,6 +273,7 @@ export async function createEntidad(
     .from("entidades")
     .insert({
       nombre,
+      numero_interno: numeroInterno,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -271,7 +285,7 @@ export async function createEntidad(
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeErrorNumeroInterno(error) ?? error.message };
 
   await syncSedePrincipalDireccionFromEntidad(
     supabase,
@@ -305,10 +319,13 @@ export async function updateEntidad(
   invitePendingOffline?: boolean;
 }> {
   const nombre = input.nombre.trim();
+  const numeroInterno = normalizeNumeroInterno(input.numero_interno);
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
 
   if (!nombre) return { error: "La razón social es obligatoria." };
+  const numeroError = validarNumeroInterno(numeroInterno);
+  if (numeroError) return { error: numeroError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -318,9 +335,18 @@ export async function updateEntidad(
   if (!isOnline()) {
     const cached = await findMasterItem<EntidadConConteo>("entidades", entidadId);
     if (!cached) return { error: "Entidad no encontrada en caché local." };
+    const existentes = await listMasterDomain<EntidadConConteo>("entidades", "");
+    if (
+      existentes.some(
+        (item) => item.id !== entidadId && item.numero_interno === numeroInterno,
+      )
+    ) {
+      return { error: "Ya existe un proyecto con ese número." };
+    }
     const updated: EntidadConConteo = {
       ...cached.data,
       nombre,
+      numero_interno: numeroInterno,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -358,6 +384,7 @@ export async function updateEntidad(
     .from("entidades")
     .update({
       nombre,
+      numero_interno: numeroInterno,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -371,7 +398,7 @@ export async function updateEntidad(
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeErrorNumeroInterno(error) ?? error.message };
 
   await syncSedePrincipalDireccionFromEntidad(
     supabase,

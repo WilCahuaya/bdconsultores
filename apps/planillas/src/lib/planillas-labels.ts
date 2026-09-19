@@ -92,6 +92,7 @@ export const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoPlanilla, string> = {
   VIDA_LEY_COMPROBANTE: "Comprobante de envío Vida Ley",
   TRAMITE_AFP: "Documento de alta AFP",
   ASISTENCIA: "Asistencia del mes",
+  VACACIONES_FIRMADO: "Respaldo de vacaciones firmado",
   OTRO: "Otro",
 };
 

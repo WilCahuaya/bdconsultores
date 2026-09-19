@@ -637,6 +637,7 @@ export async function setDocumentoArchivo(
   revalidatePath("/contratos");
   revalidatePath("/pendientes");
   revalidatePath("/asistencias");
+  revalidatePath("/vacaciones");
   return {};
 }
 

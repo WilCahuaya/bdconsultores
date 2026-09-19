@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation";
 import type { EntidadConConteo } from "@inventario/types";
 import {
   LABEL_PRINT_LAYOUT_FONTS,
+  entidadEtiqueta,
   entidadNombreRequiereEtiquetaOverride,
   entidadUsaInventarios,
   entidadUsaPlanillas,
+  NUMERO_INTERNO_INPUT_PATTERN,
+  sortEntidadesByNumero,
   suggestNombreEtiqueta,
 } from "@inventario/types";
 import { Button, ConfirmDialog, Dialog, Input, Label } from "@inventario/ui";
@@ -49,10 +52,7 @@ import {
 } from "./panel-ui";
 
 function sortEntidades(items: EntidadConConteo[]) {
-  return [...items].sort((a, b) => {
-    if (a.activo !== b.activo) return a.activo ? -1 : 1;
-    return a.nombre.localeCompare(b.nombre);
-  });
+  return sortEntidadesByNumero(items);
 }
 
 function modulosEntidadResumen(entidad: EntidadConConteo) {
@@ -171,6 +171,21 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
 
   return (
     <>
+      <div className="space-y-2">
+        <Label htmlFor="numero_interno">Nº de proyecto</Label>
+        <Input
+          id="numero_interno"
+          name="numero_interno"
+          required
+          placeholder="7 o 11.1"
+          defaultValue={entidad?.numero_interno ?? ""}
+          pattern={NUMERO_INTERNO_INPUT_PATTERN}
+          title="Solo dígitos y puntos, por ejemplo 7 o 11.1"
+        />
+        <p className="text-xs text-muted-foreground">
+          Enumeración manual del estudio. Debe ser única.
+        </p>
+      </div>
       <div className="space-y-2">
         <Label htmlFor="nombre">Razón social</Label>
         <Input
@@ -382,6 +397,7 @@ function entidadFromForm(form: FormData) {
     : null;
   return {
     nombre,
+    numero_interno: String(form.get("numero_interno") || ""),
     nombre_etiqueta: nombreEtiqueta,
     ruc: String(form.get("ruc") || ""),
     direccion: String(form.get("direccion") || ""),
@@ -423,7 +439,9 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
       ? entidades
       : entidades.filter(
           (e) =>
+            entidadEtiqueta(e).toLowerCase().includes(q) ||
             e.nombre.toLowerCase().includes(q) ||
+            (e.numero_interno?.toLowerCase().includes(q) ?? false) ||
             (e.ruc?.toLowerCase().includes(q) ?? false) ||
             (e.admin_nombre?.toLowerCase().includes(q) ?? false),
         );
@@ -700,7 +718,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
                 role="link"
               >
                 <PanelTableTd className="font-medium text-primary" title={entidad.nombre}>
-                  {entidad.nombre}
+                  {entidadEtiqueta(entidad)}
                 </PanelTableTd>
                 <PanelTableTd
                   className={`font-mono text-xs text-muted-foreground ${panelTableShrinkCellClass}`}
@@ -745,7 +763,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
                 className="flex flex-1 flex-col outline-none transition-colors hover:bg-muted/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
               >
                 <div className="flex items-start justify-between gap-2 border-b border-border/50 px-4 py-3">
-                  <h3 className="font-semibold leading-snug text-primary">{entidad.nombre}</h3>
+                  <h3 className="font-semibold leading-snug text-primary">{entidadEtiqueta(entidad)}</h3>
                   <StatusBadge variant={entidad.activo ? "active" : "default"}>
                     {entidad.activo ? "Activa" : "Inactiva"}
                   </StatusBadge>

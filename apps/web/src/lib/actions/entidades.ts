@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import type { Entidad, EntidadConConteo } from "@inventario/types";
-import { normalizeResponsableDni, validarAdminEntidadDni } from "@inventario/types";
+import {
+  mensajeErrorNumeroInterno,
+  normalizeNumeroInterno,
+  normalizeResponsableDni,
+  sortEntidadesByNumero,
+  validarAdminEntidadDni,
+  validarNumeroInterno,
+} from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
@@ -11,6 +18,7 @@ import { syncAdminResponsableForEntidad } from "@/lib/responsables-admin-sync";
 
 export interface CreateEntidadInput {
   nombre: string;
+  numero_interno?: string | null;
   nombre_etiqueta?: string | null;
   ruc?: string;
   direccion?: string;
@@ -25,11 +33,14 @@ export async function createEntidad(input: CreateEntidadInput) {
   const supabase = await createClient();
 
   const nombre = input.nombre.trim();
+  const numeroInterno = normalizeNumeroInterno(input.numero_interno);
   const ruc = input.ruc?.trim() || null;
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
 
   if (!nombre) return { error: "La razón social es obligatoria." };
+  const numeroError = validarNumeroInterno(numeroInterno);
+  if (numeroError) return { error: numeroError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -40,6 +51,7 @@ export async function createEntidad(input: CreateEntidadInput) {
     .from("entidades")
     .insert({
       nombre,
+      numero_interno: numeroInterno,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc,
       direccion: input.direccion?.trim() || null,
@@ -51,7 +63,7 @@ export async function createEntidad(input: CreateEntidadInput) {
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeErrorNumeroInterno(error) ?? error.message };
 
   await syncSedePrincipalDireccionFromEntidad(supabase, data.id, data.direccion);
 
@@ -126,11 +138,13 @@ export async function listEntidades(): Promise<EntidadConConteo[]> {
     activoCountByEntidad.set(entidadId, (activoCountByEntidad.get(entidadId) ?? 0) + 1);
   }
 
-  return ((data ?? []) as Entidad[]).map((entidad) => ({
-    ...entidad,
-    ambiente_count: ambienteCountByEntidad.get(entidad.id) ?? 0,
-    activo_count: activoCountByEntidad.get(entidad.id) ?? 0,
-  }));
+  return sortEntidadesByNumero(
+    ((data ?? []) as Entidad[]).map((entidad) => ({
+      ...entidad,
+      ambiente_count: ambienteCountByEntidad.get(entidad.id) ?? 0,
+      activo_count: activoCountByEntidad.get(entidad.id) ?? 0,
+    })),
+  );
 }
 
 export async function updateEntidad(entidadId: string, input: CreateEntidadInput) {
@@ -138,10 +152,13 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
   const supabase = await createClient();
 
   const nombre = input.nombre.trim();
+  const numeroInterno = normalizeNumeroInterno(input.numero_interno);
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
 
   if (!nombre) return { error: "La razón social es obligatoria." };
+  const numeroError = validarNumeroInterno(numeroInterno);
+  if (numeroError) return { error: numeroError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -164,6 +181,7 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
     .from("entidades")
     .update({
       nombre,
+      numero_interno: numeroInterno,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -177,7 +195,7 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeErrorNumeroInterno(error) ?? error.message };
 
   await syncSedePrincipalDireccionFromEntidad(supabase, data.id, data.direccion);
 

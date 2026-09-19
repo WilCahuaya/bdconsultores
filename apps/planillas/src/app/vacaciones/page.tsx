@@ -52,7 +52,8 @@ export default async function VacacionesPage({
         <div>
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Vacaciones</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            30 días por año de servicio. Controle el goce del periodo y registre las fechas en Vacaciones.
+            30 días por año de servicio. Controle el goce del periodo y registre las fechas con el documento de
+            respaldo firmado.
           </p>
         </div>
 
@@ -149,7 +150,7 @@ export default async function VacacionesPage({
             </div>
             {canWrite ? (
               <p className="text-sm text-muted-foreground">
-                Entre al trámite de la persona para registrar el goce (fechas, días y si está programado o ya gozado).
+                Entre al trámite de la persona para registrar el goce (fechas, días y el documento de respaldo firmado).
               </p>
             ) : null}
           </>

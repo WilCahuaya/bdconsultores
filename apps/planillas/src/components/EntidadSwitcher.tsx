@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import type { Entidad } from "@inventario/types";
+import { entidadEtiqueta, type Entidad } from "@inventario/types";
 
 export function EntidadSwitcher({
   entidades,
@@ -32,7 +32,7 @@ export function EntidadSwitcher({
       >
         {entidades.map((entidad) => (
           <option key={entidad.id} value={entidad.id}>
-            {entidad.nombre}
+            {entidadEtiqueta(entidad)}
             {entidad.ruc ? ` · RUC ${entidad.ruc}` : ""}
           </option>
         ))}

@@ -218,9 +218,12 @@ export function FichaResumen({
         ? `${periodo}: ${resumenVac.diasTomados} de ${DIAS_VACACIONES_ANUALES} días · saldo ${resumenVac.saldo}`
         : `${periodo}: aún no genera derecho`,
     },
-    ...resumenVac.registros.map((item) => ({
-      texto: `${formatFechaPlanilla(item.fecha_inicio)} – ${formatFechaPlanilla(item.fecha_fin)} · ${item.dias} día${item.dias === 1 ? "" : "s"} · ${ESTADO_VACACION_LABEL[item.estado]}`,
-    })),
+    ...resumenVac.registros.map((item) => {
+      const conRespaldo = documentos.some((d) => d.id === item.documento_id && Boolean(d.storage_path));
+      return {
+        texto: `${formatFechaPlanilla(item.fecha_inicio)} – ${formatFechaPlanilla(item.fecha_fin)} · ${item.dias} día${item.dias === 1 ? "" : "s"} · ${ESTADO_VACACION_LABEL[item.estado]}${conRespaldo ? " · respaldo firmado" : " · sin respaldo"}`,
+      };
+    }),
     { texto: "Ir al trámite", href: `/vacaciones?entidadId=${entidadId}&periodo=${periodo}` },
   ];
 

@@ -119,6 +119,8 @@ export interface Profile {
 export interface Entidad {
   id: string;
   nombre: string;
+  /** Enumeración manual del estudio (ej. 7, 11.1). */
+  numero_interno: string | null;
   nombre_etiqueta: string | null;
   ruc: string | null;
   direccion: string | null;
@@ -147,6 +149,17 @@ export function entidadUsaInventarios(
 export function entidadUsaPlanillas(entidad: Pick<Entidad, "usa_planillas">): boolean {
   return entidad.usa_planillas !== false;
 }
+
+export {
+  compareEntidadesByNumero,
+  compareNumeroInterno,
+  entidadEtiqueta,
+  mensajeErrorNumeroInterno,
+  normalizeNumeroInterno,
+  NUMERO_INTERNO_INPUT_PATTERN,
+  sortEntidadesByNumero,
+  validarNumeroInterno,
+} from "./entidad-numero";
 
 export interface EntidadConConteo extends Entidad {
   ambiente_count: number;
@@ -2053,6 +2066,7 @@ export type TipoDocumentoPlanilla =
   | "VIDA_LEY_COMPROBANTE"
   | "TRAMITE_AFP"
   | "ASISTENCIA"
+  | "VACACIONES_FIRMADO"
   | "OTRO";
 export type EstadoDocumentoPlanilla = "SI" | "NO" | "NA" | "PENDIENTE";
 export type TipoPension = "AFP" | "ONP";

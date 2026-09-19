@@ -156,6 +156,7 @@ async function processMasterOp(
     const { error: insertError } = await supabase.from("entidades").insert({
       id: entidadId,
       nombre: input.nombre.trim(),
+      numero_interno: input.numero_interno?.trim() || null,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -238,6 +239,7 @@ async function processMasterOp(
       .from("entidades")
       .update({
         nombre: input.nombre.trim(),
+        numero_interno: input.numero_interno?.trim() || null,
         nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
         ruc: input.ruc?.trim() || null,
         direccion: input.direccion?.trim() || null,

@@ -3,9 +3,13 @@
 import { revalidatePath } from "next/cache";
 import {
   esUsuarioEntidad,
+  mensajeErrorNumeroInterno,
+  normalizeNumeroInterno,
   normalizeResponsableDni,
   parseRepresentanteLegalDni,
+  sortEntidadesByNumero,
   validarAdminEntidadDni,
+  validarNumeroInterno,
   type Entidad,
 } from "@inventario/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -23,7 +27,7 @@ export async function listEntidadesPlanillas(): Promise<Entidad[]> {
 
   let query = supabase
     .from("entidades")
-    .select("id, nombre, ruc, pe_codigo, activo")
+    .select("id, nombre, numero_interno, ruc, pe_codigo, activo")
     .eq("activo", true)
     .eq("usa_planillas", true)
     .order("nombre");
@@ -34,7 +38,7 @@ export async function listEntidadesPlanillas(): Promise<Entidad[]> {
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return (data ?? []) as Entidad[];
+  return sortEntidadesByNumero((data ?? []) as Entidad[]);
 }
 
 export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | null> {
@@ -46,7 +50,7 @@ export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | 
   const { data, error } = await supabase
     .from("entidades")
     .select(
-      "id, nombre, ruc, direccion, admin_nombre, admin_email, admin_dni, admin_telefono, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, activo, usa_inventarios, usa_planillas",
+      "id, nombre, numero_interno, ruc, direccion, admin_nombre, admin_email, admin_dni, admin_telefono, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, activo, usa_inventarios, usa_planillas",
     )
     .eq("id", entidadId)
     .maybeSingle();
@@ -85,6 +89,7 @@ type EmpresaFormParsed =
   | { error: string }
   | {
       nombre: string;
+      numeroInterno: string;
       ruc: string | null;
       direccion: string | null;
       adminNombre: string;
@@ -99,6 +104,7 @@ type EmpresaFormParsed =
 
 function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   const nombre = String(formData.get("nombre") ?? "").trim();
+  const numeroInterno = normalizeNumeroInterno(String(formData.get("numero_interno") ?? ""));
   const ruc = String(formData.get("ruc") ?? "").trim() || null;
   const direccion = String(formData.get("direccion") ?? "").trim() || null;
   const adminNombre = String(formData.get("admin_nombre") ?? "").trim();
@@ -108,6 +114,8 @@ function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   const usaInventarios = formData.get("usa_inventarios") === "on";
 
   if (!nombre) return { error: "La razón social es obligatoria." };
+  const numeroError = validarNumeroInterno(numeroInterno);
+  if (numeroError || !numeroInterno) return { error: numeroError ?? "El número de proyecto es obligatorio." };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const dniError = validarAdminEntidadDni(adminDni);
@@ -117,6 +125,7 @@ function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
 
   return {
     nombre,
+    numeroInterno,
     ruc,
     direccion,
     adminNombre,
@@ -171,6 +180,7 @@ async function syncEmpresaRelacionados(
 function entidadPayload(parsed: Exclude<EmpresaFormParsed, { error: string }>) {
   return {
     nombre: parsed.nombre,
+    numero_interno: parsed.numeroInterno,
     ruc: parsed.ruc,
     direccion: parsed.direccion,
     admin_nombre: parsed.adminNombre,
@@ -203,7 +213,7 @@ export async function createEntidadPlanillas(formData: FormData): Promise<{
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeErrorNumeroInterno(error) ?? error.message };
 
   const synced = await syncEmpresaRelacionados(supabase, data.id, parsed);
   if ("error" in synced) return { error: synced.error };
@@ -256,7 +266,7 @@ export async function updateEntidadPlanillas(
     .select("id")
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeErrorNumeroInterno(error) ?? error.message };
 
   const synced = await syncEmpresaRelacionados(supabase, data.id, parsed, inviteMode);
   if ("error" in synced) return { error: synced.error };

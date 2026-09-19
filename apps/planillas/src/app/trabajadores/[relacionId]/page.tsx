@@ -216,11 +216,13 @@ export default async function FichaTrabajadorPage({
             </div>
             <FichaVacaciones
               relacionId={params.relacionId}
+              entidadId={trabajador.entidad_id}
               periodo={periodoVacacion}
               derecho={resumenVac.derecho}
               diasTomados={resumenVac.diasTomados}
               saldo={resumenVac.saldo}
               registros={resumenVac.registros}
+              documentos={documentos}
               canWrite={canEditFicha}
             />
           </div>

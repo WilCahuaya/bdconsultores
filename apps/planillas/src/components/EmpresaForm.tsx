@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
-import type { Entidad } from "@inventario/types";
+import { NUMERO_INTERNO_INPUT_PATTERN, type Entidad } from "@inventario/types";
 import { consultarDni, consultarRuc, createEntidadPlanillas, updateEntidadPlanillas } from "@/lib/actions/entidades";
 import { Field, FormSection } from "@/components/fields";
 
@@ -94,6 +94,20 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
         hint="Con el RUC se puede traer razón social y dirección del padrón."
       >
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Field
+              label="Nº de proyecto"
+              name="numero_interno"
+              required
+              placeholder="7 o 11.1"
+              defaultValue={entidad?.numero_interno ?? ""}
+              pattern={NUMERO_INTERNO_INPUT_PATTERN}
+              title="Solo dígitos y puntos, por ejemplo 7 o 11.1"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enumeración manual. Ejemplos: 7, 11.1. Debe ser única.
+            </p>
+          </div>
           <div className="space-y-1.5">
             <Field
               label="RUC"
