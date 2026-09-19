@@ -157,6 +157,7 @@ async function processMasterOp(
       id: entidadId,
       nombre: input.nombre.trim(),
       numero_interno: input.numero_interno?.trim() || null,
+      pe_codigo: input.pe_codigo?.trim() || null,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -240,6 +241,7 @@ async function processMasterOp(
       .update({
         nombre: input.nombre.trim(),
         numero_interno: input.numero_interno?.trim() || null,
+        pe_codigo: input.pe_codigo?.trim() || null,
         nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
         ruc: input.ruc?.trim() || null,
         direccion: input.direccion?.trim() || null,

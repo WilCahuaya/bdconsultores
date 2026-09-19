@@ -8,12 +8,14 @@ import {
   buildAmbientePreregistroNombre,
   mensajeErrorNumeroInterno,
   normalizeNumeroInterno,
+  normalizePeCodigo,
   normalizeResponsableDni,
   normalizeResponsableNombre,
   RESPONSABLE_CARGO_ADMIN,
   sortEntidadesByNumero,
   validarAdminEntidadDni,
   validarNumeroInterno,
+  validarPeCodigo,
 } from "@inventario/types";
 import {
   enqueueOfflineOp,
@@ -33,6 +35,7 @@ import { syncAdminResponsableForEntidad } from "./responsables-admin-sync";
 export interface CreateEntidadInput {
   nombre: string;
   numero_interno?: string | null;
+  pe_codigo?: string | null;
   nombre_etiqueta?: string | null;
   ruc?: string;
   direccion?: string;
@@ -149,12 +152,15 @@ export async function createEntidad(
 }> {
   const nombre = input.nombre.trim();
   const numeroInterno = normalizeNumeroInterno(input.numero_interno);
+  const peCodigo = normalizePeCodigo(input.pe_codigo);
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
 
   if (!nombre) return { error: "La razón social es obligatoria." };
   const numeroError = validarNumeroInterno(numeroInterno);
   if (numeroError) return { error: numeroError };
+  const codigoError = validarPeCodigo(peCodigo);
+  if (codigoError) return { error: codigoError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -166,6 +172,9 @@ export async function createEntidad(
     if (existentes.some((item) => item.numero_interno === numeroInterno)) {
       return { error: "Ya existe un proyecto con ese número." };
     }
+    if (existentes.some((item) => item.pe_codigo === peCodigo)) {
+      return { error: "Ya existe un proyecto con ese código." };
+    }
     const id = newLocalId();
     const sedeId = newLocalId();
     const preregistroId = newLocalId();
@@ -176,6 +185,7 @@ export async function createEntidad(
       id,
       nombre,
       numero_interno: numeroInterno,
+      pe_codigo: peCodigo,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -250,6 +260,7 @@ export async function createEntidad(
       input: {
         nombre,
         numero_interno: numeroInterno,
+        pe_codigo: peCodigo,
         nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
         ruc: input.ruc?.trim() || null,
         direccion: input.direccion?.trim() || null,
@@ -274,6 +285,7 @@ export async function createEntidad(
     .insert({
       nombre,
       numero_interno: numeroInterno,
+      pe_codigo: peCodigo,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -320,12 +332,15 @@ export async function updateEntidad(
 }> {
   const nombre = input.nombre.trim();
   const numeroInterno = normalizeNumeroInterno(input.numero_interno);
+  const peCodigo = normalizePeCodigo(input.pe_codigo);
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
 
   if (!nombre) return { error: "La razón social es obligatoria." };
   const numeroError = validarNumeroInterno(numeroInterno);
   if (numeroError) return { error: numeroError };
+  const codigoError = validarPeCodigo(peCodigo);
+  if (codigoError) return { error: codigoError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -343,10 +358,16 @@ export async function updateEntidad(
     ) {
       return { error: "Ya existe un proyecto con ese número." };
     }
+    if (
+      existentes.some((item) => item.id !== entidadId && item.pe_codigo === peCodigo)
+    ) {
+      return { error: "Ya existe un proyecto con ese código." };
+    }
     const updated: EntidadConConteo = {
       ...cached.data,
       nombre,
       numero_interno: numeroInterno,
+      pe_codigo: peCodigo,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,
@@ -385,6 +406,7 @@ export async function updateEntidad(
     .update({
       nombre,
       numero_interno: numeroInterno,
+      pe_codigo: peCodigo,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,

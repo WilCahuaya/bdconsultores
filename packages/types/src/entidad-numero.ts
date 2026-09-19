@@ -5,6 +5,30 @@ const NUMERO_INTERNO_RE = /^[0-9]+(\.[0-9]+)*$/;
 /** Patrón HTML: dígitos y puntos, p. ej. 7 o 11.1 */
 export const NUMERO_INTERNO_INPUT_PATTERN = "[0-9]+(\\.[0-9]+)*";
 
+/** Código de proyecto, p. ej. PE356 */
+export const PE_CODIGO_INPUT_PATTERN = "[Pp][Ee][0-9]+";
+
+const PE_CODIGO_RE = /^PE[0-9]+$/;
+
+export function normalizePeCodigo(raw: string | null | undefined): string | null {
+  const value = raw?.trim().replace(/\s+/g, "").toUpperCase() ?? "";
+  return value || null;
+}
+
+export function validarPeCodigo(
+  raw: string | null | undefined,
+  required = true,
+): string | null {
+  const value = normalizePeCodigo(raw);
+  if (!value) {
+    return required ? "El código de proyecto es obligatorio." : null;
+  }
+  if (!PE_CODIGO_RE.test(value)) {
+    return "Use un código como PE356 (PE seguido de números).";
+  }
+  return null;
+}
+
 export function normalizeNumeroInterno(raw: string | null | undefined): string | null {
   const value = raw?.trim() ?? "";
   return value || null;
@@ -48,9 +72,12 @@ export function compareNumeroInterno(
 export function entidadEtiqueta(entidad: {
   nombre: string;
   numero_interno?: string | null;
+  pe_codigo?: string | null;
 }): string {
   const numero = normalizeNumeroInterno(entidad.numero_interno);
-  return numero ? `${numero} ${entidad.nombre}` : entidad.nombre;
+  const base = numero ? `${numero} ${entidad.nombre}` : entidad.nombre;
+  const codigo = normalizePeCodigo(entidad.pe_codigo);
+  return codigo ? `${base} · ${codigo}` : base;
 }
 
 export function compareEntidadesByNumero<
@@ -87,8 +114,14 @@ export function mensajeErrorNumeroInterno(
   if (error.code === "23505" && message.includes("numero_interno")) {
     return "Ya existe un proyecto con ese número.";
   }
+  if (error.code === "23505" && message.includes("pe_codigo")) {
+    return "Ya existe un proyecto con ese código.";
+  }
   if (error.code === "23514" && message.includes("numero_interno")) {
     return "Use un número como 7 o 11.1 (solo dígitos y puntos).";
+  }
+  if (error.code === "23514" && message.includes("pe_codigo")) {
+    return "Use un código como PE356 (PE seguido de números).";
   }
   return null;
 }

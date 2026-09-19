@@ -5,11 +5,13 @@ import type { Entidad, EntidadConConteo } from "@inventario/types";
 import {
   mensajeErrorNumeroInterno,
   normalizeNumeroInterno,
+  normalizePeCodigo,
   normalizeResponsableDni,
   parseRepresentanteLegalDni,
   sortEntidadesByNumero,
   validarAdminEntidadDni,
   validarNumeroInterno,
+  validarPeCodigo,
 } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { consultarDniReniec, consultarRucSunat } from "@bd/config";
@@ -22,6 +24,7 @@ import { syncAdminTrabajadorPlanillas } from "@/lib/planillas-admin-trabajador";
 export interface CreateEntidadInput {
   nombre: string;
   numero_interno?: string | null;
+  pe_codigo?: string | null;
   nombre_etiqueta?: string | null;
   ruc?: string;
   direccion?: string;
@@ -79,6 +82,7 @@ export async function createEntidad(input: CreateEntidadInput) {
 
   const nombre = input.nombre.trim();
   const numeroInterno = normalizeNumeroInterno(input.numero_interno);
+  const peCodigo = normalizePeCodigo(input.pe_codigo);
   const ruc = input.ruc?.trim() || null;
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
@@ -86,6 +90,8 @@ export async function createEntidad(input: CreateEntidadInput) {
   if (!nombre) return { error: "La razón social es obligatoria." };
   const numeroError = validarNumeroInterno(numeroInterno);
   if (numeroError) return { error: numeroError };
+  const codigoError = validarPeCodigo(peCodigo);
+  if (codigoError) return { error: codigoError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -101,6 +107,7 @@ export async function createEntidad(input: CreateEntidadInput) {
     .insert({
       nombre,
       numero_interno: numeroInterno,
+      pe_codigo: peCodigo,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc,
       direccion: input.direccion?.trim() || null,
@@ -219,12 +226,15 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
 
   const nombre = input.nombre.trim();
   const numeroInterno = normalizeNumeroInterno(input.numero_interno);
+  const peCodigo = normalizePeCodigo(input.pe_codigo);
   const adminEmail = input.admin_email?.trim() || null;
   const adminNombre = input.admin_nombre?.trim() || null;
 
   if (!nombre) return { error: "La razón social es obligatoria." };
   const numeroError = validarNumeroInterno(numeroInterno);
   if (numeroError) return { error: numeroError };
+  const codigoError = validarPeCodigo(peCodigo);
+  if (codigoError) return { error: codigoError };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const adminDni = normalizeResponsableDni(input.admin_dni ?? "");
@@ -252,6 +262,7 @@ export async function updateEntidad(entidadId: string, input: CreateEntidadInput
     .update({
       nombre,
       numero_interno: numeroInterno,
+      pe_codigo: peCodigo,
       nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
       ruc: input.ruc?.trim() || null,
       direccion: input.direccion?.trim() || null,

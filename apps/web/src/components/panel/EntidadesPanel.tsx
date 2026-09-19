@@ -9,6 +9,7 @@ import {
   entidadEtiqueta,
   entidadNombreRequiereEtiquetaOverride,
   NUMERO_INTERNO_INPUT_PATTERN,
+  PE_CODIGO_INPUT_PATTERN,
   sortEntidadesByNumero,
   suggestNombreEtiqueta,
 } from "@inventario/types";
@@ -104,6 +105,21 @@ function EntidadFields({ entidad, requireAdmin = false }: { entidad?: EntidadCon
         />
         <p className="text-xs text-muted-foreground">
           Enumeración manual del estudio. Debe ser única.
+        </p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="pe_codigo">Código</Label>
+        <Input
+          id="pe_codigo"
+          name="pe_codigo"
+          required
+          placeholder="PE356"
+          defaultValue={entidad?.pe_codigo ?? ""}
+          pattern={PE_CODIGO_INPUT_PATTERN}
+          title="Ejemplo: PE356"
+        />
+        <p className="text-xs text-muted-foreground">
+          Código del proyecto, por ejemplo PE356. Debe ser único.
         </p>
       </div>
       <div className="space-y-2">
@@ -211,6 +227,7 @@ function entidadFromForm(form: FormData) {
   return {
     nombre,
     numero_interno: String(form.get("numero_interno") || ""),
+    pe_codigo: String(form.get("pe_codigo") || ""),
     nombre_etiqueta: nombreEtiqueta,
     ruc: String(form.get("ruc") || ""),
     direccion: String(form.get("direccion") || ""),
@@ -250,6 +267,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
             entidadEtiqueta(e).toLowerCase().includes(q) ||
             e.nombre.toLowerCase().includes(q) ||
             (e.numero_interno?.toLowerCase().includes(q) ?? false) ||
+            (e.pe_codigo?.toLowerCase().includes(q) ?? false) ||
             (e.ruc?.toLowerCase().includes(q) ?? false) ||
             (e.admin_nombre?.toLowerCase().includes(q) ?? false),
         );

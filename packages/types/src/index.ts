@@ -131,7 +131,8 @@ export interface Entidad {
   representante_legal_nombre?: string | null;
   representante_legal_dni?: string | null;
   representante_legal_cargo?: string | null;
-  pe_codigo?: string | null;
+  /** Código de proyecto (ej. PE356). */
+  pe_codigo: string | null;
   notas_planillas?: string | null;
   usa_inventarios: boolean;
   usa_planillas: boolean;
@@ -156,9 +157,12 @@ export {
   entidadEtiqueta,
   mensajeErrorNumeroInterno,
   normalizeNumeroInterno,
+  normalizePeCodigo,
   NUMERO_INTERNO_INPUT_PATTERN,
+  PE_CODIGO_INPUT_PATTERN,
   sortEntidadesByNumero,
   validarNumeroInterno,
+  validarPeCodigo,
 } from "./entidad-numero";
 
 export interface EntidadConConteo extends Entidad {

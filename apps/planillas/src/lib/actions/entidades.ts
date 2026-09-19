@@ -5,11 +5,13 @@ import {
   esUsuarioEntidad,
   mensajeErrorNumeroInterno,
   normalizeNumeroInterno,
+  normalizePeCodigo,
   normalizeResponsableDni,
   parseRepresentanteLegalDni,
   sortEntidadesByNumero,
   validarAdminEntidadDni,
   validarNumeroInterno,
+  validarPeCodigo,
   type Entidad,
 } from "@inventario/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -50,7 +52,7 @@ export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | 
   const { data, error } = await supabase
     .from("entidades")
     .select(
-      "id, nombre, numero_interno, ruc, direccion, admin_nombre, admin_email, admin_dni, admin_telefono, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, activo, usa_inventarios, usa_planillas",
+      "id, nombre, numero_interno, pe_codigo, ruc, direccion, admin_nombre, admin_email, admin_dni, admin_telefono, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, activo, usa_inventarios, usa_planillas",
     )
     .eq("id", entidadId)
     .maybeSingle();
@@ -90,6 +92,7 @@ type EmpresaFormParsed =
   | {
       nombre: string;
       numeroInterno: string;
+      peCodigo: string;
       ruc: string | null;
       direccion: string | null;
       adminNombre: string;
@@ -105,6 +108,7 @@ type EmpresaFormParsed =
 function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   const nombre = String(formData.get("nombre") ?? "").trim();
   const numeroInterno = normalizeNumeroInterno(String(formData.get("numero_interno") ?? ""));
+  const peCodigo = normalizePeCodigo(String(formData.get("pe_codigo") ?? ""));
   const ruc = String(formData.get("ruc") ?? "").trim() || null;
   const direccion = String(formData.get("direccion") ?? "").trim() || null;
   const adminNombre = String(formData.get("admin_nombre") ?? "").trim();
@@ -116,6 +120,8 @@ function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   if (!nombre) return { error: "La razón social es obligatoria." };
   const numeroError = validarNumeroInterno(numeroInterno);
   if (numeroError || !numeroInterno) return { error: numeroError ?? "El número de proyecto es obligatorio." };
+  const codigoError = validarPeCodigo(peCodigo);
+  if (codigoError || !peCodigo) return { error: codigoError ?? "El código de proyecto es obligatorio." };
   if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const dniError = validarAdminEntidadDni(adminDni);
@@ -126,6 +132,7 @@ function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   return {
     nombre,
     numeroInterno,
+    peCodigo,
     ruc,
     direccion,
     adminNombre,
@@ -181,6 +188,7 @@ function entidadPayload(parsed: Exclude<EmpresaFormParsed, { error: string }>) {
   return {
     nombre: parsed.nombre,
     numero_interno: parsed.numeroInterno,
+    pe_codigo: parsed.peCodigo,
     ruc: parsed.ruc,
     direccion: parsed.direccion,
     admin_nombre: parsed.adminNombre,

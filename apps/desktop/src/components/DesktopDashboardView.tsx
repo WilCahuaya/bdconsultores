@@ -68,6 +68,7 @@ export function DesktopDashboard({
             entidadEtiqueta(e).toLowerCase().includes(q) ||
             e.nombre.toLowerCase().includes(q) ||
             (e.numero_interno?.toLowerCase().includes(q) ?? false) ||
+            (e.pe_codigo?.toLowerCase().includes(q) ?? false) ||
             (e.ruc?.toLowerCase().includes(q) ?? false),
         );
     return sortEntidadesByNumero(base);

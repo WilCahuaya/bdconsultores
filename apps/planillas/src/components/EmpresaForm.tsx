@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
-import { NUMERO_INTERNO_INPUT_PATTERN, type Entidad } from "@inventario/types";
+import { NUMERO_INTERNO_INPUT_PATTERN, PE_CODIGO_INPUT_PATTERN, type Entidad } from "@inventario/types";
 import { consultarDni, consultarRuc, createEntidadPlanillas, updateEntidadPlanillas } from "@/lib/actions/entidades";
 import { Field, FormSection } from "@/components/fields";
 
@@ -106,6 +106,20 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
             />
             <p className="text-xs text-muted-foreground">
               Enumeración manual. Ejemplos: 7, 11.1. Debe ser única.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Field
+              label="Código"
+              name="pe_codigo"
+              required
+              placeholder="PE356"
+              defaultValue={entidad?.pe_codigo ?? ""}
+              pattern={PE_CODIGO_INPUT_PATTERN}
+              title="Ejemplo: PE356"
+            />
+            <p className="text-xs text-muted-foreground">
+              Código del proyecto. Debe ser único.
             </p>
           </div>
           <div className="space-y-1.5">
