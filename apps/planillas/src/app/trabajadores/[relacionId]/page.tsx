@@ -157,7 +157,6 @@ export default async function FichaTrabajadorPage({
             contratos={contratos}
             documentos={documentos}
             vacaciones={vacaciones}
-            canWrite={canEditFicha}
           />
         ) : null}
         {esEstudio && tab === "vida-ley" ? (

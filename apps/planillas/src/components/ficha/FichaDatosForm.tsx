@@ -115,8 +115,6 @@ export function FichaPuestoForm({
         <p className="text-sm text-muted-foreground">
           Dado de baja el {formatFechaPlanilla(trabajador.fecha_cese)}. El cese es de la empresa, no de un contrato.
         </p>
-      ) : canWrite ? (
-        <DarDeBajaControl trabajador={trabajador} />
       ) : null}
       <form action={onSubmit} className="space-y-4">
         <FormSection
@@ -150,13 +148,18 @@ export function FichaPuestoForm({
               onChange={(event) => setJornada(event.target.value)}
             />
             <HorarioLaboralField jornada={jornada} defaultValue={trabajador.horario} readOnly={!canWrite} />
-            <DateField
-              label="Fecha de ingreso a la empresa"
-              name="fecha_ingreso"
-              defaultValue={trabajador.fecha_ingreso}
-              readOnly={!canWrite}
-              hint="De la empresa, no del PDF de contrato."
-            />
+            <div className="sm:col-span-2">
+              <DateField
+                label="Fecha de ingreso a la empresa"
+                name="fecha_ingreso"
+                defaultValue={trabajador.fecha_ingreso}
+                readOnly={!canWrite}
+                hint="De la empresa, no del PDF de contrato."
+                action={
+                  !cesada && canWrite ? <DarDeBajaControl trabajador={trabajador} compact /> : undefined
+                }
+              />
+            </div>
             {cesada ? (
               <DateField
                 label="Fecha de cese en la empresa"

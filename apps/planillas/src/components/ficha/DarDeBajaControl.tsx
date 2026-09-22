@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ConfirmDialog, FileInput, useToast } from "@inventario/ui";
-import { TIPOS_DOCUMENTO_BAJA, type TipoDocumentoPlanilla } from "@inventario/types";
+import type { TipoDocumentoPlanilla } from "@inventario/types";
 import { darDeBajaTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { addDocumento, setDocumentoArchivo } from "@/lib/actions/ficha";
 import { TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
@@ -12,21 +12,28 @@ import { uploadDocumentoFile } from "@/lib/upload-documento";
 import { documentoCargado } from "@/lib/flujo-ficha";
 import { DateField, SelectField } from "@/components/fields";
 
+type MotivoBaja = "CARTA_RENUNCIA" | "TERMINO_CONTRATO";
+
 export function DarDeBajaControl({
   trabajador,
+  compact = false,
 }: {
   trabajador: TrabajadorListItem;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [fechaCese, setFechaCese] = useState("");
-  const [tipoBaja, setTipoBaja] = useState<TipoDocumentoPlanilla>("CARTA_RENUNCIA");
-  const [archivoBaja, setArchivoBaja] = useState<File | null>(null);
-  const [archivoTrBaja, setArchivoTrBaja] = useState<File | null>(null);
-  const yaHaySustentoBaja = TIPOS_DOCUMENTO_BAJA.some((tipo) => documentoCargado(trabajador.documentos, tipo));
+  const [motivo, setMotivo] = useState<MotivoBaja>("CARTA_RENUNCIA");
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const yaHayCarta = documentoCargado(trabajador.documentos, "CARTA_RENUNCIA");
   const yaHayTrBaja = documentoCargado(trabajador.documentos, "TR_BAJA");
+  const esCarta = motivo === "CARTA_RENUNCIA";
+  const tipoArchivo: TipoDocumentoPlanilla = esCarta ? "CARTA_RENUNCIA" : "TR_BAJA";
+  const yaHayArchivo = esCarta ? yaHayCarta : yaHayTrBaja;
+  const listoArchivo = yaHayArchivo || Boolean(archivo);
 
   async function subirDocumento(tipo: TipoDocumentoPlanilla, file: File): Promise<string | null> {
     const data = new FormData();
@@ -46,33 +53,25 @@ export function DarDeBajaControl({
 
   async function onBaja() {
     if (!fechaCese.trim()) return;
-    if (!yaHaySustentoBaja && !archivoBaja) {
-      pushToast("Suba la carta de renuncia o el término de contrato.", "error");
-      return;
-    }
-    if (!yaHayTrBaja && !archivoTrBaja) {
-      pushToast("Suba el documento de T-Registro baja.", "error");
+    if (!listoArchivo) {
+      pushToast(
+        esCarta ? "Suba la carta de renuncia." : "Suba el documento de T-Registro baja.",
+        "error",
+      );
       return;
     }
     setPending(true);
-    if (archivoBaja) {
-      const errorSustento = await subirDocumento(tipoBaja, archivoBaja);
-      if (errorSustento) {
+    if (archivo) {
+      const errorArchivo = await subirDocumento(tipoArchivo, archivo);
+      if (errorArchivo) {
         setPending(false);
-        pushToast(errorSustento, "error");
-        return;
-      }
-    }
-    if (archivoTrBaja) {
-      const errorTr = await subirDocumento("TR_BAJA", archivoTrBaja);
-      if (errorTr) {
-        setPending(false);
-        pushToast(errorTr, "error");
+        pushToast(errorArchivo, "error");
         return;
       }
     }
     const form = new FormData();
     form.set("fecha_cese", fechaCese);
+    form.set("tipo_baja", motivo);
     const result = await darDeBajaTrabajador(trabajador.id, form);
     setPending(false);
     if (result.error) {
@@ -80,20 +79,21 @@ export function DarDeBajaControl({
       return;
     }
     setOpen(false);
-    setArchivoBaja(null);
-    setArchivoTrBaja(null);
+    setArchivo(null);
     pushToast("Trabajador dado de baja.");
     router.refresh();
   }
 
   return (
-    <div className="space-y-2">
+    <div className={compact ? "shrink-0" : "space-y-2"}>
       <Button type="button" variant="destructive" onClick={() => setOpen(true)}>
         Dar de baja
       </Button>
-      <p className="text-sm text-muted-foreground">
-        Solo cuando deja la empresa. El fin de un contrato no es un cese.
-      </p>
+      {compact ? null : (
+        <p className="text-sm text-muted-foreground">
+          Solo cuando deja la empresa. El fin de un contrato no es un cese.
+        </p>
+      )}
       <ConfirmDialog
         open={open}
         onClose={() => {
@@ -101,44 +101,52 @@ export function DarDeBajaControl({
           setOpen(false);
         }}
         title="Dar de baja"
-        description="La ficha pasa a cesada. La fecha de cese es de la empresa, no del fin de un contrato. Hace falta la carta de renuncia o el término de contrato, y el documento de T-Registro baja."
+        description={
+          esCarta
+            ? "La ficha pasa a cesada. Con carta de renuncia solo se sube ese documento."
+            : "La ficha pasa a cesada. En término de contrato solo se sube la baja de T-Registro."
+        }
         confirmLabel="Dar de baja"
         confirmVariant="destructive"
         pending={pending}
-        confirmDisabled={!fechaCese.trim() || (!yaHaySustentoBaja && !archivoBaja) || (!yaHayTrBaja && !archivoTrBaja)}
+        confirmDisabled={!fechaCese.trim() || !listoArchivo}
         onConfirm={() => void onBaja()}
       >
         <DateField label="Fecha de cese en la empresa" name="fecha_cese" value={fechaCese} onChange={setFechaCese} />
         <SelectField
-          label="Documento de baja"
+          label="Motivo de baja"
           name="tipo_baja"
-          value={tipoBaja}
-          options={TIPOS_DOCUMENTO_BAJA.map((tipo) => ({ value: tipo, label: TIPO_DOCUMENTO_LABEL[tipo] }))}
-          onChange={(event) => setTipoBaja(event.target.value as TipoDocumentoPlanilla)}
+          value={motivo}
+          options={[
+            { value: "CARTA_RENUNCIA", label: TIPO_DOCUMENTO_LABEL.CARTA_RENUNCIA },
+            { value: "TERMINO_CONTRATO", label: TIPO_DOCUMENTO_LABEL.TERMINO_CONTRATO },
+          ]}
+          onChange={(event) => {
+            setMotivo(event.target.value as MotivoBaja);
+            setArchivo(null);
+          }}
         />
         <FileInput
           accept={DOCUMENTO_ACCEPT}
           disabled={pending}
-          file={archivoBaja}
-          buttonLabel={archivoBaja ? "Cambiar archivo" : "Subir documento"}
-          emptyLabel={
-            yaHaySustentoBaja
-              ? "Ya hay un documento de baja. Puede subir otro o usar el que está."
-              : "PDF, JPG, PNG o WEBP. Máximo 10 MB."
+          file={archivo}
+          buttonLabel={
+            archivo
+              ? "Cambiar archivo"
+              : esCarta
+                ? "Subir carta de renuncia"
+                : "Subir T-Registro baja"
           }
-          onFileChange={setArchivoBaja}
-        />
-        <FileInput
-          accept={DOCUMENTO_ACCEPT}
-          disabled={pending}
-          file={archivoTrBaja}
-          buttonLabel={archivoTrBaja ? "Cambiar T-Registro baja" : "Subir T-Registro baja"}
           emptyLabel={
-            yaHayTrBaja
-              ? "Ya hay T-Registro baja. Puede subir otro o usar el que está."
-              : "Constancia de baja en T-Registro. PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            yaHayArchivo
+              ? esCarta
+                ? "Ya hay carta de renuncia. Puede subir otra o usar la que está."
+                : "Ya hay T-Registro baja. Puede subir otro o usar el que está."
+              : esCarta
+                ? "Solo este archivo. PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                : "Solo la constancia de baja en T-Registro. PDF, JPG, PNG o WEBP. Máximo 10 MB."
           }
-          onFileChange={setArchivoTrBaja}
+          onFileChange={setArchivo}
         />
       </ConfirmDialog>
     </div>

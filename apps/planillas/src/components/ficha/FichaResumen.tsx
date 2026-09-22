@@ -5,7 +5,6 @@ import type { ContratoRow, DocumentoRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import type { VacacionRow } from "@/lib/actions/vacaciones";
 import { VerHorario } from "@/components/ficha/VerHorario";
-import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
 import { contratoConfirmado, contratoVigente, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
 import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import {
@@ -139,7 +138,6 @@ export function FichaResumen({
   contratos,
   documentos,
   vacaciones,
-  canWrite,
 }: {
   relacionId: string;
   entidadId: string;
@@ -147,7 +145,6 @@ export function FichaResumen({
   contratos: ContratoRow[];
   documentos: DocumentoRow[];
   vacaciones: VacacionRow[];
-  canWrite?: boolean;
 }) {
   const p = trabajador.persona;
   const flujo = flujoDesdeTrabajador(trabajador);
@@ -247,11 +244,6 @@ export function FichaResumen({
                 {linea.texto}
               </li>
             ))}
-            {canWrite && trabajador.estado !== "CESADA" ? (
-              <li className="mt-2 list-none pl-0">
-                <DarDeBajaControl trabajador={trabajador} />
-              </li>
-            ) : null}
           </>
         }
       />

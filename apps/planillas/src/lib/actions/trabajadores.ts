@@ -7,7 +7,7 @@ import type {
   EstadoValidacionAltaPlanilla,
   JornadaLaboral,
 } from "@inventario/types";
-import { TIPOS_DOCUMENTO_ALTA_INICIALES, TIPOS_DOCUMENTO_BAJA, esPersonalEstudio } from "@inventario/types";
+import { TIPOS_DOCUMENTO_ALTA_INICIALES, esPersonalEstudio } from "@inventario/types";
 import {
   entidadAlcance,
   puedeCrearTrabajador,
@@ -396,12 +396,17 @@ export async function darDeBajaTrabajador(
   if (actual.fecha_ingreso && cese.value < actual.fecha_ingreso) {
     return { error: "El cese no puede ser anterior al ingreso a la empresa." };
   }
-  const conSustento = TIPOS_DOCUMENTO_BAJA.some((tipo) => documentoCargado(actual.documentos, tipo));
-  if (!conSustento) {
-    return { error: "Suba la carta de renuncia o el término de contrato para dar de baja." };
-  }
-  if (!documentoCargado(actual.documentos, "TR_BAJA")) {
-    return { error: "Suba el documento de T-Registro baja." };
+  const motivo = String(formData.get("tipo_baja") ?? "").trim();
+  if (motivo === "CARTA_RENUNCIA") {
+    if (!documentoCargado(actual.documentos, "CARTA_RENUNCIA")) {
+      return { error: "Suba la carta de renuncia." };
+    }
+  } else if (motivo === "TERMINO_CONTRATO") {
+    if (!documentoCargado(actual.documentos, "TR_BAJA")) {
+      return { error: "Suba el documento de T-Registro baja." };
+    }
+  } else {
+    return { error: "Indique si la baja es por carta de renuncia o término de contrato." };
   }
 
   const db = await planillasDb();
