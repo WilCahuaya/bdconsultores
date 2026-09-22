@@ -103,11 +103,6 @@ export function FichaAltaDocumentos({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Primero los escaneos. Al lado de cada uno, complete a mano los datos que más adelante usa Persona y el contrato.
-        Si falta un archivo, ese recuadro queda en alerta; el contrato se puede seguir igual. En Sistema de pensión, el
-        estudio inicia el alta AFP o, si es ONP, solo deja indicado que es ONP.
-      </p>
       <CapturaDni relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={dniDoc} canWrite={canWrite} />
       <CapturaFicha relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={fichaDoc} canWrite={canWrite} />
       <CapturaPension relacionId={relacionId} entidadId={entidadId} documento={pensionDoc} pension={pension} canWrite={canWrite} />

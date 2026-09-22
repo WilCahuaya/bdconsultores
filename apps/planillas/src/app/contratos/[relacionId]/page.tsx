@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { AlertaDocumentosAlta, AltaPasosNav } from "@/components/ficha/FichaTabs";
+import { AltaPasosNav } from "@/components/ficha/FichaTabs";
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
@@ -28,16 +28,11 @@ import {
   listTRegistro,
 } from "@/lib/actions/ficha";
 import {
-  claseBadgePaso,
   estadoPasosAlta,
-  etiquetaAlertaDocumentos,
   faltasPorPaso,
   flujoDesdeTrabajador,
-  hrefSiguientePaso,
   parseContratoPaso,
   pasoAltaInicial,
-  resolverSiguientePaso,
-  textoListaFaltas,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
 
@@ -56,12 +51,9 @@ export default async function ContratoProcesoPage({
   const flujo = flujoDesdeTrabajador(trabajador);
   const faltas = faltasPorPaso(flujo);
   const completados = estadoPasosAlta(flujo);
-  const siguiente = resolverSiguientePaso(flujo, esEstudio);
-  const alertaDocumentos = etiquetaAlertaDocumentos(flujo);
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const porValidar = trabajador.validacion === "PENDIENTE";
   const paso = searchParams.paso ? parseContratoPaso(searchParams.paso) : pasoAltaInicial(completados);
-  const faltasPaso = faltas[paso];
   if (paso === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
   }
@@ -102,24 +94,6 @@ export default async function ContratoProcesoPage({
             Ver ficha
           </Link>
         </div>
-        <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
-          <span className="text-muted-foreground">Siguiente paso</span>
-          {siguiente.paso === "listo" ? (
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}>
-              {siguiente.etiqueta}
-            </span>
-          ) : (
-            <Link
-              href={hrefSiguientePaso(params.relacionId, siguiente)}
-              className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}
-            >
-              {siguiente.etiqueta}
-            </Link>
-          )}
-        </p>
-        {alertaDocumentos ? (
-          <AlertaDocumentosAlta relacionId={params.relacionId} etiqueta={alertaDocumentos} />
-        ) : null}
         {porValidar ? (
           <div className={`${panelCardClass} space-y-3 p-5`}>
             <p className="text-sm text-foreground">
@@ -135,16 +109,6 @@ export default async function ContratoProcesoPage({
           </div>
         ) : null}
         <AltaPasosNav tab={paso} completados={completados} faltas={faltas} relacionId={params.relacionId} />
-        {faltasPaso.length > 0 ? (
-          <p className={`${panelCardClass} border-amber-300 bg-amber-50 p-4 text-sm text-amber-950`}>
-            Alerta: faltan {textoListaFaltas(faltasPaso.map((item) => item.etiqueta))}. Puede continuar en cualquier
-            paso.
-          </p>
-        ) : (
-          <p className={`${panelCardClass} border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950`}>
-            Este paso está completo.
-          </p>
-        )}
         {paso === "documentos" ? (
           <FichaAltaDocumentos
             relacionId={params.relacionId}
