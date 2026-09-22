@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -26,14 +26,13 @@ function PreviewEscaneo({
   file,
   remoteUrl,
   esPdf,
-  vacio = "Suba el escaneo para verlo aquí y complete los campos a mano.",
+  vacio = "Suba el escaneo para verlo aquí.",
 }: {
   file: File | null;
   remoteUrl?: string | null;
   esPdf: boolean;
   vacio?: string;
 }) {
-  const [visible, setVisible] = useState(false);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!file) {
@@ -46,22 +45,17 @@ function PreviewEscaneo({
   }, [file]);
   const src = localUrl ?? remoteUrl ?? null;
   if (!src) {
-    return <p className="text-sm text-muted-foreground">{vacio}</p>;
+    return (
+      <div className="flex h-[min(56vh,36rem)] items-center justify-center rounded-md border border-dashed bg-muted/30 p-4">
+        <p className="text-center text-sm text-muted-foreground">{vacio}</p>
+      </div>
+    );
   }
-  return (
-    <div className="space-y-2">
-      <Button type="button" size="sm" variant="outline" onClick={() => setVisible((v) => !v)}>
-        {visible ? "Ocultar previsualización" : "Ver previsualización"}
-      </Button>
-      {visible ? (
-        esPdf ? (
-          <iframe title="Vista previa" src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt="Vista previa del escaneo" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
-        )
-      ) : null}
-    </div>
+  return esPdf ? (
+    <iframe title="Vista previa" src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
+  ) : (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="Vista previa del escaneo" className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
   );
 }
 
@@ -72,12 +66,62 @@ function archivoEsPdf(file: File | null, path: string | null): boolean {
 
 function capturaCardClass(alerta: boolean) {
   return alerta
-    ? `${panelCardClass} space-y-4 border-amber-400 bg-amber-50 p-5`
-    : `${panelCardClass} space-y-4 p-5`;
+    ? `${panelCardClass} !overflow-visible border-amber-400 bg-amber-50 p-5`
+    : `${panelCardClass} !overflow-visible p-5`;
 }
 
 function AlertaFaltaDocumento({ nombre }: { nombre: string }) {
   return <p className="text-sm font-medium text-amber-900">Alerta: falta el documento de {nombre}.</p>;
+}
+
+function CapturaDesplegable({
+  titulo,
+  alerta,
+  alertaNombre,
+  hint,
+  defaultOpen,
+  datos,
+  preview,
+}: {
+  titulo: string;
+  alerta: boolean;
+  alertaNombre: string;
+  hint: string;
+  defaultOpen?: boolean;
+  datos: ReactNode;
+  preview: ReactNode;
+}) {
+  return (
+    <details defaultOpen={defaultOpen ?? alerta} className={`group ${capturaCardClass(alerta)}`}>
+      <summary className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+          aria-hidden
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">{titulo}</p>
+          {alerta ? (
+            <AlertaFaltaDocumento nombre={alertaNombre} />
+          ) : (
+            <p className="text-sm text-emerald-800">Documento cargado</p>
+          )}
+        </div>
+      </summary>
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">{hint}</p>
+          {datos}
+        </div>
+        <div className="lg:sticky lg:top-4">{preview}</div>
+      </div>
+    </details>
+  );
 }
 
 export function FichaAltaDocumentos({
@@ -202,47 +246,49 @@ function CapturaDni({
   }
 
   const alerta = !file && !documento?.storage_path;
+  const preview = (
+    <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
+  );
 
   return (
-    <section className={capturaCardClass(alerta)}>
-      <div>
-        <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.DNI}</p>
-        {alerta ? <AlertaFaltaDocumento nombre="DNI" /> : null}
-        <p className="text-sm text-muted-foreground">
-          Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato. El número de DNI de la ficha no se cambia aquí.
-        </p>
-      </div>
-      <div className="space-y-4">
-        <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
-        {canWrite ? (
-          <FileInput
-            accept={DOCUMENTO_ACCEPT}
-            disabled={pending}
-            file={file}
-            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir DNI escaneado"}
-            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-            onFileChange={setFile}
-          />
-        ) : null}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="DNI" name="dni_leido" value={dni} copyable onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
-          <Field label="Nombres" name="nombres" value={nombres} onChange={(event) => setNombres(event.target.value)} readOnly={!canWrite} />
-          <Field label="Apellido paterno" name="apellido_paterno" value={apellidoPaterno} onChange={(event) => setApellidoPaterno(event.target.value)} readOnly={!canWrite} />
-          <Field label="Apellido materno" name="apellido_materno" value={apellidoMaterno} onChange={(event) => setApellidoMaterno(event.target.value)} readOnly={!canWrite} />
-          <DateField label="Fecha de nacimiento" name="fecha_nacimiento" value={fechaNacimiento} onChange={setFechaNacimiento} readOnly={!canWrite} />
-        </div>
-      </div>
-      {canWrite ? (
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={pending || dni.length < 8} onClick={() => void buscarReniec()}>
-            Buscar en RENIEC
-          </Button>
-          <Button type="button" disabled={pending} onClick={() => void guardar()}>
-            {pending ? "Guardando…" : "Guardar datos del DNI"}
-          </Button>
-        </div>
-      ) : null}
-    </section>
+    <CapturaDesplegable
+      titulo={TIPO_DOCUMENTO_LABEL.DNI}
+      alerta={alerta}
+      alertaNombre="DNI"
+      hint="Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato. El número de DNI de la ficha no se cambia aquí."
+      preview={preview}
+      datos={
+        <>
+          {canWrite ? (
+            <FileInput
+              accept={DOCUMENTO_ACCEPT}
+              disabled={pending}
+              file={file}
+              buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir DNI escaneado"}
+              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              onFileChange={setFile}
+            />
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="DNI" name="dni_leido" value={dni} copyable onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
+            <Field label="Nombres" name="nombres" value={nombres} onChange={(event) => setNombres(event.target.value)} readOnly={!canWrite} />
+            <Field label="Apellido paterno" name="apellido_paterno" value={apellidoPaterno} onChange={(event) => setApellidoPaterno(event.target.value)} readOnly={!canWrite} />
+            <Field label="Apellido materno" name="apellido_materno" value={apellidoMaterno} onChange={(event) => setApellidoMaterno(event.target.value)} readOnly={!canWrite} />
+            <DateField label="Fecha de nacimiento" name="fecha_nacimiento" value={fechaNacimiento} onChange={setFechaNacimiento} readOnly={!canWrite} />
+          </div>
+          {canWrite ? (
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" disabled={pending || dni.length < 8} onClick={() => void buscarReniec()}>
+                Buscar en RENIEC
+              </Button>
+              <Button type="button" disabled={pending} onClick={() => void guardar()}>
+                {pending ? "Guardando…" : "Guardar datos del DNI"}
+              </Button>
+            </div>
+          ) : null}
+        </>
+      }
+    />
   );
 }
 
@@ -323,52 +369,54 @@ function CapturaFicha({
   }
 
   const alerta = !file && !documento?.storage_path;
+  const preview = (
+    <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
+  );
 
   return (
-    <section className={capturaCardClass(alerta)}>
-      <div>
-        <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.FICHA_DATOS}</p>
-        {alerta ? <AlertaFaltaDocumento nombre="ficha de datos personales" /> : null}
-        <p className="text-sm text-muted-foreground">
-          Suba el escaneo y complete la dirección: región, provincia, distrito, tipo de vía y número. Eso se copia en AFPNet y queda armado para la ficha, por ejemplo Av. Grau 123 - El Tambo - Huancayo - Junín.
-        </p>
-      </div>
-      <div className="space-y-4">
-        <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
-        {canWrite ? (
-          <FileInput
-            accept={DOCUMENTO_ACCEPT}
-            disabled={pending}
-            file={file}
-            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir ficha escaneada"}
-            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-            onFileChange={setFile}
-          />
-        ) : null}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Celular" name="celular" value={celular} inputMode="tel" onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
-          <Field label="Correo" name="correo" type="email" value={correo} onChange={(event) => setCorreo(event.target.value)} readOnly={!canWrite} />
-          <DireccionAfpnetFields value={direccion} onChange={setDireccion} canWrite={canWrite} />
-          <SelectField
-            label="¿Recibe asignación familiar?"
-            name="recibe_asignacion_familiar"
-            value={recibe}
-            allowEmpty
-            disabled={!canWrite}
-            options={[
-              { value: "si", label: "Sí · S/ 113.00" },
-              { value: "no", label: "No" },
-            ]}
-            onChange={(event) => setRecibe(event.target.value)}
-          />
-        </div>
-      </div>
-      {canWrite ? (
-        <Button type="button" disabled={pending} onClick={() => void guardar()}>
-          {pending ? "Guardando…" : "Guardar datos de la ficha"}
-        </Button>
-      ) : null}
-    </section>
+    <CapturaDesplegable
+      titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
+      alerta={alerta}
+      alertaNombre="ficha de datos personales"
+      hint="Suba el escaneo y complete la dirección: región, provincia, distrito, tipo de vía y número. Eso se copia en AFPNet y queda armado para la ficha, por ejemplo Av. Grau 123 - El Tambo - Huancayo - Junín."
+      preview={preview}
+      datos={
+        <>
+          {canWrite ? (
+            <FileInput
+              accept={DOCUMENTO_ACCEPT}
+              disabled={pending}
+              file={file}
+              buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir ficha escaneada"}
+              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              onFileChange={setFile}
+            />
+          ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Celular" name="celular" value={celular} inputMode="tel" onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
+            <Field label="Correo" name="correo" type="email" value={correo} onChange={(event) => setCorreo(event.target.value)} readOnly={!canWrite} />
+            <DireccionAfpnetFields value={direccion} onChange={setDireccion} canWrite={canWrite} />
+            <SelectField
+              label="¿Recibe asignación familiar?"
+              name="recibe_asignacion_familiar"
+              value={recibe}
+              allowEmpty
+              disabled={!canWrite}
+              options={[
+                { value: "si", label: "Sí · S/ 113.00" },
+                { value: "no", label: "No" },
+              ]}
+              onChange={(event) => setRecibe(event.target.value)}
+            />
+          </div>
+          {canWrite ? (
+            <Button type="button" disabled={pending} onClick={() => void guardar()}>
+              {pending ? "Guardando…" : "Guardar datos de la ficha"}
+            </Button>
+          ) : null}
+        </>
+      }
+    />
   );
 }
 
@@ -433,47 +481,49 @@ function CapturaPension({
   }
 
   const alerta = !file && !documento?.storage_path;
+  const preview = (
+    <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
+  );
 
   return (
-    <section className={capturaCardClass(alerta)}>
-      <div>
-        <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}</p>
-        {alerta ? <AlertaFaltaDocumento nombre="sistema de pensiones" /> : null}
-        <p className="text-sm text-muted-foreground">
-          En el alta solo se indica AFP u ONP. Si es AFP, el estudio registra el alta, CUSPP y fecha de afiliación en Sistema de pensión.
-        </p>
-      </div>
-      <div className="space-y-4">
-        <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
-        {canWrite ? (
-          <FileInput
-            accept={DOCUMENTO_ACCEPT}
-            disabled={pending}
-            file={file}
-            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir sistema de pensiones"}
-            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-            onFileChange={setFile}
+    <CapturaDesplegable
+      titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
+      alerta={alerta}
+      alertaNombre="sistema de pensiones"
+      hint="En el alta solo se indica AFP u ONP. Si es AFP, el estudio registra el alta, CUSPP y fecha de afiliación en Sistema de pensión."
+      preview={preview}
+      datos={
+        <>
+          {canWrite ? (
+            <FileInput
+              accept={DOCUMENTO_ACCEPT}
+              disabled={pending}
+              file={file}
+              buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir sistema de pensiones"}
+              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              onFileChange={setFile}
+            />
+          ) : null}
+          <SelectField
+            label="Sistema"
+            name="tipo"
+            value={tipo}
+            allowEmpty
+            disabled={!canWrite}
+            options={[
+              { value: "AFP", label: "AFP" },
+              { value: "ONP", label: "ONP" },
+            ]}
+            onChange={(event) => setTipo(event.target.value as TipoPension | "")}
           />
-        ) : null}
-        <SelectField
-          label="Sistema"
-          name="tipo"
-          value={tipo}
-          allowEmpty
-          disabled={!canWrite}
-          options={[
-            { value: "AFP", label: "AFP" },
-            { value: "ONP", label: "ONP" },
-          ]}
-          onChange={(event) => setTipo(event.target.value as TipoPension | "")}
-        />
-      </div>
-      {canWrite ? (
-        <Button type="button" disabled={pending} onClick={() => void guardar()}>
-          {pending ? "Guardando…" : "Guardar AFP u ONP"}
-        </Button>
-      ) : null}
-    </section>
+          {canWrite ? (
+            <Button type="button" disabled={pending} onClick={() => void guardar()}>
+              {pending ? "Guardando…" : "Guardar AFP u ONP"}
+            </Button>
+          ) : null}
+        </>
+      }
+    />
   );
 }
 
@@ -532,37 +582,41 @@ function CapturaAsignacion({
   }
 
   const alerta = !file && !documento?.storage_path;
+  const preview = (
+    <PreviewEscaneo
+      file={file}
+      remoteUrl={file ? null : remoteUrl}
+      esPdf={archivoEsPdf(file, documento?.storage_path ?? null)}
+      vacio="Suba el escaneo para verlo aquí."
+    />
+  );
 
   return (
-    <section className={capturaCardClass(alerta)}>
-      <div>
-        <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.ASIGNACION_FAMILIAR}</p>
-        {alerta ? <AlertaFaltaDocumento nombre="asignación familiar" /> : null}
-        <p className="text-sm text-muted-foreground">La ficha indica que sí recibe. Suba el sustento (partida u otro documento).</p>
-      </div>
-      <div className="space-y-4">
-        <PreviewEscaneo
-          file={file}
-          remoteUrl={file ? null : remoteUrl}
-          esPdf={archivoEsPdf(file, documento?.storage_path ?? null)}
-          vacio="Suba el escaneo para verlo aquí."
-        />
-        {canWrite ? (
-          <FileInput
-            accept={DOCUMENTO_ACCEPT}
-            disabled={pending}
-            file={file}
-            buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir asignación familiar"}
-            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-            onFileChange={setFile}
-          />
-        ) : null}
-      </div>
-      {canWrite ? (
-        <Button type="button" disabled={pending || !documento} onClick={() => void guardar()}>
-          {pending ? "Guardando…" : "Guardar asignación familiar"}
-        </Button>
-      ) : null}
-    </section>
+    <CapturaDesplegable
+      titulo={TIPO_DOCUMENTO_LABEL.ASIGNACION_FAMILIAR}
+      alerta={alerta}
+      alertaNombre="asignación familiar"
+      hint="La ficha indica que sí recibe. Suba el sustento (partida u otro documento)."
+      preview={preview}
+      datos={
+        <>
+          {canWrite ? (
+            <FileInput
+              accept={DOCUMENTO_ACCEPT}
+              disabled={pending}
+              file={file}
+              buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir asignación familiar"}
+              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              onFileChange={setFile}
+            />
+          ) : null}
+          {canWrite ? (
+            <Button type="button" disabled={pending || !documento} onClick={() => void guardar()}>
+              {pending ? "Guardando…" : "Guardar asignación familiar"}
+            </Button>
+          ) : null}
+        </>
+      }
+    />
   );
 }
