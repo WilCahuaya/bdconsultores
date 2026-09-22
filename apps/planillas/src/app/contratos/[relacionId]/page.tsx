@@ -51,13 +51,14 @@ export default async function ContratoProcesoPage({
   const flujo = flujoDesdeTrabajador(trabajador);
   const faltas = faltasPorPaso(flujo);
   const completados = estadoPasosAlta(flujo);
-  const canEditFicha = puedeEditarFichaLaboral(profile);
-  const porValidar = trabajador.validacion === "PENDIENTE";
+  const fichaCesada = trabajador.estado === "CESADA";
+  const canEditFicha = puedeEditarFichaLaboral(profile) && !fichaCesada;
+  const porValidar = trabajador.validacion === "PENDIENTE" && !fichaCesada;
   const paso = searchParams.paso ? parseContratoPaso(searchParams.paso) : pasoAltaInicial(completados);
   if (paso === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
   }
-  if (paso === "alta" && esEstudio) {
+  if (paso === "alta" && esEstudio && !fichaCesada) {
     await Promise.all([
       asegurarDocumentoTramiteAfp(params.relacionId),
       asegurarDocumentoTrAlta(params.relacionId),
@@ -94,6 +95,11 @@ export default async function ContratoProcesoPage({
             Ver ficha
           </Link>
         </div>
+        {fichaCesada ? (
+          <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
+            Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
+          </p>
+        ) : null}
         {porValidar ? (
           <div className={`${panelCardClass} space-y-3 p-5`}>
             <p className="text-sm text-foreground">
@@ -129,7 +135,7 @@ export default async function ContratoProcesoPage({
             contratos={contratos}
             documentos={documentos}
             canWrite={canEditFicha}
-            canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
+            canMarcarRecogido={puedeMarcarContratoRecogido(profile) && !fichaCesada}
           />
         ) : null}
         {paso === "alta" ? (
@@ -145,7 +151,7 @@ export default async function ContratoProcesoPage({
               entidad={entidad}
               documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
               documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
-              canWrite={esEstudio}
+              canWrite={esEstudio && !fichaCesada}
             />
             <FichaTRegistro
               relacionId={params.relacionId}
@@ -155,7 +161,7 @@ export default async function ContratoProcesoPage({
               documentoDni={documentos.find((d) => d.tipo === "DNI") ?? null}
               documentoFicha={documentos.find((d) => d.tipo === "FICHA_DATOS") ?? null}
               documentoTrAlta={documentos.find((d) => d.tipo === "TR_ALTA") ?? null}
-              canWrite={esEstudio}
+              canWrite={esEstudio && !fichaCesada}
             />
           </div>
         ) : null}

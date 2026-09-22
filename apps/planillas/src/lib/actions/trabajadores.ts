@@ -7,7 +7,7 @@ import type {
   EstadoValidacionAltaPlanilla,
   JornadaLaboral,
 } from "@inventario/types";
-import { TIPOS_DOCUMENTO_ALTA_INICIALES, esPersonalEstudio } from "@inventario/types";
+import { TIPOS_DOCUMENTO_ALTA_INICIALES, TIPOS_DOCUMENTO_BAJA, esPersonalEstudio } from "@inventario/types";
 import {
   entidadAlcance,
   puedeCrearTrabajador,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth/access";
 import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
 import type { FlujoContrato, FlujoDocumento, FlujoPension, FlujoTRegistro } from "@/lib/flujo-ficha";
+import { documentoCargado } from "@/lib/flujo-ficha";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { planillasDb } from "@/lib/supabase/planillas";
 
@@ -395,6 +396,13 @@ export async function darDeBajaTrabajador(
   if (actual.fecha_ingreso && cese.value < actual.fecha_ingreso) {
     return { error: "El cese no puede ser anterior al ingreso a la empresa." };
   }
+  const conSustento = TIPOS_DOCUMENTO_BAJA.some((tipo) => documentoCargado(actual.documentos, tipo));
+  if (!conSustento) {
+    return { error: "Suba la carta de renuncia o el término de contrato para dar de baja." };
+  }
+  if (!documentoCargado(actual.documentos, "TR_BAJA")) {
+    return { error: "Suba el documento de T-Registro baja." };
+  }
 
   const db = await planillasDb();
   const { error } = await db
@@ -405,6 +413,17 @@ export async function darDeBajaTrabajador(
     })
     .eq("id", relacionId);
   if (error) return { error: error.message };
+
+  const yaBajaTr = actual.tRegistro.some((item) => item.tipo === "BAJA");
+  if (!yaBajaTr) {
+    const { error: trError } = await db.from("t_registro").insert({
+      relacion_id: relacionId,
+      tipo: "BAJA",
+      realizado: true,
+      fecha: cese.value,
+    });
+    if (trError) return { error: trError.message };
+  }
 
   revalidatePath("/");
   revalidatePath("/pendientes");

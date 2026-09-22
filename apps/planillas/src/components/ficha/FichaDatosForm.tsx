@@ -2,22 +2,28 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ConfirmDialog, useToast } from "@inventario/ui";
+import { Button, ConfirmDialog, FileInput, useToast } from "@inventario/ui";
+import { TIPOS_DOCUMENTO_BAJA, type TipoDocumentoPlanilla } from "@inventario/types";
 import {
   darDeBajaTrabajador,
   updatePersonaTrabajador,
   updatePuestoTrabajador,
   type TrabajadorListItem,
 } from "@/lib/actions/trabajadores";
+import { addDocumento, setDocumentoArchivo } from "@/lib/actions/ficha";
 import {
   CLASIFICACION_LABEL,
   JORNADA_LABEL,
+  TIPO_DOCUMENTO_LABEL,
   cargoCanonico,
   formatFechaPlanilla,
   formatRemuneracion,
   montoAsignacionFamiliar,
   opcionesCargo,
 } from "@/lib/planillas-labels";
+import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
+import { uploadDocumentoFile } from "@/lib/upload-documento";
+import { documentoCargado } from "@/lib/flujo-ficha";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
@@ -97,8 +103,13 @@ export function FichaPuestoForm({
   const [bajaPending, setBajaPending] = useState(false);
   const [mostrarBaja, setMostrarBaja] = useState(false);
   const [fechaCese, setFechaCese] = useState("");
+  const [tipoBaja, setTipoBaja] = useState<TipoDocumentoPlanilla>("CARTA_RENUNCIA");
+  const [archivoBaja, setArchivoBaja] = useState<File | null>(null);
+  const [archivoTrBaja, setArchivoTrBaja] = useState<File | null>(null);
   const [jornada, setJornada] = useState(trabajador.jornada ?? "");
   const cesada = trabajador.estado === "CESADA";
+  const yaHaySustentoBaja = TIPOS_DOCUMENTO_BAJA.some((tipo) => documentoCargado(trabajador.documentos, tipo));
+  const yaHayTrBaja = documentoCargado(trabajador.documentos, "TR_BAJA");
 
   async function onSubmit(formData: FormData) {
     setPending(true);
@@ -112,10 +123,51 @@ export function FichaPuestoForm({
     router.refresh();
   }
 
+  async function subirDocumento(tipo: TipoDocumentoPlanilla, file: File): Promise<string | null> {
+    const data = new FormData();
+    data.set("tipo", tipo);
+    data.set("estado", "PENDIENTE");
+    const created = await addDocumento(trabajador.id, data);
+    if (created.error || !created.documentoId) {
+      return created.error ?? "No se pudo registrar el documento de baja.";
+    }
+    const upload = await uploadDocumentoFile(trabajador.entidad_id, trabajador.id, created.documentoId, file);
+    if (upload.error || !upload.path) {
+      return upload.error ?? "No se pudo subir el documento de baja.";
+    }
+    const savedFile = await setDocumentoArchivo(trabajador.id, created.documentoId, upload.path);
+    return savedFile.error ?? null;
+  }
+
   async function onBaja() {
+    if (!fechaCese.trim()) return;
+    if (!yaHaySustentoBaja && !archivoBaja) {
+      pushToast("Suba la carta de renuncia o el término de contrato.", "error");
+      return;
+    }
+    if (!yaHayTrBaja && !archivoTrBaja) {
+      pushToast("Suba el documento de T-Registro baja.", "error");
+      return;
+    }
+    setBajaPending(true);
+    if (archivoBaja) {
+      const errorSustento = await subirDocumento(tipoBaja, archivoBaja);
+      if (errorSustento) {
+        setBajaPending(false);
+        pushToast(errorSustento, "error");
+        return;
+      }
+    }
+    if (archivoTrBaja) {
+      const errorTr = await subirDocumento("TR_BAJA", archivoTrBaja);
+      if (errorTr) {
+        setBajaPending(false);
+        pushToast(errorTr, "error");
+        return;
+      }
+    }
     const form = new FormData();
     form.set("fecha_cese", fechaCese);
-    setBajaPending(true);
     const result = await darDeBajaTrabajador(trabajador.id, form);
     setBajaPending(false);
     if (result.error) {
@@ -123,6 +175,8 @@ export function FichaPuestoForm({
       return;
     }
     setMostrarBaja(false);
+    setArchivoBaja(null);
+    setArchivoTrBaja(null);
     pushToast("Trabajador dado de baja.");
     router.refresh();
   }
@@ -204,14 +258,45 @@ export function FichaPuestoForm({
           setMostrarBaja(false);
         }}
         title="Dar de baja"
-        description="La ficha pasa a cesada. Esto no es el fin de un contrato: es cuando deja la empresa."
+        description="La ficha pasa a cesada. La fecha de cese es de la empresa, no del fin de un contrato. Hace falta la carta de renuncia o el término de contrato, y el documento de T-Registro baja."
         confirmLabel="Dar de baja"
         confirmVariant="destructive"
         pending={bajaPending}
-        confirmDisabled={!fechaCese.trim()}
+        confirmDisabled={!fechaCese.trim() || (!yaHaySustentoBaja && !archivoBaja) || (!yaHayTrBaja && !archivoTrBaja)}
         onConfirm={() => void onBaja()}
       >
         <DateField label="Fecha de cese en la empresa" name="fecha_cese" value={fechaCese} onChange={setFechaCese} />
+        <SelectField
+          label="Documento de baja"
+          name="tipo_baja"
+          value={tipoBaja}
+          options={TIPOS_DOCUMENTO_BAJA.map((tipo) => ({ value: tipo, label: TIPO_DOCUMENTO_LABEL[tipo] }))}
+          onChange={(event) => setTipoBaja(event.target.value as TipoDocumentoPlanilla)}
+        />
+        <FileInput
+          accept={DOCUMENTO_ACCEPT}
+          disabled={bajaPending}
+          file={archivoBaja}
+          buttonLabel={archivoBaja ? "Cambiar archivo" : "Subir documento"}
+          emptyLabel={
+            yaHaySustentoBaja
+              ? "Ya hay un documento de baja. Puede subir otro o usar el que está."
+              : "PDF, JPG, PNG o WEBP. Máximo 10 MB."
+          }
+          onFileChange={setArchivoBaja}
+        />
+        <FileInput
+          accept={DOCUMENTO_ACCEPT}
+          disabled={bajaPending}
+          file={archivoTrBaja}
+          buttonLabel={archivoTrBaja ? "Cambiar T-Registro baja" : "Subir T-Registro baja"}
+          emptyLabel={
+            yaHayTrBaja
+              ? "Ya hay T-Registro baja. Puede subir otro o usar el que está."
+              : "Constancia de baja en T-Registro. PDF, JPG, PNG o WEBP. Máximo 10 MB."
+          }
+          onFileChange={setArchivoTrBaja}
+        />
       </ConfirmDialog>
     </div>
   );

@@ -21,11 +21,10 @@ const PASOS_VACIOS: Record<PasoAltaId, boolean> = {
 };
 
 function clasePaso(active: boolean, done: boolean, clickable: boolean) {
-  if (active && done) return "border-emerald-600 bg-emerald-50 text-emerald-950";
-  if (active) return "border-primary bg-primary/5 text-primary";
+  if (active) return "border-primary bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30 font-medium";
   if (done) return "border-emerald-400 bg-emerald-50 text-emerald-950";
-  if (clickable) return "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground";
-  return "border-border text-muted-foreground";
+  if (clickable) return "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground";
+  return "border-border bg-card text-muted-foreground";
 }
 
 function PasoBadge({
@@ -40,10 +39,10 @@ function PasoBadge({
   return (
     <span
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-        done
-          ? "bg-emerald-600 text-white"
-          : active
-            ? "bg-primary text-primary-foreground"
+        active
+          ? "bg-primary-foreground text-primary"
+          : done
+            ? "bg-emerald-600 text-white"
             : "bg-muted text-muted-foreground"
       }`}
     >
@@ -116,11 +115,17 @@ export function AltaPasosNav({
               href={hrefAltaTrabajador(relacionId, paso.id)}
               aria-current={active ? "page" : undefined}
               aria-label={
-                done
-                  ? `${paso.label}, completo`
-                  : pendientes.length > 0
-                    ? `${paso.label}, ${pendientes.length} ${pendientes.length === 1 ? "falta" : "faltas"}`
-                    : paso.label
+                [
+                  paso.label,
+                  active ? "paso actual" : null,
+                  done
+                    ? "completo"
+                    : pendientes.length > 0
+                      ? `${pendientes.length} ${pendientes.length === 1 ? "falta" : "faltas"}`
+                      : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")
               }
               className={className}
             >
