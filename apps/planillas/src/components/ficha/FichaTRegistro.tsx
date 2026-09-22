@@ -114,7 +114,7 @@ export function FichaTRegistro({
     setFileAlta(null);
     setPendingAlta(false);
     pushToast("Alta de T-Registro guardada.");
-    router.push(`/trabajadores/${relacionId}`);
+    router.refresh();
   }
 
   async function onSubmit(formData: FormData) {
@@ -131,7 +131,7 @@ export function FichaTRegistro({
   }
 
   return (
-    <div className="space-y-4">
+    <div id="t-registro" className="space-y-4">
       <DocumentoPrevisualizacion
         titulo={TIPO_DOCUMENTO_LABEL.DNI}
         storagePath={documentoDni?.storage_path}
@@ -245,7 +245,7 @@ export function FichaTRegistro({
           href={`/trabajadores/${relacionId}`}
           className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
-          Ver siguiente paso
+          Ver ficha
         </Link>
       ) : null}
       {canWrite && !mostrarForm ? (

@@ -126,8 +126,8 @@ export default async function ContratosPage({
         <div>
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Contratos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Proceso por empresa: genere el Word, suba el firmado, confirme los datos y márquelo recogido. Después, el
-            estudio da de alta AFP y T-Registro. El nombre abre el trámite de esa persona.
+            Proceso por empresa: los cinco pasos se hacen aquí. El nombre abre documentos, persona, puesto, contrato y
+            el alta AFP y T-Registro de esa persona.
           </p>
         </div>
 

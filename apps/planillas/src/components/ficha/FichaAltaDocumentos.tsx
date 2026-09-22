@@ -70,6 +70,16 @@ function archivoEsPdf(file: File | null, path: string | null): boolean {
   return Boolean(path?.toLowerCase().endsWith(".pdf"));
 }
 
+function capturaCardClass(alerta: boolean) {
+  return alerta
+    ? `${panelCardClass} space-y-4 border-amber-400 bg-amber-50 p-5`
+    : `${panelCardClass} space-y-4 p-5`;
+}
+
+function AlertaFaltaDocumento({ nombre }: { nombre: string }) {
+  return <p className="text-sm font-medium text-amber-900">Alerta: falta el documento de {nombre}.</p>;
+}
+
 export function FichaAltaDocumentos({
   relacionId,
   entidadId,
@@ -95,7 +105,8 @@ export function FichaAltaDocumentos({
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
         Primero los escaneos. Al lado de cada uno, complete a mano los datos que más adelante usa Persona y el contrato.
-        En Sistema de pensión, el estudio inicia el alta AFP o, si es ONP, solo deja indicado que es ONP.
+        Si falta un archivo, ese recuadro queda en alerta; el contrato se puede seguir igual. En Sistema de pensión, el
+        estudio inicia el alta AFP o, si es ONP, solo deja indicado que es ONP.
       </p>
       <CapturaDni relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={dniDoc} canWrite={canWrite} />
       <CapturaFicha relacionId={relacionId} entidadId={entidadId} trabajador={trabajador} documento={fichaDoc} canWrite={canWrite} />
@@ -195,10 +206,13 @@ function CapturaDni({
     router.refresh();
   }
 
+  const alerta = !file && !documento?.storage_path;
+
   return (
-    <section className={`${panelCardClass} space-y-4 p-5`}>
+    <section className={capturaCardClass(alerta)}>
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.DNI}</p>
+        {alerta ? <AlertaFaltaDocumento nombre="DNI" /> : null}
         <p className="text-sm text-muted-foreground">
           Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato. El número de DNI de la ficha no se cambia aquí.
         </p>
@@ -313,10 +327,13 @@ function CapturaFicha({
     router.refresh();
   }
 
+  const alerta = !file && !documento?.storage_path;
+
   return (
-    <section className={`${panelCardClass} space-y-4 p-5`}>
+    <section className={capturaCardClass(alerta)}>
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.FICHA_DATOS}</p>
+        {alerta ? <AlertaFaltaDocumento nombre="ficha de datos personales" /> : null}
         <p className="text-sm text-muted-foreground">
           Suba el escaneo y complete la dirección: región, provincia, distrito, tipo de vía y número. Eso se copia en AFPNet y queda armado para la ficha, por ejemplo Av. Grau 123 - El Tambo - Huancayo - Junín.
         </p>
@@ -420,10 +437,13 @@ function CapturaPension({
     router.refresh();
   }
 
+  const alerta = !file && !documento?.storage_path;
+
   return (
-    <section className={`${panelCardClass} space-y-4 p-5`}>
+    <section className={capturaCardClass(alerta)}>
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}</p>
+        {alerta ? <AlertaFaltaDocumento nombre="sistema de pensiones" /> : null}
         <p className="text-sm text-muted-foreground">
           En el alta solo se indica AFP u ONP. Si es AFP, el estudio registra el alta, CUSPP y fecha de afiliación en Sistema de pensión.
         </p>
@@ -516,10 +536,13 @@ function CapturaAsignacion({
     router.refresh();
   }
 
+  const alerta = !file && !documento?.storage_path;
+
   return (
-    <section className={`${panelCardClass} space-y-4 p-5`}>
+    <section className={capturaCardClass(alerta)}>
       <div>
         <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.ASIGNACION_FAMILIAR}</p>
+        {alerta ? <AlertaFaltaDocumento nombre="asignación familiar" /> : null}
         <p className="text-sm text-muted-foreground">La ficha indica que sí recibe. Suba el sustento (partida u otro documento).</p>
       </div>
       <div className="space-y-4">

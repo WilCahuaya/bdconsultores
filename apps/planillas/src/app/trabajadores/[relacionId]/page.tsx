@@ -2,10 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
+import { AlertaDocumentosAlta, ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
 import { FichaResumen } from "@/components/ficha/FichaResumen";
-import { FichaPensiones } from "@/components/ficha/FichaPensiones";
-import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
 import { FichaAsistencia } from "@/components/ficha/FichaAsistencia";
 import { FichaVacaciones } from "@/components/ficha/FichaVacaciones";
@@ -14,16 +12,11 @@ import {
   puedeEscribirPlanillas,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
-import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import {
-  getPension,
   getVidaLey,
   listContratos,
   listDocumentos,
-  listTRegistro,
-  asegurarDocumentoTramiteAfp,
-  asegurarDocumentoTrAlta,
   asegurarDocumentosVidaLey,
 } from "@/lib/actions/ficha";
 import { listVacaciones } from "@/lib/actions/vacaciones";
@@ -33,6 +26,7 @@ import {
   HORIZONTE_VENCIMIENTO_DIAS,
   contratoConfirmado,
   contratoVigente,
+  etiquetaAlertaDocumentos,
   enlaceProcesoOperativo,
   enlaceProcesoPendiente,
   flujoDesdeTrabajador,
@@ -65,31 +59,25 @@ export default async function FichaTrabajadorPage({
   if (tabRaw === "contratos" || tabRaw === "firma") {
     redirect(`/contratos/${params.relacionId}`);
   }
+  if (tabRaw === "pensiones" || tabRaw === "t-registro" || tabRaw === "alta") {
+    redirect(`/contratos/${params.relacionId}?paso=alta`);
+  }
 
   const flujo = flujoDesdeTrabajador(trabajador);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
+  const alertaDocumentos = etiquetaAlertaDocumentos(flujo);
   const contratoVig = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
   const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const canEditFicha = puedeEditarFichaLaboral(profile);
-  const canWriteTramite = esEstudio;
-  if (esEstudio && tab === "pensiones") {
-    await asegurarDocumentoTramiteAfp(params.relacionId);
-  }
-  if (esEstudio && tab === "t-registro") {
-    await asegurarDocumentoTrAlta(params.relacionId);
-  }
   if (esEstudio && tab === "vida-ley") {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [documentos, pension, vidaLey, tRegistro, entidad, vacaciones, contratos] = await Promise.all([
+  const [documentos, vidaLey, vacaciones, contratos] = await Promise.all([
     listDocumentos(params.relacionId),
-    tab === "pensiones" || tab === "t-registro" ? getPension(params.relacionId) : Promise.resolve(null),
     esEstudio && (tab === "vida-ley" || !tab)
       ? getVidaLey(params.relacionId)
       : Promise.resolve(null),
-    tab === "t-registro" ? listTRegistro(params.relacionId) : Promise.resolve([]),
-    tab === "pensiones" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
     !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
     !tab ? listContratos(params.relacionId) : Promise.resolve([]),
   ]);
@@ -138,6 +126,9 @@ export default async function FichaTrabajadorPage({
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
         </div>
+        {alertaDocumentos ? (
+          <AlertaDocumentosAlta relacionId={params.relacionId} etiqueta={alertaDocumentos} />
+        ) : null}
         {tab ? (
           <ProcesoDesdeFichaHeader
             relacionId={params.relacionId}
@@ -162,29 +153,6 @@ export default async function FichaTrabajadorPage({
             vacaciones={vacaciones}
           />
         ) : null}
-        {esEstudio && tab === "pensiones" ? (
-          <FichaPensiones
-            relacionId={params.relacionId}
-            pension={pension}
-            trabajador={trabajador}
-            entidad={entidad}
-            documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
-            documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
-            canWrite={canWriteTramite}
-          />
-        ) : null}
-        {esEstudio && tab === "t-registro" ? (
-          <FichaTRegistro
-            relacionId={params.relacionId}
-            items={tRegistro}
-            pension={pension}
-            trabajador={trabajador}
-            documentoDni={documentos.find((d) => d.tipo === "DNI") ?? null}
-            documentoFicha={documentos.find((d) => d.tipo === "FICHA_DATOS") ?? null}
-            documentoTrAlta={documentos.find((d) => d.tipo === "TR_ALTA") ?? null}
-            canWrite={canWriteTramite}
-          />
-        ) : null}
         {esEstudio && tab === "vida-ley" ? (
           <FichaVidaLey
             relacionId={params.relacionId}
@@ -194,7 +162,7 @@ export default async function FichaTrabajadorPage({
             documentoConstancia={documentos.find((d) => d.tipo === "VIDA_LEY_CONSTANCIA") ?? null}
             documentoFactura={documentos.find((d) => d.tipo === "VIDA_LEY_FACTURA") ?? null}
             documentoComprobante={documentos.find((d) => d.tipo === "VIDA_LEY_COMPROBANTE") ?? null}
-            canWrite={canWriteTramite}
+            canWrite={esEstudio}
           />
         ) : null}
         {tab === "asistencia" ? (

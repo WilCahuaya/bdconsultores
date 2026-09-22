@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { panelCardClass } from "@inventario/ui/panel";
 import {
   PASOS_ALTA,
   hrefAltaTrabajador,
@@ -15,6 +16,7 @@ const PASOS_VACIOS: Record<PasoAltaId, boolean> = {
   persona: false,
   puesto: false,
   contratos: false,
+  alta: false,
 };
 
 function clasePaso(active: boolean, done: boolean, clickable: boolean) {
@@ -52,15 +54,13 @@ export function AltaPasosNav({
   tab,
   completados = PASOS_VACIOS,
   relacionId,
-  altaSistemas,
 }: {
   tab?: PasoAltaId;
   completados?: Record<PasoAltaId, boolean>;
   relacionId?: string;
-  altaSistemas?: { done: boolean; href: string; active?: boolean };
 }) {
   return (
-    <ol className={`grid grid-cols-2 gap-2 ${altaSistemas ? "sm:grid-cols-5" : "sm:grid-cols-4"}`}>
+    <ol className="grid grid-cols-2 gap-2 sm:grid-cols-5">
       {PASOS_ALTA.map((paso) => {
         const active = tab === paso.id;
         const done = completados[paso.id];
@@ -89,18 +89,6 @@ export function AltaPasosNav({
           </li>
         );
       })}
-      {altaSistemas ? (
-        <li>
-          <Link
-            href={altaSistemas.href}
-            aria-current={altaSistemas.active ? "page" : undefined}
-            className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${clasePaso(Boolean(altaSistemas.active), altaSistemas.done, true)}`}
-          >
-            <PasoBadge active={Boolean(altaSistemas.active)} done={altaSistemas.done} n={5} />
-            <span className="leading-tight">Dar de alta</span>
-          </Link>
-        </li>
-      ) : null}
     </ol>
   );
 }
@@ -140,14 +128,32 @@ export function ProcesoDesdeFichaHeader({
   );
 }
 
-const TABS_PROCESO: FichaTab[] = ["pensiones", "t-registro", "vida-ley", "asistencia", "vacaciones"];
+export function AlertaDocumentosAlta({
+  relacionId,
+  etiqueta,
+}: {
+  relacionId: string;
+  etiqueta: string;
+}) {
+  return (
+    <p className={`${panelCardClass} border-amber-400 bg-amber-50 p-4 text-sm text-amber-950`}>
+      {etiqueta}. Puede seguir el contrato; el recuadro del documento queda en alerta hasta que lo suba.{" "}
+      <Link href={hrefAltaTrabajador(relacionId, "documentos")} className="font-medium underline">
+        Ir a documentos
+      </Link>
+    </p>
+  );
+}
+
+const TABS_PROCESO: FichaTab[] = ["vida-ley", "asistencia", "vacaciones"];
 
 export function parseFichaTab(value: string | undefined, esEstudio = false): FichaTab | null {
   if (!value || value === "datos" || value === "persona" || value === "puesto" || value === "documentos") {
     return null;
   }
   if (value === "firma" || value === "contratos") return "contratos";
-  if (!esEstudio && (value === "pensiones" || value === "t-registro" || value === "vida-ley")) {
+  if (value === "pensiones" || value === "t-registro" || value === "alta") return "alta";
+  if (!esEstudio && value === "vida-ley") {
     return null;
   }
   return TABS_PROCESO.includes(value as FichaTab) ? (value as FichaTab) : null;

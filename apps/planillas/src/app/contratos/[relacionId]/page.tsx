@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { AltaPasosNav } from "@/components/ficha/FichaTabs";
+import { AlertaDocumentosAlta, AltaPasosNav } from "@/components/ficha/FichaTabs";
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
+import { FichaPensiones } from "@/components/ficha/FichaPensiones";
+import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
 import {
   puedeEditarFichaLaboral,
@@ -14,15 +16,23 @@ import {
   puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
+import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
-import { asegurarDocumentosAlta, getPension, listContratos, listDocumentos } from "@/lib/actions/ficha";
 import {
-  altasAfiliacionListas,
+  asegurarDocumentoTrAlta,
+  asegurarDocumentoTramiteAfp,
+  asegurarDocumentosAlta,
+  getPension,
+  listContratos,
+  listDocumentos,
+  listTRegistro,
+} from "@/lib/actions/ficha";
+import {
   claseBadgePaso,
   estadoPasosAlta,
+  etiquetaAlertaDocumentos,
   flujoDesdeTrabajador,
   hrefAltaTrabajador,
-  hrefPasoTrabajador,
   hrefSiguientePaso,
   parseContratoPaso,
   pasoAltaInicial,
@@ -45,16 +55,25 @@ export default async function ContratoProcesoPage({
   const flujo = flujoDesdeTrabajador(trabajador);
   const completados = estadoPasosAlta(flujo);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
+  const alertaDocumentos = etiquetaAlertaDocumentos(flujo);
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const porValidar = trabajador.validacion === "PENDIENTE";
   const paso = searchParams.paso ? parseContratoPaso(searchParams.paso) : pasoAltaInicial(completados);
   if (paso === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
   }
-  const [contratos, documentos, pension] = await Promise.all([
+  if (paso === "alta" && esEstudio) {
+    await Promise.all([
+      asegurarDocumentoTramiteAfp(params.relacionId),
+      asegurarDocumentoTrAlta(params.relacionId),
+    ]);
+  }
+  const [contratos, documentos, pension, tRegistro, entidad] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
-    paso === "documentos" ? getPension(params.relacionId) : Promise.resolve(null),
+    paso === "documentos" || paso === "alta" ? getPension(params.relacionId) : Promise.resolve(null),
+    paso === "alta" ? listTRegistro(params.relacionId) : Promise.resolve([]),
+    paso === "alta" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
   ]);
 
   return (
@@ -95,6 +114,9 @@ export default async function ContratoProcesoPage({
             </Link>
           )}
         </p>
+        {alertaDocumentos ? (
+          <AlertaDocumentosAlta relacionId={params.relacionId} etiqueta={alertaDocumentos} />
+        ) : null}
         {porValidar ? (
           <div className={`${panelCardClass} space-y-3 p-5`}>
             <p className="text-sm text-foreground">
@@ -109,19 +131,7 @@ export default async function ContratoProcesoPage({
             )}
           </div>
         ) : null}
-        <AltaPasosNav
-          tab={paso}
-          completados={completados}
-          relacionId={params.relacionId}
-          altaSistemas={{
-            done: altasAfiliacionListas(flujo),
-            href:
-              siguiente.paso === "pensiones" || siguiente.paso === "t-registro"
-                ? hrefSiguientePaso(params.relacionId, siguiente)
-                : hrefPasoTrabajador(params.relacionId, "pensiones"),
-            active: siguiente.paso === "pensiones" || siguiente.paso === "t-registro",
-          }}
-        />
+        <AltaPasosNav tab={paso} completados={completados} relacionId={params.relacionId} />
         {paso === "documentos" ? (
           <FichaAltaDocumentos
             relacionId={params.relacionId}
@@ -136,13 +146,13 @@ export default async function ContratoProcesoPage({
         {paso === "puesto" ? <FichaPuestoForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {paso === "contratos" ? (
           <>
-            {!completados.documentos || !completados.persona || !completados.puesto ? (
+            {!completados.persona || !completados.puesto ? (
               <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
-                Falta completar el alta (documentos, persona o puesto) para generar el contrato.{" "}
+                Falta completar persona o puesto para armar bien el contrato.{" "}
                 <Link
                   href={hrefAltaTrabajador(
                     params.relacionId,
-                    !completados.documentos ? "documentos" : !completados.persona ? "persona" : "puesto",
+                    !completados.persona ? "persona" : "puesto",
                   )}
                   className="font-medium text-primary hover:underline"
                 >
@@ -160,6 +170,33 @@ export default async function ContratoProcesoPage({
               canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
             />
           </>
+        ) : null}
+        {paso === "alta" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              El estudio da de alta AFP y T-Registro aquí, en Contratos. Si es ONP, no hay alta AFP. Después se
+              registra el alta en T-Registro.
+            </p>
+            <FichaPensiones
+              relacionId={params.relacionId}
+              pension={pension}
+              trabajador={trabajador}
+              entidad={entidad}
+              documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
+              documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
+              canWrite={esEstudio}
+            />
+            <FichaTRegistro
+              relacionId={params.relacionId}
+              items={tRegistro}
+              pension={pension}
+              trabajador={trabajador}
+              documentoDni={documentos.find((d) => d.tipo === "DNI") ?? null}
+              documentoFicha={documentos.find((d) => d.tipo === "FICHA_DATOS") ?? null}
+              documentoTrAlta={documentos.find((d) => d.tipo === "TR_ALTA") ?? null}
+              canWrite={esEstudio}
+            />
+          </div>
         ) : null}
       </div>
     </PlanillasShell>

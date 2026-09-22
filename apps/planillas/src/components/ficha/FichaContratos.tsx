@@ -133,7 +133,7 @@ export function FichaContratos({
       return;
     }
     pushToast("Contrato marcado como recogido. Siga con el alta AFP y T-Registro.");
-    router.push(`/trabajadores/${relacionId}?tab=pensiones`);
+    router.push(`/contratos/${relacionId}?paso=alta`);
   }
 
   return (

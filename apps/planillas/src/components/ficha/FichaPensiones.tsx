@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -123,7 +122,7 @@ export function FichaPensiones({
     setFileAlta(null);
     if (tieneDocumentoAlta || afiliacionCompleta) {
       pushToast("Sistema de pensión guardado. Siga con T-Registro.");
-      router.push(`/trabajadores/${relacionId}?tab=t-registro`);
+      router.refresh();
       return;
     }
     pushToast("Sistema de pensión guardado.");
@@ -251,12 +250,12 @@ export function FichaPensiones({
       ) : null}
 
       {esOnp || (esAfp && pension?.tramite_estado === "TRAMITADO") ? (
-        <Link
-          href={`/trabajadores/${relacionId}?tab=t-registro`}
+        <a
+          href="#t-registro"
           className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
         >
           Ir a T-Registro
-        </Link>
+        </a>
       ) : null}
     </div>
   );

@@ -10,7 +10,7 @@ import {
 } from "@inventario/types";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { trabajadorActivoEnMes } from "@/lib/horario-asistencia";
-import { ESTADO_CONTRATO_LABEL, resolverEtapaVidaLey } from "@/lib/planillas-labels";
+import { ESTADO_CONTRATO_LABEL, TIPO_DOCUMENTO_LABEL, resolverEtapaVidaLey } from "@/lib/planillas-labels";
 import { saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
 
 export const PASOS_ALTA = [
@@ -18,10 +18,11 @@ export const PASOS_ALTA = [
   { id: "persona", n: 2, label: "Persona" },
   { id: "puesto", n: 3, label: "Puesto" },
   { id: "contratos", n: 4, label: "Contrato" },
+  { id: "alta", n: 5, label: "Dar de alta" },
 ] as const;
 
 export type PasoAltaId = (typeof PASOS_ALTA)[number]["id"];
-export type PasoFichaId = Exclude<PasoAltaId, "contratos">;
+export type PasoFichaId = Exclude<PasoAltaId, "contratos" | "alta">;
 export const PASOS_FICHA = [PASOS_ALTA[0], PASOS_ALTA[1], PASOS_ALTA[2]] as const;
 export type FlujoTab = PasoAltaId | "firma" | "pensiones" | "t-registro" | "vida-ley" | "asistencia" | "vacaciones";
 export type EnlaceProceso = { href: string; etiqueta: string };
@@ -30,22 +31,30 @@ export function esTabFicha(tab: FlujoTab): tab is PasoFichaId {
   return tab === "documentos" || tab === "persona" || tab === "puesto";
 }
 
+export function esPasoAltaSistemas(tab: FlujoTab): boolean {
+  return tab === "alta" || tab === "pensiones" || tab === "t-registro";
+}
+
 export function tabFichaInicial(completados: Record<PasoAltaId, boolean>): PasoFichaId {
-  if (!completados.documentos) return "documentos";
   if (!completados.persona) return "persona";
   if (!completados.puesto) return "puesto";
   return "documentos";
 }
 
 export function pasoAltaInicial(completados: Record<PasoAltaId, boolean>): PasoAltaId {
-  if (!completados.documentos) return "documentos";
   if (!completados.persona) return "persona";
   if (!completados.puesto) return "puesto";
+  if (!completados.contratos) return "contratos";
+  if (!completados.alta) return "alta";
+  if (!completados.documentos) return "documentos";
   return "contratos";
 }
 
 export function parseContratoPaso(value: string | undefined): PasoAltaId {
-  if (value === "documentos" || value === "persona" || value === "puesto" || value === "contratos") return value;
+  if (value === "documentos" || value === "persona" || value === "puesto" || value === "contratos" || value === "alta") {
+    return value;
+  }
+  if (value === "pensiones" || value === "t-registro") return "alta";
   return "contratos";
 }
 
@@ -91,14 +100,32 @@ export type FlujoFichaInput = {
 };
 
 export type SiguientePaso = {
-  paso: PasoAltaId | "listo" | "pensiones" | "t-registro";
+  paso: PasoAltaId | "listo";
   tab: FlujoTab;
   etiqueta: string;
-  rol: "empresa" | "estudio" | "hecho";
+  rol: "empresa" | "estudio" | "hecho" | "alerta";
 };
 
 export function documentoCargado(docs: FlujoDocumento[], tipo: TipoDocumentoPlanilla): boolean {
   return docs.some((d) => d.tipo === tipo && d.estado === "SI" && Boolean(d.storage_path));
+}
+
+export function documentosAltaFaltantes(
+  input: Pick<FlujoFichaInput, "documentos" | "recibeAsignacionFamiliar">,
+): TipoDocumentoPlanilla[] {
+  return tiposDocumentosAltaRequeridos(input.recibeAsignacionFamiliar).filter(
+    (tipo) => !documentoCargado(input.documentos, tipo),
+  );
+}
+
+export function etiquetaAlertaDocumentos(
+  input: Pick<FlujoFichaInput, "documentos" | "recibeAsignacionFamiliar">,
+): string | null {
+  const faltantes = documentosAltaFaltantes(input);
+  if (faltantes.length === 0) return null;
+  const nombres = faltantes.map((tipo) => TIPO_DOCUMENTO_LABEL[tipo]);
+  if (nombres.length === 1) return `Alerta: falta ${nombres[0]}`;
+  return `Alerta: faltan ${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
 }
 
 export function pensionAltaLista(input: Pick<FlujoFichaInput, "pension">): boolean {
@@ -155,6 +182,7 @@ export function estadoPasosAlta(input: FlujoFichaInput): Record<PasoAltaId, bool
       documentoCargado(input.documentos, tipo),
     ),
     contratos: Boolean(contratoConfirmado(input.contratos)),
+    alta: altasAfiliacionListas(input),
   };
 }
 
@@ -165,9 +193,6 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   const firmado = documentoCargado(input.documentos, "CONTRATO_FIRMADO");
   const pasos = estadoPasosAlta(input);
 
-  if (!pasos.documentos) {
-    return { paso: "documentos", tab: "documentos", etiqueta: "Subir documentos", rol: "empresa" };
-  }
   if (!pasos.persona) {
     return { paso: "persona", tab: "persona", etiqueta: "Completar persona", rol: "empresa" };
   }
@@ -195,15 +220,19 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   }
   if (!pensionAltaLista(input)) {
     return esEstudio
-      ? { paso: "pensiones", tab: "pensiones", etiqueta: "Dar de alta AFP y T-Registro", rol: "estudio" }
-      : { paso: "pensiones", tab: "contratos", etiqueta: "En alta AFP y T-Registro del estudio", rol: "empresa" };
+      ? { paso: "alta", tab: "alta", etiqueta: "Dar de alta AFP y T-Registro", rol: "estudio" }
+      : { paso: "alta", tab: "alta", etiqueta: "En alta AFP y T-Registro del estudio", rol: "empresa" };
   }
   if (!tRegistroAltaLista(input)) {
     return esEstudio
-      ? { paso: "t-registro", tab: "t-registro", etiqueta: "Dar de alta T-Registro", rol: "estudio" }
-      : { paso: "t-registro", tab: "contratos", etiqueta: "En alta T-Registro del estudio", rol: "empresa" };
+      ? { paso: "alta", tab: "alta", etiqueta: "Dar de alta T-Registro", rol: "estudio" }
+      : { paso: "alta", tab: "alta", etiqueta: "En alta T-Registro del estudio", rol: "empresa" };
   }
   if (vigente?.estado === "RECOGIDO" || vigente?.estado === "COMPLETO") {
+    const alertaDocs = etiquetaAlertaDocumentos(input);
+    if (alertaDocs) {
+      return { paso: "documentos", tab: "documentos", etiqueta: alertaDocs, rol: "alerta" };
+    }
     return { paso: "listo", tab: "contratos", etiqueta: "Recogido", rol: "hecho" };
   }
   return { paso: "contratos", tab: "contratos", etiqueta: "Revisar contrato", rol: "empresa" };
@@ -221,13 +250,14 @@ export function hrefAltaTrabajador(relacionId: string, paso?: PasoAltaId): strin
 export function hrefPasoTrabajador(relacionId: string, tab: FlujoTab): string {
   if (tab === "contratos" || tab === "firma") return hrefAltaTrabajador(relacionId);
   if (tab === "documentos" || tab === "persona" || tab === "puesto") return hrefAltaTrabajador(relacionId, tab);
+  if (esPasoAltaSistemas(tab)) return hrefAltaTrabajador(relacionId, "alta");
   return `/trabajadores/${relacionId}?tab=${tab}`;
 }
 
 export function hrefSiguientePaso(relacionId: string, siguiente: SiguientePaso): string {
   if (siguiente.paso === "listo") return hrefFichaTrabajador(relacionId);
-  if (siguiente.tab === "pensiones" || siguiente.tab === "t-registro") {
-    return hrefPasoTrabajador(relacionId, siguiente.tab);
+  if (siguiente.paso === "alta" || esPasoAltaSistemas(siguiente.tab)) {
+    return hrefAltaTrabajador(relacionId, "alta");
   }
   if (siguiente.paso === "contratos" || siguiente.tab === "contratos" || siguiente.tab === "firma") {
     return hrefAltaTrabajador(relacionId);
@@ -240,7 +270,7 @@ export function hrefListaProceso(tab: FlujoTab, entidadId: string): string | nul
   if (tab === "vida-ley") return `/vida-ley?entidadId=${entidadId}`;
   if (tab === "asistencia") return `/asistencias?entidadId=${entidadId}`;
   if (tab === "vacaciones") return `/vacaciones?entidadId=${entidadId}`;
-  if (tab === "contratos" || tab === "firma") return `/contratos?entidadId=${entidadId}`;
+  if (tab === "contratos" || tab === "firma" || esPasoAltaSistemas(tab)) return `/contratos?entidadId=${entidadId}`;
   return null;
 }
 
@@ -279,10 +309,10 @@ export function enlaceProcesoOperativo(input: {
       documentos: input.documentos ?? [],
     };
     if (afiliacionCargada && input.contratoCerrado && input.relacionId && !pensionAltaLista(afiliacion)) {
-      return { href: hrefPasoTrabajador(input.relacionId, "pensiones"), etiqueta: "Dar de alta AFP y T-Registro" };
+      return { href: hrefAltaTrabajador(input.relacionId, "alta"), etiqueta: "Dar de alta AFP y T-Registro" };
     }
     if (afiliacionCargada && input.contratoCerrado && input.relacionId && !tRegistroAltaLista(afiliacion)) {
-      return { href: hrefPasoTrabajador(input.relacionId, "t-registro"), etiqueta: "Dar de alta T-Registro" };
+      return { href: hrefAltaTrabajador(input.relacionId, "alta"), etiqueta: "Dar de alta T-Registro" };
     }
     if (!afiliacionCargada || altasAfiliacionListas(afiliacion)) {
       const etapa = resolverEtapaVidaLey(input.vidaLey, { hoy: input.hoy, limite: input.limite });
@@ -367,9 +397,6 @@ export function resolverEtapaContrato(
   const vigente = confirmado ?? contratoVigente(flujo.contratos);
   const firmado = documentoCargado(flujo.documentos, "CONTRATO_FIRMADO");
 
-  if (!pasos.documentos) {
-    return { id: "alta", etiqueta: "Falta documentos para generar el contrato", tab: "documentos", rol: "empresa", pendiente: true };
-  }
   if (!pasos.persona) {
     return { id: "alta", etiqueta: "Falta completar persona para generar el contrato", tab: "persona", rol: "empresa", pendiente: true };
   }
@@ -397,13 +424,13 @@ export function resolverEtapaContrato(
   }
   if (!pensionAltaLista(flujo)) {
     return esEstudio
-      ? { id: "afp", etiqueta: "Falta dar de alta AFP y T-Registro", tab: "pensiones", rol: "estudio", pendiente: true }
-      : { id: "afp", etiqueta: "En alta AFP y T-Registro del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+      ? { id: "afp", etiqueta: "Falta dar de alta AFP y T-Registro", tab: "alta", rol: "estudio", pendiente: true }
+      : { id: "afp", etiqueta: "En alta AFP y T-Registro del estudio", tab: "alta", rol: "empresa", pendiente: true };
   }
   if (!tRegistroAltaLista(flujo)) {
     return esEstudio
-      ? { id: "t-registro", etiqueta: "Falta dar de alta T-Registro", tab: "t-registro", rol: "estudio", pendiente: true }
-      : { id: "t-registro", etiqueta: "En alta T-Registro del estudio", tab: "contratos", rol: "empresa", pendiente: true };
+      ? { id: "t-registro", etiqueta: "Falta dar de alta T-Registro", tab: "alta", rol: "estudio", pendiente: true }
+      : { id: "t-registro", etiqueta: "En alta T-Registro del estudio", tab: "alta", rol: "empresa", pendiente: true };
   }
 
   const hoy = opts?.hoy ?? new Date().toISOString().slice(0, 10);
@@ -425,10 +452,15 @@ export function resolverEtapaContrato(
       pendiente: true,
     };
   }
+  const alertaDocs = etiquetaAlertaDocumentos(flujo);
+  if (alertaDocs) {
+    return { id: "alta", etiqueta: alertaDocs, tab: "documentos", rol: "alerta", pendiente: true };
+  }
   return { id: "listo", etiqueta: "Recogido", tab: "contratos", rol: "hecho", pendiente: false };
 }
 
 export function claseBadgePaso(rol: SiguientePaso["rol"]): string {
+  if (rol === "alerta") return "bg-amber-100 text-amber-950 ring-1 ring-amber-400";
   if (rol === "estudio") return "bg-amber-100 text-amber-950";
   if (rol === "hecho") return "bg-emerald-100 text-emerald-950";
   return "bg-sky-100 text-sky-950";
