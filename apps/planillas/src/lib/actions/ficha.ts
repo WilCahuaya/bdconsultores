@@ -54,6 +54,7 @@ export type ContratoRow = {
   es_vigente: boolean;
   estado: EstadoContratoPlanilla;
   datos_confirmados: boolean;
+  documento_id: string | null;
 };
 
 export type DocumentoRow = {
@@ -96,7 +97,7 @@ export async function listContratos(relacionId: string): Promise<ContratoRow[]> 
   const db = await planillasDb();
   const { data, error } = await db
     .from("contratos")
-    .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados")
+    .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados, documento_id")
     .eq("relacion_id", relacionId)
     .neq("estado", "BAJA")
     .order("version", { ascending: false });
@@ -133,32 +134,82 @@ function parseSnapshotContrato(formData: FormData, cargoActual: string | null) {
   };
 }
 
-async function asegurarDocumentoFirmado(relacionId: string) {
+async function asegurarDocumentoFirmadoDeContrato(
+  relacionId: string,
+  contratoId: string,
+  version: number,
+): Promise<{ error?: string; documentoId?: string }> {
   const db = await planillasDb();
-  const { data: contratoDoc } = await db
+  const { data: contrato, error: loadError } = await db
+    .from("contratos")
+    .select("id, documento_id")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!contrato) return { error: "Contrato no encontrado." };
+  if (contrato.documento_id) return { documentoId: contrato.documento_id as string };
+
+  const { data: usados } = await db
+    .from("contratos")
+    .select("documento_id")
+    .eq("relacion_id", relacionId)
+    .not("documento_id", "is", null);
+  const usadosIds = new Set((usados ?? []).map((row) => row.documento_id as string));
+
+  const { data: existentes } = await db
     .from("documentos")
     .select("id")
     .eq("relacion_id", relacionId)
     .eq("tipo", "CONTRATO_FIRMADO")
-    .maybeSingle();
-  if (!contratoDoc) {
-    await db.from("documentos").insert({
-      relacion_id: relacionId,
-      tipo: "CONTRATO_FIRMADO",
-      estado: "PENDIENTE",
-    });
+    .order("created_at", { ascending: true });
+  const libre = (existentes ?? []).find((row) => !usadosIds.has(row.id));
+  let documentoId = libre?.id as string | undefined;
+  if (!documentoId) {
+    const { data: creado, error } = await db
+      .from("documentos")
+      .insert({
+        relacion_id: relacionId,
+        tipo: "CONTRATO_FIRMADO" as TipoDocumentoPlanilla,
+        estado: "PENDIENTE" as EstadoDocumentoPlanilla,
+        observaciones: `Versión ${version}`,
+      })
+      .select("id")
+      .single();
+    if (error || !creado) return { error: error?.message ?? "No se pudo registrar el documento firmado." };
+    documentoId = creado.id;
+  } else {
+    await db
+      .from("documentos")
+      .update({ observaciones: `Versión ${version}` })
+      .eq("id", documentoId)
+      .eq("relacion_id", relacionId);
   }
+
+  const { error: linkError } = await db
+    .from("contratos")
+    .update({ documento_id: documentoId })
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId);
+  if (linkError) return { error: linkError.message };
+  return { documentoId };
 }
 
-async function hayPdfFirmado(relacionId: string): Promise<{ error?: string; ok: boolean }> {
+async function hayPdfFirmadoDeContrato(
+  relacionId: string,
+  documentoId: string | null | undefined,
+): Promise<{ error?: string; ok: boolean }> {
+  if (!documentoId) return { ok: false };
   const db = await planillasDb();
-  const { data: firmados, error } = await db
+  const { data, error } = await db
     .from("documentos")
     .select("id, storage_path, estado")
+    .eq("id", documentoId)
     .eq("relacion_id", relacionId)
-    .eq("tipo", "CONTRATO_FIRMADO");
+    .eq("tipo", "CONTRATO_FIRMADO")
+    .maybeSingle();
   if (error) return { error: error.message, ok: false };
-  return { ok: Boolean((firmados ?? []).find((d) => d.storage_path && d.estado === "SI")) };
+  return { ok: Boolean(data?.storage_path && data.estado === "SI") };
 }
 
 function contratoEstaCerrado(estado: EstadoContratoPlanilla): boolean {
@@ -180,7 +231,7 @@ export async function generarContratoParaFirma(
   const db = await planillasDb();
   const { data: existentes, error: listError } = await db
     .from("contratos")
-    .select("id, version, estado, datos_confirmados")
+    .select("id, version, estado, datos_confirmados, documento_id")
     .eq("relacion_id", relacionId)
     .order("version", { ascending: false });
   if (listError) return { error: listError.message };
@@ -204,6 +255,9 @@ export async function generarContratoParaFirma(
   };
 
   let idGuardado = destino?.id as string | undefined;
+  const versionGuardada = destino
+    ? (destino.version as number)
+    : ((existentes ?? [])[0]?.version ?? 0) + 1;
   if (destino) {
     const { error } = await db.from("contratos").update(campos).eq("id", destino.id).eq("relacion_id", relacionId);
     if (error) return { error: error.message };
@@ -216,12 +270,11 @@ export async function generarContratoParaFirma(
       if (estadoError) return { error: estadoError.message };
     }
   } else {
-    const version = ((existentes ?? [])[0]?.version ?? 0) + 1;
     const { data: creado, error } = await db
       .from("contratos")
       .insert({
         relacion_id: relacionId,
-        version,
+        version: versionGuardada,
         numero_contrato: null,
         estado: "PENDIENTE_DOCS" as EstadoContratoPlanilla,
         ...campos,
@@ -238,7 +291,9 @@ export async function generarContratoParaFirma(
     if (estadoError) return { error: estadoError.message };
   }
 
-  await asegurarDocumentoFirmado(relacionId);
+  if (!idGuardado) return { error: "No se pudo generar el contrato." };
+  const doc = await asegurarDocumentoFirmadoDeContrato(relacionId, idGuardado, versionGuardada);
+  if (doc.error) return { error: doc.error };
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
@@ -299,7 +354,7 @@ export async function confirmarContratoFirmado(
   const db = await planillasDb();
   const { data: contrato, error: loadError } = await db
     .from("contratos")
-    .select("id, estado")
+    .select("id, estado, documento_id")
     .eq("id", contratoId)
     .eq("relacion_id", relacionId)
     .maybeSingle();
@@ -309,9 +364,9 @@ export async function confirmarContratoFirmado(
     return { error: "Este contrato ya está cerrado." };
   }
 
-  const pdf = await hayPdfFirmado(relacionId);
+  const pdf = await hayPdfFirmadoDeContrato(relacionId, contrato.documento_id as string | null);
   if (pdf.error) return { error: pdf.error };
-  if (!pdf.ok) return { error: "Suba el PDF firmado antes de guardar los datos del contrato." };
+  if (!pdf.ok) return { error: "Suba el PDF firmado de este contrato antes de guardar los datos." };
 
   await db.from("contratos").update({ es_vigente: false }).eq("relacion_id", relacionId);
 
@@ -360,7 +415,7 @@ export async function marcarContratoRecogido(
   const db = await planillasDb();
   const { data: contrato, error: loadError } = await db
     .from("contratos")
-    .select("id, estado, datos_confirmados")
+    .select("id, estado, datos_confirmados, documento_id")
     .eq("id", contratoId)
     .eq("relacion_id", relacionId)
     .maybeSingle();
@@ -374,10 +429,10 @@ export async function marcarContratoRecogido(
     return { error: "Confirme los datos del PDF firmado antes de marcarlo Recogido." };
   }
 
-  const pdf = await hayPdfFirmado(relacionId);
+  const pdf = await hayPdfFirmadoDeContrato(relacionId, contrato.documento_id as string | null);
   if (pdf.error) return { error: pdf.error };
   if (!pdf.ok) {
-    return { error: "Suba el PDF del contrato firmado antes de marcarlo como recogido." };
+    return { error: "Suba el PDF firmado de este contrato antes de marcarlo como recogido." };
   }
 
   const { error } = await db
@@ -392,6 +447,28 @@ export async function marcarContratoRecogido(
   revalidatePath("/contratos");
   revalidatePath(`/contratos/${relacionId}`);
   return {};
+}
+
+export async function asegurarFirmadoContrato(
+  relacionId: string,
+  contratoId: string,
+): Promise<{ error?: string; documentoId?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: contrato, error } = await db
+    .from("contratos")
+    .select("id, version")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (error) return { error: error.message };
+  if (!contrato) return { error: "Contrato no encontrado." };
+  const result = await asegurarDocumentoFirmadoDeContrato(relacionId, contratoId, contrato.version as number);
+  if (result.error) return { error: result.error };
+  revalidatePath(`/contratos/${relacionId}`);
+  revalidatePath(`/trabajadores/${relacionId}`);
+  return { documentoId: result.documentoId };
 }
 
 export async function listDocumentos(relacionId: string): Promise<DocumentoRow[]> {

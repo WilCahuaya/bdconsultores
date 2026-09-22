@@ -59,6 +59,7 @@ export function parseContratoPaso(value: string | undefined): PasoAltaId {
 }
 
 export type FlujoDocumento = {
+  id?: string;
   tipo: TipoDocumentoPlanilla;
   estado: EstadoDocumentoPlanilla;
   storage_path: string | null;
@@ -71,6 +72,7 @@ export type FlujoContrato = {
   remuneracion: number | null;
   es_vigente: boolean;
   datos_confirmados?: boolean;
+  documento_id?: string | null;
 };
 
 export type FlujoPension = {
@@ -124,6 +126,19 @@ export type SiguientePaso = {
 
 export function documentoCargado(docs: FlujoDocumento[], tipo: TipoDocumentoPlanilla): boolean {
   return docs.some((d) => d.tipo === tipo && d.estado === "SI" && Boolean(d.storage_path));
+}
+
+export function contratoTieneFirmado(
+  contrato: Pick<FlujoContrato, "documento_id"> | null | undefined,
+  docs: FlujoDocumento[],
+): boolean {
+  if (!contrato) return false;
+  if (contrato.documento_id) {
+    return docs.some(
+      (d) => d.id === contrato.documento_id && d.estado === "SI" && Boolean(d.storage_path),
+    );
+  }
+  return documentoCargado(docs, "CONTRATO_FIRMADO");
 }
 
 export function documentosAltaFaltantes(
@@ -226,7 +241,7 @@ export function faltasPorPaso(input: FlujoFichaInput): FaltasPasosAlta {
 
   const confirmado = contratoConfirmado(input.contratos);
   const borrador = contratoBorrador(input.contratos);
-  const firmado = documentoCargado(input.documentos, "CONTRATO_FIRMADO");
+  const firmado = contratoTieneFirmado(borrador, input.documentos);
   const contratos: FaltaPaso[] = [];
   if (borrador && !confirmado) {
     if (!firmado) contratos.push({ id: "firmar", etiqueta: "Subir contrato firmado" });
@@ -269,7 +284,7 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   const borrador = contratoBorrador(input.contratos);
   const confirmado = contratoConfirmado(input.contratos);
   const vigente = confirmado ?? contratoVigente(input.contratos);
-  const firmado = documentoCargado(input.documentos, "CONTRATO_FIRMADO");
+  const firmado = contratoTieneFirmado(borrador ?? vigente, input.documentos);
   const pasos = estadoPasosAlta(input);
 
   if (!pasos.persona) {
@@ -470,7 +485,7 @@ export function resolverEtapaContrato(
   const borrador = contratoBorrador(flujo.contratos);
   const confirmado = contratoConfirmado(flujo.contratos);
   const vigente = confirmado ?? contratoVigente(flujo.contratos);
-  const firmado = documentoCargado(flujo.documentos, "CONTRATO_FIRMADO");
+  const firmado = contratoTieneFirmado(borrador ?? vigente, flujo.documentos);
 
   if (!pasos.persona) {
     return { id: "alta", etiqueta: "Falta completar persona", tab: "persona", rol: "empresa", pendiente: true };
