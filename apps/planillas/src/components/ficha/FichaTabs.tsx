@@ -5,6 +5,7 @@ import {
   hrefAltaTrabajador,
   hrefFichaTrabajador,
   hrefListaProceso,
+  type FaltaPaso,
   type FlujoTab,
   type PasoAltaId,
 } from "@/lib/flujo-ficha";
@@ -20,9 +21,10 @@ const PASOS_VACIOS: Record<PasoAltaId, boolean> = {
 };
 
 function clasePaso(active: boolean, done: boolean, clickable: boolean) {
+  if (active && done) return "border-emerald-600 bg-emerald-50 text-emerald-950";
   if (active) return "border-primary bg-primary/5 text-primary";
-  if (done) return "border-border bg-muted/40 text-foreground";
-  if (clickable) return "border-border text-muted-foreground hover:text-foreground";
+  if (done) return "border-emerald-400 bg-emerald-50 text-emerald-950";
+  if (clickable) return "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground";
   return "border-border text-muted-foreground";
 }
 
@@ -38,14 +40,37 @@ function PasoBadge({
   return (
     <span
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium ${
-        active
-          ? "bg-primary text-primary-foreground"
-          : done
-            ? "bg-primary/80 text-primary-foreground"
+        done
+          ? "bg-emerald-600 text-white"
+          : active
+            ? "bg-primary text-primary-foreground"
             : "bg-muted text-muted-foreground"
       }`}
     >
-      {done && !active ? "✓" : n}
+      {done ? "✓" : n}
+    </span>
+  );
+}
+
+function IconAlerta({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0ZM12 9a1 1 0 0 1 1 1v3.5a1 1 0 1 1-2 0V10a1 1 0 0 1 1-1Zm0 8.25a1.15 1.15 0 1 1 0-2.3 1.15 1.15 0 0 1 0 2.3Z" />
+    </svg>
+  );
+}
+
+function FaltasBadge({ faltas }: { faltas: FaltaPaso[] }) {
+  if (faltas.length === 0) return null;
+  const n = faltas.length;
+  return (
+    <span
+      title={faltas.map((item) => item.etiqueta).join(", ")}
+      className="ml-auto inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold leading-none text-amber-950"
+      aria-label={`${n} ${n === 1 ? "falta" : "faltas"}`}
+    >
+      <IconAlerta className="h-3 w-3" />
+      {n}
     </span>
   );
 }
@@ -53,25 +78,34 @@ function PasoBadge({
 export function AltaPasosNav({
   tab,
   completados = PASOS_VACIOS,
+  faltas,
   relacionId,
 }: {
   tab?: PasoAltaId;
   completados?: Record<PasoAltaId, boolean>;
+  faltas?: Record<PasoAltaId, FaltaPaso[]>;
   relacionId?: string;
 }) {
   return (
     <ol className="grid grid-cols-2 gap-2 sm:grid-cols-5">
       {PASOS_ALTA.map((paso) => {
         const active = tab === paso.id;
-        const done = completados[paso.id];
-        const className = `flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${clasePaso(active, done, Boolean(relacionId))}`;
+        const pendientes = faltas?.[paso.id] ?? [];
+        const done = faltas ? pendientes.length === 0 : completados[paso.id];
+        const className = `flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm ${clasePaso(active, done, Boolean(relacionId))}`;
         const badge = <PasoBadge active={active} done={done} n={paso.n} />;
+        const label = (
+          <>
+            {badge}
+            <span className="min-w-0 leading-tight">{paso.label}</span>
+            {done ? null : <FaltasBadge faltas={pendientes} />}
+          </>
+        );
         if (!relacionId) {
           return (
             <li key={paso.id}>
               <span aria-current={active ? "step" : undefined} className={className}>
-                {badge}
-                <span className="leading-tight">{paso.label}</span>
+                {label}
               </span>
             </li>
           );
@@ -81,10 +115,16 @@ export function AltaPasosNav({
             <Link
               href={hrefAltaTrabajador(relacionId, paso.id)}
               aria-current={active ? "page" : undefined}
+              aria-label={
+                done
+                  ? `${paso.label}, completo`
+                  : pendientes.length > 0
+                    ? `${paso.label}, ${pendientes.length} ${pendientes.length === 1 ? "falta" : "faltas"}`
+                    : paso.label
+              }
               className={className}
             >
-              {badge}
-              <span className="leading-tight">{paso.label}</span>
+              {label}
             </Link>
           </li>
         );

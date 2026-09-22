@@ -31,12 +31,13 @@ import {
   claseBadgePaso,
   estadoPasosAlta,
   etiquetaAlertaDocumentos,
+  faltasPorPaso,
   flujoDesdeTrabajador,
-  hrefAltaTrabajador,
   hrefSiguientePaso,
   parseContratoPaso,
   pasoAltaInicial,
   resolverSiguientePaso,
+  textoListaFaltas,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
 
@@ -53,12 +54,14 @@ export default async function ContratoProcesoPage({
 
   const esEstudio = puedeEscribirPlanillas(profile);
   const flujo = flujoDesdeTrabajador(trabajador);
+  const faltas = faltasPorPaso(flujo);
   const completados = estadoPasosAlta(flujo);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
   const alertaDocumentos = etiquetaAlertaDocumentos(flujo);
   const canEditFicha = puedeEditarFichaLaboral(profile);
   const porValidar = trabajador.validacion === "PENDIENTE";
   const paso = searchParams.paso ? parseContratoPaso(searchParams.paso) : pasoAltaInicial(completados);
+  const faltasPaso = faltas[paso];
   if (paso === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
   }
@@ -131,7 +134,17 @@ export default async function ContratoProcesoPage({
             )}
           </div>
         ) : null}
-        <AltaPasosNav tab={paso} completados={completados} relacionId={params.relacionId} />
+        <AltaPasosNav tab={paso} completados={completados} faltas={faltas} relacionId={params.relacionId} />
+        {faltasPaso.length > 0 ? (
+          <p className={`${panelCardClass} border-amber-300 bg-amber-50 p-4 text-sm text-amber-950`}>
+            Alerta: faltan {textoListaFaltas(faltasPaso.map((item) => item.etiqueta))}. Puede continuar en cualquier
+            paso.
+          </p>
+        ) : (
+          <p className={`${panelCardClass} border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-950`}>
+            Este paso está completo.
+          </p>
+        )}
         {paso === "documentos" ? (
           <FichaAltaDocumentos
             relacionId={params.relacionId}
@@ -145,31 +158,15 @@ export default async function ContratoProcesoPage({
         {paso === "persona" ? <FichaPersonaForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {paso === "puesto" ? <FichaPuestoForm trabajador={trabajador} canWrite={canEditFicha} /> : null}
         {paso === "contratos" ? (
-          <>
-            {!completados.persona || !completados.puesto ? (
-              <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
-                Falta completar persona o puesto para armar bien el contrato.{" "}
-                <Link
-                  href={hrefAltaTrabajador(
-                    params.relacionId,
-                    !completados.persona ? "persona" : "puesto",
-                  )}
-                  className="font-medium text-primary hover:underline"
-                >
-                  Completar alta
-                </Link>
-              </p>
-            ) : null}
-            <FichaContratos
-              relacionId={params.relacionId}
-              entidadId={trabajador.entidad_id}
-              trabajador={trabajador}
-              contratos={contratos}
-              documentos={documentos}
-              canWrite={canEditFicha}
-              canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
-            />
-          </>
+          <FichaContratos
+            relacionId={params.relacionId}
+            entidadId={trabajador.entidad_id}
+            trabajador={trabajador}
+            contratos={contratos}
+            documentos={documentos}
+            canWrite={canEditFicha}
+            canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
+          />
         ) : null}
         {paso === "alta" ? (
           <div className="space-y-4">

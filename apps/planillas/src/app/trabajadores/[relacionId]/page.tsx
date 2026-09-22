@@ -57,7 +57,7 @@ export default async function FichaTrabajadorPage({
     redirect(`/contratos/${params.relacionId}?paso=${tabRaw}`);
   }
   if (tabRaw === "contratos" || tabRaw === "firma") {
-    redirect(`/contratos/${params.relacionId}`);
+    redirect(`/contratos/${params.relacionId}?paso=contratos`);
   }
   if (tabRaw === "pensiones" || tabRaw === "t-registro" || tabRaw === "alta") {
     redirect(`/contratos/${params.relacionId}?paso=alta`);

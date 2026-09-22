@@ -88,9 +88,22 @@ export type FlujoTRegistro = {
 
 export type FlujoFichaInput = {
   nombres: string | null;
-  cargo: string | null;
-  horario: string | null;
+  apellidoPaterno: string | null;
+  apellidoMaterno: string | null;
+  fechaNacimiento: string | null;
+  celular: string | null;
+  correo: string | null;
   direccion: string | null;
+  tipoVia: string | null;
+  viaNombre: string | null;
+  region: string | null;
+  provincia: string | null;
+  distrito: string | null;
+  cargo: string | null;
+  clasificacion: string | null;
+  jornada: string | null;
+  horario: string | null;
+  fechaIngreso: string | null;
   recibeAsignacionFamiliar: boolean | null;
   validacion: EstadoValidacionAltaPlanilla;
   contratos: FlujoContrato[];
@@ -98,6 +111,9 @@ export type FlujoFichaInput = {
   pension: FlujoPension | null;
   tRegistro: FlujoTRegistro[];
 };
+
+export type FaltaPaso = { id: string; etiqueta: string };
+export type FaltasPasosAlta = Record<PasoAltaId, FaltaPaso[]>;
 
 export type SiguientePaso = {
   paso: PasoAltaId | "listo";
@@ -174,16 +190,80 @@ export function contratoConfirmado(contratos: FlujoContrato[]): FlujoContrato | 
   return contratos.find((c) => c.datos_confirmados && c.es_vigente) ?? contratos.find((c) => c.datos_confirmados) ?? null;
 }
 
+function campoVacio(value: string | null | undefined): boolean {
+  return !value?.trim();
+}
+
+function faltaSiVacio(id: string, etiqueta: string, value: string | null | undefined): FaltaPaso | null {
+  return campoVacio(value) ? { id, etiqueta } : null;
+}
+
+export function faltasPorPaso(input: FlujoFichaInput): FaltasPasosAlta {
+  const documentos = tiposDocumentosAltaRequeridos(input.recibeAsignacionFamiliar)
+    .filter((tipo) => !documentoCargado(input.documentos, tipo))
+    .map((tipo) => ({ id: tipo, etiqueta: TIPO_DOCUMENTO_LABEL[tipo] }));
+
+  const persona = [
+    faltaSiVacio("nombres", "Nombres", input.nombres),
+    faltaSiVacio("apellido_paterno", "Apellido paterno", input.apellidoPaterno),
+    faltaSiVacio("apellido_materno", "Apellido materno", input.apellidoMaterno),
+    faltaSiVacio("fecha_nacimiento", "Fecha de nacimiento", input.fechaNacimiento),
+    faltaSiVacio("celular", "Celular", input.celular),
+    faltaSiVacio("correo", "Correo", input.correo),
+    faltaSiVacio("region", "Región", input.region),
+    faltaSiVacio("provincia", "Provincia", input.provincia),
+    faltaSiVacio("distrito", "Distrito", input.distrito),
+    faltaSiVacio("tipo_via", "Tipo de vía", input.tipoVia),
+    faltaSiVacio("via_nombre", "Nombre de avenida, calle o jirón", input.viaNombre),
+  ].filter((item): item is FaltaPaso => item !== null);
+
+  const puesto = [
+    faltaSiVacio("cargo", "Cargo", input.cargo),
+    faltaSiVacio("jornada", "Jornada", input.jornada),
+    horarioEstaCompleto(input.horario) ? null : { id: "horario", etiqueta: "Horario laboral" },
+    faltaSiVacio("fecha_ingreso", "Fecha de ingreso a la empresa", input.fechaIngreso),
+  ].filter((item): item is FaltaPaso => item !== null);
+
+  const confirmado = contratoConfirmado(input.contratos);
+  const borrador = contratoBorrador(input.contratos);
+  const firmado = documentoCargado(input.documentos, "CONTRATO_FIRMADO");
+  const contratos: FaltaPaso[] = [];
+  if (!confirmado) {
+    if (!borrador) contratos.push({ id: "generar", etiqueta: "Generar contrato" });
+    if (!firmado) contratos.push({ id: "firmar", etiqueta: "Subir contrato firmado" });
+    contratos.push({ id: "confirmar", etiqueta: "Confirmar datos del firmado" });
+  }
+
+  const alta: FaltaPaso[] = [];
+  if (!pensionAltaLista(input)) {
+    alta.push({
+      id: "afp",
+      etiqueta: input.pension?.tipo === "AFP" ? "Completar alta AFP" : "AFP u ONP",
+    });
+  }
+  if (!tRegistroAltaLista(input)) {
+    alta.push({ id: "t-registro", etiqueta: "Alta T-Registro" });
+  }
+
+  return { documentos, persona, puesto, contratos, alta };
+}
+
 export function estadoPasosAlta(input: FlujoFichaInput): Record<PasoAltaId, boolean> {
+  const faltas = faltasPorPaso(input);
   return {
-    persona: Boolean(input.nombres?.trim() && input.direccion?.trim()),
-    puesto: Boolean(input.cargo?.trim() && horarioEstaCompleto(input.horario)),
-    documentos: tiposDocumentosAltaRequeridos(input.recibeAsignacionFamiliar).every((tipo) =>
-      documentoCargado(input.documentos, tipo),
-    ),
-    contratos: Boolean(contratoConfirmado(input.contratos)),
-    alta: altasAfiliacionListas(input),
+    documentos: faltas.documentos.length === 0,
+    persona: faltas.persona.length === 0,
+    puesto: faltas.puesto.length === 0,
+    contratos: faltas.contratos.length === 0,
+    alta: faltas.alta.length === 0,
   };
+}
+
+export function textoListaFaltas(etiquetas: string[]): string {
+  if (etiquetas.length === 0) return "";
+  if (etiquetas.length === 1) return etiquetas[0];
+  if (etiquetas.length === 2) return `${etiquetas[0]} y ${etiquetas[1]}`;
+  return `${etiquetas.slice(0, -1).join(", ")} y ${etiquetas[etiquetas.length - 1]}`;
 }
 
 export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean): SiguientePaso {
@@ -243,8 +323,7 @@ export function hrefFichaTrabajador(relacionId: string): string {
 }
 
 export function hrefAltaTrabajador(relacionId: string, paso?: PasoAltaId): string {
-  if (!paso || paso === "contratos") return `/contratos/${relacionId}`;
-  return `/contratos/${relacionId}?paso=${paso}`;
+  return `/contratos/${relacionId}?paso=${paso ?? "contratos"}`;
 }
 
 export function hrefPasoTrabajador(relacionId: string, tab: FlujoTab): string {
@@ -468,9 +547,25 @@ export function claseBadgePaso(rol: SiguientePaso["rol"]): string {
 
 export function flujoDesdeTrabajador(input: {
   cargo: string | null;
+  clasificacion?: string | null;
+  jornada?: string | null;
   horario: string | null;
+  fecha_ingreso?: string | null;
   recibe_asignacion_familiar?: boolean | null;
-  persona: { nombres: string; direccion: string | null };
+  persona: {
+    nombres: string;
+    apellido_paterno?: string | null;
+    apellido_materno?: string | null;
+    fecha_nacimiento?: string | null;
+    celular?: string | null;
+    correo?: string | null;
+    direccion: string | null;
+    tipo_via?: string | null;
+    via_nombre?: string | null;
+    region?: string | null;
+    provincia?: string | null;
+    distrito?: string | null;
+  };
   validacion: EstadoValidacionAltaPlanilla;
   contratos: FlujoContrato[];
   documentos: FlujoDocumento[];
@@ -479,9 +574,22 @@ export function flujoDesdeTrabajador(input: {
 }): FlujoFichaInput {
   return {
     nombres: input.persona.nombres,
-    cargo: input.cargo,
-    horario: input.horario,
+    apellidoPaterno: input.persona.apellido_paterno ?? null,
+    apellidoMaterno: input.persona.apellido_materno ?? null,
+    fechaNacimiento: input.persona.fecha_nacimiento ?? null,
+    celular: input.persona.celular ?? null,
+    correo: input.persona.correo ?? null,
     direccion: input.persona.direccion,
+    tipoVia: input.persona.tipo_via ?? null,
+    viaNombre: input.persona.via_nombre ?? null,
+    region: input.persona.region ?? null,
+    provincia: input.persona.provincia ?? null,
+    distrito: input.persona.distrito ?? null,
+    cargo: input.cargo,
+    clasificacion: input.clasificacion ?? null,
+    jornada: input.jornada ?? null,
+    horario: input.horario,
+    fechaIngreso: input.fecha_ingreso ?? null,
     recibeAsignacionFamiliar: input.recibe_asignacion_familiar ?? null,
     validacion: input.validacion,
     contratos: input.contratos,
