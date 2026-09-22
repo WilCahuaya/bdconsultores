@@ -105,6 +105,7 @@ export function DateField({
   readOnly,
   value,
   onChange,
+  hint,
 }: {
   label: string;
   name: string;
@@ -113,6 +114,7 @@ export function DateField({
   readOnly?: boolean;
   value?: string;
   onChange?: (value: string) => void;
+  hint?: string;
 }) {
   const [inner, setInner] = useState(() => toDdMmYyyy(value ?? defaultValue));
   const display = value !== undefined ? toDdMmYyyy(value) : inner;
@@ -136,6 +138,7 @@ export function DateField({
         title="Escriba o pegue la fecha: DD/MM/AAAA"
         className={fieldClass}
       />
+      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
     </label>
   );
 }

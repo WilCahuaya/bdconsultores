@@ -5,6 +5,7 @@ import type { ContratoRow, DocumentoRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import type { VacacionRow } from "@/lib/actions/vacaciones";
 import { VerHorario } from "@/components/ficha/VerHorario";
+import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
 import { contratoConfirmado, contratoVigente, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
 import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import {
@@ -138,6 +139,7 @@ export function FichaResumen({
   contratos,
   documentos,
   vacaciones,
+  canWrite,
 }: {
   relacionId: string;
   entidadId: string;
@@ -145,6 +147,7 @@ export function FichaResumen({
   contratos: ContratoRow[];
   documentos: DocumentoRow[];
   vacaciones: VacacionRow[];
+  canWrite?: boolean;
 }) {
   const p = trabajador.persona;
   const flujo = flujoDesdeTrabajador(trabajador);
@@ -182,8 +185,9 @@ export function FichaResumen({
     ...(trabajador.cargo ? [{ texto: trabajador.cargo }] : []),
     ...(trabajador.clasificacion ? [{ texto: CLASIFICACION_LABEL[trabajador.clasificacion] }] : []),
     ...(trabajador.jornada ? [{ texto: JORNADA_LABEL[trabajador.jornada] }] : []),
-    ...(trabajador.fecha_ingreso ? [{ texto: formatFechaPlanilla(trabajador.fecha_ingreso) }] : []),
+    ...(trabajador.fecha_ingreso ? [{ texto: `Ingreso a la empresa ${formatFechaPlanilla(trabajador.fecha_ingreso)}` }] : []),
     ...(trabajador.fecha_cese ? [{ texto: `Cese ${formatFechaPlanilla(trabajador.fecha_cese)}` }] : []),
+    { texto: "Ir a puesto", href: `/contratos/${relacionId}?paso=puesto` },
   ];
   const puestoPago: Linea[] = [
     ...(trabajador.remuneracion != null ? [{ texto: `S/ ${formatRemuneracion(trabajador.remuneracion)}` }] : []),
@@ -243,6 +247,11 @@ export function FichaResumen({
                 {linea.texto}
               </li>
             ))}
+            {canWrite && trabajador.estado !== "CESADA" ? (
+              <li className="mt-2 list-none pl-0">
+                <DarDeBajaControl trabajador={trabajador} />
+              </li>
+            ) : null}
           </>
         }
       />

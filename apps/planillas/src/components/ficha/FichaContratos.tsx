@@ -50,7 +50,7 @@ export function FichaContratos({
     (c) => c.estado !== "RECOGIDO" && c.estado !== "BAJA" && c.estado !== "COMPLETO",
   );
   const [pending, setPending] = useState<"generar" | "editar" | "confirmar" | string | null>(null);
-  const [mostrarGenerar, setMostrarGenerar] = useState(contratos.length === 0);
+  const [mostrarGenerar, setMostrarGenerar] = useState(false);
   const [editando, setEditando] = useState<ContratoRow | null>(null);
   const [eliminando, setEliminando] = useState<ContratoRow | null>(null);
   const [mostrarConfirmar, setMostrarConfirmar] = useState(!abierto?.datos_confirmados);
@@ -139,9 +139,9 @@ export function FichaContratos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Al generar se descarga el Word con cargo, funciones, fechas de ese contrato, sueldo, horario y tipo. El inicio
-        y el fin son del contrato, no de la estadía en la empresa. Los datos se guardan cuando sube el PDF firmado y
-        los confirma. Puede haber varios contratos durante la estadía.
+        El contrato es opcional. Puede no haber ninguno, solo el vigente o solo el PDF firmado si se perdieron los
+        anteriores. Las fechas de este documento no tienen que coincidir con el ingreso a la empresa. Si genera Word,
+        esas fechas van al papel; el ingreso del puesto no cambia.
       </p>
 
       {canWrite ? (
@@ -174,7 +174,7 @@ export function FichaContratos({
         <form action={onGenerar}>
           <FormSection
             title="Generar contrato"
-            hint="Estos datos van al documento. Al confirmar el firmado se actualizan cargo, horario y jornada del puesto. No se toca la fecha de ingreso a la empresa."
+            hint="Estos datos van al documento de este contrato. Pueden ser posteriores al ingreso a la empresa. Al confirmar el firmado se actualizan cargo, horario y jornada del puesto. No se toca la fecha de ingreso."
           >
             <DatosContratoFields
               key={`gen-${base?.id ?? "nuevo"}-${base?.horario ?? ""}`}
@@ -214,7 +214,7 @@ export function FichaContratos({
       {abierto ? (
         <FormSection
           title="Contrato firmado"
-          hint="Suba el PDF. Luego revise los datos generados; si el papel cambió algo, corríjalo aquí y guarde."
+          hint="Suba el PDF. Si no hay Word generado, igual puede dejar el firmado vigente. Luego, si hay un contrato abierto, revise los datos y guarde."
         >
           <FichaDocumentos
             relacionId={relacionId}
@@ -223,7 +223,7 @@ export function FichaContratos({
             canWrite={canWrite}
             tiposFiltro={["CONTRATO_FIRMADO"]}
             permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
-            hint="PDF firmado. Hasta confirmar, no se actualizan cargo, horario ni jornada. El ingreso a la empresa no cambia."
+            hint="PDF firmado. El ingreso a la empresa no cambia."
           />
           {canWrite && tieneFirmado ? (
             mostrarConfirmar ? (
@@ -257,7 +257,22 @@ export function FichaContratos({
             <p className="text-sm text-muted-foreground">Cuando suba el firmado podrá confirmar y guardar los datos.</p>
           ) : null}
         </FormSection>
-      ) : null}
+      ) : (
+        <FormSection
+          title="Contrato firmado"
+          hint="Si solo tiene el PDF vigente, súbalo aquí. No hace falta generar Word ni reconstruir contratos perdidos."
+        >
+          <FichaDocumentos
+            relacionId={relacionId}
+            entidadId={entidadId}
+            documentos={documentos}
+            canWrite={canWrite}
+            tiposFiltro={["CONTRATO_FIRMADO"]}
+            permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
+            hint="PDF firmado. El ingreso a la empresa no cambia."
+          />
+        </FormSection>
+      )}
 
       <div className={`${panelCardClass} overflow-x-auto p-0`}>
         <table className="w-full min-w-[760px] text-left text-sm">
@@ -277,7 +292,7 @@ export function FichaContratos({
             {contratos.length === 0 ? (
               <tr>
                 <td className="px-4 py-6 text-muted-foreground" colSpan={8}>
-                  Aún no hay contratos. Genere el Word para firmar.
+                  Aún no hay contratos registrados. Puede dejarlo así, subir solo el firmado vigente o generar un Word.
                 </td>
               </tr>
             ) : (
@@ -403,8 +418,14 @@ function DatosContratoFields({
         label="Fecha de inicio de contrato"
         name="fecha_inicio"
         defaultValue={contrato?.fecha_inicio ?? ""}
+        hint="De este documento. Puede diferir del ingreso a la empresa."
       />
-      <DateField label="Fecha de fin de contrato" name="fecha_fin" defaultValue={contrato?.fecha_fin ?? ""} />
+      <DateField
+        label="Fecha de fin de contrato"
+        name="fecha_fin"
+        defaultValue={contrato?.fecha_fin ?? ""}
+        hint="De este documento, no de la estadía en la empresa."
+      />
       <Field
         label="Remuneración"
         name="remuneracion"

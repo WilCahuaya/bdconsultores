@@ -228,8 +228,7 @@ export function faltasPorPaso(input: FlujoFichaInput): FaltasPasosAlta {
   const borrador = contratoBorrador(input.contratos);
   const firmado = documentoCargado(input.documentos, "CONTRATO_FIRMADO");
   const contratos: FaltaPaso[] = [];
-  if (!confirmado) {
-    if (!borrador) contratos.push({ id: "generar", etiqueta: "Generar contrato" });
+  if (borrador && !confirmado) {
     if (!firmado) contratos.push({ id: "firmar", etiqueta: "Subir contrato firmado" });
     contratos.push({ id: "confirmar", etiqueta: "Confirmar datos del firmado" });
   }
@@ -279,9 +278,6 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   if (!pasos.puesto) {
     return { paso: "puesto", tab: "puesto", etiqueta: "Completar puesto", rol: "empresa" };
   }
-  if (!borrador && !confirmado) {
-    return { paso: "contratos", tab: "contratos", etiqueta: "Generar contrato", rol: "empresa" };
-  }
   if (borrador && !firmado) {
     return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado", rol: "empresa" };
   }
@@ -308,12 +304,12 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
       ? { paso: "alta", tab: "alta", etiqueta: "Dar de alta T-Registro", rol: "estudio" }
       : { paso: "alta", tab: "alta", etiqueta: "En alta T-Registro del estudio", rol: "empresa" };
   }
-  if (vigente?.estado === "RECOGIDO" || vigente?.estado === "COMPLETO") {
+  if (vigente?.estado === "RECOGIDO" || vigente?.estado === "COMPLETO" || !vigente) {
     const alertaDocs = etiquetaAlertaDocumentos(input);
     if (alertaDocs) {
       return { paso: "documentos", tab: "documentos", etiqueta: alertaDocs, rol: "alerta" };
     }
-    return { paso: "listo", tab: "contratos", etiqueta: "Recogido", rol: "hecho" };
+    return { paso: "listo", tab: "contratos", etiqueta: vigente ? "Recogido" : "Ficha lista", rol: "hecho" };
   }
   return { paso: "contratos", tab: "contratos", etiqueta: "Revisar contrato", rol: "empresa" };
 }
@@ -477,13 +473,10 @@ export function resolverEtapaContrato(
   const firmado = documentoCargado(flujo.documentos, "CONTRATO_FIRMADO");
 
   if (!pasos.persona) {
-    return { id: "alta", etiqueta: "Falta completar persona para generar el contrato", tab: "persona", rol: "empresa", pendiente: true };
+    return { id: "alta", etiqueta: "Falta completar persona", tab: "persona", rol: "empresa", pendiente: true };
   }
   if (!pasos.puesto) {
-    return { id: "alta", etiqueta: "Falta completar puesto para generar el contrato", tab: "puesto", rol: "empresa", pendiente: true };
-  }
-  if (!borrador && !confirmado) {
-    return { id: "generar", etiqueta: "Falta generar el documento de contrato", tab: "contratos", rol: "empresa", pendiente: true };
+    return { id: "alta", etiqueta: "Falta completar puesto", tab: "puesto", rol: "empresa", pendiente: true };
   }
   if (borrador && !firmado) {
     return { id: "firmar", etiqueta: "Contrato generado: falta subir el firmado", tab: "contratos", rol: "empresa", pendiente: true };
@@ -535,7 +528,7 @@ export function resolverEtapaContrato(
   if (alertaDocs) {
     return { id: "alta", etiqueta: alertaDocs, tab: "documentos", rol: "alerta", pendiente: true };
   }
-  return { id: "listo", etiqueta: "Recogido", tab: "contratos", rol: "hecho", pendiente: false };
+  return { id: "listo", etiqueta: vigente ? "Recogido" : "Sin contrato registrado", tab: "contratos", rol: "hecho", pendiente: false };
 }
 
 export function claseBadgePaso(rol: SiguientePaso["rol"]): string {
