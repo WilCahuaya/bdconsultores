@@ -91,8 +91,13 @@ function CapturaDesplegable({
   datos: ReactNode;
   preview: ReactNode;
 }) {
+  const [abierto, setAbierto] = useState(defaultOpen ?? alerta);
   return (
-    <details defaultOpen={defaultOpen ?? alerta} className={`group ${capturaCardClass(alerta)}`}>
+    <details
+      open={abierto}
+      onToggle={(event) => setAbierto(event.currentTarget.open)}
+      className={`group ${capturaCardClass(alerta)}`}
+    >
       <summary className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
         <svg
           viewBox="0 0 24 24"
