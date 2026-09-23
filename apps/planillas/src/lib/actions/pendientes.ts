@@ -3,12 +3,21 @@
 import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { esMesAsistencia, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
-import { nombreCompleto, resolverEtapaVidaLey, type PendienteItem } from "@/lib/planillas-labels";
+import {
+  formatFechaPlanilla,
+  nombreCompleto,
+  resolverEtapaVidaLey,
+  type EtapaVidaLeyId,
+  type PendienteItem,
+} from "@/lib/planillas-labels";
 import {
   altasAfiliacionListas,
   flujoDesdeTrabajador,
+  hrefPasoTrabajador,
   resolverEtapaContrato,
   HORIZONTE_VENCIMIENTO_DIAS,
+  type EtapaContratoId,
+  type FlujoTab,
 } from "@/lib/flujo-ficha";
 import { planillasDb } from "@/lib/supabase/planillas";
 import { anioActualLima, saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
@@ -21,6 +30,57 @@ export type ControlEmpresa = {
   asistencia: PendienteItem[];
   vacaciones: PendienteItem[];
 };
+
+export type ColorPendiente = "gris" | "ambar" | "rojo" | "verde";
+
+export type CeldaPendiente = {
+  color: ColorPendiente;
+  texto: string;
+  titulo: string;
+  href?: string;
+};
+
+export type ColumnaPendienteId = "contrato" | "vidaLey" | "asistencia" | "vacaciones";
+
+export type FilaPendienteTrabajador = {
+  id: string;
+  dni: string;
+  nombre: string;
+  cargo: string | null;
+  cesada: boolean;
+  celdas: Record<ColumnaPendienteId, CeldaPendiente>;
+};
+
+const CONTRATO_CORTO: Record<EtapaContratoId, string> = {
+  alta: "Alta",
+  generar: "Generar",
+  firmar: "Firmar",
+  confirmar: "Confirmar",
+  validar: "Validar",
+  recoger: "Recoger",
+  afp: "AFP",
+  "t-registro": "T-Reg.",
+  vence: "Vence",
+  revisar: "Revisar",
+  listo: "Listo",
+};
+
+const VIDA_LEY_CORTO: Record<EtapaVidaLeyId, string> = {
+  sin: "Sin",
+  elaborado: "Docs",
+  recepcionado: "Envío",
+  vence: "Vence",
+  registrado: "Listo",
+};
+
+function celdaPendiente(
+  color: ColorPendiente,
+  texto: string,
+  titulo: string,
+  href?: string,
+): CeldaPendiente {
+  return href ? { color, texto, titulo, href } : { color, texto, titulo };
+}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -40,15 +100,18 @@ function baseDe(trabajador: { id: string; persona: { dni: string; nombres: strin
   };
 }
 
-export async function listControlEmpresa(entidadId: string): Promise<ControlEmpresa> {
+async function cargarPendientes(entidadId: string): Promise<{
+  control: ControlEmpresa;
+  filas: FilaPendienteTrabajador[];
+}> {
   const profile = await requirePlanillasProfile();
   const alcance = entidadAlcance(profile);
   const vacio: ControlEmpresa = { contratos: [], vidaLey: [], asistencia: [], vacaciones: [] };
-  if (alcance !== "todas" && alcance !== entidadId) return vacio;
+  if (alcance !== "todas" && alcance !== entidadId) return { control: vacio, filas: [] };
 
   const esEstudio = puedeEscribirPlanillas(profile);
   const trabajadores = await listTrabajadores(entidadId);
-  if (trabajadores.length === 0) return vacio;
+  if (trabajadores.length === 0) return { control: vacio, filas: [] };
 
   const ids = trabajadores.map((t) => t.id);
   const mes = mesActualLima();
@@ -90,67 +153,130 @@ export async function listControlEmpresa(entidadId: string): Promise<ControlEmpr
   const vidaLey: PendienteItem[] = [];
   const asistencia: PendienteItem[] = [];
   const vacaciones: PendienteItem[] = [];
+  const filas: FilaPendienteTrabajador[] = [];
 
   for (const trabajador of trabajadores) {
     const base = baseDe(trabajador);
     const activa = trabajador.estado === "ACTIVA";
+    const paso = (tab: FlujoTab) => hrefPasoTrabajador(trabajador.id, tab);
 
-    if (activa) {
-      const contrato = resolverEtapaContrato(trabajador, esEstudio, { hoy, limite });
-      if (contrato.pendiente) {
-        contratos.push({
+    if (!activa) {
+      const titulo = trabajador.fecha_cese
+        ? `De baja el ${formatFechaPlanilla(trabajador.fecha_cese)}`
+        : "De baja";
+      filas.push({
+        id: trabajador.id,
+        dni: base.dni,
+        nombre: base.nombre,
+        cargo: trabajador.cargo,
+        cesada: true,
+        celdas: {
+          contrato: celdaPendiente("gris", "Baja", titulo),
+          vidaLey: celdaPendiente("gris", "—", titulo),
+          asistencia: celdaPendiente("gris", "—", titulo),
+          vacaciones: celdaPendiente("gris", "—", titulo),
+        },
+      });
+      continue;
+    }
+
+    const contrato = resolverEtapaContrato(trabajador, esEstudio, { hoy, limite });
+    if (contrato.pendiente) {
+      contratos.push({
+        ...base,
+        id: `${trabajador.id}:contrato:${contrato.id}`,
+        tipo: "contrato",
+        detalle: contrato.etiqueta,
+        tab: contrato.tab as PendienteItem["tab"],
+      });
+    }
+    const celdaContrato = celdaPendiente(
+      contrato.pendiente ? (contrato.id === "vence" ? "rojo" : "ambar") : "verde",
+      contrato.pendiente ? CONTRATO_CORTO[contrato.id] : "Listo",
+      contrato.etiqueta,
+      paso(contrato.tab),
+    );
+
+    let celdaVida: CeldaPendiente;
+    if (
+      esEstudio &&
+      trabajador.validacion !== "PENDIENTE" &&
+      altasAfiliacionListas(flujoDesdeTrabajador(trabajador))
+    ) {
+      const etapa = resolverEtapaVidaLey(vidaLeyPorId.get(trabajador.id), { hoy, limite });
+      if (etapa.pendiente) {
+        vidaLey.push({
           ...base,
-          id: `${trabajador.id}:contrato:${contrato.id}`,
-          tipo: "contrato",
-          detalle: contrato.etiqueta,
-          tab: contrato.tab as PendienteItem["tab"],
+          id: `${trabajador.id}:vidaley:${etapa.id}`,
+          tipo: "vida-ley",
+          detalle: etapa.etiqueta,
+          tab: "vida-ley",
         });
       }
+      celdaVida = celdaPendiente(
+        etapa.pendiente ? (etapa.id === "vence" ? "rojo" : "ambar") : "verde",
+        etapa.pendiente ? VIDA_LEY_CORTO[etapa.id] : "Listo",
+        etapa.etiqueta,
+        paso("vida-ley"),
+      );
+    } else {
+      celdaVida = celdaPendiente("gris", "—", "Aún no corresponde.");
+    }
 
-      if (
-        esEstudio &&
-        trabajador.validacion !== "PENDIENTE" &&
-        altasAfiliacionListas(flujoDesdeTrabajador(trabajador))
-      ) {
-        const etapa = resolverEtapaVidaLey(vidaLeyPorId.get(trabajador.id), { hoy, limite });
-        if (etapa.pendiente) {
-          vidaLey.push({
-            ...base,
-            id: `${trabajador.id}:vidaley:${etapa.id}`,
-            tipo: "vida-ley",
-            detalle: etapa.etiqueta,
-            tab: "vida-ley",
-          });
-        }
-      }
+    const activoMes = trabajadorActivoEnMes(mes, trabajador.fecha_ingreso, trabajador.fecha_cese);
+    let celdaAsistencia: CeldaPendiente;
+    if (!activoMes) {
+      celdaAsistencia = celdaPendiente("gris", "—", "No laboró este mes.");
+    } else if (pdfAsistencia.has(trabajador.id)) {
+      celdaAsistencia = celdaPendiente("verde", "Listo", "PDF firmado del mes.", paso("asistencia"));
+    } else {
+      asistencia.push({
+        ...base,
+        id: `${trabajador.id}:asistencia:${mes}`,
+        tipo: "asistencia",
+        detalle: "Falta PDF firmado del mes",
+        tab: "asistencia",
+      });
+      celdaAsistencia = celdaPendiente("ambar", "Falta", "Falta PDF firmado del mes.", paso("asistencia"));
+    }
 
-      if (trabajadorActivoEnMes(mes, trabajador.fecha_ingreso, trabajador.fecha_cese) && !pdfAsistencia.has(trabajador.id)) {
-        asistencia.push({
+    let celdaVacaciones: CeldaPendiente;
+    if (!tieneDerechoVacaciones(trabajador.fecha_ingreso)) {
+      celdaVacaciones = celdaPendiente("gris", "—", "Aún no cumple el año para vacaciones.");
+    } else {
+      const tomados = diasVacacion.get(trabajador.id) ?? 0;
+      const saldo = saldoVacaciones(tomados);
+      if (saldo > 0) {
+        const detalle =
+          tomados === 0
+            ? `Sin vacaciones registradas en ${periodo}`
+            : `Quedan ${saldo} día${saldo === 1 ? "" : "s"} de goce en ${periodo}`;
+        vacaciones.push({
           ...base,
-          id: `${trabajador.id}:asistencia:${mes}`,
-          tipo: "asistencia",
-          detalle: "Falta PDF firmado del mes",
-          tab: "asistencia",
+          id: `${trabajador.id}:vacaciones:${periodo}`,
+          tipo: "vacaciones",
+          detalle,
+          tab: "vacaciones",
         });
-      }
-
-      if (tieneDerechoVacaciones(trabajador.fecha_ingreso)) {
-        const tomados = diasVacacion.get(trabajador.id) ?? 0;
-        const saldo = saldoVacaciones(tomados);
-        if (saldo > 0) {
-          vacaciones.push({
-            ...base,
-            id: `${trabajador.id}:vacaciones:${periodo}`,
-            tipo: "vacaciones",
-            detalle:
-              tomados === 0
-                ? `Sin vacaciones registradas en ${periodo}`
-                : `Quedan ${saldo} día${saldo === 1 ? "" : "s"} de goce en ${periodo}`,
-            tab: "vacaciones",
-          });
-        }
+        celdaVacaciones = celdaPendiente("ambar", `${saldo}d`, detalle, paso("vacaciones"));
+      } else {
+        celdaVacaciones = celdaPendiente("verde", "Listo", `Vacaciones de ${periodo} al día.`, paso("vacaciones"));
       }
     }
+
+    filas.push({
+      id: trabajador.id,
+      dni: base.dni,
+      nombre: base.nombre,
+      cargo: trabajador.cargo,
+      cesada: false,
+      celdas: {
+        contrato: celdaContrato,
+        vidaLey: celdaVida,
+        asistencia: celdaAsistencia,
+        vacaciones: celdaVacaciones,
+      },
+    });
   }
 
   const porNombre = (a: PendienteItem, b: PendienteItem) => a.nombre.localeCompare(b.nombre, "es");
@@ -158,7 +284,15 @@ export async function listControlEmpresa(entidadId: string): Promise<ControlEmpr
   vidaLey.sort(porNombre);
   asistencia.sort(porNombre);
   vacaciones.sort(porNombre);
-  return { contratos, vidaLey, asistencia, vacaciones };
+  return { control: { contratos, vidaLey, asistencia, vacaciones }, filas };
+}
+
+export async function listControlEmpresa(entidadId: string): Promise<ControlEmpresa> {
+  return (await cargarPendientes(entidadId)).control;
+}
+
+export async function listFilasPendientesTrabajadores(entidadId: string): Promise<FilaPendienteTrabajador[]> {
+  return (await cargarPendientes(entidadId)).filas;
 }
 
 export async function listPendientes(entidadId: string): Promise<PendienteItem[]> {
