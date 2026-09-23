@@ -23,10 +23,9 @@ export function planillasNavSections(opts: {
 
   const expediente: PanelNavSection["items"] = [
     { href: withEntidad("/", entidadId), label: "Trabajadores", icon: "users" },
-    { href: withEntidad("/pendientes", entidadId), label: "Pendientes", icon: "pending" },
   ];
   if (esEstudio) {
-    expediente.splice(1, 0, { href: "/tablero", label: "Tablero", icon: "dashboard" });
+    expediente.push({ href: "/tablero", label: "Tablero", icon: "dashboard" });
   }
 
   return [
