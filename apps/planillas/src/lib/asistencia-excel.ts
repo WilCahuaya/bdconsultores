@@ -12,6 +12,7 @@ import {
 } from "@/lib/horario-asistencia";
 
 export type AsistenciaExcelTrabajador = {
+  relacionId?: string;
   nombre: string;
   dni: string;
   horario: string | null;

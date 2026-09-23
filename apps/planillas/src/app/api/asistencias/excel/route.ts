@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { datosAsistenciaEmpresa, datosAsistenciaTrabajador } from "@/lib/actions/asistencias";
+import {
+  datosAsistenciaEmpresa,
+  datosAsistenciaTrabajador,
+  registrarAsistenciaExcel,
+} from "@/lib/actions/asistencias";
 import {
   bufferAsistenciaExcel,
   nombreArchivoAsistenciaEmpresa,
@@ -25,6 +29,10 @@ export async function GET(request: Request) {
     if (datos.error || !datos.empresa || !datos.trabajador) {
       return NextResponse.json({ error: datos.error ?? "No se pudo armar el Excel." }, { status: 400 });
     }
+    await registrarAsistenciaExcel({
+      mes,
+      relacionIds: [datos.trabajador.relacionId ?? relacionId],
+    }).catch(() => undefined);
     const buffer = await bufferAsistenciaExcel(datos.empresa, [datos.trabajador], mes);
     const filename = nombreArchivoAsistenciaTrabajador(datos.trabajador.nombre);
     return excelResponse(buffer, filename);
@@ -35,6 +43,11 @@ export async function GET(request: Request) {
     if (datos.error || !datos.empresa || !datos.trabajadores) {
       return NextResponse.json({ error: datos.error ?? "No se pudo armar el Excel." }, { status: 400 });
     }
+    await registrarAsistenciaExcel({
+      mes,
+      entidadId,
+      relacionIds: datos.trabajadores.map((t) => t.relacionId).filter((id): id is string => Boolean(id)),
+    }).catch(() => undefined);
     const buffer = await bufferAsistenciaExcel(datos.empresa, datos.trabajadores, mes);
     const filename = nombreArchivoAsistenciaEmpresa(mes, datos.empresa.nombre);
     return excelResponse(buffer, filename);

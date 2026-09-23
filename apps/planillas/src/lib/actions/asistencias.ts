@@ -25,6 +25,7 @@ function horarioDeContratos(contratos: ContratoHorario[], fallback: string | nul
 
 function aFilaExcel(t: TrabajadorListItem, horario: string | null): AsistenciaExcelTrabajador {
   return {
+    relacionId: t.id,
     nombre: nombreCompleto(t.persona),
     dni: t.persona.dni,
     horario,
@@ -183,5 +184,45 @@ export async function guardarNotaAsistenciaMes(
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/asistencias");
   revalidatePath("/pendientes");
+  return {};
+}
+
+export async function registrarAsistenciaExcel(params: {
+  mes: string;
+  relacionIds: string[];
+  entidadId?: string;
+}): Promise<{ error?: string }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para generar asistencia." };
+  if (!esMesAsistencia(params.mes)) return { error: "Indique el mes (AAAA-MM)." };
+  const relacionIds = [...new Set(params.relacionIds.filter(Boolean))];
+  if (relacionIds.length === 0) return {};
+
+  const db = await planillasDb();
+  const { data: relaciones, error: relError } = await db
+    .from("relaciones_laborales")
+    .select("id, entidad_id")
+    .in("id", relacionIds);
+  if (relError) return { error: relError.message };
+  const entidadPorRelacion = new Map((relaciones ?? []).map((row) => [row.id as string, row.entidad_id as string]));
+  const now = new Date().toISOString();
+  const rows = relacionIds
+    .map((relacion_id) => {
+      const entidad_id = params.entidadId ?? entidadPorRelacion.get(relacion_id);
+      if (!entidad_id) return null;
+      return {
+        relacion_id,
+        entidad_id,
+        mes: params.mes,
+        generado_en: now,
+        generado_por: profile.id,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+  if (rows.length === 0) return {};
+  const { error } = await db.from("asistencia_excel").upsert(rows, { onConflict: "relacion_id,mes" });
+  if (error) return { error: error.message };
+  revalidatePath("/asistencias");
+  revalidatePath("/tablero");
   return {};
 }

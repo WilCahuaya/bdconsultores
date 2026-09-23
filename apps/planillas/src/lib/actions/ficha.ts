@@ -298,6 +298,7 @@ export async function generarContratoParaFirma(
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
   revalidatePath(`/contratos/${relacionId}`);
+  revalidatePath("/tablero");
   return { contratoId: idGuardado };
 }
 
@@ -402,6 +403,7 @@ export async function confirmarContratoFirmado(
   revalidatePath("/contratos");
   revalidatePath(`/contratos/${relacionId}`);
   revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/tablero");
   return {};
 }
 
@@ -719,6 +721,7 @@ export async function setDocumentoArchivo(
   revalidatePath("/pendientes");
   revalidatePath("/asistencias");
   revalidatePath("/vacaciones");
+  revalidatePath("/tablero");
   return {};
 }
 

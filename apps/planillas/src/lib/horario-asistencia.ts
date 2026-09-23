@@ -57,6 +57,44 @@ export function mesActualLima(): string {
   return `${year}-${month}`;
 }
 
+export function hoyIsoLima(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+export function diaDelMesLima(iso = hoyIsoLima()): number {
+  return Number(iso.slice(8, 10));
+}
+
+export function ultimoDiaDelMes(mes: string): number {
+  const dias = diasIsoDelMes(mes);
+  return dias.length;
+}
+
+/** 28–30 (o últimos 3 días en febrero). */
+export function diaInicioVentanaMesSiguiente(ultimoDia: number): number {
+  return Math.min(28, Math.max(1, ultimoDia - 2));
+}
+
+export function timestampEnMesLima(value: string | null | undefined, mes: string): boolean {
+  if (!value) return false;
+  const lima = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(value));
+  return lima.slice(0, 7) === mes;
+}
+
+export function fechaEnMes(isoDate: string | null | undefined, mes: string): boolean {
+  return Boolean(isoDate && isoDate.slice(0, 7) === mes);
+}
+
 export function partesMes(mes: string): { year: number; month: number } | null {
   if (!esMesAsistencia(mes)) return null;
   const [year, month] = mes.split("-").map(Number);
