@@ -127,10 +127,12 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
 
   if (error) throw new Error(error.message);
 
-  return (data ?? []).flatMap((row) => {
-    const mapped = mapTrabajadorRow(row);
-    return mapped ? [mapped] : [];
-  });
+  return aplicarSueldoAdendas(
+    (data ?? []).flatMap((row) => {
+      const mapped = mapTrabajadorRow(row);
+      return mapped ? [mapped] : [];
+    }),
+  );
 }
 
 export async function getTrabajador(relacionId: string): Promise<TrabajadorListItem | null> {
@@ -148,7 +150,39 @@ export async function getTrabajador(relacionId: string): Promise<TrabajadorListI
   const alcance = entidadAlcance(profile);
   if (alcance !== "todas" && alcance !== data.entidad_id) return null;
 
-  return mapTrabajadorRow(data);
+  const mapped = mapTrabajadorRow(data);
+  if (!mapped) return null;
+  const [conSueldo] = await aplicarSueldoAdendas([mapped]);
+  return conSueldo ?? mapped;
+}
+
+async function aplicarSueldoAdendas(items: TrabajadorListItem[]): Promise<TrabajadorListItem[]> {
+  if (items.length === 0) return items;
+  const db = await planillasDb();
+  const { data, error } = await db
+    .from("adendas")
+    .select("relacion_id, remuneracion_nueva, fecha_vigencia, created_at")
+    .eq("tipo", "REMUNERACION")
+    .eq("datos_confirmados", true)
+    .in(
+      "relacion_id",
+      items.map((item) => item.id),
+    );
+  if (error || !data) return items;
+  const orden = new Map<string, { rem: number; fecha: string; created: string }>();
+  for (const row of data) {
+    if (row.remuneracion_nueva == null) continue;
+    const fecha = String(row.fecha_vigencia ?? "");
+    const created = String(row.created_at ?? "");
+    const prev = orden.get(String(row.relacion_id));
+    if (!prev || fecha > prev.fecha || (fecha === prev.fecha && created > prev.created)) {
+      orden.set(String(row.relacion_id), { rem: Number(row.remuneracion_nueva), fecha, created });
+    }
+  }
+  return items.map((item) => {
+    const sueldo = orden.get(item.id);
+    return sueldo ? { ...item, remuneracion: sueldo.rem } : item;
+  });
 }
 
 function mapTrabajadorRow(row: {

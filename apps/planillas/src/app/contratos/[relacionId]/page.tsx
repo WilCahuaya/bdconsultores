@@ -6,6 +6,7 @@ import { AlertaDocumentosAlta, AltaPasosNav } from "@/components/ficha/FichaTabs
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
+import { FichaAdendas } from "@/components/ficha/FichaAdendas";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
@@ -18,6 +19,7 @@ import {
 } from "@/lib/auth/access";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador } from "@/lib/actions/trabajadores";
+import { listAdendas } from "@/lib/actions/adendas";
 import {
   asegurarDocumentoTrAlta,
   asegurarDocumentoTramiteAfp,
@@ -68,9 +70,10 @@ export default async function ContratoProcesoPage({
       asegurarDocumentoTrAlta(params.relacionId),
     ]);
   }
-  const [contratos, documentos, pension, tRegistro, entidad] = await Promise.all([
+  const [contratos, documentos, adendas, pension, tRegistro, entidad] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
+    paso === "contratos" ? listAdendas(params.relacionId) : Promise.resolve([]),
     paso === "documentos" || paso === "alta" ? getPension(params.relacionId) : Promise.resolve(null),
     paso === "alta" ? listTRegistro(params.relacionId) : Promise.resolve([]),
     paso === "alta" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
@@ -166,6 +169,15 @@ export default async function ContratoProcesoPage({
               trabajador={trabajador}
               contratos={contratos}
               documentos={documentos}
+              canWrite={canEditFicha}
+              canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
+            />
+            <FichaAdendas
+              relacionId={params.relacionId}
+              entidadId={trabajador.entidad_id}
+              trabajador={trabajador}
+              contratos={contratos}
+              adendas={adendas}
               canWrite={canEditFicha}
               canMarcarRecogido={puedeMarcarContratoRecogido(profile)}
             />

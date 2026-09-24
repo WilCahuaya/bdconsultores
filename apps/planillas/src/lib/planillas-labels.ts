@@ -1,6 +1,7 @@
 import type {
   ClasificacionTrabajador,
   EstadoContratoPlanilla,
+  TipoAdendaPlanilla,
   EstadoDocumentoPlanilla,
   EstadoRelacionLaboral,
   EstadoTramitePension,
@@ -31,6 +32,12 @@ export const CLASIFICACION_LABEL: Record<ClasificacionTrabajador, string> = {
 export const JORNADA_LABEL: Record<JornadaLaboral, string> = {
   TIEMPO_COMPLETO: "Tiempo completo",
   TIEMPO_PARCIAL: "Tiempo parcial",
+};
+
+export const TIPO_ADENDA_LABEL: Record<TipoAdendaPlanilla, string> = {
+  CARGO: "Cargo",
+  REMUNERACION: "Sueldo",
+  HORARIO: "Horario",
 };
 
 export function opcionesCargo(actual?: string | null): { value: string; label: string }[] {

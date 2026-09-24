@@ -2042,6 +2042,7 @@ export type ClasificacionTrabajador = "PATROCINADO" | "SUPERVIVENCIA";
 export type JornadaLaboral = "TIEMPO_COMPLETO" | "TIEMPO_PARCIAL";
 export type EstadoRelacionLaboral = "ACTIVA" | "CESADA";
 export type EstadoValidacionAltaPlanilla = "PENDIENTE" | "ACEPTADA";
+export type TipoAdendaPlanilla = "CARGO" | "REMUNERACION" | "HORARIO";
 export type EstadoContratoPlanilla =
   | "PENDIENTE_DOCS"
   | "ELABORADO"
