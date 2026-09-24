@@ -10,21 +10,14 @@ import {
   puedeEscribirPlanillas,
 } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
-import { listTrabajadores } from "@/lib/actions/trabajadores";
-import { listPendientes } from "@/lib/actions/pendientes";
-import {
-  claseBadgePaso,
-  flujoDesdeTrabajador,
-  hrefFichaTrabajador,
-  hrefSiguientePaso,
-  resolverSiguientePaso,
-} from "@/lib/flujo-ficha";
-import { nombreCompleto } from "@/lib/planillas-labels";
+import { listFilasPendientesTrabajadores } from "@/lib/actions/pendientes";
+import { MostrarBajasCheck } from "@/components/MostrarBajasCheck";
+import { TrabajadoresPendientesTabla } from "@/components/TrabajadoresPendientesTabla";
 
 export default async function PlanillasHomePage({
   searchParams,
 }: {
-  searchParams: { entidadId?: string; aviso?: string };
+  searchParams: { entidadId?: string; aviso?: string; bajas?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const entidades = await listEntidadesPlanillas();
@@ -32,15 +25,14 @@ export default async function PlanillasHomePage({
     searchParams.entidadId && entidades.some((e) => e.id === searchParams.entidadId)
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
-  const [trabajadores, pendientes] =
-    selectedId
-      ? await Promise.all([listTrabajadores(selectedId), listPendientes(selectedId)])
-      : [[], []];
+  const mostrarBajas = searchParams.bajas === "1";
+  const todos = selectedId ? await listFilasPendientesTrabajadores(selectedId) : [];
+  const trabajadores = mostrarBajas ? todos : todos.filter((t) => !t.cesada);
+  const hayBajas = todos.some((t) => t.cesada);
   const canCreateTrabajador = puedeCrearTrabajador(profile);
   const canCreate = puedeCrearEntidad(profile);
   const esEstudio = puedeEscribirPlanillas(profile);
   const aviso = searchParams.aviso?.trim() || null;
-  const pendientesVisibles = pendientes;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -49,7 +41,7 @@ export default async function PlanillasHomePage({
           <div>
             <h1 className="text-xl font-bold text-primary sm:text-2xl">Trabajadores</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Hola, {profile.nombre}. El nombre abre sus datos. El paso pendiente lleva al trámite.
+              Hola, {profile.nombre}. El nombre abre la ficha. Cada pastilla abre ese pendiente.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -103,61 +95,23 @@ export default async function PlanillasHomePage({
               entidades={entidades}
               selectedId={selectedId}
               locked={esUsuarioEntidad(profile.rol)}
+              queryExtra={mostrarBajas ? "bajas=1" : undefined}
             />
-            {pendientesVisibles.length > 0 ? (
-              <Link
-                href={`/pendientes?entidadId=${selectedId}`}
-                className={`${panelCardClass} block p-4 text-sm hover:bg-muted/30`}
-              >
-                Hay <span className="font-semibold text-primary">{pendientesVisibles.length}</span> pendientes en
-                esta empresa.
-              </Link>
-            ) : null}
-            <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b bg-muted/40 text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">DNI</th>
-                    <th className="px-4 py-2 font-medium">Nombre</th>
-                    <th className="px-4 py-2 font-medium">Cargo</th>
-                    <th className="px-4 py-2 font-medium">Siguiente paso</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trabajadores.length === 0 ? (
-                    <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={4}>
-                        No hay trabajadores en esta empresa. El listado arranca en blanco.
-                      </td>
-                    </tr>
-                  ) : (
-                    trabajadores.map((t) => {
-                      const siguiente = resolverSiguientePaso(flujoDesdeTrabajador(t), esEstudio);
-                      return (
-                        <tr key={t.id} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-4 py-2 font-mono">{t.persona.dni}</td>
-                          <td className="px-4 py-2">
-                            <Link href={hrefFichaTrabajador(t.id)} className="font-medium text-primary hover:underline">
-                              {nombreCompleto(t.persona)}
-                            </Link>
-                          </td>
-                          <td className="px-4 py-2">{t.cargo ?? "—"}</td>
-                          <td className="px-4 py-2">
-                            <Link href={hrefSiguientePaso(t.id, siguiente)}>
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${claseBadgePaso(siguiente.rol)}`}
-                              >
-                                {siguiente.etiqueta}
-                              </span>
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <MostrarBajasCheck entidadId={selectedId} checked={mostrarBajas} />
+              {hayBajas && !mostrarBajas ? (
+                <p className="text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</p>
+              ) : null}
             </div>
+            {trabajadores.length === 0 ? (
+              <p className={`${panelCardClass} px-4 py-8 text-sm text-muted-foreground`}>
+                {hayBajas && !mostrarBajas
+                  ? "No hay trabajadores activos. Marque Mostrar bajas para ver a los cesados."
+                  : "No hay trabajadores en esta empresa. El listado arranca en blanco."}
+              </p>
+            ) : (
+              <TrabajadoresPendientesTabla filas={trabajadores} esEstudio={esEstudio} />
+            )}
           </>
         )}
       </div>

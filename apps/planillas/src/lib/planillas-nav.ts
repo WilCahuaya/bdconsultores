@@ -21,13 +21,17 @@ export function planillasNavSections(opts: {
     { href: withEntidad("/vacaciones", entidadId), label: "Vacaciones", icon: "reports" },
   );
 
+  const expediente: PanelNavSection["items"] = [
+    { href: withEntidad("/", entidadId), label: "Trabajadores", icon: "users" },
+  ];
+  if (esEstudio) {
+    expediente.push({ href: "/tablero", label: "Tablero", icon: "dashboard" });
+  }
+
   return [
     {
       label: "Expediente",
-      items: [
-        { href: withEntidad("/", entidadId), label: "Trabajadores", icon: "users" },
-        { href: withEntidad("/pendientes", entidadId), label: "Pendientes", icon: "pending" },
-      ],
+      items: expediente,
     },
     {
       label: "Trámites",
@@ -40,6 +44,9 @@ export function matchPlanillasNavPath(pathname: string, href: string): boolean {
   const path = href.split("?")[0] || "/";
   if (path === "/") {
     return pathname === "/" || pathname.startsWith("/trabajadores") || pathname.startsWith("/empresas");
+  }
+  if (path === "/tablero") {
+    return pathname === "/tablero" || pathname.startsWith("/tablero/");
   }
   return pathname === path || pathname.startsWith(`${path}/`);
 }

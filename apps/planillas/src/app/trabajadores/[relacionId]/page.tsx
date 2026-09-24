@@ -57,7 +57,7 @@ export default async function FichaTrabajadorPage({
     redirect(`/contratos/${params.relacionId}?paso=${tabRaw}`);
   }
   if (tabRaw === "contratos" || tabRaw === "firma") {
-    redirect(`/contratos/${params.relacionId}`);
+    redirect(`/contratos/${params.relacionId}?paso=contratos`);
   }
   if (tabRaw === "pensiones" || tabRaw === "t-registro" || tabRaw === "alta") {
     redirect(`/contratos/${params.relacionId}?paso=alta`);
@@ -69,8 +69,9 @@ export default async function FichaTrabajadorPage({
   const contratoVig = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
   const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
-  const canEditFicha = puedeEditarFichaLaboral(profile);
-  if (esEstudio && tab === "vida-ley") {
+  const fichaCesada = trabajador.estado === "CESADA";
+  const canEditFicha = puedeEditarFichaLaboral(profile) && !fichaCesada;
+  if (esEstudio && tab === "vida-ley" && !fichaCesada) {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
   const [documentos, vidaLey, vacaciones, contratos] = await Promise.all([
@@ -126,7 +127,12 @@ export default async function FichaTrabajadorPage({
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
         </div>
-        {alertaDocumentos ? (
+        {fichaCesada ? (
+          <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
+            Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
+          </p>
+        ) : null}
+        {alertaDocumentos && !fichaCesada ? (
           <AlertaDocumentosAlta relacionId={params.relacionId} etiqueta={alertaDocumentos} />
         ) : null}
         {tab ? (
@@ -135,7 +141,7 @@ export default async function FichaTrabajadorPage({
             entidadId={trabajador.entidad_id}
             tab={tab}
           />
-        ) : proceso ? (
+        ) : proceso && !fichaCesada ? (
           <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
             <span className="text-muted-foreground">Proceso pendiente</span>
             <Link href={proceso.href} className="font-medium text-primary hover:underline">
@@ -162,7 +168,7 @@ export default async function FichaTrabajadorPage({
             documentoConstancia={documentos.find((d) => d.tipo === "VIDA_LEY_CONSTANCIA") ?? null}
             documentoFactura={documentos.find((d) => d.tipo === "VIDA_LEY_FACTURA") ?? null}
             documentoComprobante={documentos.find((d) => d.tipo === "VIDA_LEY_COMPROBANTE") ?? null}
-            canWrite={esEstudio}
+            canWrite={esEstudio && !fichaCesada}
           />
         ) : null}
         {tab === "asistencia" ? (

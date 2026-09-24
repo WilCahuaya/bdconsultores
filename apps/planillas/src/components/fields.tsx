@@ -105,6 +105,8 @@ export function DateField({
   readOnly,
   value,
   onChange,
+  hint,
+  action,
 }: {
   label: string;
   name: string;
@@ -113,6 +115,8 @@ export function DateField({
   readOnly?: boolean;
   value?: string;
   onChange?: (value: string) => void;
+  hint?: string;
+  action?: ReactNode;
 }) {
   const [inner, setInner] = useState(() => toDdMmYyyy(value ?? defaultValue));
   const display = value !== undefined ? toDdMmYyyy(value) : inner;
@@ -123,20 +127,24 @@ export function DateField({
   }
 
   return (
-    <label className="block space-y-1.5">
+    <div className="block space-y-1.5">
       <span className="text-sm font-medium text-foreground">{label}</span>
-      <FechaDdMmYyyyInput
-        name={name}
-        value={display}
-        onChange={handleChange}
-        required={required}
-        readOnly={readOnly}
-        disabled={readOnly}
-        placeholder="DD/MM/AAAA"
-        title="Escriba o pegue la fecha: DD/MM/AAAA"
-        className={fieldClass}
-      />
-    </label>
+      <div className="flex items-start gap-2">
+        <FechaDdMmYyyyInput
+          name={name}
+          value={display}
+          onChange={handleChange}
+          required={required}
+          readOnly={readOnly}
+          disabled={readOnly}
+          placeholder="DD/MM/AAAA"
+          title="Escriba o pegue la fecha: DD/MM/AAAA"
+          className={`${fieldClass} min-w-0 flex-1`}
+        />
+        {action}
+      </div>
+      {hint ? <span className="text-xs text-muted-foreground">{hint}</span> : null}
+    </div>
   );
 }
 

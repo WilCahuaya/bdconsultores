@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth/access";
 import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
 import type { FlujoContrato, FlujoDocumento, FlujoPension, FlujoTRegistro } from "@/lib/flujo-ficha";
+import { documentoCargado } from "@/lib/flujo-ficha";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { planillasDb } from "@/lib/supabase/planillas";
 
@@ -71,16 +72,18 @@ type ContratoEmbed = {
   fecha_inicio: string | null;
   fecha_fin: string | null;
   datos_confirmados?: boolean;
+  documento_id?: string | null;
 };
 
 type DocumentoEmbed = {
+  id?: string;
   tipo: string;
   estado: string;
   storage_path: string | null;
 };
 
 const TRABAJADOR_SELECT =
-  "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados), documentos (tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
+  "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados, documento_id), documentos (id, tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
 
 function asList<T>(value: T | T[] | null | undefined): T[] {
   if (!value) return [];
@@ -429,6 +432,18 @@ export async function darDeBajaTrabajador(
   if (actual.fecha_ingreso && cese.value < actual.fecha_ingreso) {
     return { error: "El cese no puede ser anterior al ingreso a la empresa." };
   }
+  const motivo = String(formData.get("tipo_baja") ?? "").trim();
+  if (motivo === "CARTA_RENUNCIA") {
+    if (!documentoCargado(actual.documentos, "CARTA_RENUNCIA")) {
+      return { error: "Suba la carta de renuncia." };
+    }
+  } else if (motivo === "TERMINO_CONTRATO") {
+    if (!documentoCargado(actual.documentos, "TR_BAJA")) {
+      return { error: "Suba el documento de T-Registro baja." };
+    }
+  } else {
+    return { error: "Indique si la baja es por carta de renuncia o término de contrato." };
+  }
 
   const db = await planillasDb();
   const { error } = await db
@@ -439,6 +454,17 @@ export async function darDeBajaTrabajador(
     })
     .eq("id", relacionId);
   if (error) return { error: error.message };
+
+  const yaBajaTr = actual.tRegistro.some((item) => item.tipo === "BAJA");
+  if (!yaBajaTr) {
+    const { error: trError } = await db.from("t_registro").insert({
+      relacion_id: relacionId,
+      tipo: "BAJA",
+      realizado: true,
+      fecha: cese.value,
+    });
+    if (trError) return { error: trError.message };
+  }
 
   revalidatePath("/");
   revalidatePath("/pendientes");

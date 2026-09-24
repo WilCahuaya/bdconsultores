@@ -182,8 +182,9 @@ export function FichaResumen({
     ...(trabajador.cargo ? [{ texto: trabajador.cargo }] : []),
     ...(trabajador.clasificacion ? [{ texto: CLASIFICACION_LABEL[trabajador.clasificacion] }] : []),
     ...(trabajador.jornada ? [{ texto: JORNADA_LABEL[trabajador.jornada] }] : []),
-    ...(trabajador.fecha_ingreso ? [{ texto: formatFechaPlanilla(trabajador.fecha_ingreso) }] : []),
+    ...(trabajador.fecha_ingreso ? [{ texto: `Ingreso a la empresa ${formatFechaPlanilla(trabajador.fecha_ingreso)}` }] : []),
     ...(trabajador.fecha_cese ? [{ texto: `Cese ${formatFechaPlanilla(trabajador.fecha_cese)}` }] : []),
+    { texto: "Ir a puesto", href: `/contratos/${relacionId}?paso=puesto` },
   ];
   const puestoPago: Linea[] = [
     ...(trabajador.remuneracion != null ? [{ texto: `S/ ${formatRemuneracion(trabajador.remuneracion)}` }] : []),
