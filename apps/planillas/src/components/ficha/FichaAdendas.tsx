@@ -397,7 +397,7 @@ function FormAdenda({
             label="Jornada"
             name="jornada"
             value={jornada}
-            onChange={(event) => setJornada(event.target.value)}
+            onChange={(event) => setJornada(event.target.value as keyof typeof JORNADA_LABEL)}
             options={(Object.keys(JORNADA_LABEL) as (keyof typeof JORNADA_LABEL)[]).map((value) => ({
               value,
               label: JORNADA_LABEL[value],
