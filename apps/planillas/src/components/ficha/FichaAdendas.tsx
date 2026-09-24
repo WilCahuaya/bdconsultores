@@ -288,15 +288,28 @@ export function FichaAdendas({
                       : ESTADO_CONTRATO_LABEL[adenda.estado]}
                   </td>
                   <td className="px-4 py-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={pending === `word-${adenda.id}`}
-                      onClick={() => void onDescargar(adenda.id)}
-                    >
-                      Word
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={pending === `word-${adenda.id}`}
+                        onClick={() => void onDescargar(adenda.id)}
+                      >
+                        {pending === `word-${adenda.id}` ? "…" : "Word"}
+                      </Button>
+                      {adenda.storage_path ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={pending === `ver-${adenda.id}`}
+                          onClick={() => void onVerPdf(adenda)}
+                        >
+                          {pending === `ver-${adenda.id}` ? "…" : "Ver firmado"}
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))
