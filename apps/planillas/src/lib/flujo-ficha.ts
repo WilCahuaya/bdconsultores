@@ -71,6 +71,7 @@ export type FlujoContrato = {
   fecha_fin: string | null;
   remuneracion: number | null;
   es_vigente: boolean;
+  version?: number;
   datos_confirmados?: boolean;
   documento_id?: string | null;
 };

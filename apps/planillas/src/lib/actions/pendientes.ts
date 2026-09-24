@@ -1,12 +1,17 @@
 "use server";
 
 import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
-import { listTrabajadores } from "@/lib/actions/trabajadores";
-import { esMesAsistencia, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import { listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { cargoSigla } from "@/lib/cargos-funciones";
+import { esMesAsistencia, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import {
+  ASIGNACION_FAMILIAR_SOLES,
   formatFechaPlanilla,
+  formatRemuneracion,
   nombreCompleto,
+  remuneracionBruta,
   resolverEtapaVidaLey,
+  TIEMPO_LABEL,
   type EtapaVidaLeyId,
   type PendienteItem,
 } from "@/lib/planillas-labels";
@@ -42,12 +47,25 @@ export type CeldaPendiente = {
 
 export type ColumnaPendienteId = "contrato" | "vidaLey" | "asistencia" | "vacaciones";
 
+export type DatosLaboralesFila = {
+  cargoSigla: string;
+  cargoTitulo: string;
+  mesInicio: string;
+  fechaIngreso: string;
+  fechaCese: string;
+  tiempo: string;
+  remuneracion: string;
+  asignacion: string;
+  bruta: string;
+};
+
 export type FilaPendienteTrabajador = {
   id: string;
   dni: string;
   nombre: string;
   cargo: string | null;
   cesada: boolean;
+  laboral: DatosLaboralesFila;
   celdas: Record<ColumnaPendienteId, CeldaPendiente>;
 };
 
@@ -80,6 +98,36 @@ function celdaPendiente(
   href?: string,
 ): CeldaPendiente {
   return href ? { color, texto, titulo, href } : { color, texto, titulo };
+}
+
+function mesInicioEmpresa(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const month = Number(iso.slice(5, 7));
+  const abrev = MES_ABREV[month - 1];
+  return abrev ? abrev.toUpperCase() : "—";
+}
+
+function fechaFinUltimoContrato(trabajador: TrabajadorListItem): string | null {
+  const vivos = trabajador.contratos.filter((c) => c.estado !== "BAJA");
+  const lista = vivos.length > 0 ? vivos : trabajador.contratos;
+  const ultimo = [...lista].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
+  return ultimo?.fecha_fin ?? null;
+}
+
+function datosLaborales(trabajador: TrabajadorListItem): DatosLaboralesFila {
+  const bruta = remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar);
+  const asignacion = trabajador.recibe_asignacion_familiar === true ? ASIGNACION_FAMILIAR_SOLES : null;
+  return {
+    cargoSigla: cargoSigla(trabajador.cargo) || "—",
+    cargoTitulo: trabajador.cargo?.trim() || "Sin cargo",
+    mesInicio: mesInicioEmpresa(trabajador.fecha_ingreso),
+    fechaIngreso: formatFechaPlanilla(trabajador.fecha_ingreso),
+    fechaCese: formatFechaPlanilla(fechaFinUltimoContrato(trabajador)),
+    tiempo: trabajador.jornada ? TIEMPO_LABEL[trabajador.jornada] : "—",
+    remuneracion: formatRemuneracion(trabajador.remuneracion),
+    asignacion: formatRemuneracion(asignacion),
+    bruta: formatRemuneracion(bruta),
+  };
 }
 
 function todayIso(): string {
@@ -170,6 +218,7 @@ async function cargarPendientes(entidadId: string): Promise<{
         nombre: base.nombre,
         cargo: trabajador.cargo,
         cesada: true,
+        laboral: datosLaborales(trabajador),
         celdas: {
           contrato: celdaPendiente("gris", "Baja", titulo),
           vidaLey: celdaPendiente("gris", "—", titulo),
@@ -270,6 +319,7 @@ async function cargarPendientes(entidadId: string): Promise<{
       nombre: base.nombre,
       cargo: trabajador.cargo,
       cesada: false,
+      laboral: datosLaborales(trabajador),
       celdas: {
         contrato: celdaContrato,
         vidaLey: celdaVida,

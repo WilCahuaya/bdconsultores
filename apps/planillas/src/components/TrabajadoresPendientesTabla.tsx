@@ -12,6 +12,17 @@ const COLOR_CLASS: Record<ColorPendiente, string> = {
   verde: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/70 dark:text-emerald-50",
 };
 
+const DATOS: { key: keyof FilaPendienteTrabajador["laboral"]; label: string; title: string; money?: boolean }[] = [
+  { key: "cargoSigla", label: "Cargo", title: "Cargo" },
+  { key: "mesInicio", label: "Mes", title: "Mes de inicio en la empresa" },
+  { key: "fechaIngreso", label: "Inicio", title: "Fecha de inicio en la empresa" },
+  { key: "fechaCese", label: "Cese", title: "Fecha de fin del último contrato" },
+  { key: "tiempo", label: "Tiempo", title: "Tiempo completo o parcial" },
+  { key: "remuneracion", label: "Remuneración", title: "Remuneración", money: true },
+  { key: "asignacion", label: "Asig. fam.", title: "Asignación familiar", money: true },
+  { key: "bruta", label: "Rem. bruta", title: "Remuneración más asignación familiar", money: true },
+];
+
 const COLUMNAS: { id: ColumnaPendienteId; corto: string; estudio?: boolean }[] = [
   { id: "contrato", corto: "Contrato" },
   { id: "vidaLey", corto: "Vida Ley", estudio: true },
@@ -104,12 +115,21 @@ export function TrabajadoresPendientesTabla({
 
       <div className={panelCardClass}>
         <div className="max-h-[calc(100dvh-16rem)] overflow-auto">
-          <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-sm">
+          <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 top-0 z-30 w-[20rem] min-w-[20rem] border-b bg-muted px-3 py-2 font-medium">
+                <th className="sticky left-0 top-0 z-30 w-[16rem] min-w-[16rem] border-b bg-muted px-3 py-2 font-medium">
                   Trabajador
                 </th>
+                {DATOS.map((col) => (
+                  <th
+                    key={col.key}
+                    title={col.title}
+                    className={`sticky top-0 z-20 whitespace-nowrap border-b bg-muted px-2 py-2 text-[11px] font-medium ${col.money ? "text-right" : "text-center"}`}
+                  >
+                    {col.label}
+                  </th>
+                ))}
                 {columnas.map((col) => (
                   <th
                     key={col.id}
@@ -123,7 +143,7 @@ export function TrabajadoresPendientesTabla({
             <tbody>
               {visibles.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-muted-foreground" colSpan={columnas.length + 1}>
+                  <td className="px-4 py-8 text-muted-foreground" colSpan={columnas.length + DATOS.length + 1}>
                     {filas.length === 0
                       ? "No hay trabajadores en esta empresa."
                       : "Ningún trabajador coincide con el filtro."}
@@ -134,7 +154,7 @@ export function TrabajadoresPendientesTabla({
                   const titulo = [fila.nombre, fila.dni, fila.cargo].filter(Boolean).join(" · ");
                   return (
                     <tr key={fila.id}>
-                      <td className="sticky left-0 z-10 w-[20rem] min-w-[20rem] max-w-[20rem] border-b bg-background px-3 py-1">
+                      <td className="sticky left-0 z-10 w-[16rem] min-w-[16rem] max-w-[16rem] border-b bg-background px-3 py-1">
                         <div className="flex min-w-0 items-baseline gap-2" title={titulo}>
                           <Link href={`/trabajadores/${fila.id}`} className="min-w-0 truncate font-medium text-primary hover:underline">
                             {fila.nombre}
@@ -142,6 +162,15 @@ export function TrabajadoresPendientesTabla({
                           <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{fila.dni}</span>
                         </div>
                       </td>
+                      {DATOS.map((col) => (
+                        <td
+                          key={col.key}
+                          title={col.key === "cargoSigla" ? fila.laboral.cargoTitulo : col.title}
+                          className={`whitespace-nowrap border-b px-2 py-1 align-middle text-xs ${col.money ? "text-right tabular-nums" : "text-center"}`}
+                        >
+                          {fila.laboral[col.key]}
+                        </td>
+                      ))}
                       {columnas.map((col) => (
                         <td key={col.id} className="border-b px-1.5 py-1 align-middle">
                           <CeldaVista celda={fila.celdas[col.id]} />

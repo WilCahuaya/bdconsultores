@@ -200,6 +200,14 @@ const CARGO_OCUPACION_CORTO: Record<CargoTrabajador, string> = {
   "Formador educativo y espiritual": "FEE",
 };
 
+const CARGO_SIGLA: Record<CargoTrabajador, string> = {
+  Administrador: "ADM",
+  "Responsable de tesorería, logística y almacén": "TES",
+  "Responsable de procesos administrativos y comunicaciones del participante": "SEC",
+  "Coordinador de implementación programática y monitoreo": "CORD",
+  "Formador educativo y espiritual": "FEE",
+};
+
 export const LEYENDA_CODIGO_OCUPACION = [
   { corto: "Administrador", codigo: "252003" },
   { corto: "Tesorero", codigo: "451020" },
@@ -221,4 +229,10 @@ export function cargoCorto(cargo: string | null | undefined): string {
   const canon = cargoCanonico(cargo);
   if (canon) return CARGO_OCUPACION_CORTO[canon];
   return cargo?.trim() || "";
+}
+
+export function cargoSigla(cargo: string | null | undefined): string {
+  const canon = cargoCanonico(cargo);
+  if (canon) return CARGO_SIGLA[canon];
+  return "";
 }
