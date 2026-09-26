@@ -4,6 +4,7 @@ export type DesktopMainNav =
   | "portal"
   | "dashboard"
   | "entidades"
+  | "espacios"
   | "inventario"
   | "catalogo"
   | "usuarios"
@@ -28,6 +29,7 @@ export function desktopNavSections(preregistrados = 0): PanelNavSection[] {
           badgeTitle: "Preregistrados pendientes",
         },
         { href: "entidades", label: "Entidades", icon: "entities" },
+        { href: "espacios", label: "Espacios", icon: "spaces" },
         { href: "reportes", label: "Reportes", icon: "reports" },
       ],
     },
@@ -46,6 +48,7 @@ export function isDesktopMainNav(value: string): value is DesktopMainNav {
     value === "portal" ||
     value === "dashboard" ||
     value === "entidades" ||
+    value === "espacios" ||
     value === "inventario" ||
     value === "catalogo" ||
     value === "usuarios" ||

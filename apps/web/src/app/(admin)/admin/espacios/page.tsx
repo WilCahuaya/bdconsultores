@@ -10,18 +10,13 @@ import {
   listVisitasCampoHistorial,
 } from "@/lib/actions/visitas-campo";
 
-export default async function AdminAmbientesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ tab?: string }>;
-}) {
+export default async function AdminEspaciosPage() {
   const profile = await getProfile();
   if (!profile || profile.rol !== "ADMIN_ENTIDAD" || !profile.entidad_id) {
     redirect("/login");
   }
 
   const entidadId = profile.entidad_id;
-  const { tab } = await searchParams;
   const [entidad, ambientesRaw, sedes, responsables, visitasActivas, visitasHistorial] =
     await Promise.all([
       getEntidad(entidadId),
@@ -43,17 +38,7 @@ export default async function AdminAmbientesPage({
       responsables={responsables}
       visitasActivas={visitasActivas}
       visitasHistorial={visitasHistorial}
-      initialTab={
-        tab === "espacios"
-          ? "espacios"
-          : tab === "sucursales"
-            ? "sucursales"
-            : tab === "responsables"
-              ? "responsables"
-              : tab === "visitas"
-                ? "visitas"
-                : undefined
-      }
+      initialTab="espacios"
     />
   );
 }

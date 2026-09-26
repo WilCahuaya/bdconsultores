@@ -44,7 +44,15 @@ export default async function AdminAmbientesPage({
       visitasActivas={visitasActivas}
       visitasHistorial={visitasHistorial}
       initialTab={
-        tab === "responsables" ? "responsables" : tab === "visitas" ? "visitas" : undefined
+        tab === "espacios"
+          ? "espacios"
+          : tab === "sucursales"
+            ? "sucursales"
+            : tab === "responsables"
+              ? "responsables"
+              : tab === "visitas"
+                ? "visitas"
+                : undefined
       }
     />
   );

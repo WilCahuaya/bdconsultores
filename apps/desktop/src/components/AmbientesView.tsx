@@ -12,7 +12,7 @@ import type {
 import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
 import { ESTRUCTURA_REFRESH_EVENT } from "@inventario/realtime";
 import { panelFieldsetClass } from "@inventario/ui/panel";
-import { Button, Dialog, EspaciosSedeDialog, ResponsablesPanel, Select } from "@inventario/ui";
+import { Button, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel, Select } from "@inventario/ui";
 import {
   DeleteIcon,
   EditIcon,
@@ -93,11 +93,12 @@ import {
 import { InventarioEntidadView } from "./InventarioEntidadView";
 import type { AmbienteDestinoNavigation } from "./AgregarBienesSimilaresDialog";
 
-type EntityTab = "inventario" | "ambientes" | "responsables" | "sucursales" | "visitas";
+type EntityTab = "inventario" | "ambientes" | "espacios" | "responsables" | "sucursales" | "visitas";
 
 const ENTITY_TABS: { id: EntityTab; label: string }[] = [
   { id: "inventario", label: "Inventario" },
   { id: "ambientes", label: "Ambientes" },
+  { id: "espacios", label: "Espacios" },
   { id: "responsables", label: "Responsables" },
   { id: "sucursales", label: "Sucursales" },
   { id: "visitas", label: "Visitas de campo" },
@@ -773,6 +774,35 @@ export function AmbientesView({
                   }),
                 );
                 void syncAmbientesYResponsables();
+              }}
+            />
+          ) : !sedeFocus && tab === "espacios" ? (
+            <EspaciosGestionPanel
+              sedes={sedes}
+              onList={listEspacios}
+              onCreate={async (sedeId, nombre, descripcion) => {
+                const result = await createEspacio(sedeId, nombre, descripcion);
+                if (result.error) return { error: result.error };
+                void syncEspaciosEntidad();
+                return {};
+              }}
+              onEnsureHasta={async (sedeId, cantidad, descripcion) => {
+                const result = await ensureEspaciosHasta(sedeId, cantidad, descripcion);
+                if (result.error) return { error: result.error };
+                void syncEspaciosEntidad();
+                return { creados: result.creados };
+              }}
+              onUpdateDescripcion={async (espacioId, descripcion) => {
+                const result = await updateEspacio(espacioId, descripcion);
+                if (result.error) return { error: result.error };
+                void syncEspaciosEntidad();
+                return {};
+              }}
+              onDelete={async (espacioId) => {
+                const result = await deleteEspacio(espacioId);
+                if (result.error) return { error: result.error };
+                void syncEspaciosEntidad();
+                return {};
               }}
             />
           ) : (

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { CreateResponsableInput, Entidad, Espacio, EspacioConOcupacion, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
 import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
-import { Button, CrearResponsableDialog, Dialog, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
+import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
 import {
   EditIcon,
   PanelDataTable,
@@ -66,10 +66,11 @@ import {
   panelCardClass,
 } from "./panel-ui";
 
-type AdminEntityTab = "ambientes" | "sucursales" | "responsables" | "visitas";
+type AdminEntityTab = "ambientes" | "espacios" | "sucursales" | "responsables" | "visitas";
 
 const ADMIN_ENTITY_TABS: { id: AdminEntityTab; label: string }[] = [
   { id: "ambientes", label: "Ambientes" },
+  { id: "espacios", label: "Espacios" },
   { id: "sucursales", label: "Sucursales" },
   { id: "responsables", label: "Responsables" },
   { id: "visitas", label: "Visitas de campo" },
@@ -100,6 +101,19 @@ export function AdminAmbientesPanel({
 }: AdminAmbientesPanelProps) {
   const router = useRouter();
   const [tab, setTab] = useState<AdminEntityTab>(initialTab);
+
+  function handleTabChange(next: AdminEntityTab) {
+    setTab(next);
+    if (next === "espacios") {
+      router.replace("/admin/espacios", { scroll: false });
+      return;
+    }
+    if (next === "ambientes") {
+      router.replace("/admin/activos", { scroll: false });
+      return;
+    }
+    router.replace(`/admin/activos?tab=${next}`, { scroll: false });
+  }
   const [ambientes, setAmbientes] = useState(initial);
   const [sedes, setSedes] = useState(initialSedes);
   const [responsables, setResponsables] = useState(initialResponsables);
@@ -364,7 +378,7 @@ export function AdminAmbientesPanel({
         backLabel="Inventario global"
       />
 
-      <PanelTabs tabs={ADMIN_ENTITY_TABS} value={tab} onChange={setTab} />
+      <PanelTabs tabs={ADMIN_ENTITY_TABS} value={tab} onChange={handleTabChange} />
 
       {tab === "visitas" ? (
         <VisitasCampoHistorialPanel
@@ -384,7 +398,7 @@ export function AdminAmbientesPanel({
           sedes={sedes}
           onViewAmbientes={(sedeId) => {
             setSedeFilterId(sedeId);
-            setTab("ambientes");
+            handleTabChange("ambientes");
           }}
           onEspaciosChange={() => {
             void syncEspaciosEntidad();
@@ -392,6 +406,35 @@ export function AdminAmbientesPanel({
           onSedesChange={(next) => {
             setSedes(next);
             void syncAmbientesYResponsables();
+          }}
+        />
+      ) : tab === "espacios" ? (
+        <EspaciosGestionPanel
+          sedes={sedes}
+          onList={listEspacios}
+          onCreate={async (sedeId, nombre, descripcion) => {
+            const result = await createEspacio(sedeId, nombre, descripcion);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return {};
+          }}
+          onEnsureHasta={async (sedeId, cantidad, descripcion) => {
+            const result = await ensureEspaciosHasta(sedeId, cantidad, descripcion);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return { creados: result.creados };
+          }}
+          onUpdateDescripcion={async (espacioId, descripcion) => {
+            const result = await updateEspacio(espacioId, descripcion);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return {};
+          }}
+          onDelete={async (espacioId) => {
+            const result = await deleteEspacio(espacioId);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return {};
           }}
         />
       ) : tab === "responsables" ? (
@@ -427,7 +470,7 @@ export function AdminAmbientesPanel({
           <button
             type="button"
             className="font-semibold text-primary underline-offset-2 hover:underline"
-            onClick={() => setTab("sucursales")}
+            onClick={() => handleTabChange("sucursales")}
           >
             Sucursales
           </button>{" "}

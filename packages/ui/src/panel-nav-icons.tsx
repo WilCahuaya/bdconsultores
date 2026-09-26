@@ -8,7 +8,8 @@ export type PanelNavIconKey =
   | "assets"
   | "pending"
   | "users"
-  | "reports";
+  | "reports"
+  | "spaces";
 
 export interface PanelNavItem {
   href: string;
@@ -109,6 +110,17 @@ export function IconUsers({ className = iconClass }: { className?: string }) {
   );
 }
 
+export function IconSpaces({ className = iconClass }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>
+      <rect x="3" y="3" width="8" height="8" rx="1" />
+      <rect x="13" y="3" width="8" height="8" rx="1" />
+      <rect x="3" y="13" width="8" height="8" rx="1" />
+      <rect x="13" y="13" width="8" height="8" rx="1" />
+    </svg>
+  );
+}
+
 export function IconMenu({ className = iconClass }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>
@@ -163,6 +175,7 @@ const ICONS: Record<PanelNavIconKey, (props: { className?: string }) => ReactNod
   pending: IconPending,
   users: IconUsers,
   reports: IconReports,
+  spaces: IconSpaces,
 };
 
 export function PanelNavIcon({ name, className }: { name: PanelNavIconKey; className?: string }) {

@@ -18,6 +18,7 @@ import { ActivoEditWithScopeDesktop } from "./components/ActivoEditWithScopeDesk
 import { ActivosAmbienteView } from "./components/ActivosAmbienteView";
 import { DesktopDashboard } from "./components/DesktopDashboardView";
 import { AmbientesView } from "./components/AmbientesView";
+import { EspaciosView } from "./components/EspaciosView";
 import { AppShell, type AppSubheader, type MainNav } from "./components/AppShell";
 import { EntidadesView } from "./components/EntidadesView";
 import { InventarioGlobalView } from "./components/InventarioGlobalView";
@@ -551,6 +552,11 @@ function MainApp({ userId }: { userId: string; email: string }) {
         }),
       };
     }
+  } else if (mainNav === "espacios") {
+    subheader = {
+      breadcrumbs: [{ label: "Espacios" }],
+      subtitle: "Locales físicos de la entidad. Varios ambientes pueden ocupar el mismo espacio.",
+    };
   } else if (mainNav === "inventario") {
     if (inventarioFlow.type === "edit") {
       subheader = {
@@ -611,6 +617,17 @@ function MainApp({ userId }: { userId: string; email: string }) {
           }}
           activos={activosCache.activos}
           activosLoading={activosCache.loading}
+        />
+      )}
+
+      {mainNav === "espacios" && (
+        <EspaciosView
+          entidades={entidadesActivas}
+          entidadId={entidadId}
+          onEntidadChange={(id) => {
+            setEntidadId(id);
+            setDashboardEntidadId(id);
+          }}
         />
       )}
 

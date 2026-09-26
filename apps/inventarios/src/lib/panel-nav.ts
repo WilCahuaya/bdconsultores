@@ -68,6 +68,11 @@ export function adminNavSections(
           label: "Ambientes",
           icon: "entities",
         },
+        {
+          href: "/admin/espacios",
+          label: "Espacios",
+          icon: "spaces",
+        },
         { href: "/admin/reportes", label: "Reportes", icon: "reports" },
       ],
     },

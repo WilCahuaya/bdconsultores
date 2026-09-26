@@ -52,13 +52,15 @@ export default async function EntidadAmbientesPage({
       initialTab={
         tab === "ambientes"
           ? "ambientes"
-          : tab === "responsables"
-            ? "responsables"
-            : tab === "visitas"
-              ? "visitas"
-              : tab === "sucursales"
-                ? "sucursales"
-                : undefined
+          : tab === "espacios"
+            ? "espacios"
+            : tab === "responsables"
+              ? "responsables"
+              : tab === "visitas"
+                ? "visitas"
+                : tab === "sucursales"
+                  ? "sucursales"
+                  : undefined
       }
     />
   );

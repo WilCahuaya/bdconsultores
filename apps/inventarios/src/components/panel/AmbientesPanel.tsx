@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Activo, CreateResponsableInput, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
 import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
-import { Button, CrearResponsableDialog, Dialog, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
+import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
 import {
   DeleteIcon,
   PanelDataTable,
@@ -86,11 +86,12 @@ import {
   panelCardClass,
 } from "./panel-ui";
 
-type EntityTab = "inventario" | "ambientes" | "responsables" | "sucursales" | "visitas";
+type EntityTab = "inventario" | "ambientes" | "espacios" | "responsables" | "sucursales" | "visitas";
 
 const ENTITY_TABS: { id: EntityTab; label: string }[] = [
   { id: "inventario", label: "Inventario" },
   { id: "ambientes", label: "Ambientes" },
+  { id: "espacios", label: "Espacios" },
   { id: "responsables", label: "Responsables" },
   { id: "sucursales", label: "Sucursales" },
   { id: "visitas", label: "Visitas de campo" },
@@ -99,6 +100,7 @@ const ENTITY_TABS: { id: EntityTab; label: string }[] = [
 function parseInitialTab(value?: string): EntityTab {
   if (
     value === "ambientes" ||
+    value === "espacios" ||
     value === "responsables" ||
     value === "sucursales" ||
     value === "visitas"
@@ -683,6 +685,35 @@ export function AmbientesPanel({
           onSedesChange={(next) => {
             setSedes(next);
             void syncAmbientesYResponsables();
+          }}
+        />
+      ) : !sedeFocus && tab === "espacios" ? (
+        <EspaciosGestionPanel
+          sedes={sedes}
+          onList={listEspacios}
+          onCreate={async (sedeId, nombre, descripcion) => {
+            const result = await createEspacio(sedeId, nombre, descripcion);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return {};
+          }}
+          onEnsureHasta={async (sedeId, cantidad, descripcion) => {
+            const result = await ensureEspaciosHasta(sedeId, cantidad, descripcion);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return { creados: result.creados };
+          }}
+          onUpdateDescripcion={async (espacioId, descripcion) => {
+            const result = await updateEspacio(espacioId, descripcion);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return {};
+          }}
+          onDelete={async (espacioId) => {
+            const result = await deleteEspacio(espacioId);
+            if (result.error) return { error: result.error };
+            void syncEspaciosEntidad();
+            return {};
           }}
         />
       ) : (

@@ -623,7 +623,11 @@ export async function createEspacio(sedeId: string, nombre: string, descripcion:
 }
 
 /** Agrega `cantidad` espacios a continuación del último número (ej. tras Espacio 10 → 11, 12…). */
-export async function ensureEspaciosHasta(sedeId: string, cantidad: number, descripcion: string) {
+export async function ensureEspaciosHasta(
+  sedeId: string,
+  cantidad: number,
+  descripcion: string,
+): Promise<{ success?: true; creados?: number; data?: EspacioConOcupacion[]; error?: string }> {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
   if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
