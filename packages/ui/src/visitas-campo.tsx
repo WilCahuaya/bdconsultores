@@ -319,16 +319,30 @@ export function VisitasCampoBanner({
                     como hallado o no. El ambiente se culmina al terminar esa revisión.
                   </p>
                 </div>
-                {puedeGestionar && onCerrar && visita.revision_completa ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={cerrarPendingId === visita.id}
-                    onClick={() => onCerrar(visita.id)}
-                  >
-                    {cerrarPendingId === visita.id ? "Terminando…" : "Terminar visita"}
-                  </Button>
+                {puedeGestionar && onCerrar ? (
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="disabled:cursor-not-allowed"
+                      disabled={!visita.revision_completa || cerrarPendingId === visita.id}
+                      title={
+                        visita.revision_completa
+                          ? "Cerrar la visita de campo"
+                          : "Revise todos los bienes antes de terminar la visita"
+                      }
+                      onClick={() => {
+                        if (!visita.revision_completa) return;
+                        onCerrar(visita.id);
+                      }}
+                    >
+                      {cerrarPendingId === visita.id ? "Terminando…" : "Terminar visita"}
+                    </Button>
+                    {!visita.revision_completa ? (
+                      <p className="text-[11px] text-muted-foreground">Faltan bienes por revisar</p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             </li>

@@ -32,6 +32,16 @@ function profileNombre(join: ProfileJoin): string | null {
   return join.nombre;
 }
 
+/** Faltante y preregistro no se visitan: Faltante solo guarda bienes no hallados. */
+function ambienteParticipaEnVisita(raw: unknown): boolean {
+  const amb = (Array.isArray(raw) ? raw[0] : raw) as {
+    es_preregistro?: boolean | null;
+    es_faltante?: boolean | null;
+  } | null;
+  if (!amb) return false;
+  return amb.es_preregistro !== true && amb.es_faltante !== true;
+}
+
 type VisitaRow = {
   id: string;
   entidad_id: string;
@@ -50,16 +60,16 @@ async function mapVisitaConConteo(
 ): Promise<VisitaCampoActiva> {
   const { data: filas } = await supabase
     .from("visita_ambientes")
-    .select("ambiente_id, estado")
+    .select("ambiente_id, estado, ambientes!inner(es_preregistro, es_faltante)")
     .eq("visita_id", visita.id);
 
-  const ambientes_total = filas?.length ?? 0;
-  const ambientes_culminados =
-    filas?.filter((f) => f.estado === "CULMINADO").length ?? 0;
+  const relevantes = (filas ?? []).filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
+  const ambientes_total = relevantes.length;
+  const ambientes_culminados = relevantes.filter((f) => f.estado === "CULMINADO").length;
   const revision_completa = await visitaRevisionCompleta(
     supabase,
     visita.id,
-    (filas ?? []).map((fila) => fila.ambiente_id as string),
+    relevantes.map((fila) => fila.ambiente_id as string),
   );
 
   return {
@@ -251,12 +261,12 @@ export async function listVisitasCampoHistorial(
   for (const v of visitas) {
     const { data: filas } = await supabase
       .from("visita_ambientes")
-      .select("estado")
+      .select("estado, ambientes!inner(es_preregistro, es_faltante)")
       .eq("visita_id", v.id);
 
-    const ambientes_total = filas?.length ?? 0;
-    const ambientes_culminados =
-      filas?.filter((f) => f.estado === "CULMINADO").length ?? 0;
+    const relevantes = (filas ?? []).filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
+    const ambientes_total = relevantes.length;
+    const ambientes_culminados = relevantes.filter((f) => f.estado === "CULMINADO").length;
 
     result.push({
       id: v.id,
@@ -286,32 +296,36 @@ export async function getVisitaCampoDetalle(
   const { data: filas, error } = await supabase
     .from("visita_ambientes")
     .select(
-      "estado, culminado_at, ambiente_id, culminado:culminado_por(nombre), ambientes(nombre, es_preregistro, sedes(nombre))",
+      "estado, culminado_at, ambiente_id, culminado:culminado_por(nombre), ambientes!inner(nombre, es_preregistro, es_faltante, sedes(nombre))",
     )
     .eq("visita_id", visitaId)
     .order("created_at");
 
   if (error || !filas) return [];
 
-  return filas.map((fila) => {
+  return filas.flatMap((fila) => {
+    if (!ambienteParticipaEnVisita(fila.ambientes)) return [];
     const ambRaw = fila.ambientes as unknown;
     const amb = (Array.isArray(ambRaw) ? ambRaw[0] : ambRaw) as {
       nombre: string;
       es_preregistro: boolean;
+      es_faltante?: boolean;
       sedes: { nombre: string } | { nombre: string }[] | null;
     } | null;
     const sede = amb?.sedes;
     const sedeNombre = Array.isArray(sede) ? sede[0]?.nombre : sede?.nombre;
 
-    return {
-      ambiente_id: fila.ambiente_id,
-      ambiente_nombre: amb?.nombre ?? "—",
-      sede_nombre: sedeNombre ?? "—",
-      es_preregistro: amb?.es_preregistro ?? false,
-      estado: fila.estado as EstadoVisitaAmbiente,
-      culminado_at: fila.culminado_at,
-      culminado_por_nombre: profileNombre(fila.culminado as ProfileJoin),
-    };
+    return [
+      {
+        ambiente_id: fila.ambiente_id,
+        ambiente_nombre: amb?.nombre ?? "—",
+        sede_nombre: sedeNombre ?? "—",
+        es_preregistro: amb?.es_preregistro ?? false,
+        estado: fila.estado as EstadoVisitaAmbiente,
+        culminado_at: fila.culminado_at,
+        culminado_por_nombre: profileNombre(fila.culminado as ProfileJoin),
+      },
+    ];
   });
 }
 
