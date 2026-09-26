@@ -77,12 +77,8 @@ function mapAmbienteEspacioError(message: string): string {
   return message;
 }
 
-function descripcionEspacioRequerida(
-  raw: string | null | undefined,
-): { descripcion: string } | { error: string } {
-  const descripcion = raw?.trim() ?? "";
-  if (!descripcion) return { error: "La descripción del espacio es obligatoria." };
-  return { descripcion };
+function descripcionEspacio(raw: string | null | undefined): { descripcion: string } {
+  return { descripcion: raw?.trim() ?? "" };
 }
 
 function sortAmbientesConSede(items: AmbienteConSede[]): AmbienteConSede[] {
@@ -672,8 +668,7 @@ export async function createEspacio(
 ): Promise<{ data?: Espacio; error?: string }> {
   const trimmed = nombre.trim();
   if (!trimmed) return { error: "Nombre de espacio obligatorio." };
-  const desc = descripcionEspacioRequerida(descripcion);
-  if ("error" in desc) return desc;
+  const desc = descripcionEspacio(descripcion);
 
   if (!isOnline()) {
     const sede = await findMasterItem<Sede>("sedes", sedeId);
@@ -749,8 +744,7 @@ export async function ensureEspaciosHasta(
   if (!Number.isFinite(cantidad) || cantidad < 1 || cantidad > 500) {
     return { error: "Indique una cantidad entre 1 y 500." };
   }
-  const desc = descripcionEspacioRequerida(descripcion);
-  if ("error" in desc) return desc;
+  const desc = descripcionEspacio(descripcion);
 
   const existentes = await listEspacios(sedeId);
   const nombres = new Set(existentes.map((e) => e.nombre.trim().toLowerCase()));
@@ -843,8 +837,7 @@ export async function updateEspacio(
   espacioId: string,
   descripcion: string,
 ): Promise<{ success?: true; error?: string }> {
-  const desc = descripcionEspacioRequerida(descripcion);
-  if ("error" in desc) return desc;
+  const desc = descripcionEspacio(descripcion);
 
   if (!isOnline()) {
     const found = await findMasterItem<Espacio>("espacios", espacioId);

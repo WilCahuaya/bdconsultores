@@ -194,7 +194,7 @@ export interface Espacio {
   id: string;
   sede_id: string;
   nombre: string;
-  /** Texto del local. Obligatorio al crear o editar. */
+  /** Texto del local. Opcional. */
   descripcion: string;
   activo: boolean;
   created_at: string;

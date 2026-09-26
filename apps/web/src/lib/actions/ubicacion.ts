@@ -353,12 +353,8 @@ function mapAmbienteEspacioError(message: string): string {
   return message;
 }
 
-function descripcionEspacioRequerida(
-  raw: string | null | undefined,
-): { descripcion: string } | { error: string } {
-  const descripcion = raw?.trim() ?? "";
-  if (!descripcion) return { error: "La descripción del espacio es obligatoria." };
-  return { descripcion };
+function descripcionEspacio(raw: string | null | undefined): { descripcion: string } {
+  return { descripcion: raw?.trim() ?? "" };
 }
 
 export async function createAmbiente(input: CreateAmbienteInput) {
@@ -577,8 +573,7 @@ export async function createEspacio(sedeId: string, nombre: string, descripcion:
 
   const trimmed = nombre.trim();
   if (!trimmed) return { error: "Nombre de espacio obligatorio." };
-  const desc = descripcionEspacioRequerida(descripcion);
-  if ("error" in desc) return desc;
+  const desc = descripcionEspacio(descripcion);
 
   const supabase = await createClient();
 
@@ -637,8 +632,7 @@ export async function ensureEspaciosHasta(sedeId: string, cantidad: number, desc
   if (!Number.isFinite(cantidad) || cantidad < 1 || cantidad > 500) {
     return { error: "Indique una cantidad entre 1 y 500." };
   }
-  const desc = descripcionEspacioRequerida(descripcion);
-  if ("error" in desc) return desc;
+  const desc = descripcionEspacio(descripcion);
 
   const supabase = await createClient();
 
@@ -731,8 +725,7 @@ export async function updateEspacio(espacioId: string, descripcion: string) {
     return { error: "No autorizado." };
   }
 
-  const desc = descripcionEspacioRequerida(descripcion);
-  if ("error" in desc) return desc;
+  const desc = descripcionEspacio(descripcion);
 
   const supabase = await createClient();
   const { data: existing } = await supabase

@@ -86,10 +86,6 @@ export function EspaciosSedeDialog({
       setLocalError("Indique el número del espacio (ej. 01, 10, 25).");
       return;
     }
-    if (!descripcion) {
-      setLocalError("La descripción del espacio es obligatoria.");
-      return;
-    }
     setLocalPending(true);
     setLocalError(null);
     const result = await onCreate(nombre, descripcion);
@@ -107,10 +103,6 @@ export function EspaciosSedeDialog({
     e.preventDefault();
     const n = Number(cantidad);
     const descripcion = descripcionVarios.trim();
-    if (!descripcion) {
-      setLocalError("La descripción del espacio es obligatoria.");
-      return;
-    }
     setLocalPending(true);
     setLocalError(null);
     const result = await onEnsureHasta(n, descripcion);
@@ -126,10 +118,6 @@ export function EspaciosSedeDialog({
 
   async function handleSaveDescripcion(espacioId: string) {
     const descripcion = editDesc.trim();
-    if (!descripcion) {
-      setLocalError("La descripción del espacio es obligatoria.");
-      return;
-    }
     setLocalPending(true);
     setLocalError(null);
     const result = await onUpdateDescripcion(espacioId, descripcion);
@@ -166,7 +154,7 @@ export function EspaciosSedeDialog({
       open={open}
       onClose={onClose}
       title={`Espacios — ${sedeNombre}`}
-      description="Locales físicos de la sucursal. Varios ambientes pueden ocupar el mismo espacio. Cada espacio lleva su descripción."
+      description="Locales físicos de la sucursal. Varios ambientes pueden ocupar el mismo espacio. La descripción es opcional."
       className="max-w-xl"
     >
       <div className="space-y-4">
@@ -190,12 +178,11 @@ export function EspaciosSedeDialog({
             </Button>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="espacios_desc_varios">Descripción</Label>
+            <Label htmlFor="espacios_desc_varios">Descripción (opcional)</Label>
             <Textarea
               id="espacios_desc_varios"
-              required
               rows={2}
-              placeholder="Se aplica a cada espacio nuevo. Luego puede editarla uno por uno."
+              placeholder="Opcional. Se aplica a cada espacio nuevo."
               value={descripcionVarios}
               onChange={(e) => setDescripcionVarios(e.target.value)}
             />
@@ -226,10 +213,9 @@ export function EspaciosSedeDialog({
             </Button>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="espacio_desc_uno">Descripción</Label>
+            <Label htmlFor="espacio_desc_uno">Descripción (opcional)</Label>
             <Textarea
               id="espacio_desc_uno"
-              required
               rows={2}
               placeholder="Ej. Aula de música, primer piso"
               value={descripcionUno}
@@ -242,7 +228,7 @@ export function EspaciosSedeDialog({
 
         {espacios.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Aún no hay espacios. Indique cuántos crear (empezarán en Espacio 01) y su descripción.
+            Aún no hay espacios. Indique cuántos crear (empezarán en Espacio 01).
           </p>
         ) : (
           <ul className="max-h-72 space-y-1 overflow-y-auto rounded-md border border-border/60 p-2 text-sm">

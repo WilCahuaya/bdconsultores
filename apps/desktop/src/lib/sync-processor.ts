@@ -385,7 +385,6 @@ async function processMasterOp(
 
   if (op === "espacio:update") {
     const descripcion = String(payload.descripcion ?? "").trim();
-    if (!descripcion) throw new Error("La descripción del espacio es obligatoria.");
     const { error } = await supabase
       .from("espacios")
       .update({ descripcion })
