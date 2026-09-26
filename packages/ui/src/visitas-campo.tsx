@@ -419,6 +419,9 @@ export function VisitasCampoHistorialPanel({
   detalleVisita,
   onVerDetalle,
   onCerrarDetalle,
+  visitasAbiertas = [],
+  onTerminar,
+  terminarPendingId,
 }: {
   historial: VisitaCampoHistorial[];
   loadingDetalle?: boolean;
@@ -426,6 +429,9 @@ export function VisitasCampoHistorialPanel({
   detalleVisita: VisitaCampoHistorial | null;
   onVerDetalle: (visita: VisitaCampoHistorial) => void;
   onCerrarDetalle: () => void;
+  visitasAbiertas?: VisitaCampoActiva[];
+  onTerminar?: (visitaId: string) => void;
+  terminarPendingId?: string | null;
 }) {
   if (historial.length === 0) {
     return (
@@ -448,13 +454,16 @@ export function VisitasCampoHistorialPanel({
             </PanelTableTh>
             <PanelTableTh className={panelTableNowrapCellClass}>Estado</PanelTableTh>
             <PanelTableTh align="right" className={panelTableNowrapCellClass}>
-              Detalle
+              Acciones
             </PanelTableTh>
           </tr>
         </thead>
         <tbody>
           {historial.map((visita) => {
             const abierto = detalleVisita?.id === visita.id;
+            const activa = visitasAbiertas.find((item) => item.id === visita.id);
+            const puedeTerminar = visita.estado === "ABIERTO" && Boolean(onTerminar);
+            const revisionCompleta = activa?.revision_completa === true;
             return (
               <Fragment key={visita.id}>
                 <tr className={panelTableBodyRowClass}>
@@ -491,15 +500,37 @@ export function VisitasCampoHistorialPanel({
                     )}
                   </PanelTableTd>
                   <PanelTableTd align="right" className={panelTableNowrapCellClass}>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      aria-expanded={abierto}
-                      onClick={() => (abierto ? onCerrarDetalle() : onVerDetalle(visita))}
-                    >
-                      {abierto ? "Ocultar" : "Ver"}
-                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      {puedeTerminar ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="disabled:cursor-not-allowed"
+                          disabled={!revisionCompleta || terminarPendingId === visita.id}
+                          title={
+                            revisionCompleta
+                              ? "Terminar la visita de campo"
+                              : "Revise todos los bienes antes de terminar la visita"
+                          }
+                          onClick={() => {
+                            if (!revisionCompleta || !onTerminar) return;
+                            onTerminar(visita.id);
+                          }}
+                        >
+                          {terminarPendingId === visita.id ? "Terminando…" : "Terminar visita"}
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        aria-expanded={abierto}
+                        onClick={() => (abierto ? onCerrarDetalle() : onVerDetalle(visita))}
+                      >
+                        {abierto ? "Ocultar" : "Ver"}
+                      </Button>
+                    </div>
                   </PanelTableTd>
                 </tr>
                 {abierto ? (

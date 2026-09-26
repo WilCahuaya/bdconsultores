@@ -200,20 +200,23 @@ async function conteoRevisionPorAmbiente(
       .in("ambiente_id", ambienteIds),
   ]);
 
-  const revisadosPorVisita = new Map<string, Set<string>>();
+  const revisadosPorAmbiente = new Map<string, Set<string>>();
   for (const fila of revisiones ?? []) {
-    const ids = revisadosPorVisita.get(fila.visita_id as string) ?? new Set<string>();
+    const ambienteId = fila.ambiente_id as string;
+    if (visitaPorAmbiente.get(ambienteId) !== fila.visita_id) continue;
+    const ids = revisadosPorAmbiente.get(ambienteId) ?? new Set<string>();
     ids.add(fila.activo_id as string);
-    revisadosPorVisita.set(fila.visita_id as string, ids);
+    revisadosPorAmbiente.set(ambienteId, ids);
   }
 
   const revisadosCount = new Map<string, number>();
   const totalCount = new Map<string, number>();
   for (const bien of bienes ?? []) {
-    const visitaId = visitaPorAmbiente.get(bien.ambiente_id as string);
+    const ambienteId = bien.ambiente_id as string;
+    const visitaId = visitaPorAmbiente.get(ambienteId);
     if (!visitaId) continue;
-    totalCount.set(bien.ambiente_id as string, (totalCount.get(bien.ambiente_id as string) ?? 0) + 1);
-    if (revisadosPorVisita.get(visitaId)?.has(bien.id as string)) {
+    totalCount.set(ambienteId, (totalCount.get(ambienteId) ?? 0) + 1);
+    if (revisadosPorAmbiente.get(ambienteId)?.has(bien.id as string)) {
       revisadosCount.set(
         bien.ambiente_id as string,
         (revisadosCount.get(bien.ambiente_id as string) ?? 0) + 1,

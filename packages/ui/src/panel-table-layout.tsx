@@ -80,7 +80,7 @@ export const AMBIENTES_TABLE_COLS_SIN_SUCURSAL_VISITA: PanelTableColSpec[] = [
 export const SUCURSALES_TABLE_COL_WIDTHS_PCT = [24, 26, 10, 14, 26] as const;
 
 /** #, sucursal, apertura, cierre, ambientes, estado, detalle */
-export const VISITAS_HISTORIAL_TABLE_WIDTHS_PCT = [5, 18, 22, 22, 9, 11, 13] as const;
+export const VISITAS_HISTORIAL_TABLE_WIDTHS_PCT = [5, 14, 18, 18, 8, 10, 27] as const;
 
 /** Sucursales: nombre, dirección, ambientes, tipo, acciones */
 export const SUCURSALES_TABLE_COLS: PanelTableColSpec[] = [

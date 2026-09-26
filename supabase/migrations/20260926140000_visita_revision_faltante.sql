@@ -107,8 +107,14 @@ BEGIN
         FROM public.visita_revisiones r
         WHERE r.visita_id = p_visita_id
           AND r.activo_id = ac.id
+          AND r.ambiente_id = ac.ambiente_id
       )
   ) THEN
+    UPDATE public.visita_ambientes
+    SET estado = 'EN_PROCESO', culminado_at = NULL, culminado_por = NULL
+    WHERE visita_id = p_visita_id
+      AND ambiente_id = p_ambiente_id
+      AND estado = 'CULMINADO';
     RETURN;
   END IF;
 
@@ -513,6 +519,7 @@ DECLARE
   v_destino_entidad UUID;
   v_responsable TEXT;
   v_motivo TEXT;
+  v_visita_id UUID;
 BEGIN
   IF NOT public.is_contador() THEN
     RAISE EXCEPTION 'Solo el contador puede resolver un bien faltante';
@@ -563,6 +570,25 @@ BEGIN
       updated_by = v_user,
       updated_at = now()
     WHERE id = p_activo_id;
+
+    DELETE FROM public.visita_revisiones r
+    USING public.visitas_campo v
+    WHERE r.activo_id = p_activo_id
+      AND r.visita_id = v.id
+      AND v.entidad_id = v_entidad_id
+      AND v.estado = 'ABIERTO';
+
+    FOR v_visita_id IN
+      SELECT v.id
+      FROM public.visitas_campo v
+      INNER JOIN public.visita_ambientes va
+        ON va.visita_id = v.id
+       AND va.ambiente_id = p_ambiente_id
+      WHERE v.entidad_id = v_entidad_id
+        AND v.estado = 'ABIERTO'
+    LOOP
+      PERFORM public.visita_sync_ambiente(v_visita_id, p_ambiente_id);
+    END LOOP;
   ELSIF p_accion = 'BAJA' THEN
     IF v_estado_bien IS DISTINCT FROM 'MALO' THEN
       RAISE EXCEPTION 'Solo se da de baja desde Faltante si el bien está en estado Malo';

@@ -645,6 +645,9 @@ export function AmbientesPanel({
             setDetalleVisita(null);
             setDetalleAmbientes(null);
           }}
+          visitasAbiertas={visitasActivas}
+          onTerminar={puedeGestionarVisita ? handleCerrarVisita : undefined}
+          terminarPendingId={cerrarPendingId}
         />
       ) : !sedeFocus && tab === "responsables" ? (
         <ResponsablesPanel

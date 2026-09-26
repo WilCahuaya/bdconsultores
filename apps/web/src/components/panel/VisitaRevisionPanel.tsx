@@ -363,6 +363,10 @@ export function FaltanteBienesPanel({
       return;
     }
     setMotivo("");
+    if (accion === "MOVER" && destino) {
+      router.push(`/contador/entidades/${entidadId}/ambientes/${destino}`);
+      return;
+    }
     router.refresh();
   }
 
