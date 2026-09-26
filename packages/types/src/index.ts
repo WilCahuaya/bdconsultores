@@ -1610,6 +1610,8 @@ export type CatalogoEstadoSbn = "ACTIVO" | "EXCLUIDO";
 /** Prefijo de códigos propios (cuenta de orden) agregados por la entidad. */
 export const CATALOGO_PROPIO_PREFIX = "BD";
 
+export { attachCatalogoNacionalPorCodigo } from "./catalogo-por-codigo";
+
 export const CATALOGO_CUENTA_ORDEN_CONTABILIDAD = "2524";
 export const CATALOGO_CUENTA_ORDEN_ESTADO: CatalogoEstadoSbn = "EXCLUIDO";
 

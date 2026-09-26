@@ -5,6 +5,7 @@ import type { Activo, CategoriaBien, EstadoBien, EstadoRegistro } from "@inventa
 import {
   MAX_ACTIVOS_SIMILARES_CANTIDAD,
   applyCuentaContableToPayloadIfProvided,
+  attachCatalogoNacionalPorCodigo,
   resolveCuentaContableActivo,
   resolveObservacionAdmin,
   mergeObservacionActivo,
@@ -86,16 +87,13 @@ export interface ActivoListRow {
   catalogo_clase?: string | null;
 }
 
-const CATALOGO_ACTIVO_SELECT =
-  "catalogo_nacional:codigo_catalogo(cuenta_codigo, contabilidad, grupo, clase)";
-
 const POSIBLE_AMBIENTE_SELECT = "posible_ambiente:posible_ambiente_id(nombre, sede_id)";
 
 const ACTIVO_SELECT =
-  `*, entidades(nombre), sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}, ${CATALOGO_ACTIVO_SELECT}`;
+  `*, entidades(nombre), sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}`;
 
 const ACTIVO_SELECT_SIN_ENTIDAD =
-  `*, sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}, ${CATALOGO_ACTIVO_SELECT}`;
+  `*, sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}`;
 
 export async function previewCodigoBarras(entidadId: string, codigoCatalogo: string) {
   const profile = await getProfile();
@@ -809,10 +807,11 @@ export async function listActivosPorAmbiente(ambienteId: string) {
     .order("created_at", { ascending: false });
 
   if (error) throw new Error(error.message);
-  return enrichPosibleSedeNombres(
+  const conCatalogo = await attachCatalogoNacionalPorCodigo(
     supabase,
-    mapActivoRows(data as Record<string, unknown>[]),
+    data as Record<string, unknown>[],
   );
+  return enrichPosibleSedeNombres(supabase, mapActivoRows(conCatalogo));
 }
 
 export type ActivoConUbicacion = Activo & ActivoListRow;
@@ -914,7 +913,11 @@ export async function listActivos(entidadId?: string, filters?: ListActivosFilte
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
-  return enrichPosibleSedeNombres(supabase, mapActivoRows(data as Record<string, unknown>[]));
+  const conCatalogo = await attachCatalogoNacionalPorCodigo(
+    supabase,
+    data as Record<string, unknown>[],
+  );
+  return enrichPosibleSedeNombres(supabase, mapActivoRows(conCatalogo));
 }
 
 export async function registrarActivo(

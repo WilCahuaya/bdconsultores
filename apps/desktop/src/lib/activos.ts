@@ -1,6 +1,7 @@
 import {
   MAX_ACTIVOS_SIMILARES_CANTIDAD,
   applyCuentaContableToPayloadIfProvided,
+  attachCatalogoNacionalPorCodigo,
   codigoBarrasLookupVariants,
   resolveCuentaContableActivo,
   type ActivosSimilaresPreview,
@@ -68,16 +69,13 @@ export type ActivoConUbicacion = Activo & {
   catalogo_clase?: string | null;
 };
 
-const CATALOGO_ACTIVO_SELECT =
-  "catalogo_nacional:codigo_catalogo(cuenta_codigo, contabilidad, grupo, clase)";
-
 const POSIBLE_AMBIENTE_SELECT = "posible_ambiente:posible_ambiente_id(nombre, sede_id)";
 
 const ACTIVO_SELECT_SIN_ENTIDAD =
-  `*, sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}, ${CATALOGO_ACTIVO_SELECT}`;
+  `*, sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}`;
 
 const ACTIVO_SELECT_GLOBAL =
-  `*, entidades(nombre), sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}, ${CATALOGO_ACTIVO_SELECT}`;
+  `*, entidades(nombre), sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}`;
 
 export interface CreateActivoInput {
   entidad_id: string;
@@ -196,7 +194,11 @@ export async function findActivoByCodigo(
 
       if (error) throw new Error(error.message);
       if (data) {
-        const mapped = mapActivoRow(data as Record<string, unknown>);
+        const [hydrated] =
+          (await attachCatalogoNacionalPorCodigo(supabase, [
+            data as Record<string, unknown>,
+          ])) ?? [];
+        const mapped = mapActivoRow(hydrated ?? (data as Record<string, unknown>));
         const { upsertCachedActivo } = await import("./offline");
         await upsertCachedActivo(entidadId, mapped);
         return mapped;
@@ -328,7 +330,8 @@ async function enrichPosibleSedeNombres(
 async function mapActivoRowsEnriched(
   data: Record<string, unknown>[] | null,
 ): Promise<ActivoConUbicacion[]> {
-  return enrichPosibleSedeNombres(mapActivoRows(data));
+  const conCatalogo = await attachCatalogoNacionalPorCodigo(getSupabaseClient(), data);
+  return enrichPosibleSedeNombres(mapActivoRows(conCatalogo));
 }
 
 export async function getActivoById(activoId: string): Promise<ActivoConUbicacion | null> {
@@ -344,7 +347,11 @@ export async function getActivoById(activoId: string): Promise<ActivoConUbicacio
 
       if (error) throw new Error(error.message);
       if (!data) return null;
-      const mapped = mapActivoRow(data as Record<string, unknown>);
+      const [hydrated] =
+        (await attachCatalogoNacionalPorCodigo(supabase, [
+          data as Record<string, unknown>,
+        ])) ?? [];
+      const mapped = mapActivoRow(hydrated ?? (data as Record<string, unknown>));
       const [enriched] = await enrichPosibleSedeNombres([mapped]);
       return enriched ?? mapped;
     } catch {

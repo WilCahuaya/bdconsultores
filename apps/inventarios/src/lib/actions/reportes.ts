@@ -1,7 +1,7 @@
 "use server";
 
 import type { EstadoRegistro } from "@inventario/types";
-import { resolveCuentaContableActivo } from "@inventario/types";
+import { attachCatalogoNacionalPorCodigo, resolveCuentaContableActivo } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
 import type { ActivoReporte } from "@/lib/reportes/types";
@@ -76,7 +76,7 @@ export async function cargarActivosReporte(
   let query = supabase
     .from("activos")
     .select(
-      "*, entidades(nombre), sedes:sede_id(nombre), ambientes:ambiente_id(nombre, responsable), catalogo_nacional:codigo_catalogo(cuenta_codigo, contabilidad, grupo)",
+      "*, entidades(nombre), sedes:sede_id(nombre), ambientes:ambiente_id(nombre, responsable)",
     )
     .eq("entidad_id", input.entidadId)
     .order("codigo_catalogo")
@@ -119,7 +119,11 @@ export async function cargarActivosReporte(
   const { data, error } = await query;
   if (error) return { error: error.message };
 
-  let activos = mapActivoReporteRows(data as Record<string, unknown>[]);
+  const conCatalogo = await attachCatalogoNacionalPorCodigo(
+    supabase,
+    data as Record<string, unknown>[],
+  );
+  let activos = mapActivoReporteRows(conCatalogo);
   activos = filtrarActivosPorFechaCorte(
     activos,
     input.reporteId as ReporteId,
