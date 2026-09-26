@@ -7,6 +7,7 @@ import type {
   ResponsableConConteo,
   SedeConConteo,
 } from "@inventario/types";
+import { etiquetaNombreEspacio, resumenOcupacionEspacio } from "@inventario/types";
 import { replaceMasterDomain } from "./master-cache";
 import { getSupabaseClient } from "./supabase";
 import { loadSedesForEntidad } from "./sede-principal-direccion";
@@ -114,10 +115,13 @@ async function fetchAmbientesRemote(entidadId: string) {
   if (espacioIds.length > 0) {
     const { data: espaciosRows } = await supabase
       .from("espacios")
-      .select("id, nombre")
+      .select("id, nombre, descripcion")
       .in("id", espacioIds);
     const nombreById = new Map(
-      (espaciosRows ?? []).map((e) => [e.id as string, e.nombre as string]),
+      (espaciosRows ?? []).map((e) => [
+        e.id as string,
+        etiquetaNombreEspacio(e.nombre as string, e.descripcion as string | null),
+      ]),
     );
     for (const amb of mapped) {
       if (amb.espacio_id) amb.espacio_nombre = nombreById.get(amb.espacio_id) ?? null;
@@ -140,12 +144,12 @@ async function fetchEspaciosRemote(sedeId: string): Promise<EspacioConOcupacion[
   return (data ?? []).map((row) => {
     const ambientes =
       (row.ambientes as Array<{ id: string; nombre: string; activo: boolean }> | null) ?? [];
-    const ocupante = ambientes.find((a) => a.activo);
     const { ambientes: _, ...espacio } = row;
+    const base = espacio as Espacio;
     return {
-      ...(espacio as Espacio),
-      ambiente_id: ocupante?.id ?? null,
-      ambiente_nombre: ocupante?.nombre ?? null,
+      ...base,
+      descripcion: base.descripcion ?? "",
+      ...resumenOcupacionEspacio(ambientes),
     };
   });
 }

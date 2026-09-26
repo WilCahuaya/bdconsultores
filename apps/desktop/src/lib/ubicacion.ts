@@ -1,4 +1,5 @@
 import type { Ambiente, Espacio, EspacioConOcupacion, Sede, SedeConConteo } from "@inventario/types";
+import { etiquetaNombreEspacio, resumenOcupacionEspacio } from "@inventario/types";
 import { listCachedActivos } from "./offline";
 import {
   enqueueOfflineOp,
@@ -76,52 +77,18 @@ function mapAmbienteEspacioError(message: string): string {
   return message;
 }
 
-async function mensajeSiEspacioOcupado(
-  espacioId: string | null | undefined,
-  excludeAmbienteId?: string,
-  entidadIdHint?: string,
-): Promise<string | null> {
-  if (!espacioId) return null;
-
-  if (!isOnline()) {
-    let entidadId = entidadIdHint;
-    if (!entidadId) {
-      const found = await findMasterItem<Espacio>("espacios", espacioId);
-      entidadId = found?.entidadId;
-    }
-    if (!entidadId) return null;
-    const ambientes = await listMasterDomain<AmbienteConSede>("ambientes", entidadId);
-    const ocupante = ambientes.find(
-      (a) =>
-        a.activo &&
-        a.espacio_id === espacioId &&
-        (!excludeAmbienteId || a.id !== excludeAmbienteId),
-    );
-    if (!ocupante) return null;
-    const nombre = ocupante.nombre?.trim();
-    return nombre ? `Ese espacio ya está ocupado por «${nombre}».` : ESPACIO_OCUPADO_MSG;
-  }
-
-  const supabase = getSupabaseClient();
-  let query = supabase
-    .from("ambientes")
-    .select("id, nombre")
-    .eq("espacio_id", espacioId)
-    .eq("activo", true);
-  if (excludeAmbienteId) {
-    query = query.neq("id", excludeAmbienteId);
-  }
-  const { data } = await query.maybeSingle();
-  if (!data) return null;
-  const nombre = (data.nombre as string | null)?.trim();
-  return nombre
-    ? `Ese espacio ya está ocupado por «${nombre}».`
-    : ESPACIO_OCUPADO_MSG;
+function descripcionEspacioRequerida(
+  raw: string | null | undefined,
+): { descripcion: string } | { error: string } {
+  const descripcion = raw?.trim() ?? "";
+  if (!descripcion) return { error: "La descripción del espacio es obligatoria." };
+  return { descripcion };
 }
 
 function sortAmbientesConSede(items: AmbienteConSede[]): AmbienteConSede[] {
   return [...items].sort((a, b) => {
     if (a.es_preregistro !== b.es_preregistro) return a.es_preregistro ? -1 : 1;
+    if (Boolean(a.es_faltante) !== Boolean(b.es_faltante)) return a.es_faltante ? -1 : 1;
     if (a.sede_es_principal !== b.sede_es_principal) return a.sede_es_principal ? -1 : 1;
     if (a.sede_nombre !== b.sede_nombre) return a.sede_nombre.localeCompare(b.sede_nombre);
     return a.nombre.localeCompare(b.nombre);
@@ -149,11 +116,11 @@ async function listEspaciosFromCache(sedeId: string): Promise<EspacioConOcupacio
   return espacios
     .filter((e) => e.sede_id === sedeId && e.activo)
     .map((e) => {
-      const ocupante = ambientes.find((a) => a.activo && a.espacio_id === e.id);
+      const delEspacio = ambientes.filter((a) => a.activo && a.espacio_id === e.id);
       return {
         ...e,
-        ambiente_id: ocupante?.id ?? null,
-        ambiente_nombre: ocupante?.nombre ?? null,
+        descripcion: e.descripcion ?? "",
+        ...resumenOcupacionEspacio(delEspacio),
       };
     })
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
@@ -257,10 +224,13 @@ export async function listAmbientesPorEntidad(
       if (espacioIds.length > 0) {
         const { data: espaciosRows } = await supabase
           .from("espacios")
-          .select("id, nombre")
+          .select("id, nombre, descripcion")
           .in("id", espacioIds);
         const nombreById = new Map(
-          (espaciosRows ?? []).map((e) => [e.id as string, e.nombre as string]),
+          (espaciosRows ?? []).map((e) => [
+            e.id as string,
+            etiquetaNombreEspacio(e.nombre as string, e.descripcion as string | null),
+          ]),
         );
         for (const amb of mapped) {
           if (amb.espacio_id) {
@@ -293,14 +263,13 @@ export async function createAmbiente(
   if (!isOnline()) {
     const sede = await findMasterItem<Sede>("sedes", input.sedeId);
     if (!sede) return { error: "Sucursal no encontrada en caché local." };
-    const ocupado = await mensajeSiEspacioOcupado(input.espacioId, undefined, sede.entidadId);
-    if (ocupado) return { error: ocupado };
-
     const espacios = await listMasterDomain<Espacio>("espacios", sede.entidadId);
-    const espacioNombre =
-      input.espacioId
-        ? (espacios.find((e) => e.id === input.espacioId)?.nombre ?? null)
-        : null;
+    const espacioElegido = input.espacioId
+      ? espacios.find((e) => e.id === input.espacioId)
+      : undefined;
+    const espacioNombre = espacioElegido
+      ? etiquetaNombreEspacio(espacioElegido.nombre, espacioElegido.descripcion)
+      : null;
 
     const id = newLocalId();
     const now = new Date().toISOString();
@@ -335,9 +304,6 @@ export async function createAmbiente(
     return { data: ambiente };
   }
 
-  const ocupado = await mensajeSiEspacioOcupado(input.espacioId);
-  if (ocupado) return { error: ocupado };
-
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
     .from("ambientes")
@@ -368,18 +334,13 @@ export async function updateAmbiente(
     if (found.data.es_preregistro) {
       return { error: "El ambiente de preregistros no se puede editar." };
     }
-    const ocupado = await mensajeSiEspacioOcupado(
-      input.espacioId,
-      ambienteId,
-      found.entidadId,
-    );
-    if (ocupado) return { error: ocupado };
-
     const espacios = await listMasterDomain<Espacio>("espacios", found.entidadId);
-    const espacioNombre =
-      input.espacioId
-        ? (espacios.find((e) => e.id === input.espacioId)?.nombre ?? null)
-        : null;
+    const espacioElegido = input.espacioId
+      ? espacios.find((e) => e.id === input.espacioId)
+      : undefined;
+    const espacioNombre = espacioElegido
+      ? etiquetaNombreEspacio(espacioElegido.nombre, espacioElegido.descripcion)
+      : null;
 
     const updated: AmbienteConSede = {
       ...found.data,
@@ -413,9 +374,6 @@ export async function updateAmbiente(
   if (existing?.es_preregistro) {
     return { error: "El ambiente de preregistros no se puede editar." };
   }
-
-  const ocupado = await mensajeSiEspacioOcupado(input.espacioId, ambienteId);
-  if (ocupado) return { error: ocupado };
 
   const { error } = await supabase
     .from("ambientes")
@@ -669,12 +627,12 @@ export async function listEspacios(sedeId: string): Promise<EspacioConOcupacion[
       return (data ?? []).map((row) => {
         const ambientes =
           (row.ambientes as Array<{ id: string; nombre: string; activo: boolean }> | null) ?? [];
-        const ocupante = ambientes.find((a) => a.activo);
         const { ambientes: _, ...espacio } = row;
+        const base = espacio as Espacio;
         return {
-          ...(espacio as Espacio),
-          ambiente_id: ocupante?.id ?? null,
-          ambiente_nombre: ocupante?.nombre ?? null,
+          ...base,
+          descripcion: base.descripcion ?? "",
+          ...resumenOcupacionEspacio(ambientes),
         };
       });
     } catch {
@@ -710,9 +668,12 @@ export async function listEspaciosPorEntidad(entidadId: string): Promise<Espacio
 export async function createEspacio(
   sedeId: string,
   nombre: string,
+  descripcion: string,
 ): Promise<{ data?: Espacio; error?: string }> {
   const trimmed = nombre.trim();
   if (!trimmed) return { error: "Nombre de espacio obligatorio." };
+  const desc = descripcionEspacioRequerida(descripcion);
+  if ("error" in desc) return desc;
 
   if (!isOnline()) {
     const sede = await findMasterItem<Sede>("sedes", sedeId);
@@ -728,9 +689,11 @@ export async function createEspacio(
       id,
       sede_id: sedeId,
       nombre: trimmed,
+      descripcion: desc.descripcion,
       activo: true,
       created_at: now,
       updated_at: now,
+      ocupantes: [],
       ambiente_id: null,
       ambiente_nombre: null,
     };
@@ -739,6 +702,7 @@ export async function createEspacio(
       id,
       sedeId,
       nombre: trimmed,
+      descripcion: desc.descripcion,
     });
     return { data: espacio };
   }
@@ -760,7 +724,7 @@ export async function createEspacio(
 
   const { data, error } = await supabase
     .from("espacios")
-    .insert({ sede_id: sedeId, nombre: trimmed })
+    .insert({ sede_id: sedeId, nombre: trimmed, descripcion: desc.descripcion })
     .select()
     .single();
 
@@ -780,19 +744,22 @@ export async function createEspacio(
 export async function ensureEspaciosHasta(
   sedeId: string,
   cantidad: number,
+  descripcion: string,
 ): Promise<{ success?: true; creados?: number; data?: EspacioConOcupacion[]; error?: string }> {
   if (!Number.isFinite(cantidad) || cantidad < 1 || cantidad > 500) {
     return { error: "Indique una cantidad entre 1 y 500." };
   }
+  const desc = descripcionEspacioRequerida(descripcion);
+  if ("error" in desc) return desc;
 
   const existentes = await listEspacios(sedeId);
   const nombres = new Set(existentes.map((e) => e.nombre.trim().toLowerCase()));
   const desde = maxNumeroEspacioExistente(existentes) + 1;
-  const aCrear: { id?: string; sede_id: string; nombre: string }[] = [];
+  const aCrear: { id?: string; sede_id: string; nombre: string; descripcion: string }[] = [];
   for (let i = 0; i < cantidad; i++) {
     const nombre = nombreEspacioNumerado(desde + i);
     if (!nombres.has(nombre.toLowerCase())) {
-      aCrear.push({ sede_id: sedeId, nombre });
+      aCrear.push({ sede_id: sedeId, nombre, descripcion: desc.descripcion });
     }
   }
 
@@ -811,9 +778,11 @@ export async function ensureEspaciosHasta(
         id,
         sede_id: sedeId,
         nombre: row.nombre,
+        descripcion: row.descripcion,
         activo: true,
         created_at: now,
         updated_at: now,
+        ocupantes: [],
         ambiente_id: null,
         ambiente_nombre: null,
       };
@@ -822,6 +791,7 @@ export async function ensureEspaciosHasta(
         id,
         sedeId,
         nombre: row.nombre,
+        descripcion: row.descripcion,
       });
       creados.push(espacio);
     }
@@ -865,6 +835,38 @@ export async function deleteEspacio(espacioId: string): Promise<{ success?: true
     .from("espacios")
     .update({ activo: false })
     .eq("id", espacioId);
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function updateEspacio(
+  espacioId: string,
+  descripcion: string,
+): Promise<{ success?: true; error?: string }> {
+  const desc = descripcionEspacioRequerida(descripcion);
+  if ("error" in desc) return desc;
+
+  if (!isOnline()) {
+    const found = await findMasterItem<Espacio>("espacios", espacioId);
+    if (!found) return { error: "Espacio no encontrado en caché local." };
+    await upsertMasterItem("espacios", found.entidadId, {
+      ...found.data,
+      descripcion: desc.descripcion,
+      updated_at: new Date().toISOString(),
+    });
+    await enqueueOfflineOp("espacio:update", found.entidadId, {
+      espacioId,
+      descripcion: desc.descripcion,
+    });
+    return { success: true };
+  }
+
+  const supabase = getSupabaseClient();
+  const { error } = await supabase
+    .from("espacios")
+    .update({ descripcion: desc.descripcion })
+    .eq("id", espacioId)
+    .eq("activo", true);
   if (error) return { error: error.message };
   return { success: true };
 }

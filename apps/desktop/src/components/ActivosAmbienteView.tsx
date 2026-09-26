@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { listAmbientesPorEntidad } from "../lib/ubicacion";
 import type { Entidad } from "@inventario/types";
 import { Button } from "@inventario/ui";
 import type { ActivoConUbicacion } from "../lib/activos";
@@ -9,6 +10,7 @@ import {
 } from "../lib/ficha-asignacion-meta";
 import { ActivosCampoList } from "./ActivosCampoList";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
+import { FaltanteBienesPanel, useVisitaRevision } from "./VisitaRevisionPanel";
 
 interface ActivosAmbienteViewProps {
   entidad: Entidad;
@@ -19,6 +21,7 @@ interface ActivosAmbienteViewProps {
   sedeId: string;
   sedeNombre?: string | null;
   esAmbientePreregistro?: boolean;
+  esAmbienteFaltante?: boolean;
   activos: ActivoConUbicacion[];
   loading: boolean;
   online: boolean;
@@ -31,6 +34,7 @@ interface ActivosAmbienteViewProps {
   onActivoUpdated: (activo: ActivoConUbicacion) => void;
   onActivoDeleted?: () => void;
   onAbrirAmbienteDestino?: (destino: AmbienteDestinoNavigation) => void;
+  onInventarioRefresh?: () => void;
 }
 
 export function ActivosAmbienteView({
@@ -42,6 +46,7 @@ export function ActivosAmbienteView({
   sedeId,
   sedeNombre,
   esAmbientePreregistro = false,
+  esAmbienteFaltante = false,
   activos,
   loading,
   online,
@@ -54,11 +59,32 @@ export function ActivosAmbienteView({
   onActivoUpdated,
   onActivoDeleted,
   onAbrirAmbienteDestino,
+  onInventarioRefresh,
 }: ActivosAmbienteViewProps) {
   const activosAmbiente = useMemo(
     () => activos.filter((a) => a.ambiente_id === ambienteId),
     [activos, ambienteId],
   );
+  const [esFaltanteRemoto, setEsFaltanteRemoto] = useState<boolean | null>(null);
+  useEffect(() => {
+    setEsFaltanteRemoto(null);
+    let cancel = false;
+    void listAmbientesPorEntidad(entidad.id, sedeId).then((lista) => {
+      if (cancel) return;
+      const actual = lista.find((item) => item.id === ambienteId);
+      if (actual) setEsFaltanteRemoto(actual.es_faltante === true);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [ambienteId, entidad.id, sedeId]);
+  const esFaltante = esFaltanteRemoto ?? esAmbienteFaltante === true;
+  const visita = useVisitaRevision({
+    ambienteId,
+    activos: activosAmbiente,
+    enabled: !esAmbientePreregistro && !esFaltante,
+    onChanged: onInventarioRefresh,
+  });
 
   const [fichaMeta, setFichaMeta] = useState<FichaAsignacionExportMeta | null>(null);
 
@@ -117,6 +143,18 @@ export function ActivosAmbienteView({
       fixedSedeId={sedeId}
       fixedAmbienteId={ambienteId}
       esAmbientePreregistro={esAmbientePreregistro}
+      headerExtra={
+        esFaltante ? (
+          <FaltanteBienesPanel
+            entidadId={entidad.id}
+            activos={activosAmbiente}
+            onAbrirDestino={onAbrirAmbienteDestino}
+            onChanged={onInventarioRefresh}
+          />
+        ) : null
+      }
+      leyendaVisita={visita.activa ? visita.leyenda : null}
+      renderVisita={visita.activa ? visita.renderCelda : undefined}
       exportMeta={exportMeta}
       reportesExport={
         !esAmbientePreregistro ? (

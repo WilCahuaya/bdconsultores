@@ -5,6 +5,7 @@ import type {
   VisitaCampoAmbienteDetalle,
   VisitaCampoHistorial,
 } from "@inventario/types";
+import { fetchProfile } from "./profile";
 import { getSupabaseClient } from "./supabase";
 import type { AmbienteConSede } from "./ubicacion";
 import {
@@ -298,7 +299,61 @@ async function findVisitaAmbientesAcrossEntidades(visitaId: string): Promise<Vis
 
 export type AmbienteConVisita = AmbienteConSede & {
   visita_estado: EstadoVisitaAmbiente | null;
+  /** Bienes ya marcados Sí o No en la visita abierta. */
+  visita_revisados: number | null;
+  /** Bienes registrados que entran en la revisión de ese ambiente. */
+  visita_total: number | null;
 };
+
+async function conteoRevisionPorAmbiente(
+  visitaPorAmbiente: Map<string, string>,
+): Promise<Map<string, { revisados: number; total: number }>> {
+  const resultado = new Map<string, { revisados: number; total: number }>();
+  const ambienteIds = [...visitaPorAmbiente.keys()];
+  if (ambienteIds.length === 0) return resultado;
+
+  const supabase = getSupabaseClient();
+  const visitaIds = [...new Set(visitaPorAmbiente.values())];
+  const [{ data: revisiones }, { data: bienes }] = await Promise.all([
+    supabase
+      .from("visita_revisiones")
+      .select("visita_id, ambiente_id, activo_id")
+      .in("visita_id", visitaIds),
+    supabase
+      .from("activos")
+      .select("id, ambiente_id")
+      .eq("estado_registro", "REGISTRADO")
+      .in("ambiente_id", ambienteIds),
+  ]);
+
+  const revisadosPorAmbiente = new Map<string, Set<string>>();
+  for (const fila of revisiones ?? []) {
+    const ambienteId = fila.ambiente_id as string;
+    if (visitaPorAmbiente.get(ambienteId) !== fila.visita_id) continue;
+    const ids = revisadosPorAmbiente.get(ambienteId) ?? new Set<string>();
+    ids.add(fila.activo_id as string);
+    revisadosPorAmbiente.set(ambienteId, ids);
+  }
+
+  const revisadosCount = new Map<string, number>();
+  const totalCount = new Map<string, number>();
+  for (const bien of bienes ?? []) {
+    const ambienteId = bien.ambiente_id as string;
+    if (!visitaPorAmbiente.get(ambienteId)) continue;
+    totalCount.set(ambienteId, (totalCount.get(ambienteId) ?? 0) + 1);
+    if (revisadosPorAmbiente.get(ambienteId)?.has(bien.id as string)) {
+      revisadosCount.set(ambienteId, (revisadosCount.get(ambienteId) ?? 0) + 1);
+    }
+  }
+
+  for (const ambienteId of ambienteIds) {
+    resultado.set(ambienteId, {
+      revisados: revisadosCount.get(ambienteId) ?? 0,
+      total: totalCount.get(ambienteId) ?? 0,
+    });
+  }
+  return resultado;
+}
 
 export async function getVisitasCampoActivas(entidadId: string): Promise<VisitaCampoActiva[]> {
   if (isOnline()) {
@@ -324,10 +379,16 @@ export async function attachVisitaEstadoToAmbientes(
 ): Promise<AmbienteConVisita[]> {
   const visitas = await getVisitasCampoActivas(entidadId);
   if (visitas.length === 0) {
-    return ambientes.map((a) => ({ ...a, visita_estado: null }));
+    return ambientes.map((a) => ({
+      ...a,
+      visita_estado: null,
+      visita_revisados: null,
+      visita_total: null,
+    }));
   }
 
   const porAmbiente = new Map<string, EstadoVisitaAmbiente>();
+  const visitaPorAmbiente = new Map<string, string>();
 
   if (isOnline()) {
     try {
@@ -340,12 +401,21 @@ export async function attachVisitaEstadoToAmbientes(
 
         for (const fila of filas ?? []) {
           porAmbiente.set(fila.ambiente_id, fila.estado as EstadoVisitaAmbiente);
+          visitaPorAmbiente.set(fila.ambiente_id, visita.id);
         }
       }
-      return ambientes.map((a) => ({
-        ...a,
-        visita_estado: a.es_preregistro || a.es_faltante ? null : (porAmbiente.get(a.id) ?? null),
-      }));
+      const conteo = await conteoRevisionPorAmbiente(visitaPorAmbiente);
+      return ambientes.map((a) => {
+        const enVisita = !a.es_preregistro && !a.es_faltante && porAmbiente.has(a.id);
+        const cifras = conteo.get(a.id);
+        const completo = cifras != null && cifras.revisados === cifras.total;
+        return {
+          ...a,
+          visita_estado: enVisita ? (completo ? "CULMINADO" : "EN_PROCESO") : null,
+          visita_revisados: enVisita ? (cifras?.revisados ?? 0) : null,
+          visita_total: enVisita ? (cifras?.total ?? 0) : null,
+        };
+      });
     } catch {
       /* usar caché */
     }
@@ -362,6 +432,8 @@ export async function attachVisitaEstadoToAmbientes(
   return ambientes.map((a) => ({
     ...a,
     visita_estado: a.es_preregistro || a.es_faltante ? null : (porAmbiente.get(a.id) ?? null),
+    visita_revisados: null,
+    visita_total: null,
   }));
 }
 
@@ -586,6 +658,107 @@ export async function cerrarVisitaCampo(visitaId: string) {
   const { error } = await supabase.rpc("cerrar_visita_campo", {
     p_visita_id: visitaId,
   });
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export type RevisionVisitaItem = {
+  activo_id: string;
+  hallado: boolean;
+  accion: "BAJA" | "FALTANTE" | null;
+};
+
+export async function getRevisionVisitaAmbiente(ambienteId: string): Promise<{
+  visitaId: string;
+  items: RevisionVisitaItem[];
+} | null> {
+  if (!isOnline()) return null;
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return null;
+
+  const supabase = getSupabaseClient();
+  const { data: ambiente } = await supabase
+    .from("ambientes")
+    .select("id, sede_id, es_preregistro, es_faltante, sedes!inner(entidad_id)")
+    .eq("id", ambienteId)
+    .maybeSingle();
+
+  if (!ambiente || ambiente.es_preregistro || ambiente.es_faltante) return null;
+
+  const sedeJoin = ambiente.sedes as { entidad_id: string } | { entidad_id: string }[] | null;
+  const entidadId = Array.isArray(sedeJoin) ? sedeJoin[0]?.entidad_id : sedeJoin?.entidad_id;
+  if (!entidadId) return null;
+
+  const { data: visitas } = await supabase
+    .from("visitas_campo")
+    .select("id, sede_id")
+    .eq("entidad_id", entidadId)
+    .eq("estado", "ABIERTO");
+
+  const visita = (visitas ?? []).find(
+    (v) => v.sede_id == null || v.sede_id === ambiente.sede_id,
+  );
+  if (!visita) return null;
+
+  const { data: filas } = await supabase
+    .from("visita_revisiones")
+    .select("activo_id, hallado, accion")
+    .eq("visita_id", visita.id)
+    .eq("ambiente_id", ambienteId);
+
+  return {
+    visitaId: visita.id,
+    items: (filas ?? []).map((fila) => ({
+      activo_id: fila.activo_id as string,
+      hallado: Boolean(fila.hallado),
+      accion: (fila.accion as "BAJA" | "FALTANTE" | null) ?? null,
+    })),
+  };
+}
+
+export async function registrarRevisionVisita(input: {
+  ambienteId: string;
+  activoId: string;
+  hallado: boolean;
+  estadoBien?: "BUENO" | "REGULAR" | "MALO" | null;
+  accion?: "BAJA" | "FALTANTE" | null;
+  motivo?: string | null;
+}) {
+  if (!isOnline()) return { error: "Sin conexión. La revisión de la visita requiere internet." };
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
+
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.rpc("registrar_revision_visita", {
+    p_activo_id: input.activoId,
+    p_hallado: input.hallado,
+    p_estado_bien: input.hallado ? input.estadoBien ?? null : null,
+    p_accion: input.hallado ? null : input.accion ?? null,
+    p_motivo: input.motivo ?? null,
+  });
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
+export async function resolverBienFaltante(input: {
+  activoId: string;
+  accion: "MOVER" | "BAJA";
+  destinoAmbienteId?: string | null;
+  motivo?: string | null;
+}) {
+  if (!isOnline()) return { error: "Sin conexión. Resolver un bien de Faltante requiere internet." };
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
+
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.rpc("resolver_bien_faltante", {
+    p_activo_id: input.activoId,
+    p_accion: input.accion,
+    p_ambiente_id: input.destinoAmbienteId ?? null,
+    p_motivo: input.motivo ?? null,
+  });
+
   if (error) return { error: error.message };
   return { success: true };
 }

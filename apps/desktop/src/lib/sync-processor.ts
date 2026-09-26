@@ -377,7 +377,19 @@ async function processMasterOp(
       id: String(payload.id),
       sede_id: String(payload.sedeId),
       nombre: String(payload.nombre),
+      descripcion: String(payload.descripcion ?? "").trim(),
     });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (op === "espacio:update") {
+    const descripcion = String(payload.descripcion ?? "").trim();
+    if (!descripcion) throw new Error("La descripción del espacio es obligatoria.");
+    const { error } = await supabase
+      .from("espacios")
+      .update({ descripcion })
+      .eq("id", String(payload.espacioId));
     if (error) throw new Error(error.message);
     return;
   }

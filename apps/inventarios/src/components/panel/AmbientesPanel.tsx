@@ -41,6 +41,7 @@ import {
   deleteAmbiente,
   deleteEspacio,
   ensureEspaciosHasta,
+  updateEspacio,
   listAmbientesPorEntidad,
   listEspacios,
   listEspaciosPorEntidad,
@@ -1044,17 +1045,22 @@ export function AmbientesPanel({
         pending={manageEspaciosPending}
         error={manageEspaciosError}
         onReload={reloadManageEspacios}
-        onCreate={async (nombre) => {
+        onCreate={async (nombre, descripcion) => {
           if (!manageEspaciosSedeId) return { error: "Sucursal no válida." };
-          const result = await createEspacio(manageEspaciosSedeId, nombre);
+          const result = await createEspacio(manageEspaciosSedeId, nombre, descripcion);
           if (result.error) return { error: result.error };
           return {};
         }}
-        onEnsureHasta={async (cantidad) => {
+        onEnsureHasta={async (cantidad, descripcion) => {
           if (!manageEspaciosSedeId) return { error: "Sucursal no válida." };
-          const result = await ensureEspaciosHasta(manageEspaciosSedeId, cantidad);
+          const result = await ensureEspaciosHasta(manageEspaciosSedeId, cantidad, descripcion);
           if (result.error) return { error: result.error };
           return { creados: result.creados };
+        }}
+        onUpdateDescripcion={async (espacioId, descripcion) => {
+          const result = await updateEspacio(espacioId, descripcion);
+          if (result.error) return { error: result.error };
+          return {};
         }}
         onDelete={async (espacioId) => {
           const result = await deleteEspacio(espacioId);

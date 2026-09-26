@@ -55,6 +55,7 @@ type AmbienteContext = {
   ambienteResponsable?: string | null;
   ambienteResponsableId?: string | null;
   esAmbientePreregistro?: boolean;
+  esAmbienteFaltante?: boolean;
 };
 
 type EntityTab = "inventario" | "ambientes" | "responsables" | "sucursales" | "visitas";
@@ -451,6 +452,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
       ...context,
       ambienteId,
       ambienteNombre,
+      esAmbienteFaltante: false,
     });
   }
 
@@ -656,6 +658,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
               ambienteResponsable: amb.responsable,
               ambienteResponsableId: amb.responsable_id,
               esAmbientePreregistro: amb.es_preregistro,
+              esAmbienteFaltante: amb.es_faltante === true,
             })
           }
         />
@@ -674,6 +677,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
             sedeId={entidadesFlow.context.sedeId}
             sedeNombre={entidadesFlow.context.sedeNombre}
             esAmbientePreregistro={entidadesFlow.context.esAmbientePreregistro}
+            esAmbienteFaltante={entidadesFlow.context.esAmbienteFaltante}
             activos={activosCache.activos}
             loading={activosCache.loading}
             online={online}
@@ -692,8 +696,9 @@ function MainApp({ userId }: { userId: string; email: string }) {
               })
             }
             onActivoUpdated={(activo) => void handleActivoUpdated(activo)}
-          onActivoDeleted={() => void handleActivoDeleted()}
+            onActivoDeleted={() => void handleActivoDeleted()}
             onAbrirAmbienteDestino={goAmbienteDestino}
+            onInventarioRefresh={() => void refreshActivos()}
           />
         )}
 

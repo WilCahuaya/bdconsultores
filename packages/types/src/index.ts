@@ -194,15 +194,38 @@ export interface Espacio {
   id: string;
   sede_id: string;
   nombre: string;
+  /** Texto del local. Obligatorio al crear o editar. */
+  descripcion: string;
   activo: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface EspacioConOcupacion extends Espacio {
-  /** Nombre del ambiente que lo ocupa, si aplica. */
+  /** Ambientes activos que ocupan este espacio. */
+  ocupantes: Array<{ id: string; nombre: string }>;
+  /** Nombres unidos, para listas. Vacío si está libre. */
   ambiente_nombre?: string | null;
   ambiente_id?: string | null;
+}
+
+export function etiquetaNombreEspacio(nombre: string, descripcion?: string | null): string {
+  const desc = descripcion?.trim();
+  return desc ? `${nombre} — ${desc}` : nombre;
+}
+
+export function resumenOcupacionEspacio(
+  ambientes: Array<{ id: string; nombre: string; activo?: boolean }> | null | undefined,
+): Pick<EspacioConOcupacion, "ocupantes" | "ambiente_id" | "ambiente_nombre"> {
+  const ocupantes = (ambientes ?? [])
+    .filter((a) => a.activo !== false)
+    .map((a) => ({ id: a.id, nombre: a.nombre.trim() || "Sin nombre" }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  return {
+    ocupantes,
+    ambiente_id: ocupantes[0]?.id ?? null,
+    ambiente_nombre: ocupantes.length > 0 ? ocupantes.map((o) => o.nombre).join(", ") : null,
+  };
 }
 
 export interface Ambiente {

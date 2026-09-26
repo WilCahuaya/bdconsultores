@@ -44,7 +44,7 @@ import {
   useStoredViewMode,
   SedeAmbienteFilterSelect,
   VisitasCampoBanner,
-  VisitaCampoEstadoBadge,
+  VisitaCampoConteo,
   VisitasCampoHistorialPanel,
   IniciarVisitaCampoDialog,
   IniciarVisitaCampoButton,
@@ -61,6 +61,7 @@ import {
   deleteAmbiente,
   deleteEspacio,
   ensureEspaciosHasta,
+  updateEspacio,
   listAmbientesPorEntidad,
   listEspacios,
   listEspaciosPorEntidad,
@@ -73,7 +74,6 @@ import {
   abrirVisitaCampo,
   attachVisitaEstadoToAmbientes,
   cerrarVisitaCampo,
-  culminarAmbienteVisita,
   getVisitasCampoActivas,
   getVisitaCampoDetalle,
   listVisitasCampoHistorial,
@@ -131,16 +131,18 @@ function AmbienteCard({
   onDelete,
   onViewActivos,
 }: {
-  ambiente: AmbienteConSede;
+  ambiente: AmbienteConVisita;
   entidadNombre: string;
   onEdit: () => void;
   onDelete: () => void;
   onViewActivos: () => void;
 }) {
-  const espacioLabel = etiquetaEspacioAmbiente({
-    esPreregistro: ambiente.es_preregistro,
-    espacioNombre: ambiente.espacio_nombre,
-  });
+  const espacioLabel = ambiente.es_faltante
+    ? "No hallados"
+    : etiquetaEspacioAmbiente({
+        esPreregistro: ambiente.es_preregistro,
+        espacioNombre: ambiente.espacio_nombre,
+      });
   return (
     <article className={`${panelCardClass} flex flex-col overflow-hidden`}>
       <button
@@ -162,11 +164,16 @@ function AmbienteCard({
             title={
               ambiente.es_preregistro
                 ? "Ambiente de preregistros: no es un local físico"
-                : undefined
+                : ambiente.es_faltante
+                  ? "Bienes no hallados en visita"
+                  : undefined
             }
           >
             Espacio: {espacioLabel}
           </p>
+          {ambiente.visita_revisados != null && (
+            <VisitaCampoConteo revisados={ambiente.visita_revisados} total={ambiente.visita_total} />
+          )}
           {ambiente.descripcion ? (
             <p className="text-muted-foreground">{ambiente.descripcion}</p>
           ) : (
@@ -181,6 +188,7 @@ function AmbienteCard({
         </div>
       </button>
 
+      {ambiente.es_preregistro || ambiente.es_faltante ? null : (
       <div className="flex flex-wrap items-center gap-2 border-t border-border/50 bg-muted/20 px-3 py-2.5">
         <PanelIconAction label="Editar" onClick={onEdit}>
           <EditIcon />
@@ -189,6 +197,7 @@ function AmbienteCard({
           <DeleteIcon />
         </PanelIconAction>
       </div>
+      )}
     </article>
   );
 }
@@ -221,7 +230,6 @@ export function AmbientesView({
   const [visitaPending, setVisitaPending] = useState(false);
   const [cerrarPendingId, setCerrarPendingId] = useState<string | null>(null);
   const [visitaError, setVisitaError] = useState<string | null>(null);
-  const [culminarPendingId, setCulminarPendingId] = useState<string | null>(null);
   const [detalleVisita, setDetalleVisita] = useState<VisitaCampoHistorial | null>(null);
   const [detalleAmbientes, setDetalleAmbientes] = useState<Awaited<ReturnType<typeof getVisitaCampoDetalle>> | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
@@ -435,18 +443,6 @@ export function AmbientesView({
     await syncVisitaYAmbientes();
   }
 
-  async function handleCulminarAmbiente(ambienteId: string) {
-    setCulminarPendingId(ambienteId);
-    setVisitaError(null);
-    const result = await culminarAmbienteVisita(ambienteId);
-    setCulminarPendingId(null);
-    if (result.error) {
-      setVisitaError(result.error);
-      return;
-    }
-    await syncVisitaYAmbientes();
-  }
-
   async function handleVerDetalleVisita(visita: VisitaCampoHistorial) {
     setDetalleVisita(visita);
     setDetalleLoading(true);
@@ -509,6 +505,8 @@ export function AmbientesView({
 
   function sortAmbientes(rows: AmbienteConVisita[]) {
     return [...rows].sort((a, b) => {
+      if (a.es_preregistro !== b.es_preregistro) return a.es_preregistro ? -1 : 1;
+      if (Boolean(a.es_faltante) !== Boolean(b.es_faltante)) return a.es_faltante ? -1 : 1;
       if (a.sede_es_principal !== b.sede_es_principal) return a.sede_es_principal ? -1 : 1;
       if (a.sede_nombre !== b.sede_nombre) return a.sede_nombre.localeCompare(b.sede_nombre);
       return a.nombre.localeCompare(b.nombre);
@@ -546,6 +544,8 @@ export function AmbientesView({
         espacio_nombre: espacioNombre,
         activo_count: 0,
         visita_estado: visitaAbierta ? "EN_PROCESO" : null,
+        visita_revisados: visitaAbierta ? 0 : null,
+        visita_total: visitaAbierta ? 0 : null,
         responsable:
           result.data?.responsable ??
           responsableNombreById(input.responsableId) ??
@@ -931,13 +931,17 @@ export function AmbientesView({
                           title={
                             amb.es_preregistro
                               ? "Ambiente de preregistros: no es un local físico"
-                              : amb.espacio_nombre ?? undefined
+                              : amb.es_faltante
+                                ? "Bienes no hallados en visita"
+                                : amb.espacio_nombre ?? undefined
                           }
                         >
-                          {etiquetaEspacioAmbiente({
-                            esPreregistro: amb.es_preregistro,
-                            espacioNombre: amb.espacio_nombre,
-                          })}
+                          {amb.es_faltante
+                            ? "No hallados"
+                            : etiquetaEspacioAmbiente({
+                                esPreregistro: amb.es_preregistro,
+                                espacioNombre: amb.espacio_nombre,
+                              })}
                         </PanelTableTd>
                         <PanelTableTd title={amb.responsable ?? undefined}>
                           {amb.responsable ?? "—"}
@@ -963,25 +967,11 @@ export function AmbientesView({
                           {amb.activo_count}
                         </PanelTableTd>
                         {visitaAbierta && (
-                          <PanelTableTd className={panelTableNowrapCellClass}>
-                            <div
-                              className="flex flex-col items-start gap-1"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <VisitaCampoEstadoBadge estado={amb.visita_estado} />
-                              {!amb.es_preregistro && amb.visita_estado === "EN_PROCESO" && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs"
-                                  disabled={culminarPendingId === amb.id}
-                                  onClick={() => void handleCulminarAmbiente(amb.id)}
-                                >
-                                  {culminarPendingId === amb.id ? "…" : "Culminar"}
-                                </Button>
-                              )}
-                            </div>
+                          <PanelTableTd className={panelTableNowrapCellClass} align="center">
+                            <VisitaCampoConteo
+                              revisados={amb.visita_revisados}
+                              total={amb.visita_total}
+                            />
                           </PanelTableTd>
                         )}
                         <PanelTableTd className={panelTableNowrapCellClass}>
@@ -992,16 +982,18 @@ export function AmbientesView({
                           className={`overflow-visible ${panelTableNowrapCellClass}`}
                         >
                           <div onClick={(event) => event.stopPropagation()}>
-                            <PanelTableActions
-                              onEdit={() => {
-                                setError(null);
-                                setEditAmbiente(amb);
-                              }}
-                              onDelete={() => {
-                                setError(null);
-                                setDeleteTarget(amb);
-                              }}
-                            />
+                            {amb.es_preregistro || amb.es_faltante ? null : (
+                              <PanelTableActions
+                                onEdit={() => {
+                                  setError(null);
+                                  setEditAmbiente(amb);
+                                }}
+                                onDelete={() => {
+                                  setError(null);
+                                  setDeleteTarget(amb);
+                                }}
+                              />
+                            )}
                           </div>
                         </PanelTableTd>
                       </tr>
@@ -1182,17 +1174,22 @@ export function AmbientesView({
         pending={manageEspaciosPending}
         error={manageEspaciosError}
         onReload={reloadManageEspacios}
-        onCreate={async (nombre) => {
+        onCreate={async (nombre, descripcion) => {
           if (!manageEspaciosSedeId) return { error: "Sucursal no válida." };
-          const result = await createEspacio(manageEspaciosSedeId, nombre);
+          const result = await createEspacio(manageEspaciosSedeId, nombre, descripcion);
           if (result.error) return { error: result.error };
           return {};
         }}
-        onEnsureHasta={async (cantidad) => {
+        onEnsureHasta={async (cantidad, descripcion) => {
           if (!manageEspaciosSedeId) return { error: "Sucursal no válida." };
-          const result = await ensureEspaciosHasta(manageEspaciosSedeId, cantidad);
+          const result = await ensureEspaciosHasta(manageEspaciosSedeId, cantidad, descripcion);
           if (result.error) return { error: result.error };
           return { creados: result.creados };
+        }}
+        onUpdateDescripcion={async (espacioId, descripcion) => {
+          const result = await updateEspacio(espacioId, descripcion);
+          if (result.error) return { error: result.error };
+          return {};
         }}
         onDelete={async (espacioId) => {
           const result = await deleteEspacio(espacioId);

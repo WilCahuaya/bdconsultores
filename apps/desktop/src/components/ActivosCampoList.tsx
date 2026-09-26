@@ -63,6 +63,9 @@ interface ActivosCampoListProps {
   fixedSedeId?: string;
   fixedAmbienteId?: string;
   esAmbientePreregistro?: boolean;
+  headerExtra?: ReactNode;
+  leyendaVisita?: ReactNode;
+  renderVisita?: (activo: ActivoConUbicacion) => ReactNode;
   ambienteFilter?: { id: string; nombre: string };
   onClearAmbienteFilter?: () => void;
   onPrintLabel: (activo: ActivoConUbicacion) => void;
@@ -91,6 +94,9 @@ export function ActivosCampoList({
   fixedSedeId,
   fixedAmbienteId,
   esAmbientePreregistro = false,
+  headerExtra,
+  leyendaVisita,
+  renderVisita,
   ambienteFilter,
   onClearAmbienteFilter,
   onPrintLabel,
@@ -528,6 +534,7 @@ export function ActivosCampoList({
 
   return (
     <div className={`${usePanelScrollLayout ? `${panelInventarioPageClass} flex min-h-0 flex-col gap-1` : "space-y-3"} ${className ?? ""}`}>
+      {headerExtra}
       {usePanelScrollLayout && showToolbarTrigger && (
         <PanelToolbarExpandTrigger onClick={scrollToToolbar} />
       )}
@@ -747,6 +754,8 @@ export function ActivosCampoList({
           onSelectionChange={setSelectedActivos}
           gestionPreregistros={gestionPreregistros}
           onActivoEliminado={(id) => quitarActivos([id])}
+          leyendaVisita={leyendaVisita}
+          renderVisita={renderVisita}
         />
       ) : (
         <>

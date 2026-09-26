@@ -98,6 +98,7 @@ function ActivosInventarioMobileCards({
   mostrarUbicacion = false,
   ubicacionMultiplesSedes = false,
   puedeEliminarPreregistro = false,
+  renderVisita,
 }: {
   activos: ActivoConUbicacion[];
   entidadId: string;
@@ -119,6 +120,7 @@ function ActivosInventarioMobileCards({
   mostrarUbicacion?: boolean;
   ubicacionMultiplesSedes?: boolean;
   puedeEliminarPreregistro?: boolean;
+  renderVisita?: (activo: ActivoConUbicacion) => ReactNode;
 }) {
   if (activos.length === 0) {
     return (
@@ -186,6 +188,15 @@ function ActivosInventarioMobileCards({
               </div>
               <EstadoBienBadge estado={activo.estado_bien} />
             </div>
+
+            {renderVisita ? (
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Visita
+                </span>
+                {renderVisita(activo)}
+              </div>
+            ) : null}
 
             {descripcion && (
               <p className="mb-3 text-xs leading-snug text-muted-foreground">{descripcion}</p>
@@ -285,6 +296,8 @@ interface ActivosInventarioExcelViewProps {
   embeddedInParentScroll?: boolean;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
   className?: string;
+  leyendaVisita?: ReactNode;
+  renderVisita?: (activo: ActivoConUbicacion) => ReactNode;
 }
 
 export function ActivosInventarioExcelView({
@@ -311,6 +324,8 @@ export function ActivosInventarioExcelView({
   embeddedInParentScroll = false,
   tableScrollRef,
   className,
+  leyendaVisita,
+  renderVisita,
 }: ActivosInventarioExcelViewProps) {
   const preregistrados = useMemo(() => activos.filter(esActivoPreregistrado), [activos]);
   const gestionEnabled = Boolean(gestionPreregistros && preregistrados.length > 0);
@@ -478,6 +493,7 @@ export function ActivosInventarioExcelView({
         mostrarUbicacion={mostrarUbicacion}
         ubicacionMultiplesSedes={ubicacionMultiplesSedes}
         puedeEliminarPreregistro={puedeEliminarPreregistro}
+        renderVisita={renderVisita}
       />
     </div>
   );
@@ -516,6 +532,7 @@ export function ActivosInventarioExcelView({
               }
             : undefined
       }
+      renderVisita={renderVisita}
       renderComprobante={(activo) => <ComprobanteCell activo={activo} />}
       renderAcciones={(activo) => (
         <ActivosCampoAcciones
@@ -565,6 +582,7 @@ export function ActivosInventarioExcelView({
             <div ref={bodyScrollRef} className={panelInventarioBodyScrollClass}>
               {toolbar}
               {inlinePreregistroToolbar}
+              {leyendaVisita}
               <div className={panelDataCardsWrapClass}>{mobileCards}</div>
               {tableBlock}
             </div>
@@ -585,6 +603,7 @@ export function ActivosInventarioExcelView({
       }
     >
       {inlinePreregistroToolbar}
+      {leyendaVisita}
       {mobileCards}
       {tableBlock}
       {paginationBlock}

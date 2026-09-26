@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Ambiente, Espacio, Responsable, SedeConConteo } from "@inventario/types";
+import { etiquetaNombreEspacio } from "@inventario/types";
 import { Button, Input, Label, Select, Textarea } from "./components";
 
 export type AmbienteFormAmbiente = Pick<
@@ -164,11 +165,14 @@ export function AmbienteFormFields({
               disabled={!sedeId}
               options={[
                 { value: "", label: "Sin espacio asignado (opcional)" },
-                ...espaciosSede.map((e) => ({ value: e.id, label: e.nombre })),
+                ...espaciosSede.map((e) => ({
+                  value: e.id,
+                  label: etiquetaNombreEspacio(e.nombre, e.descripcion),
+                })),
               ]}
             />
             <p className="text-xs text-muted-foreground">
-              Local físico de la sucursal (ej. Espacio 01). Puede cambiarlo si el área se muda.
+              Varios ambientes pueden ocupar el mismo espacio. Puede cambiarlo si el área se muda.
             </p>
           </>
         )}
