@@ -76,6 +76,8 @@ export interface VisitaCampoActiva {
   sede_nombre: string | null;
   ambientes_total: number;
   ambientes_culminados: number;
+  /** Todos los bienes de los ambientes de esta visita ya tienen Sí o No. */
+  revision_completa: boolean;
 }
 
 /** Fila del historial de visitas de campo por entidad */

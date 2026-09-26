@@ -121,8 +121,11 @@ export const INVENTARIO_TABLE_ADMIN_PREREGISTRO_COL_COUNT =
 /** Anchos mínimos por columna (px) — lectura cómoda con scroll horizontal. */
 export const INVENTARIO_TABLE_SELECTION_COL_WIDTH_PX = 40;
 
-/** Columnas fijas a la izquierda: N°, Cat., Código, Nombre (+ selección si aplica). */
+/** Columnas fijas a la izquierda: N°, Cat., Código, Nombre (+ Visita y selección si aplican). */
 export const INVENTARIO_STICKY_DATA_COL_COUNT = 4;
+
+/** Columna Visita, insertada antes de Nombre del bien. */
+export const INVENTARIO_VISITA_COL_WIDTH_PX = 78;
 
 export const INVENTARIO_TABLE_COL_WIDTHS_PX = [
   40, // N°
@@ -219,6 +222,13 @@ export const INVENTARIO_TABLE_FULL_PREREGISTRO_COL_WIDTHS_PX = [
 
 function sumWidths(widths: readonly number[]): number {
   return widths.reduce((total, width) => total + width, 0);
+}
+
+/** Inserta Visita justo antes de Nombre del bien (índice 3: N°, Cat., Código). */
+export function insertInventarioVisitaColumn(widths: readonly number[]): number[] {
+  const next = [...widths];
+  next.splice(3, 0, INVENTARIO_VISITA_COL_WIDTH_PX);
+  return next;
 }
 
 export const INVENTARIO_TABLE_MIN_WIDTH_PX = sumWidths(INVENTARIO_TABLE_COL_WIDTHS_PX);
@@ -333,6 +343,7 @@ export function inventarioTableWidthValuesPx(options?: {
   modoAdmin?: boolean;
   mostrarUbicacion?: boolean;
   withSelection?: boolean;
+  columnaVisita?: boolean;
 }): number[] {
   const withSelection = options?.withSelection ?? false;
   let widths: readonly number[];
@@ -349,9 +360,8 @@ export function inventarioTableWidthValuesPx(options?: {
       ? INVENTARIO_TABLE_ENTITY_UBICACION_COL_WIDTHS_PX
       : INVENTARIO_TABLE_COL_WIDTHS_PX;
   }
-  return withSelection
-    ? [INVENTARIO_TABLE_SELECTION_COL_WIDTH_PX, ...widths]
-    : [...widths];
+  const data = options?.columnaVisita ? insertInventarioVisitaColumn(widths) : [...widths];
+  return withSelection ? [INVENTARIO_TABLE_SELECTION_COL_WIDTH_PX, ...data] : data;
 }
 
 /** Offsets `left` (px) para columnas sticky. */
@@ -373,6 +383,7 @@ export function inventarioTableMinWidthPx(options?: {
   modoAdmin?: boolean;
   mostrarUbicacion?: boolean;
   withSelection?: boolean;
+  columnaVisita?: boolean;
 }): number {
   return sumWidths(inventarioTableWidthValuesPx(options));
 }

@@ -30,12 +30,22 @@ export function VisitaCampoConteo({
   if (revisados == null || total == null) {
     return <span className="text-sm text-muted-foreground">—</span>;
   }
-  const title =
-    total === 0
-      ? "Sin bienes registrados para revisar"
+  const completo = total > 0 && revisados === total;
+  const enCero = revisados === 0;
+  const title = enCero
+    ? total === 0
+      ? "Sin bienes revisados"
+      : `Ninguno revisado de ${total}`
+    : completo
+      ? `${revisados} de ${total} revisados`
       : `${revisados} revisados de ${total}`;
+  const color = completo
+    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+    : enCero
+      ? "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+      : "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300";
   return (
-    <span className="text-sm tabular-nums text-foreground" title={title}>
+    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums ${color}`} title={title}>
       {revisados}/{total}
     </span>
   );
@@ -309,25 +319,17 @@ export function VisitasCampoBanner({
                     como hallado o no. El ambiente se culmina al terminar esa revisión.
                   </p>
                 </div>
-                {puedeGestionar && onCerrar && (
+                {puedeGestionar && onCerrar && visita.revision_completa ? (
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={
-                      cerrarPendingId === visita.id ||
-                      visita.ambientes_culminados < visita.ambientes_total
-                    }
+                    disabled={cerrarPendingId === visita.id}
                     onClick={() => onCerrar(visita.id)}
-                    title={
-                      visita.ambientes_culminados < visita.ambientes_total
-                        ? "Revise los bienes de cada ambiente antes de cerrar"
-                        : undefined
-                    }
                   >
-                    {cerrarPendingId === visita.id ? "Cerrando…" : "Cerrar"}
+                    {cerrarPendingId === visita.id ? "Terminando…" : "Terminar visita"}
                   </Button>
-                )}
+                ) : null}
               </div>
             </li>
           ))}

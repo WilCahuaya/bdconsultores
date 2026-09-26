@@ -634,6 +634,15 @@
     @apply mb-0 rounded-none border-x-0 border-t-0 bg-card shadow-none;
   }
 
+  .panel-inventario-body-scroll > .panel-inventario-visita-leyenda {
+    position: sticky;
+    left: 0;
+    z-index: 24;
+    box-sizing: border-box;
+    width: var(--inventario-body-client-width, 100%);
+    max-width: var(--inventario-body-client-width, 100%);
+  }
+
   .panel-filter-row {
     @apply flex flex-wrap items-center gap-1.5 border-t border-border/40 pt-2 sm:gap-2 md:gap-2.5;
   }
@@ -849,7 +858,7 @@
     background-color: color-mix(in srgb, hsl(var(--primary)) 30%, hsl(var(--card)));
   }
 
-  /* Columnas fijas al scroll horizontal (N°, Cat., Código, Nombre). */
+  /* Columnas fijas al scroll horizontal (N°, Cat., Código, Visita si aplica, Nombre). */
   .inventario-activos-table th.inventario-sticky-col,
   .inventario-activos-table td.inventario-sticky-col {
     position: sticky;

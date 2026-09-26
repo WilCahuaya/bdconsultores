@@ -19,12 +19,6 @@ import {
   INVENTARIO_TABLE_ENTITY_UBICACION_COL_COUNT,
   INVENTARIO_TABLE_FULL_PREREGISTRO_COL_COUNT,
   inventarioStickyLeftOffsets,
-  inventarioTableColWidths,
-  inventarioTableColWidthsAdmin,
-  inventarioTableColWidthsAdminEntityUbicacion,
-  inventarioTableColWidthsAdminPreregistro,
-  inventarioTableColWidthsEntityUbicacion,
-  inventarioTableColWidthsFullPreregistro,
   inventarioTableMinWidthPx,
   inventarioTableWidthValuesPx,
 } from "./inventario-table-cols";
@@ -62,31 +56,10 @@ const tdTotalBase =
 const tdTotalAccent =
   "border-t border-b border-r border-border/60 px-2 py-2 text-right text-[11px] font-semibold tabular-nums leading-none whitespace-nowrap text-primary last:border-r-0";
 
-function Colgroup({
-  modoPreregistro,
-  modoAdmin,
-  mostrarUbicacion,
-  withSelection,
-}: {
-  modoPreregistro?: boolean;
-  modoAdmin?: boolean;
-  mostrarUbicacion?: boolean;
-  withSelection?: boolean;
-}) {
-  const widths = modoAdmin
-    ? modoPreregistro
-      ? inventarioTableColWidthsAdminPreregistro({ withSelection })
-      : mostrarUbicacion
-        ? inventarioTableColWidthsAdminEntityUbicacion({ withSelection })
-        : inventarioTableColWidthsAdmin({ withSelection })
-    : modoPreregistro
-      ? inventarioTableColWidthsFullPreregistro({ withSelection })
-      : mostrarUbicacion
-        ? inventarioTableColWidthsEntityUbicacion({ withSelection })
-        : inventarioTableColWidths({ withSelection });
+function Colgroup({ widthsPx }: { widthsPx: readonly number[] }) {
   return (
     <colgroup>
-      {widths.map((w, i) => (
+      {widthsPx.map((w, i) => (
         <col key={i} style={{ width: w, minWidth: w }} />
       ))}
     </colgroup>
@@ -176,6 +149,8 @@ export interface ActivosInventarioTableProps<T extends Activo> {
   columnFilterOptions?: InventarioColumnFilterOptions;
   /** Fecha de corte para depreciación / valor neto (por defecto: hoy). */
   fechaCorte?: Date;
+  /** Columna Visita, antes de Nombre del bien. */
+  renderVisita?: (activo: T) => ReactNode;
   renderComprobante: (activo: T, meta?: { columnFiltered?: boolean }) => ReactNode;
   renderAcciones: (activo: T) => ReactNode;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
@@ -374,6 +349,7 @@ function FullTableBody<T extends Activo>({
   columnFilters,
   renderComprobante,
   renderAcciones,
+  renderVisita,
   stickyOffsets,
   stickyWidths,
   fechaCorte,
@@ -383,7 +359,9 @@ function FullTableBody<T extends Activo>({
   stickyWidths: readonly number[];
 }) {
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
+  const columnaVisita = Boolean(renderVisita);
   const sel = selection?.withSelection ? 1 : 0;
+  const nombreStickyAt = sel + 3 + (columnaVisita ? 1 : 0);
   const f = columnFilters;
   const catOn = Boolean(f?.categoria);
   const nomOn = Boolean(f?.nombre.trim());
@@ -412,7 +390,10 @@ function FullTableBody<T extends Activo>({
         const stickyN = stickyCellProps(stickyOffsets, sel, stickyWidths);
         const stickyCat = stickyCellProps(stickyOffsets, sel + 1, stickyWidths);
         const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths);
-        const stickyNom = stickyCellProps(stickyOffsets, sel + 3, stickyWidths);
+        const stickyVisita = columnaVisita
+          ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths)
+          : undefined;
+        const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths);
 
         return (
           <tr key={activo.id} className={rowClassName(activo, rowIndex)}>
@@ -437,6 +418,14 @@ function FullTableBody<T extends Activo>({
             >
               <InventarioCodigoCellContent activo={activo} />
             </td>
+            {columnaVisita && renderVisita && (
+              <td
+                className={`max-w-0 overflow-hidden border-b border-r border-border/40 px-0.5 py-1 text-center text-xs leading-none text-foreground ${stickyVisita?.className ?? ""}`}
+                style={stickyVisita?.style}
+              >
+                {renderVisita(activo)}
+              </td>
+            )}
             <InventarioTextCell
               title={activo.nombre}
               lineClamp2
@@ -519,8 +508,10 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     columnFilters,
     onColumnFiltersChange,
     columnFilterOptions = emptyInventarioColumnFilterOptions(),
+    renderVisita,
   } = props;
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
+  const columnaVisita = Boolean(renderVisita);
   const withSelection = selection?.withSelection ?? false;
   const colSpan =
     (modoAdmin
@@ -533,29 +524,37 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
         ? INVENTARIO_TABLE_ENTITY_UBICACION_COL_COUNT
         : modoPreregistro
           ? INVENTARIO_TABLE_FULL_PREREGISTRO_COL_COUNT
-          : INVENTARIO_TABLE_COL_COUNT) + (withSelection ? 1 : 0);
+          : INVENTARIO_TABLE_COL_COUNT) +
+    (withSelection ? 1 : 0) +
+    (columnaVisita ? 1 : 0);
   const tableClass = `${inventarioActivosTableClass}${modoPreregistro ? " inventario-activos-table--preregistro" : ""}${modoAdmin ? " inventario-activos-table--admin" : ""}${mostrarUbicacion ? " inventario-activos-table--ubicacion" : ""}`;
   const tableMinWidth = inventarioTableMinWidthPx({
     modoPreregistro,
     modoAdmin,
     mostrarUbicacion,
     withSelection,
+    columnaVisita,
   });
   const widthValues = inventarioTableWidthValuesPx({
     modoPreregistro,
     modoAdmin,
     mostrarUbicacion,
     withSelection,
+    columnaVisita,
   });
-  const stickyCount = (withSelection ? 1 : 0) + INVENTARIO_STICKY_DATA_COL_COUNT;
+  const stickyCount = (withSelection ? 1 : 0) + INVENTARIO_STICKY_DATA_COL_COUNT + (columnaVisita ? 1 : 0);
   const stickyOffsets = inventarioStickyLeftOffsets(widthValues, stickyCount);
   const stickyWidths = widthValues.slice(0, stickyCount);
   const sel = withSelection ? 1 : 0;
+  const nombreStickyAt = sel + 3 + (columnaVisita ? 1 : 0);
   const stickySel = stickyCellProps(stickyOffsets, 0, stickyWidths, 40);
   const stickyN = stickyCellProps(stickyOffsets, sel, stickyWidths, 40);
   const stickyCat = stickyCellProps(stickyOffsets, sel + 1, stickyWidths, 40);
   const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths, 40);
-  const stickyNom = stickyCellProps(stickyOffsets, sel + 3, stickyWidths, 40);
+  const stickyVisita = columnaVisita
+    ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths, 40)
+    : undefined;
+  const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths, 40);
   const tableWrapClass = embeddedInParentScroll
     ? `${panelDataTableWrapClass} ${panelDataTableWrapEmbeddedClass}`
     : panelDataTableWrapClass;
@@ -573,12 +572,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
           className={`${tableClass} w-full table-fixed border-separate border-spacing-0`}
           style={{ minWidth: tableMinWidth }}
         >
-          <Colgroup
-            modoPreregistro={modoPreregistro}
-            modoAdmin={modoAdmin}
-            mostrarUbicacion={mostrarUbicacion}
-            withSelection={withSelection}
-          />
+          <Colgroup widthsPx={widthValues} />
           <thead>
             <tr>
               {withSelection && selection && (
@@ -619,6 +613,15 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
               >
                 Código
               </Th>
+              {columnaVisita && (
+                <Th
+                  className={`${inventarioThStd} normal-case ${stickyVisita?.className ?? ""}`}
+                  style={stickyVisita?.style}
+                  title="Revisión de la visita"
+                >
+                  Visita
+                </Th>
+              )}
               {showColumnFilters && columnFilters ? (
                 <ColumnHeaderFilter
                   label="Nombre del bien"

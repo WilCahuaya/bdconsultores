@@ -32,6 +32,27 @@ function sedeNombre(join: SedeJoin): string | null {
   return join.nombre;
 }
 
+async function visitaRevisionCompleta(visitaId: string, ambienteIds: string[]): Promise<boolean> {
+  if (ambienteIds.length === 0) return false;
+  const supabase = getSupabaseClient();
+  const { data: bienes } = await supabase
+    .from("activos")
+    .select("id")
+    .eq("estado_registro", "REGISTRADO")
+    .in("ambiente_id", ambienteIds);
+  if (!bienes?.length) return true;
+  const { data: revisiones } = await supabase
+    .from("visita_revisiones")
+    .select("activo_id")
+    .eq("visita_id", visitaId)
+    .in(
+      "activo_id",
+      bienes.map((bien) => bien.id as string),
+    );
+  const hechos = new Set((revisiones ?? []).map((fila) => fila.activo_id as string));
+  return bienes.every((bien) => hechos.has(bien.id as string));
+}
+
 /** Fila cacheada de `visitas_campo` (activa o del historial). */
 export interface VisitaCampoCache {
   id: string;
@@ -141,21 +162,27 @@ async function fetchVisitasRemote(entidadId: string): Promise<{
     });
   }
 
-  const activas: VisitaCampoActiva[] = historial
-    .filter((h) => h.estado === "ABIERTO")
-    .map((h) => ({
-      id: h.id,
-      entidad_id: entidadId,
-      numero: h.numero,
-      estado: h.estado,
-      abierto_at: h.abierto_at,
-      abierto_por_nombre: h.abierto_por_nombre,
-      sede_id: h.sede_id,
-      sede_nombre: h.sede_nombre,
-      ambientes_total: h.ambientes_total,
-      ambientes_culminados: h.ambientes_culminados,
-    }))
-    .sort((a, b) => a.abierto_at.localeCompare(b.abierto_at));
+  const abiertas = historial.filter((h) => h.estado === "ABIERTO");
+  const activas: VisitaCampoActiva[] = (
+    await Promise.all(
+      abiertas.map(async (h) => ({
+        id: h.id,
+        entidad_id: entidadId,
+        numero: h.numero,
+        estado: h.estado,
+        abierto_at: h.abierto_at,
+        abierto_por_nombre: h.abierto_por_nombre,
+        sede_id: h.sede_id,
+        sede_nombre: h.sede_nombre,
+        ambientes_total: h.ambientes_total,
+        ambientes_culminados: h.ambientes_culminados,
+        revision_completa: await visitaRevisionCompleta(
+          h.id,
+          ambientesCache.filter((fila) => fila.visita_id === h.id).map((fila) => fila.ambiente_id),
+        ),
+      })),
+    )
+  ).sort((a, b) => a.abierto_at.localeCompare(b.abierto_at));
 
   return { activas, historial, ambientesCache };
 }
@@ -210,6 +237,7 @@ async function listVisitasActivasFromCache(entidadId: string): Promise<VisitaCam
       sede_id: v.sede_id,
       sede_nombre: v.sede_nombre,
       ...conteoAmbientes(v.id, filas),
+      revision_completa: false,
     }))
     .sort((a, b) => a.abierto_at.localeCompare(b.abierto_at));
 }

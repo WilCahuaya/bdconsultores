@@ -24,7 +24,7 @@ import {
   type PreregistroGestionToolbarState,
 } from "@inventario/ui/panel";
 import { ActivoForm } from "./ActivoForm";
-import { FaltanteBienesPanel, VisitaRevisionPanel } from "./VisitaRevisionPanel";
+import { FaltanteBienesPanel, useVisitaRevision } from "./VisitaRevisionPanel";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
 import type { FichaAsignacionExportMeta } from "@/lib/actions/ficha-asignacion-meta";
@@ -139,6 +139,12 @@ export function ActivosAmbientePanel({
   const { panelScrollRef, showToolbarTrigger, scrollToToolbar } = usePanelInventarioUnifiedScroll();
   const [preregistroHeaderToolbar, setPreregistroHeaderToolbar] =
     useState<PreregistroGestionToolbarState | null>(null);
+  const visita = useVisitaRevision({
+    entidadId,
+    ambienteId,
+    activos: activosList,
+    enabled: !isAdmin && !esAmbientePreregistro && !esAmbienteFaltante,
+  });
 
   useEffect(() => {
     const local = fechaCorteLocalHoy();
@@ -396,9 +402,6 @@ export function ActivosAmbientePanel({
 
       </div>
 
-      {!isAdmin && !esAmbientePreregistro && !esAmbienteFaltante ? (
-        <VisitaRevisionPanel entidadId={entidadId} ambienteId={ambienteId} activos={activosList} />
-      ) : null}
       {!isAdmin && esAmbienteFaltante ? (
         <FaltanteBienesPanel entidadId={entidadId} ambienteId={ambienteId} activos={activosList} />
       ) : null}
@@ -518,6 +521,8 @@ export function ActivosAmbientePanel({
           onColumnFiltersChange={setColumnFilters}
           columnFilterOptions={columnFilterOptions}
           fechaCorte={fechaCorte}
+          leyendaVisita={visita.activa ? visita.leyenda : null}
+          renderVisita={visita.activa ? visita.renderCelda : undefined}
         />
     </div>
   );

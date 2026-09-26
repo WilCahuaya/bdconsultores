@@ -423,7 +423,7 @@ export function AmbientesView({
   }
 
   async function handleCerrarVisita(visitaId: string) {
-    if (!confirm("¿Cerrar esta visita de campo? Quedará registrada en el historial.")) return;
+    if (!confirm("¿Terminar esta visita de campo? Quedará registrada en el historial.")) return;
     setCerrarPendingId(visitaId);
     setVisitaError(null);
     const result = await cerrarVisitaCampo(visitaId);

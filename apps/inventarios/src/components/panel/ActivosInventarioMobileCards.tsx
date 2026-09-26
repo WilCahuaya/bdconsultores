@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { Activo } from "@inventario/types";
 import {
   formatActivoCodigoDisplay,
@@ -38,6 +39,7 @@ interface ActivosInventarioMobileCardsProps {
   onToggleSelect?: (id: string) => void;
   puedeSeleccionar?: (activo: Activo) => boolean;
   fechaCorte?: Date;
+  renderVisita?: (activo: Activo) => ReactNode;
 }
 
 function InfoItem({
@@ -98,6 +100,7 @@ export function ActivosInventarioMobileCards({
   onToggleSelect,
   puedeSeleccionar,
   fechaCorte,
+  renderVisita,
 }: ActivosInventarioMobileCardsProps) {
   if (activos.length === 0) {
     return (
@@ -169,6 +172,15 @@ export function ActivosInventarioMobileCards({
               </div>
               <EstadoBienBadge estado={activo.estado_bien} />
             </div>
+
+            {renderVisita ? (
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Visita
+                </span>
+                {renderVisita(activo)}
+              </div>
+            ) : null}
 
             {descripcion && (
               <p className="mb-3 text-xs leading-snug text-muted-foreground">{descripcion}</p>

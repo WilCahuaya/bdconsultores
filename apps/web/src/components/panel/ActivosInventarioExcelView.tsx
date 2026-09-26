@@ -61,6 +61,8 @@ interface ActivosInventarioExcelViewProps {
   columnFilterOptions?: InventarioColumnFilterOptions;
   /** Fecha de corte para depreciación / valor neto (por defecto: hoy). */
   fechaCorte?: Date;
+  leyendaVisita?: ReactNode;
+  renderVisita?: (activo: Activo) => ReactNode;
 }
 
 function excelViewShellClass(embeddedInParentScroll: boolean): string {
@@ -95,6 +97,8 @@ export function ActivosInventarioExcelView({
   onColumnFiltersChange,
   columnFilterOptions,
   fechaCorte,
+  leyendaVisita,
+  renderVisita,
 }: ActivosInventarioExcelViewProps) {
   const paginationKey = useMemo(
     () => `${activos.length}:${activos[0]?.id ?? ""}`,
@@ -225,6 +229,7 @@ export function ActivosInventarioExcelView({
       onColumnFiltersChange={onColumnFiltersChange}
       columnFilterOptions={columnFilterOptions}
       fechaCorte={fechaCorte}
+      renderVisita={renderVisita}
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       selection={
@@ -291,6 +296,7 @@ export function ActivosInventarioExcelView({
       onToggleSelect={gestionEnabled ? toggleSelect : undefined}
       puedeSeleccionar={gestionEnabled ? esActivoPreregistrado : undefined}
       fechaCorte={fechaCorte}
+      renderVisita={renderVisita}
     />
   );
 
@@ -306,6 +312,7 @@ export function ActivosInventarioExcelView({
             <div ref={bodyScrollRef} className={panelInventarioBodyScrollClass}>
               {toolbar}
               {inlinePreregistroToolbar}
+              {leyendaVisita}
               <div className={panelDataCardsWrapClass}>{mobileCards}</div>
               {tableBlock}
             </div>
@@ -320,6 +327,7 @@ export function ActivosInventarioExcelView({
   return (
     <div className={excelViewShellClass(embeddedInParentScroll)}>
       {inlinePreregistroToolbar}
+      {leyendaVisita}
       <div className={panelDataCardsWrapClass}>{mobileCards}</div>
       {tableBlock}
       {paginationBlock}

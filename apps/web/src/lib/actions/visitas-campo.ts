@@ -50,12 +50,17 @@ async function mapVisitaConConteo(
 ): Promise<VisitaCampoActiva> {
   const { data: filas } = await supabase
     .from("visita_ambientes")
-    .select("estado")
+    .select("ambiente_id, estado")
     .eq("visita_id", visita.id);
 
   const ambientes_total = filas?.length ?? 0;
   const ambientes_culminados =
     filas?.filter((f) => f.estado === "CULMINADO").length ?? 0;
+  const revision_completa = await visitaRevisionCompleta(
+    supabase,
+    visita.id,
+    (filas ?? []).map((fila) => fila.ambiente_id as string),
+  );
 
   return {
     id: visita.id,
@@ -68,7 +73,36 @@ async function mapVisitaConConteo(
     sede_nombre: sedeNombre(visita.sedes),
     ambientes_total,
     ambientes_culminados,
+    revision_completa,
   };
+}
+
+async function visitaRevisionCompleta(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  visitaId: string,
+  ambienteIds: string[],
+): Promise<boolean> {
+  if (ambienteIds.length === 0) return false;
+
+  const { data: bienes } = await supabase
+    .from("activos")
+    .select("id")
+    .eq("estado_registro", "REGISTRADO")
+    .in("ambiente_id", ambienteIds);
+
+  if (!bienes?.length) return true;
+
+  const { data: revisiones } = await supabase
+    .from("visita_revisiones")
+    .select("activo_id")
+    .eq("visita_id", visitaId)
+    .in(
+      "activo_id",
+      bienes.map((bien) => bien.id as string),
+    );
+
+  const hechos = new Set((revisiones ?? []).map((fila) => fila.activo_id as string));
+  return bienes.every((bien) => hechos.has(bien.id as string));
 }
 
 export type AmbienteConVisita = AmbienteConSede & {
