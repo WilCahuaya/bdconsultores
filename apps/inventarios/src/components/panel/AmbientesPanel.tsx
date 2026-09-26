@@ -27,7 +27,7 @@ import {
   panelTableNowrapCellClass,
   useStoredViewMode,
   SedeAmbienteFilterSelect,
-  VisitaCampoEstadoBadge,
+  VisitaCampoConteo,
   VisitasCampoBanner,
   VisitasCampoHistorialPanel,
   IniciarVisitaCampoDialog,
@@ -53,7 +53,6 @@ import {
   abrirVisitaCampo,
   attachVisitaEstadoToAmbientes,
   cerrarVisitaCampo,
-  culminarAmbienteVisita,
   getVisitasCampoActivas,
   getVisitaCampoDetalle,
   listVisitasCampoHistorial,
@@ -257,7 +256,6 @@ export function AmbientesPanel({
   const [visitaPending, setVisitaPending] = useState(false);
   const [cerrarPendingId, setCerrarPendingId] = useState<string | null>(null);
   const [visitaError, setVisitaError] = useState<string | null>(null);
-  const [culminarPendingId, setCulminarPendingId] = useState<string | null>(null);
   const [detalleVisita, setDetalleVisita] = useState<VisitaCampoHistorial | null>(null);
   const [detalleAmbientes, setDetalleAmbientes] = useState<Awaited<ReturnType<typeof getVisitaCampoDetalle>> | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
@@ -385,18 +383,6 @@ export function AmbientesPanel({
     await syncVisitaYAmbientes();
   }
 
-  async function handleCulminarAmbiente(ambienteId: string) {
-    setCulminarPendingId(ambienteId);
-    setVisitaError(null);
-    const result = await culminarAmbienteVisita(ambienteId, entidad.id);
-    setCulminarPendingId(null);
-    if (result.error) {
-      setVisitaError(result.error);
-      return;
-    }
-    await syncVisitaYAmbientes();
-  }
-
   async function handleVerDetalleVisita(visita: VisitaCampoHistorial) {
     setDetalleVisita(visita);
     setDetalleLoading(true);
@@ -486,6 +472,8 @@ export function AmbientesPanel({
       espacio_nombre: espacioNombre,
       activo_count: 0,
       visita_estado: visitaAbierta ? "EN_PROCESO" : null,
+      visita_revisados: visitaAbierta ? 0 : null,
+      visita_total: visitaAbierta ? 0 : null,
       responsable:
         result.data?.responsable ??
         responsableNombreById(input.responsableId) ??
@@ -860,27 +848,8 @@ export function AmbientesPanel({
                   {amb.activo_count}
                 </PanelTableTd>
                 {visitaAbierta && (
-                  <PanelTableTd className={panelTableNowrapCellClass}>
-                    <div
-                      className="flex flex-col items-start gap-1"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <VisitaCampoEstadoBadge estado={amb.visita_estado} />
-                      {puedeGestionarVisita &&
-                        !amb.es_preregistro &&
-                        amb.visita_estado === "EN_PROCESO" && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-xs"
-                            disabled={culminarPendingId === amb.id}
-                            onClick={() => handleCulminarAmbiente(amb.id)}
-                          >
-                            {culminarPendingId === amb.id ? "…" : "Culminar"}
-                          </Button>
-                        )}
-                    </div>
+                  <PanelTableTd className={panelTableNowrapCellClass} align="center">
+                    <VisitaCampoConteo revisados={amb.visita_revisados} total={amb.visita_total} />
                   </PanelTableTd>
                 )}
                 <PanelTableTd className={panelTableNowrapCellClass}>

@@ -73,6 +73,10 @@ async function mapVisitaConConteo(
 
 export type AmbienteConVisita = AmbienteConSede & {
   visita_estado: EstadoVisitaAmbiente | null;
+  /** Bienes ya marcados Sí o No en la visita abierta. */
+  visita_revisados: number | null;
+  /** Bienes registrados que entran en la revisión de ese ambiente. */
+  visita_total: number | null;
 };
 
 const VISITA_SELECT =
@@ -113,11 +117,12 @@ export async function attachVisitaEstadoToAmbientes(
 ): Promise<AmbienteConVisita[]> {
   const visitas = await getVisitasCampoActivas(entidadId);
   if (visitas.length === 0) {
-    return ambientes.map((a) => ({ ...a, visita_estado: null }));
+    return ambientes.map((a) => ({ ...a, visita_estado: null, visita_revisados: null, visita_total: null }));
   }
 
   const supabase = await createClient();
   const porAmbiente = new Map<string, EstadoVisitaAmbiente>();
+  const visitaPorAmbiente = new Map<string, string>();
 
   for (const visita of visitas) {
     const { data: filas } = await supabase
@@ -127,13 +132,68 @@ export async function attachVisitaEstadoToAmbientes(
 
     for (const fila of filas ?? []) {
       porAmbiente.set(fila.ambiente_id, fila.estado as EstadoVisitaAmbiente);
+      visitaPorAmbiente.set(fila.ambiente_id, visita.id);
     }
   }
 
-  return ambientes.map((a) => ({
-    ...a,
-    visita_estado: a.es_preregistro || a.es_faltante ? null : (porAmbiente.get(a.id) ?? null),
-  }));
+  const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+
+  return ambientes.map((a) => {
+    const enVisita = !a.es_preregistro && !a.es_faltante && porAmbiente.has(a.id);
+    const cifras = conteo.get(a.id);
+    return {
+      ...a,
+      visita_estado: enVisita ? (porAmbiente.get(a.id) ?? null) : null,
+      visita_revisados: enVisita ? (cifras?.revisados ?? 0) : null,
+      visita_total: enVisita ? (cifras?.total ?? 0) : null,
+    };
+  });
+}
+
+async function conteoRevisionPorAmbiente(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  visitaPorAmbiente: Map<string, string>,
+): Promise<Map<string, { revisados: number; total: number }>> {
+  const resultado = new Map<string, { revisados: number; total: number }>();
+  const ambienteIds = [...visitaPorAmbiente.keys()];
+  if (ambienteIds.length === 0) return resultado;
+
+  const visitaIds = [...new Set(visitaPorAmbiente.values())];
+  const [{ data: revisiones }, { data: bienes }] = await Promise.all([
+    supabase
+      .from("visita_revisiones")
+      .select("visita_id, ambiente_id, activo_id")
+      .in("visita_id", visitaIds),
+    supabase
+      .from("activos")
+      .select("id, ambiente_id")
+      .eq("estado_registro", "REGISTRADO")
+      .in("ambiente_id", ambienteIds),
+  ]);
+
+  const revisadosIds = new Map<string, Set<string>>();
+  for (const fila of revisiones ?? []) {
+    if (visitaPorAmbiente.get(fila.ambiente_id) !== fila.visita_id) continue;
+    const ids = revisadosIds.get(fila.ambiente_id) ?? new Set<string>();
+    ids.add(fila.activo_id);
+    revisadosIds.set(fila.ambiente_id, ids);
+  }
+
+  const pendientes = new Map<string, number>();
+  for (const bien of bienes ?? []) {
+    const revisados = revisadosIds.get(bien.ambiente_id);
+    if (revisados?.has(bien.id)) continue;
+    pendientes.set(bien.ambiente_id, (pendientes.get(bien.ambiente_id) ?? 0) + 1);
+  }
+
+  for (const ambienteId of ambienteIds) {
+    const revisados = revisadosIds.get(ambienteId)?.size ?? 0;
+    resultado.set(ambienteId, {
+      revisados,
+      total: revisados + (pendientes.get(ambienteId) ?? 0),
+    });
+  }
+  return resultado;
 }
 
 export async function listVisitasCampoHistorial(

@@ -29,7 +29,7 @@ import {
   useStoredViewMode,
   SedeAmbienteFilterSelect,
   VisitasCampoBanner,
-  VisitaCampoEstadoBadge,
+  VisitaCampoConteo,
   VisitasCampoHistorialPanel,
 } from "@inventario/ui/panel";
 import type { AmbienteConVisita } from "@/lib/actions/visitas-campo";
@@ -292,6 +292,8 @@ export function AdminAmbientesPanel({
       espacio_nombre: espacioNombre,
       activo_count: 0,
       visita_estado: visitaAbierta ? "EN_PROCESO" : null,
+      visita_revisados: visitaAbierta ? 0 : null,
+      visita_total: visitaAbierta ? 0 : null,
       responsable:
         result.data?.responsable ??
         responsableNombreById(input.responsableId) ??
@@ -570,8 +572,8 @@ export function AdminAmbientesPanel({
                   {amb.activo_count}
                 </PanelTableTd>
                 {visitaAbierta && (
-                  <PanelTableTd className={panelTableNowrapCellClass}>
-                    <VisitaCampoEstadoBadge estado={amb.visita_estado} />
+                  <PanelTableTd className={panelTableNowrapCellClass} align="center">
+                    <VisitaCampoConteo revisados={amb.visita_revisados} total={amb.visita_total} />
                   </PanelTableTd>
                 )}
                 <PanelTableTd className={panelTableNowrapCellClass}>

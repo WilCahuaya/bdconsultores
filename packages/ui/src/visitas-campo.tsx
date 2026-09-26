@@ -20,6 +20,27 @@ import {
   panelTableStickyHeadClass,
 } from "./panel";
 
+export function VisitaCampoConteo({
+  revisados,
+  total,
+}: {
+  revisados: number | null;
+  total: number | null;
+}) {
+  if (revisados == null || total == null) {
+    return <span className="text-sm text-muted-foreground">—</span>;
+  }
+  const title =
+    total === 0
+      ? "Sin bienes registrados para revisar"
+      : `${revisados} revisados de ${total}`;
+  return (
+    <span className="text-sm tabular-nums text-foreground" title={title}>
+      {revisados}/{total}
+    </span>
+  );
+}
+
 export function VisitaCampoEstadoBadge({
   estado,
 }: {
