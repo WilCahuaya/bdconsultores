@@ -271,6 +271,9 @@ export function AmbientesPanel({
     .map((v) => v.sede_id)
     .filter((id): id is string => Boolean(id));
   const todasEnVisita = visitasActivas.some((v) => !v.sede_id);
+  const visitasEnPantalla = sedeFocus
+    ? visitasActivas.filter((visita) => !visita.sede_id || visita.sede_id === sedeFocus.id)
+    : visitasActivas;
 
   const sedeActivaId = sedeFocus?.id ?? sedeFilterId;
   const sedeFiltrada = Boolean(sedeActivaId);
@@ -680,9 +683,9 @@ export function AmbientesPanel({
         />
       ) : (
         <>
-      {!sedeFocus && (
+      {(!sedeFocus || visitasEnPantalla.length > 0) && (
         <VisitasCampoBanner
-          visitas={visitasActivas}
+          visitas={visitasEnPantalla}
           puedeGestionar={puedeGestionarVisita}
           cerrarPendingId={cerrarPendingId}
           onCerrar={handleCerrarVisita}

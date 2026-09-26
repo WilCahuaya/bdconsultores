@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Fragment } from "react";
 import type {
   EstadoVisitaAmbiente,
   VisitaCampoActiva,
@@ -311,7 +312,7 @@ export function VisitasCampoBanner({
                     Visita #{visita.numero} · {visitaCampoSedeLabel(visita)}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {visita.ambientes_culminados}/{visita.ambientes_total} ambientes culminados
+                    {visita.bienes_revisados}/{visita.bienes_total} bienes revisados
                     {visita.abierto_por_nombre ? ` · ${visita.abierto_por_nombre}` : ""}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -340,7 +341,9 @@ export function VisitasCampoBanner({
                       {cerrarPendingId === visita.id ? "Terminando…" : "Terminar visita"}
                     </Button>
                     {!visita.revision_completa ? (
-                      <p className="text-[11px] text-muted-foreground">Faltan bienes por revisar</p>
+                      <p className="max-w-[12rem] text-right text-[11px] text-muted-foreground">
+                        Faltan bienes por revisar ({visita.bienes_revisados}/{visita.bienes_total})
+                      </p>
                     ) : null}
                   </div>
                 ) : null}
@@ -450,97 +453,105 @@ export function VisitasCampoHistorialPanel({
           </tr>
         </thead>
         <tbody>
-          {historial.map((visita) => (
-            <tr key={visita.id} className={panelTableBodyRowClass}>
-              <PanelTableTd className={`font-medium ${panelTableNowrapCellClass}`}>
-                {visita.numero}
-              </PanelTableTd>
-              <PanelTableTd className="text-sm" title={visitaCampoSedeLabel(visita)}>
-                <span className="block truncate">{visitaCampoSedeLabel(visita)}</span>
-              </PanelTableTd>
-              <PanelTableTd className={panelTableNowrapCellClass}>
-                <VisitaFechaCelda
-                  fecha={visita.abierto_at}
-                  responsable={visita.abierto_por_nombre}
-                />
-              </PanelTableTd>
-              <PanelTableTd className={panelTableNowrapCellClass}>
-                {visita.cerrado_at ? (
-                  <VisitaFechaCelda
-                    fecha={visita.cerrado_at}
-                    responsable={visita.cerrado_por_nombre}
-                  />
-                ) : (
-                  <span className="text-muted-foreground">—</span>
-                )}
-              </PanelTableTd>
-              <PanelTableTd align="center" className={panelTableNowrapCellClass}>
-                {visita.ambientes_culminados}/{visita.ambientes_total}
-              </PanelTableTd>
-              <PanelTableTd className={panelTableNowrapCellClass}>
-                {visita.estado === "ABIERTO" ? (
-                  <StatusBadge variant="pending">Abierta</StatusBadge>
-                ) : (
-                  <StatusBadge variant="active">Cerrada</StatusBadge>
-                )}
-              </PanelTableTd>
-              <PanelTableTd align="right" className={panelTableNowrapCellClass}>
-                <Button type="button" size="sm" variant="outline" onClick={() => onVerDetalle(visita)}>
-                  Ver
-                </Button>
-              </PanelTableTd>
-            </tr>
-          ))}
+          {historial.map((visita) => {
+            const abierto = detalleVisita?.id === visita.id;
+            return (
+              <Fragment key={visita.id}>
+                <tr className={panelTableBodyRowClass}>
+                  <PanelTableTd className={`font-medium ${panelTableNowrapCellClass}`}>
+                    {visita.numero}
+                  </PanelTableTd>
+                  <PanelTableTd className="text-sm" title={visitaCampoSedeLabel(visita)}>
+                    <span className="block truncate">{visitaCampoSedeLabel(visita)}</span>
+                  </PanelTableTd>
+                  <PanelTableTd className={panelTableNowrapCellClass}>
+                    <VisitaFechaCelda
+                      fecha={visita.abierto_at}
+                      responsable={visita.abierto_por_nombre}
+                    />
+                  </PanelTableTd>
+                  <PanelTableTd className={panelTableNowrapCellClass}>
+                    {visita.cerrado_at ? (
+                      <VisitaFechaCelda
+                        fecha={visita.cerrado_at}
+                        responsable={visita.cerrado_por_nombre}
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </PanelTableTd>
+                  <PanelTableTd align="center" className={panelTableNowrapCellClass}>
+                    {visita.ambientes_culminados}/{visita.ambientes_total}
+                  </PanelTableTd>
+                  <PanelTableTd className={panelTableNowrapCellClass}>
+                    {visita.estado === "ABIERTO" ? (
+                      <StatusBadge variant="pending">Abierta</StatusBadge>
+                    ) : (
+                      <StatusBadge variant="active">Cerrada</StatusBadge>
+                    )}
+                  </PanelTableTd>
+                  <PanelTableTd align="right" className={panelTableNowrapCellClass}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      aria-expanded={abierto}
+                      onClick={() => (abierto ? onCerrarDetalle() : onVerDetalle(visita))}
+                    >
+                      {abierto ? "Ocultar" : "Ver"}
+                    </Button>
+                  </PanelTableTd>
+                </tr>
+                {abierto ? (
+                  <tr className="border-b border-border/40 bg-muted/20">
+                    <td colSpan={VISITAS_HISTORIAL_TABLE_WIDTHS_PCT.length} className="px-3 py-3 sm:px-4">
+                      <p className="mb-2 text-xs text-muted-foreground">
+                        {visitaCampoSedeLabel(visita)} ·{" "}
+                        {visita.cerrado_at
+                          ? `Cerrada el ${formatFecha(visita.cerrado_at)}`
+                          : `Abierta el ${formatFecha(visita.abierto_at)}`}
+                      </p>
+                      {loadingDetalle ? (
+                        <p className="text-sm text-muted-foreground">Cargando detalle…</p>
+                      ) : detalle && detalle.length > 0 ? (
+                        <ul className="space-y-2 text-sm">
+                          {detalle.map((fila) => (
+                            <li
+                              key={fila.ambiente_id}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-card px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="font-medium text-foreground">{fila.ambiente_nombre}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {fila.sede_nombre}
+                                  {fila.total != null
+                                    ? ` · ${fila.revisados ?? 0}/${fila.total} bienes`
+                                    : ""}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <VisitaCampoEstadoBadge estado={fila.estado} />
+                                {fila.estado === "CULMINADO" && fila.culminado_at ? (
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {formatFecha(fila.culminado_at)}
+                                    {fila.culminado_por_nombre ? ` · ${fila.culminado_por_nombre}` : ""}
+                                  </p>
+                                ) : null}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">Sin ambientes en esta visita.</p>
+                      )}
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </PanelDataTable>
-
-      <Dialog
-        open={!!detalleVisita}
-        onClose={onCerrarDetalle}
-        title={
-          detalleVisita
-            ? `Visita de campo #${detalleVisita.numero}`
-            : "Detalle de visita"
-        }
-        description={
-          detalleVisita
-            ? `${visitaCampoSedeLabel(detalleVisita)} · ${
-                detalleVisita.cerrado_at
-                  ? `Cerrada el ${formatFecha(detalleVisita.cerrado_at)}`
-                  : `Abierta el ${formatFecha(detalleVisita.abierto_at)}`
-              }`
-            : undefined
-        }
-      >
-        {loadingDetalle ? (
-          <p className="text-sm text-muted-foreground">Cargando detalle…</p>
-        ) : detalle && detalle.length > 0 ? (
-          <ul className="max-h-[min(24rem,60vh)] space-y-2 overflow-y-auto text-sm">
-            {detalle.map((fila) => (
-              <li
-                key={fila.ambiente_id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium text-foreground">{fila.ambiente_nombre}</p>
-                  <p className="text-xs text-muted-foreground">{fila.sede_nombre}</p>
-                </div>
-                <div className="text-right">
-                  <VisitaCampoEstadoBadge estado={fila.estado} />
-                  {fila.culminado_at && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {formatFecha(fila.culminado_at)}
-                      {fila.culminado_por_nombre ? ` · ${fila.culminado_por_nombre}` : ""}
-                    </p>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">Sin ambientes en esta visita.</p>
-        )}
-      </Dialog>
     </>
   );
 }

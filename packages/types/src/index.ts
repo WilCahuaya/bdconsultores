@@ -78,6 +78,8 @@ export interface VisitaCampoActiva {
   ambientes_culminados: number;
   /** Todos los bienes de los ambientes de esta visita ya tienen Sí o No. */
   revision_completa: boolean;
+  bienes_revisados: number;
+  bienes_total: number;
 }
 
 /** Fila del historial de visitas de campo por entidad */
@@ -104,6 +106,10 @@ export interface VisitaCampoAmbienteDetalle {
   estado: EstadoVisitaAmbiente | null;
   culminado_at: string | null;
   culminado_por_nombre: string | null;
+  /** Bienes registrados ya marcados en esta visita. */
+  revisados?: number;
+  /** Bienes registrados del ambiente que entran en la revisión. */
+  total?: number;
 }
 
 /** Perfil de usuario (tabla profiles) */

@@ -64,13 +64,23 @@ async function mapVisitaConConteo(
     .eq("visita_id", visita.id);
 
   const relevantes = (filas ?? []).filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
-  const ambientes_total = relevantes.length;
-  const ambientes_culminados = relevantes.filter((f) => f.estado === "CULMINADO").length;
-  const revision_completa = await visitaRevisionCompleta(
-    supabase,
-    visita.id,
-    relevantes.map((fila) => fila.ambiente_id as string),
+  const visitaPorAmbiente = new Map(
+    relevantes.map((fila) => [fila.ambiente_id as string, visita.id]),
   );
+  const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+  const ambientes_total = relevantes.length;
+  const ambientes_culminados = relevantes.filter((fila) => {
+    const cifras = conteo.get(fila.ambiente_id as string);
+    return cifras != null && cifras.revisados === cifras.total;
+  }).length;
+  const revision_completa = ambientes_total > 0 && ambientes_culminados === ambientes_total;
+  let bienes_revisados = 0;
+  let bienes_total = 0;
+  for (const fila of relevantes) {
+    const cifras = conteo.get(fila.ambiente_id as string);
+    bienes_revisados += cifras?.revisados ?? 0;
+    bienes_total += cifras?.total ?? 0;
+  }
 
   return {
     id: visita.id,
@@ -84,35 +94,9 @@ async function mapVisitaConConteo(
     ambientes_total,
     ambientes_culminados,
     revision_completa,
+    bienes_revisados,
+    bienes_total,
   };
-}
-
-async function visitaRevisionCompleta(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  visitaId: string,
-  ambienteIds: string[],
-): Promise<boolean> {
-  if (ambienteIds.length === 0) return false;
-
-  const { data: bienes } = await supabase
-    .from("activos")
-    .select("id")
-    .eq("estado_registro", "REGISTRADO")
-    .in("ambiente_id", ambienteIds);
-
-  if (!bienes?.length) return true;
-
-  const { data: revisiones } = await supabase
-    .from("visita_revisiones")
-    .select("activo_id")
-    .eq("visita_id", visitaId)
-    .in(
-      "activo_id",
-      bienes.map((bien) => bien.id as string),
-    );
-
-  const hechos = new Set((revisiones ?? []).map((fila) => fila.activo_id as string));
-  return bienes.every((bien) => hechos.has(bien.id as string));
 }
 
 export type AmbienteConVisita = AmbienteConSede & {
@@ -185,9 +169,10 @@ export async function attachVisitaEstadoToAmbientes(
   return ambientes.map((a) => {
     const enVisita = !a.es_preregistro && !a.es_faltante && porAmbiente.has(a.id);
     const cifras = conteo.get(a.id);
+    const completo = cifras != null && cifras.revisados === cifras.total;
     return {
       ...a,
-      visita_estado: enVisita ? (porAmbiente.get(a.id) ?? null) : null,
+      visita_estado: enVisita ? (completo ? "CULMINADO" : "EN_PROCESO") : null,
       visita_revisados: enVisita ? (cifras?.revisados ?? 0) : null,
       visita_total: enVisita ? (cifras?.total ?? 0) : null,
     };
@@ -215,26 +200,31 @@ async function conteoRevisionPorAmbiente(
       .in("ambiente_id", ambienteIds),
   ]);
 
-  const revisadosIds = new Map<string, Set<string>>();
+  const revisadosPorVisita = new Map<string, Set<string>>();
   for (const fila of revisiones ?? []) {
-    if (visitaPorAmbiente.get(fila.ambiente_id) !== fila.visita_id) continue;
-    const ids = revisadosIds.get(fila.ambiente_id) ?? new Set<string>();
-    ids.add(fila.activo_id);
-    revisadosIds.set(fila.ambiente_id, ids);
+    const ids = revisadosPorVisita.get(fila.visita_id as string) ?? new Set<string>();
+    ids.add(fila.activo_id as string);
+    revisadosPorVisita.set(fila.visita_id as string, ids);
   }
 
-  const pendientes = new Map<string, number>();
+  const revisadosCount = new Map<string, number>();
+  const totalCount = new Map<string, number>();
   for (const bien of bienes ?? []) {
-    const revisados = revisadosIds.get(bien.ambiente_id);
-    if (revisados?.has(bien.id)) continue;
-    pendientes.set(bien.ambiente_id, (pendientes.get(bien.ambiente_id) ?? 0) + 1);
+    const visitaId = visitaPorAmbiente.get(bien.ambiente_id as string);
+    if (!visitaId) continue;
+    totalCount.set(bien.ambiente_id as string, (totalCount.get(bien.ambiente_id as string) ?? 0) + 1);
+    if (revisadosPorVisita.get(visitaId)?.has(bien.id as string)) {
+      revisadosCount.set(
+        bien.ambiente_id as string,
+        (revisadosCount.get(bien.ambiente_id as string) ?? 0) + 1,
+      );
+    }
   }
 
   for (const ambienteId of ambienteIds) {
-    const revisados = revisadosIds.get(ambienteId)?.size ?? 0;
     resultado.set(ambienteId, {
-      revisados,
-      total: revisados + (pendientes.get(ambienteId) ?? 0),
+      revisados: revisadosCount.get(ambienteId) ?? 0,
+      total: totalCount.get(ambienteId) ?? 0,
     });
   }
   return resultado;
@@ -261,12 +251,19 @@ export async function listVisitasCampoHistorial(
   for (const v of visitas) {
     const { data: filas } = await supabase
       .from("visita_ambientes")
-      .select("estado, ambientes!inner(es_preregistro, es_faltante)")
+      .select("ambiente_id, estado, ambientes!inner(es_preregistro, es_faltante)")
       .eq("visita_id", v.id);
 
     const relevantes = (filas ?? []).filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
+    const visitaPorAmbiente = new Map(
+      relevantes.map((fila) => [fila.ambiente_id as string, v.id as string]),
+    );
+    const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
     const ambientes_total = relevantes.length;
-    const ambientes_culminados = relevantes.filter((f) => f.estado === "CULMINADO").length;
+    const ambientes_culminados = relevantes.filter((fila) => {
+      const cifras = conteo.get(fila.ambiente_id as string);
+      return cifras != null && cifras.revisados === cifras.total;
+    }).length;
 
     result.push({
       id: v.id,
@@ -303,8 +300,13 @@ export async function getVisitaCampoDetalle(
 
   if (error || !filas) return [];
 
-  return filas.flatMap((fila) => {
-    if (!ambienteParticipaEnVisita(fila.ambientes)) return [];
+  const participantes = filas.filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
+  const visitaPorAmbiente = new Map(
+    participantes.map((fila) => [fila.ambiente_id as string, visitaId]),
+  );
+  const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+
+  return participantes.flatMap((fila) => {
     const ambRaw = fila.ambientes as unknown;
     const amb = (Array.isArray(ambRaw) ? ambRaw[0] : ambRaw) as {
       nombre: string;
@@ -313,17 +315,21 @@ export async function getVisitaCampoDetalle(
       sedes: { nombre: string } | { nombre: string }[] | null;
     } | null;
     const sede = amb?.sedes;
-    const sedeNombre = Array.isArray(sede) ? sede[0]?.nombre : sede?.nombre;
+    const sedeNombreJoin = Array.isArray(sede) ? sede[0]?.nombre : sede?.nombre;
+    const cifras = conteo.get(fila.ambiente_id as string) ?? { revisados: 0, total: 0 };
+    const completo = cifras.revisados === cifras.total;
 
     return [
       {
         ambiente_id: fila.ambiente_id,
         ambiente_nombre: amb?.nombre ?? "—",
-        sede_nombre: sedeNombre ?? "—",
+        sede_nombre: sedeNombreJoin ?? "—",
         es_preregistro: amb?.es_preregistro ?? false,
-        estado: fila.estado as EstadoVisitaAmbiente,
-        culminado_at: fila.culminado_at,
-        culminado_por_nombre: profileNombre(fila.culminado as ProfileJoin),
+        estado: (completo ? "CULMINADO" : "EN_PROCESO") as EstadoVisitaAmbiente,
+        culminado_at: completo ? fila.culminado_at : null,
+        culminado_por_nombre: completo ? profileNombre(fila.culminado as ProfileJoin) : null,
+        revisados: cifras.revisados,
+        total: cifras.total,
       },
     ];
   });

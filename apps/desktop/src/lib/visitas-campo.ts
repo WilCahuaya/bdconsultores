@@ -32,25 +32,28 @@ function sedeNombre(join: SedeJoin): string | null {
   return join.nombre;
 }
 
-async function visitaRevisionCompleta(visitaId: string, ambienteIds: string[]): Promise<boolean> {
-  if (ambienteIds.length === 0) return false;
+async function visitaRevisionResumen(
+  visitaId: string,
+  ambienteIds: string[],
+): Promise<{ completa: boolean; revisados: number; total: number }> {
+  if (ambienteIds.length === 0) return { completa: false, revisados: 0, total: 0 };
   const supabase = getSupabaseClient();
-  const { data: bienes } = await supabase
-    .from("activos")
-    .select("id")
-    .eq("estado_registro", "REGISTRADO")
-    .in("ambiente_id", ambienteIds);
-  if (!bienes?.length) return true;
-  const { data: revisiones } = await supabase
-    .from("visita_revisiones")
-    .select("activo_id")
-    .eq("visita_id", visitaId)
-    .in(
-      "activo_id",
-      bienes.map((bien) => bien.id as string),
-    );
+  const [{ data: bienes }, { data: revisiones }] = await Promise.all([
+    supabase
+      .from("activos")
+      .select("id")
+      .eq("estado_registro", "REGISTRADO")
+      .in("ambiente_id", ambienteIds),
+    supabase
+      .from("visita_revisiones")
+      .select("activo_id")
+      .eq("visita_id", visitaId)
+      .in("ambiente_id", ambienteIds),
+  ]);
   const hechos = new Set((revisiones ?? []).map((fila) => fila.activo_id as string));
-  return bienes.every((bien) => hechos.has(bien.id as string));
+  const pendientes = (bienes ?? []).filter((bien) => !hechos.has(bien.id as string)).length;
+  const revisados = hechos.size;
+  return { completa: pendientes === 0, revisados, total: revisados + pendientes };
 }
 
 /** Fila cacheada de `visitas_campo` (activa o del historial). */
@@ -168,22 +171,27 @@ async function fetchVisitasRemote(entidadId: string): Promise<{
   const abiertas = historial.filter((h) => h.estado === "ABIERTO");
   const activas: VisitaCampoActiva[] = (
     await Promise.all(
-      abiertas.map(async (h) => ({
-        id: h.id,
-        entidad_id: entidadId,
-        numero: h.numero,
-        estado: h.estado,
-        abierto_at: h.abierto_at,
-        abierto_por_nombre: h.abierto_por_nombre,
-        sede_id: h.sede_id,
-        sede_nombre: h.sede_nombre,
-        ambientes_total: h.ambientes_total,
-        ambientes_culminados: h.ambientes_culminados,
-        revision_completa: await visitaRevisionCompleta(
+      abiertas.map(async (h) => {
+        const revision = await visitaRevisionResumen(
           h.id,
           ambientesCache.filter((fila) => fila.visita_id === h.id).map((fila) => fila.ambiente_id),
-        ),
-      })),
+        );
+        return {
+          id: h.id,
+          entidad_id: entidadId,
+          numero: h.numero,
+          estado: h.estado,
+          abierto_at: h.abierto_at,
+          abierto_por_nombre: h.abierto_por_nombre,
+          sede_id: h.sede_id,
+          sede_nombre: h.sede_nombre,
+          ambientes_total: h.ambientes_total,
+          ambientes_culminados: h.ambientes_culminados,
+          revision_completa: revision.completa,
+          bienes_revisados: revision.revisados,
+          bienes_total: revision.total,
+        };
+      }),
     )
   ).sort((a, b) => a.abierto_at.localeCompare(b.abierto_at));
 
@@ -241,6 +249,8 @@ async function listVisitasActivasFromCache(entidadId: string): Promise<VisitaCam
       sede_nombre: v.sede_nombre,
       ...conteoAmbientes(v.id, filas),
       revision_completa: false,
+      bienes_revisados: 0,
+      bienes_total: 0,
     }))
     .sort((a, b) => a.abierto_at.localeCompare(b.abierto_at));
 }
