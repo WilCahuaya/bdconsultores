@@ -24,6 +24,7 @@ import {
   type PreregistroGestionToolbarState,
 } from "@inventario/ui/panel";
 import { ActivoForm } from "./ActivoForm";
+import { FaltanteBienesPanel, VisitaRevisionPanel } from "./VisitaRevisionPanel";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
 import type { FichaAsignacionExportMeta } from "@/lib/actions/ficha-asignacion-meta";
@@ -77,6 +78,7 @@ interface ActivosAmbientePanelProps {
   usuarioNombre: string;
   usuarioEmail: string;
   esAmbientePreregistro?: boolean;
+  esAmbienteFaltante?: boolean;
   /** contador: registro completo; admin: solo preregistro */
   mode?: "contador" | "admin";
 }
@@ -100,6 +102,7 @@ export function ActivosAmbientePanel({
   usuarioNombre,
   usuarioEmail,
   esAmbientePreregistro = false,
+  esAmbienteFaltante = false,
   mode = "contador",
 }: ActivosAmbientePanelProps) {
   const isAdmin = mode === "admin";
@@ -392,6 +395,13 @@ export function ActivosAmbientePanel({
         />
 
       </div>
+
+      {!isAdmin && !esAmbientePreregistro && !esAmbienteFaltante ? (
+        <VisitaRevisionPanel entidadId={entidadId} ambienteId={ambienteId} activos={activosList} />
+      ) : null}
+      {!isAdmin && esAmbienteFaltante ? (
+        <FaltanteBienesPanel entidadId={entidadId} ambienteId={ambienteId} activos={activosList} />
+      ) : null}
 
       {showToolbarTrigger && (
         <PanelToolbarExpandTrigger onClick={scrollToToolbar} />

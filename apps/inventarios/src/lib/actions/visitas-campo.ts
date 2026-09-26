@@ -132,7 +132,7 @@ export async function attachVisitaEstadoToAmbientes(
 
   return ambientes.map((a) => ({
     ...a,
-    visita_estado: a.es_preregistro ? null : (porAmbiente.get(a.id) ?? null),
+    visita_estado: a.es_preregistro || a.es_faltante ? null : (porAmbiente.get(a.id) ?? null),
   }));
 }
 
@@ -273,5 +273,119 @@ export async function cerrarVisitaCampo(visitaId: string, entidadId: string) {
   if (error) return { error: error.message };
 
   revalidateEntidadVisita(entidadId);
+  return { success: true };
+}
+
+export type RevisionVisitaItem = {
+  activo_id: string;
+  hallado: boolean;
+  accion: "BAJA" | "FALTANTE" | null;
+};
+
+export async function getRevisionVisitaAmbiente(ambienteId: string): Promise<{
+  visitaId: string;
+  items: RevisionVisitaItem[];
+} | null> {
+  const profile = await getProfile();
+  if (!profile || profile.rol !== "CONTADOR") return null;
+
+  const supabase = await createClient();
+  const { data: ambiente } = await supabase
+    .from("ambientes")
+    .select("id, sede_id, es_preregistro, es_faltante, sedes!inner(entidad_id)")
+    .eq("id", ambienteId)
+    .maybeSingle();
+
+  if (!ambiente || ambiente.es_preregistro || ambiente.es_faltante) return null;
+
+  const sedeJoin = ambiente.sedes as { entidad_id: string } | { entidad_id: string }[] | null;
+  const entidadId = Array.isArray(sedeJoin) ? sedeJoin[0]?.entidad_id : sedeJoin?.entidad_id;
+  if (!entidadId) return null;
+
+  const { data: visitas } = await supabase
+    .from("visitas_campo")
+    .select("id, sede_id")
+    .eq("entidad_id", entidadId)
+    .eq("estado", "ABIERTO");
+
+  const visita = (visitas ?? []).find(
+    (v) => v.sede_id == null || v.sede_id === ambiente.sede_id,
+  );
+  if (!visita) return null;
+
+  const { data: filas } = await supabase
+    .from("visita_revisiones")
+    .select("activo_id, hallado, accion")
+    .eq("visita_id", visita.id)
+    .eq("ambiente_id", ambienteId);
+
+  return {
+    visitaId: visita.id,
+    items: (filas ?? []).map((fila) => ({
+      activo_id: fila.activo_id as string,
+      hallado: Boolean(fila.hallado),
+      accion: (fila.accion as "BAJA" | "FALTANTE" | null) ?? null,
+    })),
+  };
+}
+
+export async function registrarRevisionVisita(input: {
+  entidadId: string;
+  ambienteId: string;
+  activoId: string;
+  hallado: boolean;
+  estadoBien?: "BUENO" | "REGULAR" | "MALO" | null;
+  accion?: "BAJA" | "FALTANTE" | null;
+  motivo?: string | null;
+}) {
+  try {
+    await requireProfile("CONTADOR");
+  } catch {
+    return { error: "No autorizado." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("registrar_revision_visita", {
+    p_activo_id: input.activoId,
+    p_hallado: input.hallado,
+    p_estado_bien: input.hallado ? input.estadoBien ?? null : null,
+    p_accion: input.hallado ? null : input.accion ?? null,
+    p_motivo: input.motivo ?? null,
+  });
+
+  if (error) return { error: error.message };
+  revalidateEntidadVisita(input.entidadId);
+  revalidatePath(`/contador/entidades/${input.entidadId}/ambientes/${input.ambienteId}`);
+  return { success: true };
+}
+
+export async function resolverBienFaltante(input: {
+  entidadId: string;
+  ambienteId: string;
+  activoId: string;
+  accion: "MOVER" | "BAJA";
+  destinoAmbienteId?: string | null;
+  motivo?: string | null;
+}) {
+  try {
+    await requireProfile("CONTADOR");
+  } catch {
+    return { error: "No autorizado." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("resolver_bien_faltante", {
+    p_activo_id: input.activoId,
+    p_accion: input.accion,
+    p_ambiente_id: input.destinoAmbienteId ?? null,
+    p_motivo: input.motivo ?? null,
+  });
+
+  if (error) return { error: error.message };
+  revalidateEntidadVisita(input.entidadId);
+  revalidatePath(`/contador/entidades/${input.entidadId}/ambientes/${input.ambienteId}`);
+  if (input.destinoAmbienteId) {
+    revalidatePath(`/contador/entidades/${input.entidadId}/ambientes/${input.destinoAmbienteId}`);
+  }
   return { success: true };
 }

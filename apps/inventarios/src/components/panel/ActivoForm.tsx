@@ -521,7 +521,7 @@ export function ActivoForm({
       return;
     }
     void listAmbientesPorEntidad(entidadPosible).then((data) => {
-      const reales = data.filter((a) => !a.es_preregistro);
+      const reales = data.filter((a) => !a.es_preregistro && !a.es_faltante);
       setPosibleAmbientes(reales);
     });
   }, [mostrarPosibleAmbiente, entidadEfectiva, activo?.entidad_id]);

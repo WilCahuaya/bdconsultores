@@ -46,6 +46,7 @@ export default async function AmbienteActivosPage({
       sedeId={ambienteData.ambiente.sede_id}
       fichaExportMeta={fichaExportMeta}
       esAmbientePreregistro={ambienteData.ambiente.es_preregistro}
+      esAmbienteFaltante={ambienteData.ambiente.es_faltante === true}
       activos={activos}
       usuarioNombre={profile.nombre}
       usuarioEmail={profile.email}

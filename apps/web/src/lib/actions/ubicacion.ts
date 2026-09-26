@@ -201,6 +201,7 @@ export async function listAmbientesPorEntidad(
 
   return withCounts.sort((a, b) => {
     if (a.es_preregistro !== b.es_preregistro) return a.es_preregistro ? -1 : 1;
+    if (Boolean(a.es_faltante) !== Boolean(b.es_faltante)) return a.es_faltante ? -1 : 1;
     if (a.sede_es_principal !== b.sede_es_principal) {
       return a.sede_es_principal ? -1 : 1;
     }
@@ -432,7 +433,7 @@ export async function updateAmbiente(
   const supabase = await createClient();
   const { data: existing } = await supabase
     .from("ambientes")
-    .select("id, sede_id, es_preregistro")
+    .select("id, sede_id, es_preregistro, es_faltante")
     .eq("id", ambienteId)
     .eq("activo", true)
     .single();
@@ -440,6 +441,9 @@ export async function updateAmbiente(
   if (!existing) return { error: "Ambiente no encontrado." };
   if ((existing as Ambiente).es_preregistro) {
     return { error: "El ambiente de preregistros no se puede editar." };
+  }
+  if ((existing as Ambiente).es_faltante) {
+    return { error: "El ambiente Faltante no se puede editar." };
   }
 
   if (profile.rol === "ADMIN_ENTIDAD") {
@@ -486,7 +490,7 @@ export async function deleteAmbiente(ambienteId: string) {
 
   const { data: existing } = await supabase
     .from("ambientes")
-    .select("id, sede_id, es_preregistro")
+    .select("id, sede_id, es_preregistro, es_faltante")
     .eq("id", ambienteId)
     .eq("activo", true)
     .single();
@@ -494,6 +498,9 @@ export async function deleteAmbiente(ambienteId: string) {
   if (!existing) return { error: "Ambiente no encontrado." };
   if ((existing as Ambiente).es_preregistro) {
     return { error: "El ambiente de preregistros no se puede eliminar." };
+  }
+  if ((existing as Ambiente).es_faltante) {
+    return { error: "El ambiente Faltante no se puede eliminar." };
   }
 
   const { count } = await supabase

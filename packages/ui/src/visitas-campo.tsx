@@ -284,7 +284,8 @@ export function VisitasCampoBanner({
                     {visita.abierto_por_nombre ? ` · ${visita.abierto_por_nombre}` : ""}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Desde {formatFecha(visita.abierto_at)}
+                    Desde {formatFecha(visita.abierto_at)}. Entre a cada ambiente y marque cada bien
+                    como hallado o no. El ambiente se culmina al terminar esa revisión.
                   </p>
                 </div>
                 {puedeGestionar && onCerrar && (
@@ -299,7 +300,7 @@ export function VisitasCampoBanner({
                     onClick={() => onCerrar(visita.id)}
                     title={
                       visita.ambientes_culminados < visita.ambientes_total
-                        ? "Culmine todos los ambientes antes de cerrar"
+                        ? "Revise los bienes de cada ambiente antes de cerrar"
                         : undefined
                     }
                   >

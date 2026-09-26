@@ -207,6 +207,8 @@ export interface Ambiente {
   /** Espacio físico opcional que ocupa el ambiente (misma sucursal). */
   espacio_id: string | null;
   es_preregistro: boolean;
+  /** Bienes no hallados en visita. Uno por entidad, no es un local físico. */
+  es_faltante?: boolean;
   activo: boolean;
   created_at: string;
   updated_at: string;

@@ -824,13 +824,17 @@ export function AmbientesPanel({
                   title={
                     amb.es_preregistro
                       ? "Ambiente de preregistros: no es un local físico"
-                      : amb.espacio_nombre ?? undefined
+                      : amb.es_faltante
+                        ? "Bienes no hallados en visita"
+                        : amb.espacio_nombre ?? undefined
                   }
                 >
-                  {etiquetaEspacioAmbiente({
-                    esPreregistro: amb.es_preregistro,
-                    espacioNombre: amb.espacio_nombre,
-                  })}
+                  {amb.es_faltante
+                    ? "No hallados"
+                    : etiquetaEspacioAmbiente({
+                        esPreregistro: amb.es_preregistro,
+                        espacioNombre: amb.espacio_nombre,
+                      })}
                 </PanelTableTd>
                 <PanelTableTd title={amb.responsable ?? undefined}>
                   {amb.responsable ?? "—"}
@@ -884,13 +888,15 @@ export function AmbientesPanel({
                 </PanelTableTd>
                 <PanelTableTd align="right" className={`overflow-visible ${panelTableNowrapCellClass}`}>
                   <div onClick={(event) => event.stopPropagation()}>
-                    <PanelTableActions
-                      onEdit={() => {
-                        setError(null);
-                        setEditAmbiente(amb);
-                      }}
-                      onDelete={() => handleDeleteAmbiente(amb)}
-                    />
+                    {amb.es_preregistro || amb.es_faltante ? null : (
+                      <PanelTableActions
+                        onEdit={() => {
+                          setError(null);
+                          setEditAmbiente(amb);
+                        }}
+                        onDelete={() => handleDeleteAmbiente(amb)}
+                      />
+                    )}
                   </div>
                 </PanelTableTd>
               </tr>

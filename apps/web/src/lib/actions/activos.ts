@@ -930,15 +930,15 @@ export async function registrarActivo(
 
   const { data: ambienteDestino } = await supabase
     .from("ambientes")
-    .select("id, sede_id, es_preregistro, responsable")
+    .select("id, sede_id, es_preregistro, es_faltante, responsable")
     .eq("id", destino.ambienteId)
     .maybeSingle();
 
   if (!ambienteDestino || ambienteDestino.sede_id !== destino.sedeId) {
     return { error: "El ambiente no pertenece a la sede seleccionada." };
   }
-  if (ambienteDestino.es_preregistro) {
-    return { error: "Seleccione un ambiente real, no el de preregistros." };
+  if (ambienteDestino.es_preregistro || ambienteDestino.es_faltante) {
+    return { error: "Seleccione un ambiente real, no el de preregistros ni Faltante." };
   }
 
   const { data: existing } = await supabase
