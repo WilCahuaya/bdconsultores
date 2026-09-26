@@ -26,11 +26,12 @@ export default async function ContadorInventarioPage({
       : "";
 
   const [entidades, activos] = await Promise.all([listEntidades(), listActivos()]);
+  const entidadIds = new Set(entidades.map((e) => e.id));
 
   return (
     <InventarioGlobalPanel
       entidades={entidades}
-      activos={activos}
+      activos={activos.filter((a) => entidadIds.has(a.entidad_id))}
       initialEstado={initialEstado}
     />
   );

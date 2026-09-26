@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { Entidad } from "@inventario/types";
+import { entidadUsaInventarios, type Entidad } from "@inventario/types";
 import {
   BdPortalShell,
   EntityPortalMenu,
@@ -10,7 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 
 interface EntityPortalViewProps {
-  entidad: Pick<Entidad, "id" | "nombre" | "ruc" | "direccion">;
+  entidad: Pick<Entidad, "id" | "nombre" | "ruc" | "direccion" | "usa_inventarios">;
   gestionHref: string;
   cambiarEntidadHref?: string;
 }
@@ -28,15 +28,19 @@ export function EntityPortalView({
 
   const items: EntityPortalMenuItem[] = [
     { id: "financieros", label: "Estado Financieros", disabled: true },
-    {
+  ];
+  if (entidadUsaInventarios(entidad)) {
+    items.push({
       id: "inventarios",
       label: "Gestión de Inventarios",
       href: gestionHref,
       highlight: true,
-    },
+    });
+  }
+  items.push(
     { id: "archivo", label: "Archivo Permanente", disabled: true },
     { id: "otros", label: "Otros", disabled: true },
-  ];
+  );
 
   return (
     <BdPortalShell onExit={() => void handleLogout()} showBranding={false}>

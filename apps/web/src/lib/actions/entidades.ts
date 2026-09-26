@@ -116,6 +116,7 @@ export async function listEntidades(): Promise<EntidadConConteo[]> {
   const { data, error } = await supabase
     .from("entidades")
     .select("*")
+    .eq("usa_inventarios", true)
     .order("activo", { ascending: false })
     .order("nombre");
 

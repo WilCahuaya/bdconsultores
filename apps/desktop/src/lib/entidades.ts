@@ -12,6 +12,7 @@ import {
   normalizeResponsableDni,
   normalizeResponsableNombre,
   RESPONSABLE_CARGO_ADMIN,
+  entidadUsaInventarios,
   sortEntidadesByNumero,
   validarAdminEntidadDni,
   validarNumeroInterno,
@@ -92,6 +93,7 @@ async function fetchEntidadesRemote(): Promise<EntidadConConteo[]> {
   const { data, error } = await supabase
     .from("entidades")
     .select("*")
+    .eq("usa_inventarios", true)
     .order("activo", { ascending: false })
     .order("nombre");
 
@@ -139,7 +141,7 @@ export async function listEntidades(): Promise<EntidadConConteo[]> {
     }
   }
   const cached = await listMasterDomain<EntidadConConteo>("entidades", "");
-  return sortEntidadesByNumero(cached);
+  return sortEntidadesByNumero(cached.filter((item) => entidadUsaInventarios(item)));
 }
 
 export async function createEntidad(

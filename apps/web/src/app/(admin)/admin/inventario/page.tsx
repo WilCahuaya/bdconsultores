@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import type { EstadoRegistro } from "@inventario/types";
+import { entidadUsaInventarios, type EstadoRegistro } from "@inventario/types";
 import { InventarioGlobalPanel } from "@/components/panel/InventarioGlobalPanel";
 import { listActivos } from "@/lib/actions/activos";
 import { getEntidad } from "@/lib/actions/entidades";
@@ -34,6 +34,7 @@ export default async function AdminInventarioGlobalPage({
   ]);
 
   if (!entidad) redirect("/login");
+  if (!entidadUsaInventarios(entidad)) redirect("/admin/portal");
 
   return (
     <InventarioGlobalPanel

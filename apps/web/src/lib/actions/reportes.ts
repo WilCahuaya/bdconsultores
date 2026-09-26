@@ -139,6 +139,7 @@ export async function getEntidadesParaReportes() {
       .select("*")
       .eq("id", profile.entidad_id!)
       .eq("activo", true)
+      .eq("usa_inventarios", true)
       .maybeSingle();
     return data ? [data] : [];
   }
@@ -151,6 +152,7 @@ export async function getEntidadesParaReportes() {
     .from("entidades")
     .select("*")
     .eq("activo", true)
+    .eq("usa_inventarios", true)
     .order("nombre");
 
   if (error) throw new Error(error.message);

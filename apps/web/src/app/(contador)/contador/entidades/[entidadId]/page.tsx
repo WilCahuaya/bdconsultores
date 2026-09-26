@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import { entidadUsaInventarios } from "@inventario/types";
 import { AmbientesPanel } from "@/components/panel/AmbientesPanel";
 import { listActivos } from "@/lib/actions/activos";
 import { getEntidad } from "@/lib/actions/entidades";
@@ -27,7 +28,7 @@ export default async function EntidadAmbientesPage({
   const { entidadId } = await params;
   const { tab } = await searchParams;
   const entidad = await getEntidad(entidadId);
-  if (!entidad) notFound();
+  if (!entidad || !entidadUsaInventarios(entidad)) notFound();
 
   const [ambientesRaw, sedes, responsables, visitasActivas, visitasHistorial, activos] = await Promise.all([
     listAmbientesPorEntidad(entidadId),

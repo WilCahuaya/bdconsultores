@@ -57,7 +57,7 @@ export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | 
     .eq("id", entidadId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  if (!data) return null;
+  if (!data || data.usa_planillas !== true) return null;
   return data as Entidad;
 }
 
