@@ -63,6 +63,7 @@ interface ActivosInventarioExcelViewProps {
   fechaCorte?: Date;
   leyendaVisita?: ReactNode;
   renderVisita?: (activo: Activo) => ReactNode;
+  procedenciaPorActivo?: Record<string, string>;
 }
 
 function excelViewShellClass(embeddedInParentScroll: boolean): string {
@@ -99,6 +100,7 @@ export function ActivosInventarioExcelView({
   fechaCorte,
   leyendaVisita,
   renderVisita,
+  procedenciaPorActivo,
 }: ActivosInventarioExcelViewProps) {
   const paginationKey = useMemo(
     () => `${activos.length}:${activos[0]?.id ?? ""}`,
@@ -230,6 +232,7 @@ export function ActivosInventarioExcelView({
       columnFilterOptions={columnFilterOptions}
       fechaCorte={fechaCorte}
       renderVisita={renderVisita}
+      procedenciaPorActivo={procedenciaPorActivo}
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       selection={
@@ -297,6 +300,7 @@ export function ActivosInventarioExcelView({
       puedeSeleccionar={gestionEnabled ? esActivoPreregistrado : undefined}
       fechaCorte={fechaCorte}
       renderVisita={renderVisita}
+      procedenciaPorActivo={procedenciaPorActivo}
     />
   );
 

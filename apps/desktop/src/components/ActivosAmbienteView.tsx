@@ -10,6 +10,7 @@ import {
 } from "../lib/ficha-asignacion-meta";
 import { ActivosCampoList } from "./ActivosCampoList";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
+import { listProcedenciaFaltante } from "../lib/visitas-campo";
 import { FaltanteBienesPanel, useVisitaRevision } from "./VisitaRevisionPanel";
 
 interface ActivosAmbienteViewProps {
@@ -79,6 +80,25 @@ export function ActivosAmbienteView({
     };
   }, [ambienteId, entidad.id, sedeId]);
   const esFaltante = esFaltanteRemoto ?? esAmbienteFaltante === true;
+  const [procedenciaPorActivo, setProcedenciaPorActivo] = useState<Record<string, string>>({});
+  const procedenciaIds = useMemo(
+    () => (esFaltante ? activosAmbiente.map((activo) => activo.id).join(",") : ""),
+    [activosAmbiente, esFaltante],
+  );
+  useEffect(() => {
+    if (!esFaltante) {
+      setProcedenciaPorActivo({});
+      return;
+    }
+    const ids = procedenciaIds ? procedenciaIds.split(",") : [];
+    let cancel = false;
+    void listProcedenciaFaltante(ids).then((mapa) => {
+      if (!cancel) setProcedenciaPorActivo(mapa);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [esFaltante, procedenciaIds]);
   const visita = useVisitaRevision({
     ambienteId,
     activos: activosAmbiente,
@@ -148,6 +168,7 @@ export function ActivosAmbienteView({
           <FaltanteBienesPanel
             entidadId={entidad.id}
             activos={activosAmbiente}
+            procedenciaPorActivo={procedenciaPorActivo}
             onAbrirDestino={onAbrirAmbienteDestino}
             onChanged={onInventarioRefresh}
           />
@@ -155,6 +176,7 @@ export function ActivosAmbienteView({
       }
       leyendaVisita={visita.activa ? visita.leyenda : null}
       renderVisita={visita.activa ? visita.renderCelda : undefined}
+      procedenciaPorActivo={esFaltante ? procedenciaPorActivo : undefined}
       exportMeta={exportMeta}
       reportesExport={
         !esAmbientePreregistro ? (

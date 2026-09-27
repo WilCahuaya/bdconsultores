@@ -126,6 +126,8 @@ export const INVENTARIO_STICKY_DATA_COL_COUNT = 4;
 
 /** Columna Visita, insertada antes de Nombre del bien. */
 export const INVENTARIO_VISITA_COL_WIDTH_PX = 78;
+/** Columna «Viene de» en el ambiente Faltante, después del nombre. */
+export const INVENTARIO_PROCEDENCIA_COL_WIDTH_PX = 168;
 
 export const INVENTARIO_TABLE_COL_WIDTHS_PX = [
   40, // N°
@@ -228,6 +230,16 @@ function sumWidths(widths: readonly number[]): number {
 export function insertInventarioVisitaColumn(widths: readonly number[]): number[] {
   const next = [...widths];
   next.splice(3, 0, INVENTARIO_VISITA_COL_WIDTH_PX);
+  return next;
+}
+
+/** Inserta «Viene de» justo después de Nombre del bien. */
+export function insertInventarioProcedenciaColumn(
+  widths: readonly number[],
+  columnaVisita: boolean,
+): number[] {
+  const next = [...widths];
+  next.splice(columnaVisita ? 5 : 4, 0, INVENTARIO_PROCEDENCIA_COL_WIDTH_PX);
   return next;
 }
 
@@ -344,6 +356,7 @@ export function inventarioTableWidthValuesPx(options?: {
   mostrarUbicacion?: boolean;
   withSelection?: boolean;
   columnaVisita?: boolean;
+  columnaProcedencia?: boolean;
 }): number[] {
   const withSelection = options?.withSelection ?? false;
   let widths: readonly number[];
@@ -360,7 +373,11 @@ export function inventarioTableWidthValuesPx(options?: {
       ? INVENTARIO_TABLE_ENTITY_UBICACION_COL_WIDTHS_PX
       : INVENTARIO_TABLE_COL_WIDTHS_PX;
   }
-  const data = options?.columnaVisita ? insertInventarioVisitaColumn(widths) : [...widths];
+  const columnaVisita = Boolean(options?.columnaVisita);
+  let data = columnaVisita ? insertInventarioVisitaColumn(widths) : [...widths];
+  if (options?.columnaProcedencia) {
+    data = insertInventarioProcedenciaColumn(data, columnaVisita);
+  }
   return withSelection ? [INVENTARIO_TABLE_SELECTION_COL_WIDTH_PX, ...data] : data;
 }
 
@@ -384,6 +401,7 @@ export function inventarioTableMinWidthPx(options?: {
   mostrarUbicacion?: boolean;
   withSelection?: boolean;
   columnaVisita?: boolean;
+  columnaProcedencia?: boolean;
 }): number {
   return sumWidths(inventarioTableWidthValuesPx(options));
 }

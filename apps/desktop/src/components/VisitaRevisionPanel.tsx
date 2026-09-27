@@ -319,11 +319,13 @@ export function useVisitaRevision({
 export function FaltanteBienesPanel({
   entidadId,
   activos,
+  procedenciaPorActivo,
   onAbrirDestino,
   onChanged,
 }: {
   entidadId: string;
   activos: Activo[];
+  procedenciaPorActivo?: Record<string, string>;
   onAbrirDestino?: (destino: DestinoAmbiente) => void;
   onChanged?: () => void;
 }) {
@@ -395,6 +397,9 @@ export function FaltanteBienesPanel({
                 <span className="min-w-0 flex-1 text-sm">
                   {etiquetaBien(activo)}
                   <span className="ml-2 text-xs text-muted-foreground">{estadoBienLabel(activo.estado_bien)}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Viene de {procedenciaPorActivo?.[activo.id]?.trim() || "—"}
+                  </span>
                 </span>
                 <select
                   className="h-8 max-w-[14rem] rounded-md border border-input bg-background px-2 text-sm"

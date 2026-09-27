@@ -99,6 +99,7 @@ function ActivosInventarioMobileCards({
   ubicacionMultiplesSedes = false,
   puedeEliminarPreregistro = false,
   renderVisita,
+  procedenciaPorActivo,
 }: {
   activos: ActivoConUbicacion[];
   entidadId: string;
@@ -121,6 +122,7 @@ function ActivosInventarioMobileCards({
   ubicacionMultiplesSedes?: boolean;
   puedeEliminarPreregistro?: boolean;
   renderVisita?: (activo: ActivoConUbicacion) => ReactNode;
+  procedenciaPorActivo?: Record<string, string>;
 }) {
   if (activos.length === 0) {
     return (
@@ -188,6 +190,15 @@ function ActivosInventarioMobileCards({
               </div>
               <EstadoBienBadge estado={activo.estado_bien} />
             </div>
+
+            {procedenciaPorActivo ? (
+              <p className="mb-3 text-xs text-foreground">
+                <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+                  Viene de:{" "}
+                </span>
+                {procedenciaPorActivo[activo.id]?.trim() || "—"}
+              </p>
+            ) : null}
 
             {renderVisita ? (
               <div className="mb-3 flex items-center gap-2">
@@ -298,6 +309,7 @@ interface ActivosInventarioExcelViewProps {
   className?: string;
   leyendaVisita?: ReactNode;
   renderVisita?: (activo: ActivoConUbicacion) => ReactNode;
+  procedenciaPorActivo?: Record<string, string>;
 }
 
 export function ActivosInventarioExcelView({
@@ -326,6 +338,7 @@ export function ActivosInventarioExcelView({
   className,
   leyendaVisita,
   renderVisita,
+  procedenciaPorActivo,
 }: ActivosInventarioExcelViewProps) {
   const preregistrados = useMemo(() => activos.filter(esActivoPreregistrado), [activos]);
   const gestionEnabled = Boolean(gestionPreregistros && preregistrados.length > 0);
@@ -494,6 +507,7 @@ export function ActivosInventarioExcelView({
         ubicacionMultiplesSedes={ubicacionMultiplesSedes}
         puedeEliminarPreregistro={puedeEliminarPreregistro}
         renderVisita={renderVisita}
+        procedenciaPorActivo={procedenciaPorActivo}
       />
     </div>
   );
@@ -533,6 +547,7 @@ export function ActivosInventarioExcelView({
             : undefined
       }
       renderVisita={renderVisita}
+      procedenciaPorActivo={procedenciaPorActivo}
       renderComprobante={(activo) => <ComprobanteCell activo={activo} />}
       renderAcciones={(activo) => (
         <ActivosCampoAcciones

@@ -151,6 +151,8 @@ export interface ActivosInventarioTableProps<T extends Activo> {
   fechaCorte?: Date;
   /** Columna Visita, antes de Nombre del bien. */
   renderVisita?: (activo: T) => ReactNode;
+  /** Columna «Viene de» en Faltante: ambiente del que salió cada bien. */
+  procedenciaPorActivo?: Record<string, string>;
   renderComprobante: (activo: T, meta?: { columnFiltered?: boolean }) => ReactNode;
   renderAcciones: (activo: T) => ReactNode;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
@@ -263,6 +265,7 @@ function TotalsFooter({
   modoAdmin,
   modoPreregistro,
   mostrarUbicacion,
+  columnaProcedencia = false,
   stickyOffsets,
   stickyWidths,
 }: {
@@ -271,6 +274,7 @@ function TotalsFooter({
   modoAdmin?: boolean;
   modoPreregistro?: boolean;
   mostrarUbicacion?: boolean;
+  columnaProcedencia?: boolean;
   stickyOffsets: number[];
   stickyWidths: readonly number[];
 }) {
@@ -305,6 +309,7 @@ function TotalsFooter({
         >
           <span className="block truncate whitespace-nowrap">{label}</span>
         </td>
+        {columnaProcedencia && <td className={tdTotalBase} />}
         {modoPreregistro && <td className={tdTotalBase} />}
         <td className={tdTotalBase} />
         <td className={tdTotalBase} />
@@ -350,6 +355,7 @@ function FullTableBody<T extends Activo>({
   renderComprobante,
   renderAcciones,
   renderVisita,
+  procedenciaPorActivo,
   stickyOffsets,
   stickyWidths,
   fechaCorte,
@@ -360,6 +366,7 @@ function FullTableBody<T extends Activo>({
 }) {
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
   const columnaVisita = Boolean(renderVisita);
+  const columnaProcedencia = procedenciaPorActivo != null;
   const sel = selection?.withSelection ? 1 : 0;
   const nombreStickyAt = sel + 3 + (columnaVisita ? 1 : 0);
   const f = columnFilters;
@@ -440,6 +447,14 @@ function FullTableBody<T extends Activo>({
                 mostrarPreregistro={mostrarEstadoRegistro && !modoPreregistro}
               />
             </InventarioTextCell>
+            {columnaProcedencia && (
+              <InventarioTextCell
+                title={procedenciaPorActivo?.[activo.id] || "Sin ambiente de origen"}
+                lineClamp2
+              >
+                {procedenciaPorActivo?.[activo.id]?.trim() || "—"}
+              </InventarioTextCell>
+            )}
             {modoPreregistro && (
               <InventarioTextCell title={posibleAmbienteLabel(activo)} lineClamp2>
                 {posibleAmbienteLabel(activo)}
@@ -509,9 +524,11 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     onColumnFiltersChange,
     columnFilterOptions = emptyInventarioColumnFilterOptions(),
     renderVisita,
+    procedenciaPorActivo,
   } = props;
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
   const columnaVisita = Boolean(renderVisita);
+  const columnaProcedencia = procedenciaPorActivo != null;
   const withSelection = selection?.withSelection ?? false;
   const colSpan =
     (modoAdmin
@@ -526,7 +543,8 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
           ? INVENTARIO_TABLE_FULL_PREREGISTRO_COL_COUNT
           : INVENTARIO_TABLE_COL_COUNT) +
     (withSelection ? 1 : 0) +
-    (columnaVisita ? 1 : 0);
+    (columnaVisita ? 1 : 0) +
+    (columnaProcedencia ? 1 : 0);
   const tableClass = `${inventarioActivosTableClass}${modoPreregistro ? " inventario-activos-table--preregistro" : ""}${modoAdmin ? " inventario-activos-table--admin" : ""}${mostrarUbicacion ? " inventario-activos-table--ubicacion" : ""}`;
   const tableMinWidth = inventarioTableMinWidthPx({
     modoPreregistro,
@@ -534,6 +552,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     mostrarUbicacion,
     withSelection,
     columnaVisita,
+    columnaProcedencia,
   });
   const widthValues = inventarioTableWidthValuesPx({
     modoPreregistro,
@@ -541,6 +560,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     mostrarUbicacion,
     withSelection,
     columnaVisita,
+    columnaProcedencia,
   });
   const stickyCount = (withSelection ? 1 : 0) + INVENTARIO_STICKY_DATA_COL_COUNT + (columnaVisita ? 1 : 0);
   const stickyOffsets = inventarioStickyLeftOffsets(widthValues, stickyCount);
@@ -641,6 +661,15 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
                   multiline
                 >
                   Nombre del bien
+                </Th>
+              )}
+              {columnaProcedencia && (
+                <Th
+                  multiline
+                  className={`${inventarioThStd} normal-case`}
+                  title="Ambiente del que salió el bien al pasar a Faltante"
+                >
+                  Viene de
                 </Th>
               )}
               {modoPreregistro && (
@@ -775,6 +804,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
             modoAdmin={modoAdmin}
             modoPreregistro={modoPreregistro}
             mostrarUbicacion={mostrarUbicacion}
+            columnaProcedencia={columnaProcedencia}
             stickyOffsets={stickyOffsets}
             stickyWidths={stickyWidths}
           />

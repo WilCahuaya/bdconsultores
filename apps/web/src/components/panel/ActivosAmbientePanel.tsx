@@ -24,6 +24,7 @@ import {
   type PreregistroGestionToolbarState,
 } from "@inventario/ui/panel";
 import { ActivoForm } from "./ActivoForm";
+import { listProcedenciaFaltante } from "@/lib/actions/visitas-campo";
 import { FaltanteBienesPanel, useVisitaRevision } from "./VisitaRevisionPanel";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
@@ -139,6 +140,25 @@ export function ActivosAmbientePanel({
   const { panelScrollRef, showToolbarTrigger, scrollToToolbar } = usePanelInventarioUnifiedScroll();
   const [preregistroHeaderToolbar, setPreregistroHeaderToolbar] =
     useState<PreregistroGestionToolbarState | null>(null);
+  const [procedenciaPorActivo, setProcedenciaPorActivo] = useState<Record<string, string>>({});
+  const procedenciaIds = useMemo(
+    () => (esAmbienteFaltante ? activosList.map((activo) => activo.id).join(",") : ""),
+    [activosList, esAmbienteFaltante],
+  );
+  useEffect(() => {
+    if (isAdmin || !esAmbienteFaltante) {
+      setProcedenciaPorActivo({});
+      return;
+    }
+    const ids = procedenciaIds ? procedenciaIds.split(",") : [];
+    let cancel = false;
+    void listProcedenciaFaltante(ids).then((mapa) => {
+      if (!cancel) setProcedenciaPorActivo(mapa);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [esAmbienteFaltante, isAdmin, procedenciaIds]);
   const visita = useVisitaRevision({
     entidadId,
     ambienteId,
@@ -403,7 +423,12 @@ export function ActivosAmbientePanel({
       </div>
 
       {!isAdmin && esAmbienteFaltante ? (
-        <FaltanteBienesPanel entidadId={entidadId} ambienteId={ambienteId} activos={activosList} />
+        <FaltanteBienesPanel
+          entidadId={entidadId}
+          ambienteId={ambienteId}
+          activos={activosList}
+          procedenciaPorActivo={procedenciaPorActivo}
+        />
       ) : null}
 
       {showToolbarTrigger && (
@@ -523,6 +548,7 @@ export function ActivosAmbientePanel({
           fechaCorte={fechaCorte}
           leyendaVisita={visita.activa ? visita.leyenda : null}
           renderVisita={visita.activa ? visita.renderCelda : undefined}
+          procedenciaPorActivo={esAmbienteFaltante ? procedenciaPorActivo : undefined}
         />
     </div>
   );

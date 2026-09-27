@@ -66,6 +66,7 @@ interface ActivosCampoListProps {
   headerExtra?: ReactNode;
   leyendaVisita?: ReactNode;
   renderVisita?: (activo: ActivoConUbicacion) => ReactNode;
+  procedenciaPorActivo?: Record<string, string>;
   ambienteFilter?: { id: string; nombre: string };
   onClearAmbienteFilter?: () => void;
   onPrintLabel: (activo: ActivoConUbicacion) => void;
@@ -97,6 +98,7 @@ export function ActivosCampoList({
   headerExtra,
   leyendaVisita,
   renderVisita,
+  procedenciaPorActivo,
   ambienteFilter,
   onClearAmbienteFilter,
   onPrintLabel,
@@ -756,6 +758,7 @@ export function ActivosCampoList({
           onActivoEliminado={(id) => quitarActivos([id])}
           leyendaVisita={leyendaVisita}
           renderVisita={renderVisita}
+          procedenciaPorActivo={procedenciaPorActivo}
         />
       ) : (
         <>

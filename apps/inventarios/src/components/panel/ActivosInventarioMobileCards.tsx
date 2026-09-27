@@ -40,6 +40,7 @@ interface ActivosInventarioMobileCardsProps {
   puedeSeleccionar?: (activo: Activo) => boolean;
   fechaCorte?: Date;
   renderVisita?: (activo: Activo) => ReactNode;
+  procedenciaPorActivo?: Record<string, string>;
 }
 
 function InfoItem({
@@ -101,6 +102,7 @@ export function ActivosInventarioMobileCards({
   puedeSeleccionar,
   fechaCorte,
   renderVisita,
+  procedenciaPorActivo,
 }: ActivosInventarioMobileCardsProps) {
   if (activos.length === 0) {
     return (
@@ -172,6 +174,15 @@ export function ActivosInventarioMobileCards({
               </div>
               <EstadoBienBadge estado={activo.estado_bien} />
             </div>
+
+            {procedenciaPorActivo ? (
+              <p className="mb-3 text-xs text-foreground">
+                <span className="font-semibold uppercase tracking-wide text-muted-foreground">
+                  Viene de:{" "}
+                </span>
+                {procedenciaPorActivo[activo.id]?.trim() || "—"}
+              </p>
+            ) : null}
 
             {renderVisita ? (
               <div className="mb-3 flex items-center gap-2">

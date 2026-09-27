@@ -322,10 +322,12 @@ export function FaltanteBienesPanel({
   entidadId,
   ambienteId,
   activos,
+  procedenciaPorActivo,
 }: {
   entidadId: string;
   ambienteId: string;
   activos: Activo[];
+  procedenciaPorActivo?: Record<string, string>;
 }) {
   const router = useRouter();
   const [destinos, setDestinos] = useState<{ id: string; nombre: string }[]>([]);
@@ -391,6 +393,9 @@ export function FaltanteBienesPanel({
                 <span className="min-w-0 flex-1 text-sm">
                   {etiquetaBien(activo)}
                   <span className="ml-2 text-xs text-muted-foreground">{estadoBienLabel(activo.estado_bien)}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Viene de {procedenciaPorActivo?.[activo.id]?.trim() || "—"}
+                  </span>
                 </span>
                 <select
                   className="h-8 max-w-[14rem] rounded-md border border-input bg-background px-2 text-sm"

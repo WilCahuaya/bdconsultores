@@ -762,3 +762,84 @@ export async function resolverBienFaltante(input: {
   if (error) return { error: error.message };
   return { success: true };
 }
+
+type ProcedenciaAmbiente = {
+  nombre?: string | null;
+  sedes?: { nombre?: string | null } | { nombre?: string | null }[] | null;
+};
+
+function nombreDeJoin(
+  value: { nombre?: string | null } | { nombre?: string | null }[] | null | undefined,
+): string {
+  if (!value) return "";
+  const row = Array.isArray(value) ? value[0] : value;
+  return row?.nombre?.trim() ?? "";
+}
+
+function etiquetaProcedencia(ambiente: string, sede: string): string {
+  if (!ambiente) return "";
+  return sede ? `${ambiente} · ${sede}` : ambiente;
+}
+
+/** Ambiente del que salió cada bien al pasar a Faltante. */
+export async function listProcedenciaFaltante(activoIds: string[]): Promise<Record<string, string>> {
+  const ids = [...new Set(activoIds.filter(Boolean))];
+  if (ids.length === 0 || !isOnline()) return {};
+
+  const supabase = getSupabaseClient();
+  const { data: revisiones, error } = await supabase
+    .from("visita_revisiones")
+    .select("activo_id, ambiente_id, updated_at")
+    .eq("accion", "FALTANTE")
+    .in("activo_id", ids)
+    .order("updated_at", { ascending: false });
+
+  if (error) return {};
+
+  const origenIdPorActivo = new Map<string, string>();
+  for (const row of revisiones ?? []) {
+    const activoId = String(row.activo_id ?? "");
+    const ambienteId = String(row.ambiente_id ?? "");
+    if (!activoId || !ambienteId || origenIdPorActivo.has(activoId)) continue;
+    origenIdPorActivo.set(activoId, ambienteId);
+  }
+
+  const sinRevision = ids.filter((id) => !origenIdPorActivo.has(id));
+  if (sinRevision.length > 0) {
+    const { data: historial } = await supabase
+      .from("historial_cambios")
+      .select("activo_id, valor_anterior, created_at")
+      .eq("campo", "ambiente_id")
+      .in("activo_id", sinRevision)
+      .order("created_at", { ascending: false });
+    for (const row of historial ?? []) {
+      const activoId = String(row.activo_id ?? "");
+      const origenId = String(row.valor_anterior ?? "").trim();
+      if (!activoId || !origenId || origenIdPorActivo.has(activoId)) continue;
+      origenIdPorActivo.set(activoId, origenId);
+    }
+  }
+
+  const origenIds = [...new Set(origenIdPorActivo.values())];
+  if (origenIds.length === 0) return {};
+
+  const { data: ambientes } = await supabase
+    .from("ambientes")
+    .select("id, nombre, sedes(nombre)")
+    .in("id", origenIds);
+
+  const etiquetaPorAmbiente = new Map<string, string>();
+  for (const ambiente of ambientes ?? []) {
+    const id = String(ambiente.id ?? "");
+    const sede = nombreDeJoin((ambiente as { sedes?: ProcedenciaAmbiente["sedes"] }).sedes);
+    const etiqueta = etiquetaProcedencia(String(ambiente.nombre ?? ""), sede);
+    if (id && etiqueta) etiquetaPorAmbiente.set(id, etiqueta);
+  }
+
+  const out: Record<string, string> = {};
+  for (const [activoId, origenId] of origenIdPorActivo) {
+    const etiqueta = etiquetaPorAmbiente.get(origenId);
+    if (etiqueta) out[activoId] = etiqueta;
+  }
+  return out;
+}
