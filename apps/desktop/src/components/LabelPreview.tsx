@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { normalizeCodigoBarrasDisplay } from "@inventario/types";
-import { formatAnioAdquisicion, LABEL_HEIGHT_MM, LABEL_WIDTH_MM } from "../lib/zpl";
+import { formatLineaInventarioEtiqueta, LABEL_HEIGHT_MM, LABEL_WIDTH_MM } from "../lib/zpl";
 import { fetchLabelaryPreviewPng } from "../lib/labelary-preview";
 
 interface LabelPreviewProps {
@@ -40,7 +40,7 @@ function LabelDataSummary({
   entidadNombre: string;
   fechaAdquisicion?: string | null;
 }) {
-  const anio = formatAnioAdquisicion(fechaAdquisicion);
+  const lineaAnios = formatLineaInventarioEtiqueta(fechaAdquisicion);
   const codigoLegible = normalizeCodigoBarrasDisplay(codigoBarras);
 
   return (
@@ -49,7 +49,15 @@ function LabelDataSummary({
         <p className="text-[2.2mm] font-bold uppercase">{nombreBien.toUpperCase()}</p>
         <div className="space-y-[0.5mm]">
           <p className="text-[2.4mm] font-semibold tabular-nums">{codigoLegible}</p>
-          {anio && <p className="text-[1.8mm] text-gray-700">Adquisición {anio}</p>}
+          <p
+            className={
+              lineaAnios.centered
+                ? "text-[1.8mm] text-gray-700"
+                : "pl-[5.6mm] text-[1.8mm] text-gray-700"
+            }
+          >
+            {lineaAnios.text}
+          </p>
           <p className="text-[2mm] font-bold uppercase">{entidadNombre.toUpperCase()}</p>
         </div>
       </div>

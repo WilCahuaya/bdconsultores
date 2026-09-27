@@ -113,6 +113,7 @@ export const IMPORT_ACTIVOS_HEADERS = [
   "Nombre cuenta contable",
   "Sucursal",
   "Ambiente",
+  "Comprobante de adquisición",
 ] as const;
 
 export type ImportActivoHeader = (typeof IMPORT_ACTIVOS_HEADERS)[number];
@@ -172,6 +173,7 @@ export interface ImportActivoInsertPayload {
   posible_ambiente_id: string | null;
   cuenta_contable_codigo: string | null;
   cuenta_contable_nombre: string | null;
+  comprobante_serie: string | null;
   /** @deprecated Ya no actualiza catálogo; conservado por compatibilidad interna. */
   catalogo_contabilidad?: ImportActivoCatalogoContabilidadUpdate | null;
 }
@@ -234,6 +236,11 @@ const HEADER_ALIASES: Record<string, ImportActivoHeader> = {
   "nombre cuenta contable": "Nombre cuenta contable",
   "nombre de cuenta contable": "Nombre cuenta contable",
   contabilidad: "Nombre cuenta contable",
+  "comprobante de adquisicion": "Comprobante de adquisición",
+  "comprobante de adquisición": "Comprobante de adquisición",
+  comprobante: "Comprobante de adquisición",
+  "serie de comprobante": "Comprobante de adquisición",
+  "serie del comprobante": "Comprobante de adquisición",
 };
 
 const PREREGISTRO_AMBIENTE_ALIASES = new Set([
@@ -253,6 +260,23 @@ export function isImportPreregistroAmbienteAlias(text: string): boolean {
   if (PREREGISTRO_AMBIENTE_ALIASES.has(key)) return true;
   if (/^adquisicion \d{4}$/.test(key)) return true;
   return key === normalizeImportKey(`Adquisicion ${new Date().getFullYear()}`);
+}
+
+/** Misma regla que el formulario: mayúsculas; letras, números, guión, barra y espacios. */
+function parseImportComprobanteSerie(
+  raw: string,
+): { ok: true; value: string | null } | { ok: false; motivo: string } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: true, value: null };
+  const normalized = trimmed
+    .toUpperCase()
+    .replace(/[^A-Z0-9/ -]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) {
+    return { ok: false, motivo: "Comprobante de adquisición inválido." };
+  }
+  return { ok: true, value: normalized };
 }
 
 function resolveImportEstadoRegistroFromAmbiente(
@@ -678,6 +702,15 @@ export function validateImportActivoFila(
   const matchFisico = ubicacionKey ? fisicoLookup.get(ubicacionKey) : null;
   const matchTodos = ubicacionKey ? todoLookup.get(ubicacionKey) : null;
 
+  const comprobante = parseImportComprobanteSerie(fila["Comprobante de adquisición"]);
+  if (!comprobante.ok) return comprobante;
+  if (valorEsMercado && comprobante.value) {
+    return {
+      ok: false,
+      motivo: "El comprobante de adquisición no aplica cuando indica valor de mercado.",
+    };
+  }
+
   const estadoRegistro = resolveImportEstadoRegistroFromAmbiente(
     matchFisico ?? null,
     matchTodos ?? null,
@@ -752,6 +785,7 @@ export function validateImportActivoFila(
       posible_ambiente_id: posibleAmbienteId,
       cuenta_contable_codigo: cuentaActivoCodigo,
       cuenta_contable_nombre: cuentaActivoNombre,
+      comprobante_serie: valorEsMercado ? null : comprobante.value,
     },
   };
 }

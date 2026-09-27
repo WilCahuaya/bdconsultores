@@ -11,7 +11,6 @@ import {
 } from "@inventario/ui";
 import { BdGoogleSignInButton, BdPortalShell } from "@inventario/ui/panel";
 import { DESKTOP_PORTAL_HERO_DARK, DESKTOP_PORTAL_HERO_LIGHT } from "./lib/portal-assets";
-import { ContadorPortalDesktop } from "./components/ContadorPortalDesktop";
 import { buildAmbienteContextBreadcrumbs } from "./lib/ambiente-context-breadcrumbs";
 import { ActivoFormDesktop } from "./components/ActivoFormDesktop";
 import { ActivoEditWithScopeDesktop } from "./components/ActivoEditWithScopeDesktop";
@@ -224,7 +223,6 @@ function MainApp({ userId }: { userId: string; email: string }) {
 
   const [mainNav, setMainNav] = useState<MainNav>("dashboard");
   const [dashboardEntidadId, setDashboardEntidadId] = useState("");
-  const [showEntityPortal, setShowEntityPortal] = useState(true);
   const [entidadesFlow, setEntidadesFlow] = useState<EntidadesFlow>({ type: "list" });
   const [inventarioFlow, setInventarioFlow] = useState<InventarioFlow>({ type: "list" });
   const [printTarget, setPrintTarget] = useState<ActivoConUbicacion | null>(null);
@@ -314,14 +312,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
   }
 
   function handleNavChange(nav: MainNav) {
-    if (nav === "portal") {
-      setMainNav("dashboard");
-      setShowEntityPortal(true);
-      return;
-    }
-
     setMainNav(nav);
-    setShowEntityPortal(false);
     if (nav === "entidades") {
       setEntidadesFlow({ type: "list" });
     } else if (nav === "inventario") {
@@ -577,25 +568,10 @@ function MainApp({ userId }: { userId: string; email: string }) {
     (a) => a.estado_registro === "PREREGISTRADO",
   ).length;
 
-  const sidebarActiveNav: MainNav =
-    showEntityPortal && mainNav === "dashboard" ? "portal" : mainNav;
-
-  if (showEntityPortal && mainNav === "dashboard" && profile.rol === "CONTADOR") {
-    return (
-      <ToastProvider>
-        <ContadorPortalDesktop
-          nombre={profile.nombre}
-          email={profile.email}
-          onGestionInventarios={() => setShowEntityPortal(false)}
-        />
-      </ToastProvider>
-    );
-  }
-
   return (
     <ToastProvider>
     <AppShell
-      activeNav={sidebarActiveNav}
+      activeNav={mainNav}
       onNavChange={handleNavChange}
       navSections={desktopNavSections(preregistrados)}
       subheader={subheader}
@@ -607,7 +583,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
       onSyncClick={() => void syncNow({ blockUi: true })}
       user={{ nombre: profile.nombre, email: profile.email }}
     >
-      {mainNav === "dashboard" && !showEntityPortal && (
+      {mainNav === "dashboard" && (
         <DesktopDashboard
           entidades={entidadesActivas}
           selectedEntidadId={dashboardEntidadId || entidadesActivas[0]?.id || ""}

@@ -205,6 +205,25 @@ export function formatAnioAdquisicion(fecha: string | null | undefined): string 
   return year?.[1] ?? "";
 }
 
+/**
+ * Línea de años en la etiqueta.
+ * Con fecha: a la derecha de Control Patrimonial.
+ * Sin fecha: «inventario {año de impresión}», centrado en los 50 mm.
+ */
+export function formatLineaInventarioEtiqueta(
+  fechaAdquisicion: string | null | undefined,
+  anioImpresion = new Date().getFullYear(),
+): { text: string; centered: boolean } {
+  const anio = formatAnioAdquisicion(fechaAdquisicion);
+  if (anio) {
+    return {
+      text: `Adquisición ${anio} - inventario ${anioImpresion}`,
+      centered: false,
+    };
+  }
+  return { text: `inventario ${anioImpresion}`, centered: true };
+}
+
 function sanitizeZplField(value: string): string {
   return value.replace(/[\^~\\]/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -216,7 +235,19 @@ function centeredField(
   text: string,
   lines = 1,
 ): string {
-  return `^FO${tapeX},${tapeY}^A0N,${font},${font}^FB${LABEL_WIDTH_DOTS},${lines},0,C,0^FD${text}^FS`;
+  return fieldBlock(tapeX, tapeY, LABEL_WIDTH_DOTS, font, text, "C", lines);
+}
+
+function fieldBlock(
+  tapeX: number,
+  tapeY: number,
+  widthDots: number,
+  font: number,
+  text: string,
+  align: "C" | "L" | "R",
+  lines = 1,
+): string {
+  return `^FO${tapeX},${tapeY}^A0N,${font},${font}^FB${widthDots},${lines},0,${align},0^FD${text}^FS`;
 }
 
 /** Una etiqueta anclada a la cinta en tapeOriginDots. */
@@ -229,7 +260,7 @@ function buildLabelSlotZpl(tapeOriginDots: number, input: LabelZplInput, column:
   const codigoLegible = sanitizeZplField(normalizeCodigoBarrasDisplay(input.codigoBarras));
   const codigoSimbolo = sanitizeZplField(formatCodigoBarrasSimbolo(input.codigoBarras));
   const entidadRaw = sanitizeZplField(input.entidadNombre.toUpperCase());
-  const anio = formatAnioAdquisicion(input.fechaAdquisicion);
+  const lineaAnios = formatLineaInventarioEtiqueta(input.fechaAdquisicion);
 
   const nombreFit = fitLabelLine(nombreRaw, {
     maxWidthDots: LABEL_WIDTH_DOTS,
@@ -252,13 +283,25 @@ function buildLabelSlotZpl(tapeOriginDots: number, input: LabelZplInput, column:
     centeredField(ox + L.codigoText.xDots, L.codigoText.yDots, L.codigoText.font, codigoLegible),
   ];
 
-  if (anio) {
+  if (lineaAnios.centered) {
     fields.push(
       centeredField(
         ox + L.adquisicion.xDots,
         L.adquisicion.yDots,
         L.adquisicion.font,
-        `Adquisición ${anio}`,
+        lineaAnios.text,
+      ),
+    );
+  } else {
+    const leftStripDots = L.barcode.xDots + sideX;
+    fields.push(
+      fieldBlock(
+        ox + leftStripDots,
+        L.adquisicion.yDots,
+        LABEL_WIDTH_DOTS - leftStripDots,
+        L.adquisicion.font,
+        lineaAnios.text,
+        "C",
       ),
     );
   }

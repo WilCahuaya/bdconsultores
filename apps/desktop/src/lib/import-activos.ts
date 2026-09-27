@@ -141,6 +141,7 @@ function buildCreateActivoInput(payload: ImportActivoInsertPayload): CreateActiv
     observacion: payload.observacion ?? undefined,
     cuenta_contable_codigo: payload.cuenta_contable_codigo,
     cuenta_contable_nombre: payload.cuenta_contable_nombre,
+    comprobante_serie: payload.comprobante_serie ?? undefined,
     estado_registro: payload.estado_registro,
   };
 
@@ -180,6 +181,7 @@ function buildActivosInsertFromImport(
     responsable,
     cuenta_contable_codigo: payload.cuenta_contable_codigo,
     cuenta_contable_nombre: payload.cuenta_contable_nombre,
+    comprobante_serie: payload.comprobante_serie,
   };
 
   if (payload.estado_registro === "REGISTRADO") {
@@ -254,7 +256,7 @@ function buildLocalActivoFromImport(
     vida_util_meses: payload.vida_util_meses,
     foto_path: null,
     comprobante_path: null,
-    comprobante_serie: null,
+    comprobante_serie: payload.comprobante_serie,
     cuenta_contable_codigo: payload.cuenta_contable_codigo,
     cuenta_contable_nombre: payload.cuenta_contable_nombre,
     posible_ambiente_id: payload.posible_ambiente_id,

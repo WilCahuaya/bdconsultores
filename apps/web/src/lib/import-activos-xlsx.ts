@@ -135,6 +135,7 @@ export async function downloadImportActivosPlantilla(
     "Nombre cuenta contable": "",
     Sucursal: ejemploUbicacion?.sedeNombre ?? "Principal",
     Ambiente: ejemploUbicacion?.ambienteNombre ?? "",
+    "Comprobante de adquisición": "",
   };
 
   const plantillaRows = [[...IMPORT_ACTIVOS_HEADERS], IMPORT_ACTIVOS_HEADERS.map((h) => ejemplo[h])];

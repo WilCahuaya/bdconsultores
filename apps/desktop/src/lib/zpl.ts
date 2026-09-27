@@ -8,6 +8,7 @@ export {
   dotsToMm,
   estimateCode128WidthDots,
   formatAnioAdquisicion,
+  formatLineaInventarioEtiqueta,
   HONEYWELL_BARCODE_MODULES,
   resolveBarcodeModule,
   BARCODE_MAX_WIDTH_MM,

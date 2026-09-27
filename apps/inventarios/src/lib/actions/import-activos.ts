@@ -118,6 +118,7 @@ function buildActivosInsertFromImport(
     responsable,
     cuenta_contable_codigo: payload.cuenta_contable_codigo,
     cuenta_contable_nombre: payload.cuenta_contable_nombre,
+    comprobante_serie: payload.comprobante_serie,
   };
 
   if (payload.estado_registro === "REGISTRADO") {
