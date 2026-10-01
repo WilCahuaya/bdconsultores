@@ -32,7 +32,7 @@ import {
   flujoDesdeTrabajador,
   resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
-import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, nombreCompleto } from "@/lib/planillas-labels";
+import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador } from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -120,7 +120,7 @@ export default async function FichaTrabajadorPage({
           <Link href={`/?entidadId=${trabajador.entidad_id}`} className="text-sm text-primary hover:underline">
             ← Trabajadores
           </Link>
-          <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{nombreCompleto(trabajador.persona)}</h1>
+          <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{etiquetaTrabajador(trabajador.persona, trabajador.numero)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             DNI {trabajador.persona.dni} · {ESTADO_RELACION_LABEL[trabajador.estado]}
             {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}

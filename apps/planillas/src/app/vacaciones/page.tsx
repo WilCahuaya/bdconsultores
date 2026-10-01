@@ -8,7 +8,7 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listVacacionesEmpresa } from "@/lib/actions/vacaciones";
 import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
-import { nombreCompleto } from "@/lib/planillas-labels";
+import { compareTrabajadoresPorNumero, etiquetaTrabajador } from "@/lib/planillas-labels";
 
 export default async function VacacionesPage({
   searchParams,
@@ -42,7 +42,7 @@ export default async function VacacionesPage({
     .sort((a, b) => {
       if (a.resumen.derecho !== b.resumen.derecho) return a.resumen.derecho ? -1 : 1;
       if (a.resumen.saldo !== b.resumen.saldo) return b.resumen.saldo - a.resumen.saldo;
-      return nombreCompleto(a.trabajador.persona).localeCompare(nombreCompleto(b.trabajador.persona), "es");
+      return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
     });
   const pendientes = filas.filter((f) => f.resumen.derecho && f.resumen.saldo > 0).length;
 
@@ -124,7 +124,7 @@ export default async function VacacionesPage({
                             href={`/trabajadores/${trabajador.id}?tab=vacaciones&periodo=${periodo}`}
                             className="font-medium text-primary hover:underline"
                           >
-                            {nombreCompleto(trabajador.persona)}
+                            {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
                           </Link>
                         </td>
                         <td className="px-4 py-2">

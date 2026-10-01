@@ -13,6 +13,7 @@ import {
   JORNADA_LABEL,
   cargoCanonico,
   formatFechaPlanilla,
+  formatNumeroTrabajador,
   formatRemuneracion,
   montoAsignacionFamiliar,
   opcionesCargo,
@@ -122,6 +123,23 @@ export function FichaPuestoForm({
           hint="La fecha de ingreso es el primer día en la empresa. No tiene que coincidir con el contrato vigente: pueden faltar contratos viejos, haber solo el firmado actual, o no haber contrato elaborado."
         >
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Field
+                label="Nº en la empresa"
+                name="numero"
+                required={canWrite}
+                readOnly={!canWrite}
+                inputMode="numeric"
+                maxLength={4}
+                pattern="[0-9]{1,4}"
+                placeholder="01"
+                title="Número de archivo, por ejemplo 01"
+                defaultValue={formatNumeroTrabajador(trabajador.numero)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Se muestra como 01 María Paredes. Único en esta empresa; no se reutiliza al cesar.
+              </p>
+            </div>
             <SelectField
               label="Cargo"
               name="cargo"

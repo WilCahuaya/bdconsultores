@@ -10,7 +10,7 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listDocumentosAsistenciaMes } from "@/lib/actions/asistencias";
 import { esMesAsistencia, etiquetaMesAsistencia, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
-import { nombreCompleto } from "@/lib/planillas-labels";
+import { compareTrabajadoresPorNumero, etiquetaTrabajador } from "@/lib/planillas-labels";
 
 export default async function AsistenciasPage({
   searchParams,
@@ -36,7 +36,7 @@ export default async function AsistenciasPage({
       const aSubido = Boolean(pdfPorRelacion.get(a.id)?.storage_path);
       const bSubido = Boolean(pdfPorRelacion.get(b.id)?.storage_path);
       if (aSubido !== bSubido) return aSubido ? 1 : -1;
-      return nombreCompleto(a.persona).localeCompare(nombreCompleto(b.persona), "es");
+      return compareTrabajadoresPorNumero(a, b);
     });
   const pdfSubidos = activos.filter((t) => Boolean(pdfPorRelacion.get(t.id)?.storage_path)).length;
 
@@ -112,7 +112,7 @@ export default async function AsistenciasPage({
                                 href={`/trabajadores/${trabajador.id}?tab=asistencia`}
                                 className="font-medium text-primary hover:underline"
                               >
-                                {nombreCompleto(trabajador.persona)}
+                                {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
                               </Link>
                             </td>
                             <td className="px-4 py-2 align-top">

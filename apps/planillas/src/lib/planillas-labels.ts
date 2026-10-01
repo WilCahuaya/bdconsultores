@@ -306,6 +306,51 @@ export function nombreCompleto(persona: {
     .join(" ");
 }
 
+/** Número de archivo dentro de la empresa, con dos dígitos: 1 → 01. */
+export function formatNumeroTrabajador(numero: number | null | undefined): string {
+  if (numero == null || !Number.isInteger(numero) || numero < 1) return "";
+  return String(numero).padStart(2, "0");
+}
+
+export function parseNumeroTrabajador(raw: string): { value: number | null; error?: string } {
+  const value = raw.trim();
+  if (!value) return { value: null, error: "El número del trabajador es obligatorio." };
+  if (!/^\d{1,4}$/.test(value)) return { value: null, error: "Use un número como 01 o 15." };
+  const numero = Number(value);
+  if (!Number.isInteger(numero) || numero < 1) return { value: null, error: "Use un número como 01 o 15." };
+  return { value: numero };
+}
+
+/** `01 María Paredes`. Sin número, solo el nombre. */
+export function etiquetaTrabajador(
+  persona: {
+    nombres: string;
+    apellido_paterno?: string | null;
+    apellido_materno?: string | null;
+  },
+  numero?: number | null,
+): string {
+  const nombre = nombreCompleto(persona);
+  const n = formatNumeroTrabajador(numero);
+  return n ? `${n} ${nombre}` : nombre;
+}
+
+export function compareTrabajadoresPorNumero(
+  a: {
+    numero?: number | null;
+    persona: { nombres: string; apellido_paterno?: string | null; apellido_materno?: string | null };
+  },
+  b: {
+    numero?: number | null;
+    persona: { nombres: string; apellido_paterno?: string | null; apellido_materno?: string | null };
+  },
+): number {
+  const an = a.numero ?? Number.MAX_SAFE_INTEGER;
+  const bn = b.numero ?? Number.MAX_SAFE_INTEGER;
+  if (an !== bn) return an - bn;
+  return nombreCompleto(a.persona).localeCompare(nombreCompleto(b.persona), "es");
+}
+
 export function formatFechaPlanilla(value: string | null | undefined): string {
   if (!value) return "—";
   const iso = value.slice(0, 10);

@@ -15,7 +15,13 @@ import {
   puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
-import { parseFechaCampo, parseCargoCampo, armarDireccionPersona } from "@/lib/planillas-labels";
+import {
+  parseFechaCampo,
+  parseCargoCampo,
+  parseNumeroTrabajador,
+  armarDireccionPersona,
+  compareTrabajadoresPorNumero,
+} from "@/lib/planillas-labels";
 import type { FlujoContrato, FlujoDocumento, FlujoPension, FlujoTRegistro } from "@/lib/flujo-ficha";
 import { documentoCargado } from "@/lib/flujo-ficha";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -44,6 +50,7 @@ export type RelacionRow = {
   id: string;
   persona_id: string;
   entidad_id: string;
+  numero: number | null;
   cargo: string | null;
   clasificacion: ClasificacionTrabajador | null;
   jornada: JornadaLaboral | null;
@@ -83,7 +90,7 @@ type DocumentoEmbed = {
 };
 
 const TRABAJADOR_SELECT =
-  "id, persona_id, entidad_id, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados, documento_id), documentos (id, tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
+  "id, persona_id, entidad_id, numero, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados, documento_id), documentos (id, tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
 
 function asList<T>(value: T | T[] | null | undefined): T[] {
   if (!value) return [];
@@ -116,6 +123,17 @@ function normalizeDni(value: string): string {
   return value.replace(/\D/g, "").trim();
 }
 
+function mensajeErrorNumero(error: { code?: string; message?: string }): string | null {
+  const message = error.message ?? "";
+  if (error.code === "23505" && message.includes("relaciones_numero_por_entidad")) {
+    return "Ya hay un trabajador con ese número en esta empresa.";
+  }
+  if (error.code === "23514" && message.includes("relaciones_numero_positivo")) {
+    return "Use un número como 01 o 15.";
+  }
+  return null;
+}
+
 export async function listTrabajadores(entidadId: string): Promise<TrabajadorListItem[]> {
   const profile = await requirePlanillasProfile();
   const alcance = entidadAlcance(profile);
@@ -130,12 +148,14 @@ export async function listTrabajadores(entidadId: string): Promise<TrabajadorLis
 
   if (error) throw new Error(error.message);
 
-  return aplicarSueldoAdendas(
+  const items = await aplicarSueldoAdendas(
     (data ?? []).flatMap((row) => {
       const mapped = mapTrabajadorRow(row);
       return mapped ? [mapped] : [];
     }),
   );
+  items.sort(compareTrabajadoresPorNumero);
+  return items;
 }
 
 export async function getTrabajador(relacionId: string): Promise<TrabajadorListItem | null> {
@@ -232,6 +252,8 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   if (ingreso.error) return { error: ingreso.error };
   const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""));
   if (cargo.error) return { error: cargo.error };
+  const numero = parseNumeroTrabajador(String(formData.get("numero") ?? ""));
+  if (numero.error || numero.value == null) return { error: numero.error ?? "El número del trabajador es obligatorio." };
 
   const db = await planillasDb();
   const admin = createAdminClient();
@@ -273,6 +295,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
     .insert({
       persona_id: personaId,
       entidad_id: entidadId,
+      numero: numero.value,
       cargo: cargo.value,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
@@ -288,7 +311,7 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
     if (relError.message.includes("relaciones_persona_entidad_activa")) {
       return { error: "Esta persona ya tiene una relación activa en esa empresa." };
     }
-    return { error: relError.message };
+    return { error: mensajeErrorNumero(relError) ?? relError.message };
   }
 
   revalidatePath("/");
@@ -393,11 +416,14 @@ export async function updatePuestoTrabajador(
   if (ingreso.error) return { error: ingreso.error };
   const cargo = parseCargoCampo(String(formData.get("cargo") ?? ""), actual.cargo);
   if (cargo.error) return { error: cargo.error };
+  const numero = parseNumeroTrabajador(String(formData.get("numero") ?? ""));
+  if (numero.error || numero.value == null) return { error: numero.error ?? "El número del trabajador es obligatorio." };
 
   const db = await planillasDb();
   const { error } = await db
     .from("relaciones_laborales")
     .update({
+      numero: numero.value,
       cargo: cargo.value,
       clasificacion: (String(formData.get("clasificacion") ?? "").trim() || null) as ClasificacionTrabajador | null,
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
@@ -405,7 +431,7 @@ export async function updatePuestoTrabajador(
       fecha_ingreso: ingreso.value,
     })
     .eq("id", relacionId);
-  if (error) return { error: error.message };
+  if (error) return { error: mensajeErrorNumero(error) ?? error.message };
 
   revalidatePath("/");
   revalidatePath("/pendientes");

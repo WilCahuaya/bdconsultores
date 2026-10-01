@@ -87,7 +87,7 @@ export function TrabajadoresPendientesTabla({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="w-full min-w-[16rem] sm:w-80">
-            <PanelSearchInput value={consulta} onChange={setConsulta} placeholder="Buscar nombre o DNI…" />
+            <PanelSearchInput value={consulta} onChange={setConsulta} placeholder="Buscar número, nombre o DNI…" />
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
             <input

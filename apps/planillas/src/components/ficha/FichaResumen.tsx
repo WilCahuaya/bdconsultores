@@ -11,10 +11,11 @@ import {
   CLASIFICACION_LABEL,
   ESTADO_CONTRATO_LABEL,
   JORNADA_LABEL,
+  etiquetaTrabajador,
   formatFechaPlanilla,
+  formatNumeroTrabajador,
   formatRemuneracion,
   montoAsignacionFamiliar,
-  nombreCompleto,
 } from "@/lib/planillas-labels";
 import {
   DIAS_VACACIONES_ANUALES,
@@ -169,7 +170,7 @@ export function FichaResumen({
       : null;
 
   const persona: Linea[] = [
-    { texto: nombreCompleto(p) },
+    { texto: etiquetaTrabajador(p, trabajador.numero) },
     { texto: p.dni },
     ...(p.fecha_nacimiento ? [{ texto: formatFechaPlanilla(p.fecha_nacimiento) }] : []),
   ];
@@ -178,7 +179,9 @@ export function FichaResumen({
     ...(p.correo ? [{ texto: p.correo }] : []),
     ...(p.direccion ? [{ texto: p.direccion }] : []),
   ];
+  const numero = formatNumeroTrabajador(trabajador.numero);
   const puesto: Linea[] = [
+    ...(numero ? [{ texto: `Nº ${numero}` }] : []),
     ...(trabajador.cargo ? [{ texto: trabajador.cargo }] : []),
     ...(trabajador.clasificacion ? [{ texto: CLASIFICACION_LABEL[trabajador.clasificacion] }] : []),
     ...(trabajador.jornada ? [{ texto: JORNADA_LABEL[trabajador.jornada] }] : []),

@@ -12,8 +12,9 @@ import { HORIZONTE_VENCIMIENTO_DIAS } from "@/lib/flujo-ficha";
 import {
   ETAPA_VIDA_LEY_FILTRO_LABEL,
   etiquetaEstadoVidaLey,
+  compareTrabajadoresPorNumero,
+  etiquetaTrabajador,
   formatFechaPlanilla,
-  nombreCompleto,
   parseEtapaVidaLeyFiltro,
   resolverEtapaVidaLey,
   vidaLeyPendienteRecepcion,
@@ -62,7 +63,7 @@ export default async function VidaLeyPage({
     }))
     .sort((a, b) => {
       if (a.etapa.pendiente !== b.etapa.pendiente) return a.etapa.pendiente ? -1 : 1;
-      return nombreCompleto(a.trabajador.persona).localeCompare(nombreCompleto(b.trabajador.persona), "es");
+      return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
     });
   const conteo = filas.reduce(
     (acc, fila) => {
@@ -191,7 +192,7 @@ export default async function VidaLeyPage({
                             href={`/trabajadores/${trabajador.id}?tab=vida-ley`}
                             className="font-medium text-primary hover:underline"
                           >
-                            {nombreCompleto(trabajador.persona)}
+                            {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
                           </Link>
                         </td>
                         <td className="px-4 py-2">

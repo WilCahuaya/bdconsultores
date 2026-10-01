@@ -8,7 +8,7 @@ import {
   ASIGNACION_FAMILIAR_SOLES,
   formatFechaPlanilla,
   formatRemuneracion,
-  nombreCompleto,
+  etiquetaTrabajador,
   remuneracionBruta,
   resolverEtapaVidaLey,
   TIEMPO_LABEL,
@@ -144,7 +144,7 @@ function baseDe(trabajador: { id: string; persona: { dni: string; nombres: strin
   return {
     relacionId: trabajador.id,
     dni: trabajador.persona.dni,
-    nombre: nombreCompleto(trabajador.persona),
+    nombre: etiquetaTrabajador(trabajador.persona, trabajador.numero),
   };
 }
 
@@ -329,7 +329,7 @@ async function cargarPendientes(entidadId: string): Promise<{
     });
   }
 
-  const porNombre = (a: PendienteItem, b: PendienteItem) => a.nombre.localeCompare(b.nombre, "es");
+  const porNombre = (a: PendienteItem, b: PendienteItem) => a.nombre.localeCompare(b.nombre, "es", { numeric: true });
   contratos.sort(porNombre);
   vidaLey.sort(porNombre);
   asistencia.sort(porNombre);

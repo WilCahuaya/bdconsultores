@@ -186,6 +186,21 @@ export function NuevoTrabajadorForm({
               onChange={(event) => setApellidoMaterno(event.target.value)}
             />
             <DateField label="Fecha de nacimiento" name="fecha_nacimiento_vista" value={fechaNacimiento} onChange={setFechaNacimiento} />
+            <div className="space-y-1.5">
+              <Field
+                label="Nº en la empresa"
+                name="numero"
+                required
+                inputMode="numeric"
+                maxLength={4}
+                pattern="[0-9]{1,4}"
+                placeholder="01"
+                title="Número de archivo, por ejemplo 01"
+              />
+              <p className="text-xs text-muted-foreground">
+                Enumeración manual dentro de esta empresa. Ejemplo: 01. No se repite ni se reutiliza al cesar.
+              </p>
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">

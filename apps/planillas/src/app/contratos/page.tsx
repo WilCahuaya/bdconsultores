@@ -19,7 +19,7 @@ import {
   resolverEtapaContrato,
   type EtapaContratoId,
 } from "@/lib/flujo-ficha";
-import { ESTADO_RELACION_LABEL, formatFechaPlanilla, nombreCompleto } from "@/lib/planillas-labels";
+import { ESTADO_RELACION_LABEL, compareTrabajadoresPorNumero, etiquetaTrabajador, formatFechaPlanilla } from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -63,7 +63,7 @@ export default async function ContratosPage({
     .sort((a, b) => {
       if (a.etapa.pendiente !== b.etapa.pendiente) return a.etapa.pendiente ? -1 : 1;
       if (a.trabajador.estado !== b.trabajador.estado) return a.trabajador.estado === "ACTIVA" ? -1 : 1;
-      return nombreCompleto(a.trabajador.persona).localeCompare(nombreCompleto(b.trabajador.persona), "es");
+      return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
     });
   const conteo = filas.reduce(
     (acc, fila) => {
@@ -205,7 +205,7 @@ export default async function ContratosPage({
                             href={hrefPasoTrabajador(trabajador.id, etapa.tab)}
                             className="font-medium text-primary hover:underline"
                           >
-                            {nombreCompleto(trabajador.persona)}
+                            {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
                           </Link>
                         </td>
                         <td className="px-4 py-2">{ESTADO_RELACION_LABEL[trabajador.estado]}</td>
