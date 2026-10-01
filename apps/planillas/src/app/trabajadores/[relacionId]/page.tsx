@@ -12,7 +12,7 @@ import {
   puedeEscribirPlanillas,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
-import { getTrabajador } from "@/lib/actions/trabajadores";
+import { getTrabajador, listTrabajadores } from "@/lib/actions/trabajadores";
 import {
   getVidaLey,
   listContratos,
@@ -32,6 +32,7 @@ import {
   flujoDesdeTrabajador,
   resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
+import { CambiarTrabajadorSelect } from "@/components/ficha/CambiarTrabajadorSelect";
 import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorButton";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
@@ -75,14 +76,22 @@ export default async function FichaTrabajadorPage({
   if (esEstudio && tab === "vida-ley" && !fichaCesada) {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [documentos, vidaLey, vacaciones, contratos] = await Promise.all([
+  const [documentos, vidaLey, vacaciones, contratos, companeros] = await Promise.all([
     listDocumentos(params.relacionId),
     esEstudio && (tab === "vida-ley" || !tab)
       ? getVidaLey(params.relacionId)
       : Promise.resolve(null),
     !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
     !tab ? listContratos(params.relacionId) : Promise.resolve([]),
+    listTrabajadores(trabajador.entidad_id),
   ]);
+  const opcionesTrabajador = companeros.map((item) => ({
+    id: item.id,
+    etiqueta: `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
+  }));
+  const queryFicha = new URLSearchParams();
+  if (tab) queryFicha.set("tab", tab);
+  if (searchParams.periodo) queryFicha.set("periodo", searchParams.periodo);
   const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodoVacacion);
   const mes = mesActualLima();
   const periodo = anioActualLima();
@@ -121,6 +130,11 @@ export default async function FichaTrabajadorPage({
           <Link href={`/?entidadId=${trabajador.entidad_id}`} className="text-sm text-primary hover:underline">
             ← Trabajadores
           </Link>
+          <CambiarTrabajadorSelect
+            trabajadores={opcionesTrabajador}
+            relacionId={params.relacionId}
+            query={queryFicha.toString()}
+          />
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{etiquetaTrabajador(trabajador.persona, trabajador.numero)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             DNI {trabajador.persona.dni} · {ESTADO_RELACION_LABEL[trabajador.estado]}
