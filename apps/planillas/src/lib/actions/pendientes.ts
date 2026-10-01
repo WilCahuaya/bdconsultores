@@ -8,7 +8,7 @@ import {
   ASIGNACION_FAMILIAR_SOLES,
   formatFechaPlanilla,
   formatRemuneracion,
-  etiquetaTrabajador,
+  nombreCompleto,
   remuneracionBruta,
   resolverEtapaVidaLey,
   TIEMPO_LABEL,
@@ -62,6 +62,7 @@ export type DatosLaboralesFila = {
 export type FilaPendienteTrabajador = {
   id: string;
   dni: string;
+  numero: number | null;
   nombre: string;
   cargo: string | null;
   cesada: boolean;
@@ -148,7 +149,8 @@ function baseDe(trabajador: {
   return {
     relacionId: trabajador.id,
     dni: trabajador.persona.dni,
-    nombre: etiquetaTrabajador(trabajador.persona, trabajador.numero),
+    numero: trabajador.numero,
+    nombre: nombreCompleto(trabajador.persona),
   };
 }
 
@@ -219,6 +221,7 @@ async function cargarPendientes(entidadId: string): Promise<{
       filas.push({
         id: trabajador.id,
         dni: base.dni,
+        numero: base.numero,
         nombre: base.nombre,
         cargo: trabajador.cargo,
         cesada: true,
@@ -320,6 +323,7 @@ async function cargarPendientes(entidadId: string): Promise<{
     filas.push({
       id: trabajador.id,
       dni: base.dni,
+      numero: base.numero,
       nombre: base.nombre,
       cargo: trabajador.cargo,
       cesada: false,
@@ -333,7 +337,12 @@ async function cargarPendientes(entidadId: string): Promise<{
     });
   }
 
-  const porNombre = (a: PendienteItem, b: PendienteItem) => a.nombre.localeCompare(b.nombre, "es", { numeric: true });
+  const porNombre = (a: PendienteItem, b: PendienteItem) => {
+    const an = a.numero ?? Number.MAX_SAFE_INTEGER;
+    const bn = b.numero ?? Number.MAX_SAFE_INTEGER;
+    if (an !== bn) return an - bn;
+    return a.nombre.localeCompare(b.nombre, "es");
+  };
   contratos.sort(porNombre);
   vidaLey.sort(porNombre);
   asistencia.sort(porNombre);

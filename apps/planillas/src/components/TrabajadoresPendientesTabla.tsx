@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { panelCardClass, PanelSearchInput } from "@inventario/ui/panel";
 import type { CeldaPendiente, ColumnaPendienteId, ColorPendiente, FilaPendienteTrabajador } from "@/lib/actions/pendientes";
+import { formatNumeroTrabajador } from "@/lib/planillas-labels";
 
 const COLOR_CLASS: Record<ColorPendiente, string> = {
   gris: "bg-muted/70 text-muted-foreground",
@@ -40,7 +41,7 @@ function textoBusqueda(valor: string) {
 function coincide(fila: FilaPendienteTrabajador, consulta: string) {
   const q = textoBusqueda(consulta.trim());
   if (!q) return true;
-  return textoBusqueda([fila.nombre, fila.dni, fila.cargo].filter(Boolean).join(" ")).includes(q);
+  return textoBusqueda([formatNumeroTrabajador(fila.numero), fila.nombre, fila.dni, fila.cargo].filter(Boolean).join(" ")).includes(q);
 }
 
 function tienePendiente(fila: FilaPendienteTrabajador, columnas: { id: ColumnaPendienteId }[]) {
@@ -118,7 +119,10 @@ export function TrabajadoresPendientesTabla({
           <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr>
-                <th className="sticky left-0 top-0 z-30 w-[16rem] min-w-[16rem] border-b bg-muted px-3 py-2 font-medium">
+                <th className="sticky left-0 top-0 z-30 w-12 min-w-12 border-b bg-muted px-2 py-2 text-center font-medium">
+                  Nº
+                </th>
+                <th className="sticky left-12 top-0 z-30 w-[16rem] min-w-[16rem] border-b bg-muted px-3 py-2 font-medium">
                   Trabajador
                 </th>
                 {DATOS.map((col) => (
@@ -143,7 +147,7 @@ export function TrabajadoresPendientesTabla({
             <tbody>
               {visibles.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-muted-foreground" colSpan={columnas.length + DATOS.length + 1}>
+                  <td className="px-4 py-8 text-muted-foreground" colSpan={columnas.length + DATOS.length + 2}>
                     {filas.length === 0
                       ? "No hay trabajadores en esta empresa."
                       : "Ningún trabajador coincide con el filtro."}
@@ -154,7 +158,10 @@ export function TrabajadoresPendientesTabla({
                   const titulo = [fila.nombre, fila.dni, fila.cargo].filter(Boolean).join(" · ");
                   return (
                     <tr key={fila.id}>
-                      <td className="sticky left-0 z-10 w-[16rem] min-w-[16rem] max-w-[16rem] border-b bg-background px-3 py-1">
+                      <td className="sticky left-0 z-10 w-12 min-w-12 border-b bg-background px-2 py-1 text-center font-mono text-xs">
+                        {formatNumeroTrabajador(fila.numero) || "—"}
+                      </td>
+                      <td className="sticky left-12 z-10 w-[16rem] min-w-[16rem] max-w-[16rem] border-b bg-background px-3 py-1">
                         <div className="flex min-w-0 items-baseline gap-2" title={titulo}>
                           <Link href={`/trabajadores/${fila.id}`} className="min-w-0 truncate font-medium text-primary hover:underline">
                             {fila.nombre}

@@ -8,7 +8,7 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listVacacionesEmpresa } from "@/lib/actions/vacaciones";
 import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
-import { compareTrabajadoresPorNumero, etiquetaTrabajador } from "@/lib/planillas-labels";
+import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 export default async function VacacionesPage({
   searchParams,
@@ -101,6 +101,7 @@ export default async function VacacionesPage({
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
+                    <th className="px-4 py-2 font-medium">Nº</th>
                     <th className="px-4 py-2 font-medium">DNI</th>
                     <th className="px-4 py-2 font-medium">Nombre</th>
                     <th className="px-4 py-2 font-medium">Derecho</th>
@@ -111,20 +112,21 @@ export default async function VacacionesPage({
                 <tbody>
                   {filas.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={5}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={6}>
                         No hay trabajadores activos en esta empresa.
                       </td>
                     </tr>
                   ) : (
                     filas.map(({ trabajador, resumen }) => (
                       <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-2 font-mono">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
                         <td className="px-4 py-2 font-mono">{trabajador.persona.dni}</td>
                         <td className="px-4 py-2">
                           <Link
                             href={`/trabajadores/${trabajador.id}?tab=vacaciones&periodo=${periodo}`}
                             className="font-medium text-primary hover:underline"
                           >
-                            {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
+                            {nombreCompleto(trabajador.persona)}
                           </Link>
                         </td>
                         <td className="px-4 py-2">

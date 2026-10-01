@@ -278,6 +278,7 @@ export type PendienteItem = {
   id: string;
   relacionId: string;
   dni: string;
+  numero: number | null;
   nombre: string;
   tipo: PendienteTipo;
   detalle: string;
@@ -304,6 +305,21 @@ export function nombreCompleto(persona: {
     .map((p) => p?.trim())
     .filter(Boolean)
     .join(" ");
+}
+
+function normalizarNombre(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/** Ignora mayúsculas, tildes y espacios de más. */
+export function nombresCoinciden(escrito: string, esperado: string): boolean {
+  const left = normalizarNombre(escrito);
+  return left.length > 0 && left === normalizarNombre(esperado);
 }
 
 /** Número de archivo dentro de la empresa, con dos dígitos: 1 → 01. */

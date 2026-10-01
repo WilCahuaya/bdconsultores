@@ -13,8 +13,9 @@ import {
   ETAPA_VIDA_LEY_FILTRO_LABEL,
   etiquetaEstadoVidaLey,
   compareTrabajadoresPorNumero,
-  etiquetaTrabajador,
   formatFechaPlanilla,
+  formatNumeroTrabajador,
+  nombreCompleto,
   parseEtapaVidaLeyFiltro,
   resolverEtapaVidaLey,
   vidaLeyPendienteRecepcion,
@@ -165,6 +166,7 @@ export default async function VidaLeyPage({
               <table className="w-full min-w-[840px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
+                    <th className="px-4 py-2 font-medium">Nº</th>
                     <th className="px-4 py-2 font-medium">DNI</th>
                     <th className="px-4 py-2 font-medium">Nombre</th>
                     <th className="px-4 py-2 font-medium">Paso</th>
@@ -177,7 +179,7 @@ export default async function VidaLeyPage({
                 <tbody>
                   {visibles.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={7}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={8}>
                         {filas.length === 0
                           ? "No hay trabajadores con alta validada en esta empresa."
                           : "No hay trámites en este paso."}
@@ -186,13 +188,14 @@ export default async function VidaLeyPage({
                   ) : (
                     visibles.map(({ trabajador, registro, etapa }) => (
                       <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-2 font-mono">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
                         <td className="px-4 py-2 font-mono">{trabajador.persona.dni}</td>
                         <td className="px-4 py-2">
                           <Link
                             href={`/trabajadores/${trabajador.id}?tab=vida-ley`}
                             className="font-medium text-primary hover:underline"
                           >
-                            {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
+                            {nombreCompleto(trabajador.persona)}
                           </Link>
                         </td>
                         <td className="px-4 py-2">

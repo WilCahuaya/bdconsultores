@@ -8,7 +8,7 @@ import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } fr
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listControlEmpresa } from "@/lib/actions/pendientes";
 import { hrefPasoTrabajador } from "@/lib/flujo-ficha";
-import type { PendienteItem } from "@/lib/planillas-labels";
+import { formatNumeroTrabajador, type PendienteItem } from "@/lib/planillas-labels";
 
 function ApartadoTabla({
   items,
@@ -22,6 +22,7 @@ function ApartadoTabla({
       <table className="w-full min-w-[640px] text-left text-sm">
         <thead className="border-b bg-muted/40 text-muted-foreground">
           <tr>
+            <th className="px-4 py-2 font-medium">Nº</th>
             <th className="px-4 py-2 font-medium">DNI</th>
             <th className="px-4 py-2 font-medium">Nombre</th>
             <th className="px-4 py-2 font-medium">Pendiente</th>
@@ -30,13 +31,14 @@ function ApartadoTabla({
         <tbody>
           {items.length === 0 ? (
             <tr>
-              <td className="px-4 py-8 text-muted-foreground" colSpan={3}>
+              <td className="px-4 py-8 text-muted-foreground" colSpan={4}>
                 {vacio}
               </td>
             </tr>
           ) : (
             items.map((item) => (
               <tr key={item.id} className="border-b last:border-0 hover:bg-muted/30">
+                <td className="px-4 py-2 font-mono">{formatNumeroTrabajador(item.numero) || "—"}</td>
                 <td className="px-4 py-2 font-mono">{item.dni}</td>
                 <td className="px-4 py-2">
                   <Link

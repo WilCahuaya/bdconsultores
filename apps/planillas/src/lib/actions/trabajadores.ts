@@ -22,6 +22,8 @@ import {
   parseNumeroTrabajador,
   armarDireccionPersona,
   compareTrabajadoresPorNumero,
+  nombreCompleto,
+  nombresCoinciden,
 } from "@/lib/planillas-labels";
 import type { FlujoContrato, FlujoDocumento, FlujoPension, FlujoTRegistro } from "@/lib/flujo-ficha";
 import { documentoCargado } from "@/lib/flujo-ficha";
@@ -503,12 +505,18 @@ export async function darDeBajaTrabajador(
   return {};
 }
 
-export async function eliminarTrabajador(relacionId: string): Promise<{ error?: string; entidadId?: string }> {
+export async function eliminarTrabajador(
+  relacionId: string,
+  nombreEscrito: string,
+): Promise<{ error?: string; entidadId?: string }> {
   const profile = await requirePlanillasProfile();
   if (!puedeEscribirPlanillas(profile)) return { error: "Solo el estudio puede eliminar un trabajador." };
 
   const actual = await getTrabajador(relacionId);
   if (!actual) return { error: "Trabajador no encontrado." };
+  if (!nombresCoinciden(nombreEscrito, nombreCompleto(actual.persona))) {
+    return { error: "Escriba el nombre completo tal como aparece en la ficha." };
+  }
 
   const db = await planillasDb();
   const [{ data: documentos }, { data: adendas }] = await Promise.all([

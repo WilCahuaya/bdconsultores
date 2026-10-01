@@ -10,7 +10,7 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listDocumentosAsistenciaMes } from "@/lib/actions/asistencias";
 import { esMesAsistencia, etiquetaMesAsistencia, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
-import { compareTrabajadoresPorNumero, etiquetaTrabajador } from "@/lib/planillas-labels";
+import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 export default async function AsistenciasPage({
   searchParams,
@@ -86,6 +86,7 @@ export default async function AsistenciasPage({
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="border-b bg-muted/40 text-muted-foreground">
                     <tr>
+                      <th className="px-4 py-2 font-medium">Nº</th>
                       <th className="px-4 py-2 font-medium">DNI</th>
                       <th className="px-4 py-2 font-medium">Nombre</th>
                       <th className="px-4 py-2 font-medium">PDF firmado</th>
@@ -96,7 +97,7 @@ export default async function AsistenciasPage({
                   <tbody>
                     {activos.length === 0 ? (
                       <tr>
-                        <td className="px-4 py-8 text-muted-foreground" colSpan={canWrite ? 5 : 4}>
+                        <td className="px-4 py-8 text-muted-foreground" colSpan={canWrite ? 6 : 5}>
                           No hay trabajadores activos en ese mes.
                         </td>
                       </tr>
@@ -106,13 +107,14 @@ export default async function AsistenciasPage({
                         const subido = Boolean(pdf?.storage_path);
                         return (
                           <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
+                            <td className="px-4 py-2 font-mono align-top">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
                             <td className="px-4 py-2 font-mono align-top">{trabajador.persona.dni}</td>
                             <td className="px-4 py-2 align-top">
                               <Link
                                 href={`/trabajadores/${trabajador.id}?tab=asistencia`}
                                 className="font-medium text-primary hover:underline"
                               >
-                                {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
+                                {nombreCompleto(trabajador.persona)}
                               </Link>
                             </td>
                             <td className="px-4 py-2 align-top">
