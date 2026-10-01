@@ -122,9 +122,9 @@ export function FichaPuestoForm({
           title="Puesto en esta empresa"
           hint="La fecha de ingreso es el primer día en la empresa. No tiene que coincidir con el contrato vigente: pueden faltar contratos viejos, haber solo el firmado actual, o no haber contrato elaborado."
         >
-          <div className="max-w-xs space-y-1.5">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Nº en la empresa"
+              label="Nº"
               name="numero"
               required={canWrite}
               readOnly={!canWrite}
@@ -132,14 +132,9 @@ export function FichaPuestoForm({
               maxLength={4}
               pattern="[0-9]{1,4}"
               placeholder="01"
-              title="Número de archivo, por ejemplo 01"
+              title="Número del trabajador, por ejemplo 01"
               defaultValue={formatNumeroTrabajador(trabajador.numero)}
             />
-            <p className="text-xs text-muted-foreground">
-              Se muestra como 01 María Paredes. Único en esta empresa; no se reutiliza al cesar.
-            </p>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               label="Cargo"
               name="cargo"
