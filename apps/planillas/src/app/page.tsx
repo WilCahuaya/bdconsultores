@@ -12,6 +12,7 @@ import {
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listFilasPendientesTrabajadores } from "@/lib/actions/pendientes";
 import { MostrarBajasCheck } from "@/components/MostrarBajasCheck";
+import { ImportarTrabajadoresButton } from "@/components/ImportarTrabajadoresButton";
 import { TrabajadoresPendientesTabla } from "@/components/TrabajadoresPendientesTabla";
 
 export default async function PlanillasHomePage({
@@ -64,12 +65,15 @@ export default async function PlanillasHomePage({
               </>
             ) : null}
             {canCreateTrabajador && selectedId ? (
-              <Link
-                href={`/trabajadores/nuevo?entidadId=${selectedId}`}
-                className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-              >
-                Nuevo trabajador
-              </Link>
+              <>
+                <ImportarTrabajadoresButton entidadId={selectedId} />
+                <Link
+                  href={`/trabajadores/nuevo?entidadId=${selectedId}`}
+                  className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+                >
+                  Nuevo trabajador
+                </Link>
+              </>
             ) : null}
           </div>
         </div>
