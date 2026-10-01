@@ -32,7 +32,8 @@ import {
   flujoDesdeTrabajador,
   resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
-import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador } from "@/lib/planillas-labels";
+import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorButton";
+import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -126,6 +127,15 @@ export default async function FichaTrabajadorPage({
             {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
+          {esEstudio ? (
+            <div className="mt-3">
+              <EliminarTrabajadorButton
+                relacionId={params.relacionId}
+                entidadId={trabajador.entidad_id}
+                nombre={nombreCompleto(trabajador.persona)}
+              />
+            </div>
+          ) : null}
         </div>
         {fichaCesada ? (
           <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>

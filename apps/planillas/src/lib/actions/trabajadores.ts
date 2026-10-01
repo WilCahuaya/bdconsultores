@@ -12,6 +12,7 @@ import {
   entidadAlcance,
   puedeCrearTrabajador,
   puedeEditarFichaLaboral,
+  puedeEscribirPlanillas,
   puedeValidarAlta,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
@@ -24,8 +25,10 @@ import {
 } from "@/lib/planillas-labels";
 import type { FlujoContrato, FlujoDocumento, FlujoPension, FlujoTRegistro } from "@/lib/flujo-ficha";
 import { documentoCargado } from "@/lib/flujo-ficha";
+import { DOCUMENTOS_PLANILLAS_BUCKET } from "@/lib/documento-storage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { planillasDb } from "@/lib/supabase/planillas";
+import { createClient } from "@/lib/supabase/server";
 
 export type PersonaRow = {
   id: string;
@@ -498,6 +501,47 @@ export async function darDeBajaTrabajador(
   revalidatePath(`/contratos/${relacionId}`);
   revalidatePath(`/trabajadores/${relacionId}`);
   return {};
+}
+
+export async function eliminarTrabajador(relacionId: string): Promise<{ error?: string; entidadId?: string }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEscribirPlanillas(profile)) return { error: "Solo el estudio puede eliminar un trabajador." };
+
+  const actual = await getTrabajador(relacionId);
+  if (!actual) return { error: "Trabajador no encontrado." };
+
+  const db = await planillasDb();
+  const [{ data: documentos }, { data: adendas }] = await Promise.all([
+    db.from("documentos").select("storage_path").eq("relacion_id", relacionId),
+    db.from("adendas").select("storage_path").eq("relacion_id", relacionId),
+  ]);
+  const paths = [...(documentos ?? []), ...(adendas ?? [])]
+    .map((row) => row.storage_path)
+    .filter((path): path is string => Boolean(path));
+
+  const { error } = await db.from("relaciones_laborales").delete().eq("id", relacionId);
+  if (error) return { error: error.message };
+
+  const { count } = await db
+    .from("relaciones_laborales")
+    .select("id", { count: "exact", head: true })
+    .eq("persona_id", actual.persona.id);
+  if (!count) {
+    await db.from("personas").delete().eq("id", actual.persona.id);
+  }
+
+  if (paths.length > 0) {
+    const supabase = await createClient();
+    await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove(paths);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/pendientes");
+  revalidatePath("/contratos");
+  revalidatePath("/asistencias");
+  revalidatePath("/vacaciones");
+  revalidatePath("/vida-ley");
+  return { entidadId: actual.entidad_id };
 }
 
 export async function aceptarAltaTrabajador(relacionId: string): Promise<{ error?: string }> {
