@@ -140,7 +140,11 @@ function plusDays(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function baseDe(trabajador: { id: string; persona: { dni: string; nombres: string; apellido_paterno: string | null; apellido_materno: string | null } }) {
+function baseDe(trabajador: {
+  id: string;
+  numero: number | null;
+  persona: { dni: string; nombres: string; apellido_paterno: string | null; apellido_materno: string | null };
+}) {
   return {
     relacionId: trabajador.id,
     dni: trabajador.persona.dni,
