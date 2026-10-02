@@ -107,6 +107,17 @@ export function etiquetaMesAsistencia(mes: string): string {
   return `${MES_NOMBRE[partes.month - 1]} ${partes.year}`;
 }
 
+/** Fechas ISO del mes, sin repetir ni días de otro mes. */
+export function feriadosValidosDelMes(mes: string, fechas: readonly string[]): string[] {
+  const validos = new Set(diasIsoDelMes(mes));
+  const out = new Set<string>();
+  for (const raw of fechas) {
+    const iso = String(raw).slice(0, 10);
+    if (validos.has(iso)) out.add(iso);
+  }
+  return [...out].sort();
+}
+
 export function diasIsoDelMes(mes: string): string[] {
   const partes = partesMes(mes);
   if (!partes) return [];

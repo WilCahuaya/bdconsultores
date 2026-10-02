@@ -33,7 +33,7 @@ export async function GET(request: Request) {
       mes,
       relacionIds: [datos.trabajador.relacionId ?? relacionId],
     }).catch(() => undefined);
-    const buffer = await bufferAsistenciaExcel(datos.empresa, [datos.trabajador], mes);
+    const buffer = await bufferAsistenciaExcel(datos.empresa, [datos.trabajador], mes, datos.feriados ?? []);
     const filename = nombreArchivoAsistenciaTrabajador(datos.trabajador.nombre);
     return excelResponse(buffer, filename);
   }
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
       entidadId,
       relacionIds: datos.trabajadores.map((t) => t.relacionId).filter((id): id is string => Boolean(id)),
     }).catch(() => undefined);
-    const buffer = await bufferAsistenciaExcel(datos.empresa, datos.trabajadores, mes);
+    const buffer = await bufferAsistenciaExcel(datos.empresa, datos.trabajadores, mes, datos.feriados ?? []);
     const filename = nombreArchivoAsistenciaEmpresa(mes, datos.empresa.nombre);
     return excelResponse(buffer, filename);
   }

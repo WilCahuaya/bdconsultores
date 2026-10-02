@@ -59,18 +59,23 @@ export function ImportarTrabajadoresButton({ entidadId }: { entidadId: string })
     const result = await importarTrabajadores(entidadId, data);
     setCargando(false);
     if (result.error) {
-      setError(
-        result.importados
-          ? `${result.error} Se importaron ${result.importados} antes de detenerse.`
-          : result.error,
-      );
+      const hechos = (result.importados ?? 0) + (result.completados ?? 0);
+      setError(hechos ? `${result.error} Se procesaron ${hechos} antes de detenerse.` : result.error);
       return;
     }
-    setResultado(
-      `Se importaron ${result.importados ?? 0} trabajadores${
-        result.omitidos ? `. ${result.omitidos} filas no entraron.` : "."
-      }`,
-    );
+    const partes: string[] = [];
+    if (result.importados) {
+      partes.push(result.importados === 1 ? "Se creó 1 ficha" : `Se crearon ${result.importados} fichas`);
+    }
+    if (result.completados) {
+      partes.push(
+        result.completados === 1
+          ? "se completaron los datos de 1 trabajador"
+          : `se completaron datos de ${result.completados} trabajadores`,
+      );
+    }
+    const resumen = partes.length > 0 ? `${partes.join(" y ")}.` : "No hubo datos nuevos por guardar.";
+    setResultado(resumen.charAt(0).toUpperCase() + resumen.slice(1) + (result.omitidos ? ` ${result.omitidos} filas no entraron.` : ""));
     setPreview(null);
     router.refresh();
   }
@@ -108,7 +113,7 @@ export function ImportarTrabajadoresButton({ entidadId }: { entidadId: string })
           {preview ? (
             <>
               <p className="text-sm text-muted-foreground">
-                {preview.listos} listos para crear. Las filas en revisar no se importan.
+                {preview.listos} listos. Si el trabajador ya existe, se completan solo los datos vacíos. Las filas en revisar no se importan.
               </p>
               <div className="max-h-80 overflow-auto rounded-md border border-border">
                 <table className="w-full text-left text-sm">

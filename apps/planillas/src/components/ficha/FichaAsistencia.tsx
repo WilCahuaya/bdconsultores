@@ -10,6 +10,7 @@ import { descargarAsistenciaExcel } from "@/lib/descargar-asistencia-excel";
 import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
+import { FeriadosMesPicker } from "@/components/ficha/FeriadosMesPicker";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
@@ -92,6 +93,7 @@ export function FichaAsistencia({
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
           />
         </label>
+        <FeriadosMesPicker key={`${entidadId}-${mes}`} entidadId={entidadId} mes={mes} canWrite={canWrite} />
         {canWrite ? (
           <div className="flex flex-wrap gap-2">
             <Button type="button" disabled={pending} onClick={() => void onDescargar()}>

@@ -6,7 +6,7 @@ import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
 import { nombreCompleto } from "@/lib/planillas-labels";
-import { esMesAsistencia, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import { esMesAsistencia, feriadosValidosDelMes, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import type { AsistenciaExcelEmpresa, AsistenciaExcelTrabajador } from "@/lib/asistencia-excel";
 import { planillasDb } from "@/lib/supabase/planillas";
 
@@ -34,10 +34,56 @@ function aFilaExcel(t: TrabajadorListItem, horario: string | null): AsistenciaEx
   };
 }
 
+async function leerFeriadosMes(entidadId: string, mes: string): Promise<string[]> {
+  const db = await planillasDb();
+  const { data, error } = await db
+    .from("feriados_mes")
+    .select("fechas")
+    .eq("entidad_id", entidadId)
+    .eq("mes", mes)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return feriadosValidosDelMes(mes, (data?.fechas ?? []) as string[]);
+}
+
+export async function listarFeriadosMes(entidadId: string, mes: string): Promise<string[]> {
+  await requirePlanillasProfile();
+  if (!esMesAsistencia(mes)) return [];
+  const empresa = await getEntidadPlanillas(entidadId);
+  if (!empresa) return [];
+  return leerFeriadosMes(entidadId, mes);
+}
+
+export async function guardarFeriadosMes(
+  entidadId: string,
+  mes: string,
+  fechas: string[],
+): Promise<{ error?: string }> {
+  const profile = await requirePlanillasProfile();
+  if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para guardar feriados." };
+  if (!esMesAsistencia(mes)) return { error: "Indique el mes (AAAA-MM)." };
+  const empresa = await getEntidadPlanillas(entidadId);
+  if (!empresa) return { error: "Empresa no encontrada." };
+  const validas = feriadosValidosDelMes(mes, fechas);
+  const db = await planillasDb();
+  const { error } = await db.from("feriados_mes").upsert(
+    { entidad_id: entidadId, mes, fechas: validas },
+    { onConflict: "entidad_id,mes" },
+  );
+  if (error) return { error: error.message };
+  revalidatePath("/asistencias");
+  return {};
+}
+
 export async function datosAsistenciaEmpresa(
   entidadId: string,
   mes: string,
-): Promise<{ error?: string; empresa?: AsistenciaExcelEmpresa; trabajadores?: AsistenciaExcelTrabajador[] }> {
+): Promise<{
+  error?: string;
+  empresa?: AsistenciaExcelEmpresa;
+  trabajadores?: AsistenciaExcelTrabajador[];
+  feriados?: string[];
+}> {
   const profile = await requirePlanillasProfile();
   if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para generar asistencia." };
   if (!esMesAsistencia(mes)) return { error: "Indique el mes (AAAA-MM)." };
@@ -69,16 +115,28 @@ export async function datosAsistenciaEmpresa(
     .map((t) => aFilaExcel(t, horarioDeContratos(porRelacion.get(t.id) ?? [], t.horario)))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   if (filas.length === 0) return { error: "No hay trabajadores activos en ese mes." };
+  let feriados: string[] = [];
+  try {
+    feriados = await leerFeriadosMes(entidadId, mes);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "No se pudieron leer los feriados." };
+  }
   return {
     empresa: { nombre: empresa.nombre, ruc: empresa.ruc, direccion: empresa.direccion ?? null },
     trabajadores: filas,
+    feriados,
   };
 }
 
 export async function datosAsistenciaTrabajador(
   relacionId: string,
   mes: string,
-): Promise<{ error?: string; empresa?: AsistenciaExcelEmpresa; trabajador?: AsistenciaExcelTrabajador }> {
+): Promise<{
+  error?: string;
+  empresa?: AsistenciaExcelEmpresa;
+  trabajador?: AsistenciaExcelTrabajador;
+  feriados?: string[];
+}> {
   const profile = await requirePlanillasProfile();
   if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para generar asistencia." };
   if (!esMesAsistencia(mes)) return { error: "Indique el mes (AAAA-MM)." };
@@ -95,12 +153,21 @@ export async function datosAsistenciaTrabajador(
     .select("horario, jornada, es_vigente, version")
     .eq("relacion_id", relacionId);
   if (error) return { error: error.message };
+  let feriados: string[] = [];
+  try {
+    feriados = await leerFeriadosMes(trabajador.entidad_id, mes);
+  } catch (feriadosError) {
+    return {
+      error: feriadosError instanceof Error ? feriadosError.message : "No se pudieron leer los feriados.",
+    };
+  }
   return {
     empresa: { nombre: empresa.nombre, ruc: empresa.ruc, direccion: empresa.direccion ?? null },
     trabajador: aFilaExcel(
       trabajador,
       horarioDeContratos((contratos ?? []) as ContratoHorario[], trabajador.horario),
     ),
+    feriados,
   };
 }
 

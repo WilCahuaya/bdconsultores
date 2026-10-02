@@ -8,7 +8,7 @@ import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEditarFichaLaboral } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
-import { listDocumentosAsistenciaMes } from "@/lib/actions/asistencias";
+import { listarFeriadosMes, listDocumentosAsistenciaMes } from "@/lib/actions/asistencias";
 import { esMesAsistencia, etiquetaMesAsistencia, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
@@ -26,9 +26,13 @@ export default async function AsistenciasPage({
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
   const mes = searchParams.mes && esMesAsistencia(searchParams.mes) ? searchParams.mes : mesActualLima();
-  const [trabajadores, documentos] = selectedId
-    ? await Promise.all([listTrabajadores(selectedId), listDocumentosAsistenciaMes(selectedId, mes)])
-    : [[], []];
+  const [trabajadores, documentos, feriados] = selectedId
+    ? await Promise.all([
+        listTrabajadores(selectedId),
+        listDocumentosAsistenciaMes(selectedId, mes),
+        listarFeriadosMes(selectedId, mes),
+      ])
+    : [[], [], []];
   const pdfPorRelacion = new Map(documentos.map((d) => [d.relacion_id, d]));
   const activos = trabajadores
     .filter((t) => trabajadorActivoEnMes(mes, t.fecha_ingreso, t.fecha_cese))
@@ -72,7 +76,13 @@ export default async function AsistenciasPage({
               queryExtra={`mes=${mes}`}
             />
             {selectedId ? (
-              <AsistenciasMesBar key={`${selectedId}-${mes}`} entidadId={selectedId} mesInicial={mes} canWrite={canWrite} />
+              <AsistenciasMesBar
+                key={`${selectedId}-${mes}`}
+                entidadId={selectedId}
+                mesInicial={mes}
+                feriadosIniciales={feriados}
+                canWrite={canWrite}
+              />
             ) : null}
 
             <section className="space-y-3">

@@ -5,6 +5,7 @@ import {
   diasIsoDelMes,
   diaSemanaDeIso,
   etiquetaDia,
+  feriadosValidosDelMes,
   partesMes,
   trabajadorActivoEnFecha,
   tramosDelDia,
@@ -37,6 +38,7 @@ const FONT_TAHOMA_10_BOLD = { name: "Tahoma", sz: 10, bold: true, color: { rgb: 
 const FONT_COL_HEAD = { name: "Tahoma", sz: 8, color: { rgb: "000000" } };
 const FONT_HORA_HEAD = { name: "Tahoma", sz: 7, color: { rgb: "000000" } };
 const FONT_FECHA = { name: "Arial Narrow", sz: 8, color: { rgb: "FF0000" } };
+const FONT_FERIADO = { name: "Tahoma", sz: 12, bold: true, color: { rgb: "000000" } };
 
 /** Anchos del Excel de Herederos (A–K). */
 const COL_WIDTHS = [
@@ -159,7 +161,19 @@ function paint(ws: WorkSheet, r: number, c1: number, c2: number, style: Record<s
   for (let c = c1; c <= c2; c += 1) setCell(ws, r, c, "", style);
 }
 
-function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcelTrabajador, mes: string): WorkSheet {
+function estiloFeriado(): Record<string, unknown> {
+  return styleBase({
+    font: FONT_FERIADO,
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  });
+}
+
+function buildSheet(
+  empresa: AsistenciaExcelEmpresa,
+  trabajador: AsistenciaExcelTrabajador,
+  mes: string,
+  feriados: ReadonlySet<string>,
+): WorkSheet {
   const partes = partesMes(mes);
   const year = partes?.year ?? 2026;
   const monthName = partes ? MES_NOMBRE[partes.month - 1] : mes;
@@ -255,10 +269,12 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
     merge(merges, r, 0, r + 1, 0);
     setCell(ws, r + 1, 0, "", fechaStyle);
 
-    const tachaManana = tramos !== null && !laborables.some((item) => item.turno === "Mañana");
-    const tachaTarde = tramos !== null && !laborables.some((item) => item.turno === "Tarde");
+    const esFeriado = feriados.has(iso);
+    const tachaManana = !esFeriado && tramos !== null && !laborables.some((item) => item.turno === "Mañana");
+    const tachaTarde = !esFeriado && tramos !== null && !laborables.some((item) => item.turno === "Tarde");
     const tachaDia = tachaManana && tachaTarde;
-    if (tachaDia) merge(merges, r, 4, r + 1, 10);
+    if (esFeriado || tachaDia) merge(merges, r, 4, r + 1, 10);
+    const feriadoStyle = esFeriado ? estiloFeriado() : null;
 
     for (let i = 0; i < 2; i += 1) {
       const row = r + i;
@@ -273,7 +289,10 @@ function buildSheet(empresa: AsistenciaExcelEmpresa, trabajador: AsistenciaExcel
       merge(merges, row, 2, row, 3);
       setCell(ws, row, 3, "", base);
 
-      if (tachaDia) {
+      if (esFeriado && feriadoStyle) {
+        setCell(ws, row, 4, i === 0 ? "Feriado" : "", feriadoStyle);
+        paint(ws, row, 5, 10, feriadoStyle);
+      } else if (tachaDia) {
         setCell(ws, row, 4, "", tachado);
         paint(ws, row, 5, 10, tachado);
       } else {
@@ -441,12 +460,16 @@ export async function bufferAsistenciaExcel(
   empresa: AsistenciaExcelEmpresa,
   trabajadores: AsistenciaExcelTrabajador[],
   mes: string,
+  feriados: readonly string[] = [],
 ): Promise<Buffer> {
-  const XLSX = await import("xlsx-js-style");
+  type XlsxModule = typeof import("xlsx-js-style");
+  const loaded = (await import("xlsx-js-style")) as XlsxModule & { default?: XlsxModule };
+  const XLSX: XlsxModule = loaded.utils ? loaded : (loaded.default ?? loaded);
   const wb = XLSX.utils.book_new();
   const usados = new Set<string>();
+  const marcas = new Set(feriadosValidosDelMes(mes, feriados));
   trabajadores.forEach((trabajador, index) => {
-    const ws = buildSheet(empresa, trabajador, mes);
+    const ws = buildSheet(empresa, trabajador, mes, marcas);
     XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador.nombre, trabajador.dni, index, usados));
   });
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
