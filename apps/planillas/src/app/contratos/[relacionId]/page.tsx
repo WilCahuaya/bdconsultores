@@ -30,6 +30,7 @@ import {
   listTRegistro,
 } from "@/lib/actions/ficha";
 import { contextoSolicitudesRegistro } from "@/lib/actions/solicitudes-registro";
+import { listHijosAsignacion } from "@/lib/actions/hijos-asignacion";
 import {
   estadoPasosAlta,
   faltasPorPaso,
@@ -67,7 +68,7 @@ export default async function ContratoProcesoPage({
       asegurarDocumentoTrAlta(params.relacionId),
     ]);
   }
-  const [contratos, documentos, adendas, pension, tRegistro, entidad, solicitudesCtx] = await Promise.all([
+  const [contratos, documentos, adendas, pension, tRegistro, entidad, solicitudesCtx, hijosAsignacion] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
     paso === "contratos" ? listAdendas(params.relacionId) : Promise.resolve([]),
@@ -77,6 +78,7 @@ export default async function ContratoProcesoPage({
     paso === "contratos"
       ? contextoSolicitudesRegistro(trabajador.entidad_id)
       : Promise.resolve({ solicitudes: [], enlazables: [] }),
+    paso === "documentos" ? listHijosAsignacion(params.relacionId) : Promise.resolve([]),
   ]);
 
   return (
@@ -129,6 +131,7 @@ export default async function ContratoProcesoPage({
             trabajador={trabajador}
             documentos={documentos}
             pension={pension}
+            hijos={hijosAsignacion}
             canWrite={canEditFicha}
           />
         ) : null}
