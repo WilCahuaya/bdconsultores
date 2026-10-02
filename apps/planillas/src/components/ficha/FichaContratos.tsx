@@ -194,10 +194,10 @@ export function FichaContratos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        El contrato es opcional. Cada Word generado guarda su respaldo: el PDF firmado, la solicitud de registro, o ambos.
-        La solicitud se sube una vez y la ven los trabajadores que la comparten. Al generar, el formulario se cierra;
-        el de confirmar solo se abre cuando sube el respaldo de esa versión. Las fechas del papel no tienen que coincidir
-        con el ingreso a la empresa.
+        El contrato es opcional. Generar crea una versión nueva aunque la anterior no tenga respaldo ni esté recogida.
+        Cada Word guarda su respaldo: el PDF firmado, la solicitud de registro, o ambos. La solicitud se sube una vez
+        y la ven los trabajadores que la comparten. Al generar, el formulario se cierra; el de confirmar solo se abre
+        cuando sube el respaldo de esa versión. Las fechas del papel no tienen que coincidir con el ingreso a la empresa.
       </p>
 
       {canWrite ? (
@@ -231,7 +231,7 @@ export function FichaContratos({
         <form action={onGenerar}>
           <FormSection
             title="Generar contrato"
-            hint="Estos datos van al documento de este contrato. Pueden ser posteriores al ingreso a la empresa. Al confirmar el firmado se actualizan cargo, horario y jornada del puesto. No se toca la fecha de ingreso."
+            hint="Crea una versión nueva, aunque la anterior no tenga respaldo ni esté recogida. Estos datos van solo a este documento. Al confirmar el firmado se actualizan cargo, horario y jornada del puesto. No se toca la fecha de ingreso."
           >
             <DatosContratoFields
               key={`gen-${base?.id ?? "nuevo"}-${base?.horario ?? ""}`}

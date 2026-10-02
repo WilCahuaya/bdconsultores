@@ -255,8 +255,7 @@ export async function generarContratoParaFirma(
     .order("version", { ascending: false });
   if (listError) return { error: listError.message };
 
-  const abierto = (existentes ?? []).find((c) => !contratoEstaCerrado(c.estado as EstadoContratoPlanilla));
-  const destino = contratoId ? (existentes ?? []).find((c) => c.id === contratoId) : abierto;
+  const destino = contratoId ? (existentes ?? []).find((c) => c.id === contratoId) ?? null : null;
   if (contratoId && !destino) return { error: "Contrato no encontrado." };
   if (destino && contratoEstaCerrado(destino.estado as EstadoContratoPlanilla)) {
     return { error: "Este contrato ya está cerrado." };
