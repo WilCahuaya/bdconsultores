@@ -26,6 +26,7 @@ function horarioDeContratos(contratos: ContratoHorario[], fallback: string | nul
 function aFilaExcel(t: TrabajadorListItem, horario: string | null): AsistenciaExcelTrabajador {
   return {
     relacionId: t.id,
+    numero: t.numero,
     nombre: nombreCompleto(t.persona),
     dni: t.persona.dni,
     horario,
@@ -113,7 +114,12 @@ export async function datosAsistenciaEmpresa(
   const filas = trabajadores
     .filter((t) => trabajadorActivoEnMes(mes, t.fecha_ingreso, t.fecha_cese))
     .map((t) => aFilaExcel(t, horarioDeContratos(porRelacion.get(t.id) ?? [], t.horario)))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+    .sort((a, b) => {
+      const an = a.numero ?? Number.MAX_SAFE_INTEGER;
+      const bn = b.numero ?? Number.MAX_SAFE_INTEGER;
+      if (an !== bn) return an - bn;
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
   if (filas.length === 0) return { error: "No hay trabajadores activos en ese mes." };
   let feriados: string[] = [];
   try {

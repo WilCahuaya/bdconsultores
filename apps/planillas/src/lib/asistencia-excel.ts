@@ -14,6 +14,7 @@ import {
 
 export type AsistenciaExcelTrabajador = {
   relacionId?: string;
+  numero?: number | null;
   nombre: string;
   dni: string;
   horario: string | null;
@@ -144,9 +145,11 @@ function excelSerial(iso: string): number {
   return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(1899, 11, 30)) / 86400000);
 }
 
-function sheetName(nombre: string, dni: string, index: number, usados: Set<string>): string {
+function sheetName(nombre: string, dni: string, numero: number | null | undefined, usados: Set<string>): string {
   const primero = slugNombre(nombre).split(" ")[0] || dni.slice(-8) || "Hoja";
-  const base = `${String(index + 1).padStart(2, "0")} ${primero}`.slice(0, 31);
+  const nro =
+    numero != null && Number.isInteger(numero) && numero >= 1 ? String(numero).padStart(2, "0") : "";
+  const base = (nro ? `${nro} ${primero}` : primero).slice(0, 31);
   let name = base;
   let n = 2;
   while (usados.has(name.toLowerCase())) {
@@ -468,9 +471,15 @@ export async function bufferAsistenciaExcel(
   const wb = XLSX.utils.book_new();
   const usados = new Set<string>();
   const marcas = new Set(feriadosValidosDelMes(mes, feriados));
-  trabajadores.forEach((trabajador, index) => {
+  const ordenados = [...trabajadores].sort((a, b) => {
+    const an = a.numero ?? Number.MAX_SAFE_INTEGER;
+    const bn = b.numero ?? Number.MAX_SAFE_INTEGER;
+    if (an !== bn) return an - bn;
+    return a.nombre.localeCompare(b.nombre, "es");
+  });
+  ordenados.forEach((trabajador) => {
     const ws = buildSheet(empresa, trabajador, mes, marcas);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador.nombre, trabajador.dni, index, usados));
+    XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador.nombre, trabajador.dni, trabajador.numero, usados));
   });
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   return aplicarImpresionHerederos(buffer, empresa, mes);
