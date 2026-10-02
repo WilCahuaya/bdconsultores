@@ -273,16 +273,15 @@ function buildSheet(
     setCell(ws, r + 1, 0, "", fechaStyle);
 
     const esFeriado = feriados.has(iso);
-    const tachaManana = !esFeriado && tramos !== null && !laborables.some((item) => item.turno === "Mañana");
-    const tachaTarde = !esFeriado && tramos !== null && !laborables.some((item) => item.turno === "Tarde");
-    const tachaDia = tachaManana && tachaTarde;
+    const tieneHorario = laborables.some((item) => item.turno === "Mañana" || item.turno === "Tarde");
+    const tachaDia = !esFeriado && tramos !== null && !tieneHorario;
     if (esFeriado || tachaDia) merge(merges, r, 4, r + 1, 10);
     const feriadoStyle = esFeriado ? estiloFeriado() : null;
 
     for (let i = 0; i < 2; i += 1) {
       const row = r + i;
       const turno = turnos[i];
-      const tacha = turno === "Mañana" ? tachaManana : tachaTarde;
+      const tacha = tachaDia;
       const fill =
         turno === "Tarde" ? { fgColor: { rgb: GRAY_TARDE }, patternType: "solid" } : undefined;
       const base = styleBase(fill ? { fill } : undefined);
