@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -96,14 +96,36 @@ function CapturaDesplegable({
   datos: ReactNode;
   preview: ReactNode;
 }) {
-  const [abierto, setAbierto] = useState(defaultOpen ?? alerta);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const abiertoAlInicio = useRef(defaultOpen ?? alerta);
+  const inicioAplicado = useRef(false);
+  const asignarDetails = useCallback((node: HTMLDetailsElement | null) => {
+    detailsRef.current = node;
+    if (!node || inicioAplicado.current) return;
+    inicioAplicado.current = true;
+    if (abiertoAlInicio.current) node.open = true;
+  }, []);
+
+  function alternar(event: MouseEvent<HTMLElement>) {
+    event.preventDefault();
+    const details = detailsRef.current;
+    if (!details) return;
+    const scroller = details.closest("main");
+    const top = scroller?.scrollTop ?? 0;
+    details.open = !details.open;
+    if (!scroller) return;
+    scroller.scrollTop = top;
+    requestAnimationFrame(() => {
+      scroller.scrollTop = top;
+    });
+  }
+
   return (
-    <details
-      open={abierto}
-      onToggle={(event) => setAbierto(event.currentTarget.open)}
-      className={`group ${capturaCardClass(alerta)}`}
-    >
-      <summary className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
+    <details ref={asignarDetails} className={`group ${capturaCardClass(alerta)}`}>
+      <summary
+        onClick={alternar}
+        className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden [&::marker]:hidden"
+      >
         <svg
           viewBox="0 0 24 24"
           fill="none"
