@@ -19,6 +19,7 @@ import {
 import {
   parseFechaCampo,
   parseCargoCampo,
+  esDocumentoTrabajador,
   parseNumeroTrabajador,
   armarDireccionPersona,
   compareTrabajadoresPorNumero,
@@ -245,7 +246,9 @@ export async function createTrabajador(formData: FormData): Promise<{ error?: st
   const dni = normalizeDni(String(formData.get("dni") ?? ""));
   const nombres = String(formData.get("nombres") ?? "").trim();
   if (!entidadId) return { error: "Elija una empresa." };
-  if (dni.length < 8) return { error: "El DNI debe tener al menos 8 dígitos." };
+  if (!esDocumentoTrabajador(dni)) {
+    return { error: "Indique el DNI (8 dígitos) o el carné de extranjería (9 dígitos)." };
+  }
   if (!nombres) return { error: "El nombre es obligatorio." };
 
   const alcance = entidadAlcance(profile);

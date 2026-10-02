@@ -16,7 +16,7 @@ import type { JornadaLaboral } from "@inventario/types";
 import { cargoCanonico, cargoCorto, funcionesDeCargo } from "@/lib/cargos-funciones";
 import { MES_ABREV } from "@/lib/horario-asistencia";
 import { estructuraHorarioParcial, formatHorarioContrato, parseHorario } from "@/lib/horario-laboral";
-import { formatRemuneracion, nombreCompleto } from "@/lib/planillas-labels";
+import { formatRemuneracion, nombreCompleto, rotuloDocumentoIdentidad } from "@/lib/planillas-labels";
 import { solesEnLetras } from "@/lib/soles-letras";
 
 const FONT = "Times New Roman";
@@ -244,7 +244,7 @@ function celdaFirma(rol: string, nombre: string, dni: string): TableCell {
       lineaParaFirmar(),
       parrafo(rol, { center: true, justify: false, after: 80, bold: true }),
       parrafo(nombre, { center: true, justify: false, after: 80 }),
-      parrafo(`DNI ${dni}`, { center: true, justify: false, after: 0 }),
+      parrafo(`${rotuloDocumentoIdentidad(dni)} ${dni}`, { center: true, justify: false, after: 0 }),
     ],
   });
 }
@@ -257,7 +257,7 @@ function introCompleto(d: ContratoWordDatos, g: Genero, nombreTrab: string): str
     `aprobado por Decreto Supremo N.° 003-97-TR, de una parte: ${dato(d.entidadNombre)}, Asociación sin fines de lucro, ` +
     `con R.U.C. N.° ${dato(d.ruc)}, con domicilio fiscal en ${dato(d.domicilio)}, debidamente representada por su ${cargoRl} ` +
     `${dato(d.rlNombre)}, identificado con DNI N.° ${dato(d.rlDni)}, a quien en adelante se le denominará EL EMPLEADOR; ` +
-    `y de la otra parte, ${g.trato} ${nombreTrab}, ${g.identificado} con DNI N.° ${dato(d.dni)} con domicilio en ${dato(d.direccion)}, ` +
+    `y de la otra parte, ${g.trato} ${nombreTrab}, ${g.identificado} con ${rotuloDocumentoIdentidad(d.dni)} N.° ${dato(d.dni)} con domicilio en ${dato(d.direccion)}, ` +
     `a quien en adelante se le denominará ${g.parte}; en los términos y condiciones siguientes:`
   );
 }
@@ -270,7 +270,7 @@ function introParcial(d: ContratoWordDatos, g: Genero, nombreTrab: string): stri
     `Decreto Supremo N° 003-97-TR, de una parte: la Asociación sin fines de lucro ${dato(d.entidadNombre)}, ` +
     `con R.U.C. N° ${dato(d.ruc)}, con domicilio fiscal en ${dato(d.domicilio)}, debidamente representada por su ${cargoRl} ` +
     `${dato(d.rlNombre)}, identificado con DNI N° ${dato(d.rlDni)}, a quien en adelante se le denominará EL EMPLEADOR, ` +
-    `y de la otra parte, ${g.trato} ${nombreTrab}, ${g.identificado} con DNI N° ${dato(d.dni)}, con domicilio en ${dato(d.direccion)}, ` +
+    `y de la otra parte, ${g.trato} ${nombreTrab}, ${g.identificado} con ${rotuloDocumentoIdentidad(d.dni)} N° ${dato(d.dni)}, con domicilio en ${dato(d.direccion)}, ` +
     `a quien en adelante se le denominará ${g.parte}; en los términos y condiciones siguientes:`
   );
 }

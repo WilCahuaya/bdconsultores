@@ -14,8 +14,8 @@ function normalizeDni(value) {
 
 function validarDni(value) {
   const dni = normalizeDni(value);
-  if (dni.length !== 8) return "El DNI debe tener 8 dígitos.";
-  return null;
+  if (dni.length === 8 || dni.length === 9) return null;
+  return "Indique el DNI (8 dígitos) o el carné de extranjería (9 dígitos).";
 }
 
 function fechaIso(value) {
@@ -44,6 +44,7 @@ async function consultarDniReniec(dni) {
   const numero = normalizeDni(dni);
   const invalid = validarDni(numero);
   if (invalid) return { error: invalid };
+  const esCarne = numero.length === 9;
 
   const token = dniToken();
   if (!token) {
@@ -56,7 +57,7 @@ async function consultarDniReniec(dni) {
   const base = (process.env.RENIEC_DNI_API_URL?.trim() || DEFAULT_URL).replace(/\?.*$/, "");
   const result = await fetchPadronJson(`${base}?numero=${encodeURIComponent(numero)}`, token);
   if (result.error === "not_found" || /^invalid request$/i.test(result.error ?? "")) {
-    return { error: "No se encontró ese DNI." };
+    return { error: esCarne ? "No se encontró ese carné de extranjería." : "No se encontró ese DNI." };
   }
   if (result.error) return { error: result.error };
 

@@ -260,7 +260,7 @@ function CapturaDni({
       titulo={TIPO_DOCUMENTO_LABEL.DNI}
       alerta={alerta}
       alertaNombre="DNI"
-      hint="Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato. El número de DNI de la ficha no se cambia aquí."
+      hint="Suba el escaneo y complete nombres y fecha. Con 8 dígitos se busca el DNI; con 9, el carné de extranjería. El número de la ficha no se cambia aquí."
       preview={preview}
       datos={
         <>
@@ -275,7 +275,7 @@ function CapturaDni({
             />
           ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="DNI" name="dni_leido" value={dni} copyable onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))} readOnly={!canWrite} />
+            <Field label="DNI o carné" name="dni_leido" value={dni} copyable onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 9))} readOnly={!canWrite} />
             <Field label="Nombres" name="nombres" value={nombres} onChange={(event) => setNombres(event.target.value)} readOnly={!canWrite} />
             <Field label="Apellido paterno" name="apellido_paterno" value={apellidoPaterno} onChange={(event) => setApellidoPaterno(event.target.value)} readOnly={!canWrite} />
             <Field label="Apellido materno" name="apellido_materno" value={apellidoMaterno} onChange={(event) => setApellidoMaterno(event.target.value)} readOnly={!canWrite} />
@@ -283,7 +283,7 @@ function CapturaDni({
           </div>
           {canWrite ? (
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" disabled={pending || dni.length < 8} onClick={() => void buscarReniec()}>
+              <Button type="button" variant="outline" disabled={pending || (dni.length !== 8 && dni.length !== 9)} onClick={() => void buscarReniec()}>
                 Buscar en RENIEC
               </Button>
               <Button type="button" disabled={pending} onClick={() => void guardar()}>

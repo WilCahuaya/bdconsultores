@@ -131,7 +131,7 @@ export function NuevoTrabajadorForm({
         <div>
           <p className="text-sm font-medium">{TIPO_DOCUMENTO_LABEL.DNI}</p>
           <p className="text-sm text-muted-foreground">
-            Suba el escaneo y complete nombres y fecha. Sirven para Persona y para el contrato.
+            Suba el escaneo y complete el DNI (8 dígitos) o el carné de extranjería (9 dígitos). Buscar en RENIEC trae nombres y fecha.
           </p>
         </div>
         <div className="space-y-4">
@@ -162,15 +162,15 @@ export function NuevoTrabajadorForm({
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="DNI"
+              label="DNI o carné"
               name="dni_vista"
               required
               inputMode="numeric"
-              maxLength={8}
-              pattern="[0-9]{8}"
-              title="8 dígitos"
+              maxLength={9}
+              pattern="[0-9]{8,9}"
+              title="8 dígitos del DNI o 9 del carné de extranjería"
               value={dni}
-              onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 8))}
+              onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 9))}
             />
             <Field label="Nombres" name="nombres_vista" required value={nombres} onChange={(event) => setNombres(event.target.value)} />
             <Field
@@ -199,7 +199,7 @@ export function NuevoTrabajadorForm({
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" disabled={buscando || pending || dni.length < 8} onClick={() => void buscarPorDni()}>
+          <Button type="button" variant="outline" disabled={buscando || pending || (dni.length !== 8 && dni.length !== 9)} onClick={() => void buscarPorDni()}>
             {buscando ? "Consultando…" : "Buscar en RENIEC"}
           </Button>
           <Button type="submit" disabled={pending || buscando}>

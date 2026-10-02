@@ -582,10 +582,12 @@ function leerFila(row: string[], cols: Columnas, fila: number): FilaLeida {
   if (/^pe\s*\d/i.test(celda(row, cols.cargo)) || normHeader(dniCrudo) === "dni") {
     return filaOmitida(fila, true);
   }
-  if (!nombreCompleto && dni.length !== 8) return filaOmitida(fila, true);
+  if (!nombreCompleto && dni.length !== 8 && dni.length !== 9) return filaOmitida(fila, true);
 
   if (!nombreCompleto) errores.push("Falta el nombre completo.");
-  if (dni.length !== 8) errores.push("El DNI debe tener 8 dígitos.");
+  if (dni.length !== 8 && dni.length !== 9) {
+    errores.push("Indique el DNI (8 dígitos) o el carné de extranjería (9 dígitos).");
+  }
   if (numero.error || numero.value == null) errores.push(numero.error ?? "Falta el número.");
   if (cargo.error || !cargo.value) errores.push(cargo.error ?? "Falta el cargo.");
   if (clasificacion.aviso) avisos.push(clasificacion.aviso);

@@ -17,7 +17,7 @@ import { cargoCanonico, funcionesDeCargo } from "@/lib/cargos-funciones";
 import { esFemeninoNombre } from "@/lib/contrato-word";
 import { MES_ABREV } from "@/lib/horario-asistencia";
 import { estructuraHorarioParcial, formatHorarioContrato, parseHorario } from "@/lib/horario-laboral";
-import { formatRemuneracion, nombreCompleto } from "@/lib/planillas-labels";
+import { formatRemuneracion, nombreCompleto, rotuloDocumentoIdentidad } from "@/lib/planillas-labels";
 import { solesEnLetras } from "@/lib/soles-letras";
 
 const FONT = "Times New Roman";
@@ -145,7 +145,7 @@ function intro(d: AdendaWordDatos, g: Genero, nombreTrab: string): string {
     `Decreto Legislativo N.° 728 – Ley de Productividad y Competitividad Laboral, aprobado por Decreto Supremo N.° 003-97-TR, ` +
     `de una parte: la Asociación sin fines de lucro ${dato(d.entidadNombre)}, con R.U.C. N.° ${dato(d.ruc)}, con domicilio fiscal en ` +
     `${dato(d.domicilio)}, debidamente representada por su ${cargoRl} ${dato(d.rlNombre)}, identificado con DNI N.° ${dato(d.rlDni)}, ` +
-    `a quien en adelante se le denominará EL EMPLEADOR, y de la otra parte, ${g.trato} ${nombreTrab}, ${g.identificado} con DNI N.° ` +
+    `a quien en adelante se le denominará EL EMPLEADOR, y de la otra parte, ${g.trato} ${nombreTrab}, ${g.identificado} con ${rotuloDocumentoIdentidad(d.dni)} N.° ` +
     `${dato(d.dni)}, con domicilio en ${dato(d.direccion)}, a quien en adelante se le denominará ${g.parte}; en los términos y condiciones siguientes:`
   );
 }
@@ -310,7 +310,7 @@ function tablaFirmas(d: AdendaWordDatos, g: Genero, nombreTrab: string): Table {
         lineaFirma(),
         parrafo(rol, { center: true, justify: false, after: 80, bold: true }),
         parrafo(nombre, { center: true, justify: false, after: 80 }),
-        parrafo(`DNI ${dni}`, { center: true, justify: false, after: 0 }),
+        parrafo(`${rotuloDocumentoIdentidad(dni)} ${dni}`, { center: true, justify: false, after: 0 }),
       ],
     });
   }

@@ -242,7 +242,7 @@ async function clasificar(
   const db = await planillasDb();
   const admin = createAdminClient();
   const lookup = admin?.schema("planillas") ?? db;
-  const dnis = [...new Set(filas.map((fila) => fila.dni).filter((dni) => dni.length === 8))];
+  const dnis = [...new Set(filas.map((fila) => fila.dni).filter((dni) => dni.length === 8 || dni.length === 9))];
   const personaSelect =
     "id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, distrito, provincia, region";
   const personasRes = dnis.length

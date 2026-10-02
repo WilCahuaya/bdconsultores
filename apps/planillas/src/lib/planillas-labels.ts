@@ -24,6 +24,15 @@ export {
   type CargoTrabajador,
 } from "@/lib/cargos-funciones";
 
+/** DNI peruano (8) o carné de extranjería (9). */
+export function esDocumentoTrabajador(value: string): boolean {
+  return value.length === 8 || value.length === 9;
+}
+
+export function rotuloDocumentoIdentidad(numero: string): string {
+  return numero.replace(/\D/g, "").length === 9 ? "carné de extranjería" : "DNI";
+}
+
 export const CLASIFICACION_LABEL: Record<ClasificacionTrabajador, string> = {
   PATROCINADO: "Patrocinado",
   SUPERVIVENCIA: "Supervivencia",
