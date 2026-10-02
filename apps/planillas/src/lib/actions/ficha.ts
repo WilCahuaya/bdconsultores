@@ -55,6 +55,7 @@ export type ContratoRow = {
   estado: EstadoContratoPlanilla;
   datos_confirmados: boolean;
   documento_id: string | null;
+  solicitud_registro_id: string | null;
 };
 
 export type DocumentoRow = {
@@ -97,7 +98,7 @@ export async function listContratos(relacionId: string): Promise<ContratoRow[]> 
   const db = await planillasDb();
   const { data, error } = await db
     .from("contratos")
-    .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados, documento_id")
+    .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados, documento_id, solicitud_registro_id")
     .eq("relacion_id", relacionId)
     .neq("estado", "BAJA")
     .order("version", { ascending: false });
@@ -210,6 +211,24 @@ async function hayPdfFirmadoDeContrato(
     .maybeSingle();
   if (error) return { error: error.message, ok: false };
   return { ok: Boolean(data?.storage_path && data.estado === "SI") };
+}
+
+async function hayRespaldoDeContrato(
+  relacionId: string,
+  documentoId: string | null | undefined,
+  solicitudId: string | null | undefined,
+): Promise<{ error?: string; ok: boolean }> {
+  const pdf = await hayPdfFirmadoDeContrato(relacionId, documentoId);
+  if (pdf.error || pdf.ok) return pdf;
+  if (!solicitudId) return { ok: false };
+  const db = await planillasDb();
+  const { data, error } = await db
+    .from("solicitudes_registro")
+    .select("id, storage_path")
+    .eq("id", solicitudId)
+    .maybeSingle();
+  if (error) return { error: error.message, ok: false };
+  return { ok: Boolean(data?.storage_path) };
 }
 
 function contratoEstaCerrado(estado: EstadoContratoPlanilla): boolean {
@@ -355,7 +374,7 @@ export async function confirmarContratoFirmado(
   const db = await planillasDb();
   const { data: contrato, error: loadError } = await db
     .from("contratos")
-    .select("id, estado, documento_id")
+    .select("id, estado, documento_id, solicitud_registro_id")
     .eq("id", contratoId)
     .eq("relacion_id", relacionId)
     .maybeSingle();
@@ -365,9 +384,15 @@ export async function confirmarContratoFirmado(
     return { error: "Este contrato ya está cerrado." };
   }
 
-  const pdf = await hayPdfFirmadoDeContrato(relacionId, contrato.documento_id as string | null);
-  if (pdf.error) return { error: pdf.error };
-  if (!pdf.ok) return { error: "Suba el PDF firmado de este contrato antes de guardar los datos." };
+  const respaldo = await hayRespaldoDeContrato(
+    relacionId,
+    contrato.documento_id as string | null,
+    contrato.solicitud_registro_id as string | null,
+  );
+  if (respaldo.error) return { error: respaldo.error };
+  if (!respaldo.ok) {
+    return { error: "Suba el contrato firmado o enlace una solicitud de registro antes de guardar los datos." };
+  }
 
   await db.from("contratos").update({ es_vigente: false }).eq("relacion_id", relacionId);
 
@@ -417,7 +442,7 @@ export async function marcarContratoRecogido(
   const db = await planillasDb();
   const { data: contrato, error: loadError } = await db
     .from("contratos")
-    .select("id, estado, datos_confirmados, documento_id")
+    .select("id, estado, datos_confirmados, documento_id, solicitud_registro_id")
     .eq("id", contratoId)
     .eq("relacion_id", relacionId)
     .maybeSingle();
@@ -428,13 +453,17 @@ export async function marcarContratoRecogido(
     return { error: "Primero hay que generar el documento (estado Elaborado)." };
   }
   if (!contrato.datos_confirmados) {
-    return { error: "Confirme los datos del PDF firmado antes de marcarlo Recogido." };
+    return { error: "Confirme los datos del respaldo antes de marcarlo Recogido." };
   }
 
-  const pdf = await hayPdfFirmadoDeContrato(relacionId, contrato.documento_id as string | null);
-  if (pdf.error) return { error: pdf.error };
-  if (!pdf.ok) {
-    return { error: "Suba el PDF firmado de este contrato antes de marcarlo como recogido." };
+  const respaldo = await hayRespaldoDeContrato(
+    relacionId,
+    contrato.documento_id as string | null,
+    contrato.solicitud_registro_id as string | null,
+  );
+  if (respaldo.error) return { error: respaldo.error };
+  if (!respaldo.ok) {
+    return { error: "Suba el contrato firmado o enlace una solicitud de registro antes de marcarlo como recogido." };
   }
 
   const { error } = await db

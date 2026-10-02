@@ -104,8 +104,9 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       fecha_fin: string | null;
       created_at: string | null;
       documento_id: string | null;
+      solicitud_registro_id: string | null;
       es_vigente: boolean;
-    }>("contratos", "relacion_id, estado, fecha_fin, created_at, documento_id, es_vigente", "entidad_id", entidadIds),
+    }>("contratos", "relacion_id, estado, fecha_fin, created_at, documento_id, solicitud_registro_id, es_vigente", "entidad_id", entidadIds),
     selectIn<{
       id: string;
       relacion_id: string;
@@ -142,6 +143,17 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
     });
     docUpdated.set(doc.id, doc.updated_at);
   }
+
+  const solicitudIds = [
+    ...new Set(contratos.map((c) => c.solicitud_registro_id).filter((id): id is string => Boolean(id))),
+  ];
+  const solicitudes = await selectIn<{ id: string; storage_path: string | null; updated_at: string | null }>(
+    "solicitudes_registro",
+    "id, storage_path, updated_at",
+    "id",
+    solicitudIds,
+  );
+  const solicitudPorId = new Map(solicitudes.map((solicitud) => [solicitud.id, solicitud]));
 
   const contratosPorRelacion = new Map<string, typeof contratos>();
   for (const c of contratos) pushMap(contratosPorRelacion, c.relacion_id, c);
@@ -180,14 +192,28 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       vidaLeyComprobanteOk: documentoCargado(flujoDocs, "VIDA_LEY_COMPROBANTE"),
       excelGenerado: excelSet.has(rel.id),
       vidaLeyFechaFin: vidaLeyPorRelacion.get(rel.id) ?? null,
-      contratos: (contratosPorRelacion.get(rel.id) ?? []).map((c) => ({
-        estado: c.estado,
-        fechaFin: c.fecha_fin,
-        createdAt: c.created_at,
-        firmado: contratoTieneFirmado({ documento_id: c.documento_id }, flujoDocs),
-        docUpdatedAt: c.documento_id ? (docUpdated.get(c.documento_id) ?? null) : null,
-        esVigente: Boolean(c.es_vigente),
-      })),
+      contratos: (contratosPorRelacion.get(rel.id) ?? []).map((c) => {
+        const solicitud = c.solicitud_registro_id ? solicitudPorId.get(c.solicitud_registro_id) : undefined;
+        const solicitudPath = solicitud?.storage_path ?? null;
+        const pdfOk = c.documento_id
+          ? flujoDocs.some((d) => d.id === c.documento_id && d.estado === "SI" && Boolean(d.storage_path))
+          : false;
+        const marcas = [
+          pdfOk && c.documento_id ? docUpdated.get(c.documento_id) : null,
+          solicitudPath ? solicitud?.updated_at : null,
+        ].filter((fecha): fecha is string => Boolean(fecha));
+        return {
+          estado: c.estado,
+          fechaFin: c.fecha_fin,
+          createdAt: c.created_at,
+          firmado: contratoTieneFirmado(
+            { documento_id: c.documento_id, solicitud_storage_path: solicitudPath },
+            flujoDocs,
+          ),
+          docUpdatedAt: marcas.sort().at(-1) ?? null,
+          esVigente: Boolean(c.es_vigente),
+        };
+      }),
     });
     trabajadoresPorEntidad.set(rel.entidad_id, lista);
   }

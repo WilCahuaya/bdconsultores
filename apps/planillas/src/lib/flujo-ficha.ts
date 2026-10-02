@@ -74,6 +74,8 @@ export type FlujoContrato = {
   version?: number;
   datos_confirmados?: boolean;
   documento_id?: string | null;
+  solicitud_registro_id?: string | null;
+  solicitud_storage_path?: string | null;
 };
 
 export type FlujoPension = {
@@ -130,16 +132,18 @@ export function documentoCargado(docs: FlujoDocumento[], tipo: TipoDocumentoPlan
 }
 
 export function contratoTieneFirmado(
-  contrato: Pick<FlujoContrato, "documento_id"> | null | undefined,
+  contrato: Pick<FlujoContrato, "documento_id" | "solicitud_storage_path"> | null | undefined,
   docs: FlujoDocumento[],
 ): boolean {
   if (!contrato) return false;
+  const solicitud = Boolean(contrato.solicitud_storage_path);
   if (contrato.documento_id) {
-    return docs.some(
+    const pdf = docs.some(
       (d) => d.id === contrato.documento_id && d.estado === "SI" && Boolean(d.storage_path),
     );
+    return pdf || solicitud;
   }
-  return documentoCargado(docs, "CONTRATO_FIRMADO");
+  return documentoCargado(docs, "CONTRATO_FIRMADO") || solicitud;
 }
 
 export function documentosAltaFaltantes(
@@ -245,8 +249,8 @@ export function faltasPorPaso(input: FlujoFichaInput): FaltasPasosAlta {
   const firmado = contratoTieneFirmado(borrador, input.documentos);
   const contratos: FaltaPaso[] = [];
   if (borrador && !confirmado) {
-    if (!firmado) contratos.push({ id: "firmar", etiqueta: "Subir contrato firmado" });
-    contratos.push({ id: "confirmar", etiqueta: "Confirmar datos del firmado" });
+    if (!firmado) contratos.push({ id: "firmar", etiqueta: "Subir contrato firmado o solicitud de registro" });
+    contratos.push({ id: "confirmar", etiqueta: "Confirmar datos del respaldo" });
   }
 
   const alta: FaltaPaso[] = [];
@@ -295,10 +299,10 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
     return { paso: "puesto", tab: "puesto", etiqueta: "Completar puesto", rol: "empresa" };
   }
   if (borrador && !firmado) {
-    return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado", rol: "empresa" };
+    return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado o solicitud de registro", rol: "empresa" };
   }
   if (borrador && firmado) {
-    return { paso: "contratos", tab: "contratos", etiqueta: "Confirmar datos del firmado", rol: "empresa" };
+    return { paso: "contratos", tab: "contratos", etiqueta: "Confirmar datos del respaldo", rol: "empresa" };
   }
   if (input.validacion === "PENDIENTE") {
     return esEstudio
@@ -495,10 +499,10 @@ export function resolverEtapaContrato(
     return { id: "alta", etiqueta: "Falta completar puesto", tab: "puesto", rol: "empresa", pendiente: true };
   }
   if (borrador && !firmado) {
-    return { id: "firmar", etiqueta: "Contrato generado: falta subir el firmado", tab: "contratos", rol: "empresa", pendiente: true };
+    return { id: "firmar", etiqueta: "Falta el contrato firmado o la solicitud de registro", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (borrador && firmado) {
-    return { id: "confirmar", etiqueta: "Falta confirmar datos del contrato firmado", tab: "contratos", rol: "empresa", pendiente: true };
+    return { id: "confirmar", etiqueta: "Falta confirmar datos del respaldo", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (flujo.validacion === "PENDIENTE") {
     return esEstudio
@@ -507,7 +511,7 @@ export function resolverEtapaContrato(
   }
   if (vigente?.estado === "ELABORADO" && firmado) {
     return esEstudio
-      ? { id: "recoger", etiqueta: "Contrato firmado: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
+      ? { id: "recoger", etiqueta: "Contrato con respaldo: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "recoger", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (!pensionAltaLista(flujo)) {

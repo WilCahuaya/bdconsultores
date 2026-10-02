@@ -20,6 +20,8 @@ import { descargarContratoWord } from "@/lib/descargar-contrato-word";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
+import { SolicitudRegistroContrato } from "@/components/ficha/SolicitudRegistroContrato";
+import type { ContratoEnlazable, SolicitudRegistroVista } from "@/lib/actions/solicitudes-registro";
 
 function abrirVistaPrevia(relacionId: string, contratoId: string) {
   window.open(
@@ -38,12 +40,30 @@ function contratoTienePdf(contrato: ContratoRow, documentos: DocumentoRow[]): bo
   return Boolean(doc?.storage_path && doc.estado === "SI");
 }
 
+function solicitudDeContrato(contrato: ContratoRow, solicitudes: SolicitudRegistroVista[]): SolicitudRegistroVista | null {
+  if (!contrato.solicitud_registro_id) return null;
+  return solicitudes.find((item) => item.id === contrato.solicitud_registro_id) ?? null;
+}
+
+function contratoTieneSolicitud(contrato: ContratoRow, solicitudes: SolicitudRegistroVista[]): boolean {
+  return Boolean(solicitudDeContrato(contrato, solicitudes)?.storage_path);
+}
+
+function textoRespaldo(pdf: boolean, solicitud: boolean): string {
+  if (pdf && solicitud) return "Ambos";
+  if (pdf) return "Contrato";
+  if (solicitud) return "Solicitud";
+  return "No";
+}
+
 export function FichaContratos({
   relacionId,
   entidadId,
   trabajador,
   contratos,
   documentos,
+  solicitudes,
+  enlazables,
   canWrite,
   canMarcarRecogido,
 }: {
@@ -52,6 +72,8 @@ export function FichaContratos({
   trabajador: TrabajadorListItem;
   contratos: ContratoRow[];
   documentos: DocumentoRow[];
+  solicitudes: SolicitudRegistroVista[];
+  enlazables: ContratoEnlazable[];
   canWrite: boolean;
   canMarcarRecogido: boolean;
 }) {
@@ -68,6 +90,8 @@ export function FichaContratos({
   const firmando = contratos.find((c) => c.id === firmandoId) ?? null;
   const pdfFirmando = firmando ? documentoDeContrato(firmando, documentos) : null;
   const tienePdfFirmando = firmando ? contratoTienePdf(firmando, documentos) : false;
+  const tieneSolicitudFirmando = firmando ? contratoTieneSolicitud(firmando, solicitudes) : false;
+  const tieneRespaldoFirmando = tienePdfFirmando || tieneSolicitudFirmando;
   const base = abierto ?? contratos.find((c) => c.datos_confirmados) ?? null;
 
   async function onGenerar(formData: FormData) {
@@ -170,8 +194,9 @@ export function FichaContratos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        El contrato es opcional. Cada Word generado guarda su propio PDF firmado. Al generar, el formulario se cierra;
-        el de confirmar solo se abre cuando sube el firmado de esa versión. Las fechas del papel no tienen que coincidir
+        El contrato es opcional. Cada Word generado guarda su respaldo: el PDF firmado, la solicitud de registro, o ambos.
+        La solicitud se sube una vez y la ven los trabajadores que la comparten. Al generar, el formulario se cierra;
+        el de confirmar solo se abre cuando sube el respaldo de esa versión. Las fechas del papel no tienen que coincidir
         con el ingreso a la empresa.
       </p>
 
@@ -245,8 +270,8 @@ export function FichaContratos({
 
       {firmando ? (
         <FormSection
-          title={`Contrato firmado · versión ${firmando.version}`}
-          hint="Suba el PDF de esta versión. Aquí confirma los datos de este contrato. El ingreso a la empresa no cambia."
+          title={`Respaldo del contrato · versión ${firmando.version}`}
+          hint="Suba el PDF firmado, enlace una solicitud de registro, o ambos. Aquí confirma los datos de este contrato. El ingreso a la empresa no cambia."
         >
           <FichaDocumentos
             relacionId={relacionId}
@@ -257,6 +282,16 @@ export function FichaContratos({
             permitirAgregar={false}
             hint={`PDF firmado de la versión ${firmando.version}.`}
           />
+          <SolicitudRegistroContrato
+            relacionId={relacionId}
+            entidadId={entidadId}
+            contratoId={firmando.id}
+            canWrite={canWrite}
+            cerrado={firmando.estado === "RECOGIDO" || firmando.estado === "COMPLETO"}
+            solicitud={solicitudDeContrato(firmando, solicitudes)}
+            solicitudes={solicitudes}
+            enlazables={enlazables}
+          />
           {canWrite && !firmando.datos_confirmados && firmando.estado !== "BAJA" ? (
             <form action={(formData) => void onConfirmar(firmando.id, formData)} className="space-y-4">
               <p className="text-sm font-medium">Datos a guardar (del generado; se pueden cambiar)</p>
@@ -266,7 +301,7 @@ export function FichaContratos({
                 contrato={firmando}
               />
               <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={pending === "confirmar" || !tienePdfFirmando}>
+                <Button type="submit" disabled={pending === "confirmar" || !tieneRespaldoFirmando}>
                   {pending === "confirmar" ? "Guardando…" : "Confirmar y guardar contrato"}
                 </Button>
                 <Button
@@ -278,8 +313,10 @@ export function FichaContratos({
                   Cerrar
                 </Button>
               </div>
-              {tienePdfFirmando ? null : (
-                <p className="text-sm text-muted-foreground">Suba el PDF de esta versión para poder confirmar.</p>
+              {tieneRespaldoFirmando ? null : (
+                <p className="text-sm text-muted-foreground">
+                  Suba el contrato firmado o una solicitud de registro para poder confirmar.
+                </p>
               )}
             </form>
           ) : (
@@ -317,7 +354,7 @@ export function FichaContratos({
               <th className="px-4 py-2 font-medium">Estado</th>
               <th className="px-4 py-2 font-medium">Remuneración</th>
               <th className="px-4 py-2 font-medium">Rem. bruta</th>
-              <th className="px-4 py-2 font-medium">Firmado</th>
+              <th className="px-4 py-2 font-medium">Respaldo</th>
               <th className="px-4 py-2 font-medium">Guardado</th>
               <th className="px-4 py-2 font-medium">Acciones</th>
             </tr>
@@ -332,6 +369,8 @@ export function FichaContratos({
             ) : (
               contratos.map((c) => {
               const conPdf = contratoTienePdf(c, documentos);
+              const conSolicitud = contratoTieneSolicitud(c, solicitudes);
+              const conRespaldo = conPdf || conSolicitud;
               const cerrado = c.estado === "RECOGIDO" || c.estado === "COMPLETO" || c.estado === "BAJA";
               return (
                 <tr key={c.id} className="border-b last:border-0">
@@ -343,7 +382,7 @@ export function FichaContratos({
                   <td className="px-4 py-2">
                     {formatRemuneracion(remuneracionBruta(c.remuneracion, trabajador.recibe_asignacion_familiar))}
                   </td>
-                  <td className="px-4 py-2">{conPdf ? "Sí" : "No"}</td>
+                  <td className="px-4 py-2">{textoRespaldo(conPdf, conSolicitud)}</td>
                   <td className="px-4 py-2">{c.datos_confirmados ? "Sí" : "No"}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap gap-2">
@@ -356,7 +395,7 @@ export function FichaContratos({
                       >
                         {pending === `word-${c.id}` ? "…" : "Word"}
                       </Button>
-                      {canWrite || conPdf ? (
+                      {canWrite || conRespaldo ? (
                         <Button
                           type="button"
                           size="sm"
@@ -364,7 +403,7 @@ export function FichaContratos({
                           disabled={pending === `firm-${c.id}`}
                           onClick={() => void onSubirFirmado(c)}
                         >
-                          {pending === `firm-${c.id}` ? "…" : conPdf ? "Ver firmado" : "Subir firmado"}
+                          {pending === `firm-${c.id}` ? "…" : conRespaldo ? "Ver respaldo" : "Subir respaldo"}
                         </Button>
                       ) : null}
                       {canWrite && !cerrado ? (
@@ -396,7 +435,7 @@ export function FichaContratos({
                         <Button
                           type="button"
                           size="sm"
-                          disabled={pending === c.id || !conPdf}
+                          disabled={pending === c.id || !conRespaldo}
                           onClick={() => void onRecoger(c.id)}
                         >
                           {pending === c.id ? "Guardando…" : "Marcar recogido"}

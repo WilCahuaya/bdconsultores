@@ -29,6 +29,7 @@ import {
   listDocumentos,
   listTRegistro,
 } from "@/lib/actions/ficha";
+import { contextoSolicitudesRegistro } from "@/lib/actions/solicitudes-registro";
 import {
   estadoPasosAlta,
   faltasPorPaso,
@@ -66,13 +67,16 @@ export default async function ContratoProcesoPage({
       asegurarDocumentoTrAlta(params.relacionId),
     ]);
   }
-  const [contratos, documentos, adendas, pension, tRegistro, entidad] = await Promise.all([
+  const [contratos, documentos, adendas, pension, tRegistro, entidad, solicitudesCtx] = await Promise.all([
     listContratos(params.relacionId),
     listDocumentos(params.relacionId),
     paso === "contratos" ? listAdendas(params.relacionId) : Promise.resolve([]),
     paso === "documentos" || paso === "alta" ? getPension(params.relacionId) : Promise.resolve(null),
     paso === "alta" ? listTRegistro(params.relacionId) : Promise.resolve([]),
     paso === "alta" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
+    paso === "contratos"
+      ? contextoSolicitudesRegistro(trabajador.entidad_id)
+      : Promise.resolve({ solicitudes: [], enlazables: [] }),
   ]);
 
   return (
@@ -138,6 +142,8 @@ export default async function ContratoProcesoPage({
               trabajador={trabajador}
               contratos={contratos}
               documentos={documentos}
+              solicitudes={solicitudesCtx.solicitudes}
+              enlazables={solicitudesCtx.enlazables}
               canWrite={canEditFicha}
               canMarcarRecogido={puedeMarcarContratoRecogido(profile) && !fichaCesada}
             />

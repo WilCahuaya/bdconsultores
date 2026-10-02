@@ -86,6 +86,8 @@ type ContratoEmbed = {
   fecha_fin: string | null;
   datos_confirmados?: boolean;
   documento_id?: string | null;
+  solicitud_registro_id?: string | null;
+  solicitudes_registro?: { storage_path: string | null } | { storage_path: string | null }[] | null;
 };
 
 type DocumentoEmbed = {
@@ -96,7 +98,7 @@ type DocumentoEmbed = {
 };
 
 const TRABAJADOR_SELECT =
-  "id, persona_id, entidad_id, numero, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados, documento_id), documentos (id, tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
+  "id, persona_id, entidad_id, numero, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados, documento_id, solicitud_registro_id, solicitudes_registro (storage_path)), documentos (id, tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
 
 function asList<T>(value: T | T[] | null | undefined): T[] {
   if (!value) return [];
@@ -225,7 +227,14 @@ function mapTrabajadorRow(row: {
   const persona = Array.isArray(row.personas) ? row.personas[0] : row.personas;
   if (!persona) return null;
   const { personas: _p, contratos, documentos, pensiones, t_registro, ...relacion } = row;
-  const contratosList = asList(contratos) as FlujoContrato[];
+  const contratosList = asList(contratos).map((contrato) => {
+    const { solicitudes_registro: solicitud, ...resto } = contrato;
+    const anidada = Array.isArray(solicitud) ? solicitud[0] : solicitud;
+    return {
+      ...resto,
+      solicitud_storage_path: anidada?.storage_path ?? null,
+    } as FlujoContrato;
+  });
   const documentosList = asList(documentos) as FlujoDocumento[];
   return {
     ...(relacion as RelacionRow),

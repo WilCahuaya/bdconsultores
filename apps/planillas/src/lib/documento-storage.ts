@@ -33,6 +33,18 @@ export function pathDocumento(entidadId: string, relacionId: string, documentoId
   return `${entidadId}/${relacionId}/${documentoId}.${ext}`;
 }
 
+export function pathSolicitudRegistro(entidadId: string, solicitudId: string, ext: string): string {
+  return `${entidadId}/solicitudes/${solicitudId}.${ext}`;
+}
+
+export function pathPerteneceASolicitud(entidadId: string, solicitudId: string, path: string): boolean {
+  if (!isUuid(entidadId) || !isUuid(solicitudId)) return false;
+  const prefix = `${entidadId}/solicitudes/${solicitudId}.`;
+  if (!path.startsWith(prefix)) return false;
+  const ext = path.slice(prefix.length).toLowerCase();
+  return ALLOWED_EXT.has(ext) && !ext.includes("/");
+}
+
 export function pathDocumentoValido(entidadId: string, relacionId: string, path: string): boolean {
   if (!isUuid(entidadId) || !isUuid(relacionId)) return false;
   const prefix = `${entidadId}/${relacionId}/`;
