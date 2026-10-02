@@ -214,8 +214,8 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
         title="Administrador de la empresa"
         hint={
           isEdit
-            ? "Si cambia el correo, se envía una nueva invitación. El administrador sigue figurando como trabajador."
-            : "Se registra como primer trabajador y recibe invitación para entrar con Google."
+            ? "El correo es opcional. Si lo cambia, se envía una nueva invitación. El administrador sigue figurando como trabajador."
+            : "Se registra como primer trabajador. El correo es opcional; si lo indica, recibe invitación para entrar con Google."
         }
       >
         <div className="grid gap-4 sm:grid-cols-2">
@@ -244,7 +244,7 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
             value={adminNombre}
             onChange={(event) => setAdminNombre(event.target.value)}
           />
-          <Field label="Correo" name="admin_email" type="email" required defaultValue={entidad?.admin_email ?? ""} />
+          <Field label="Correo" name="admin_email" type="email" defaultValue={entidad?.admin_email ?? ""} />
           <Field label="Teléfono" name="admin_telefono" inputMode="tel" defaultValue={entidad?.admin_telefono ?? ""} />
         </div>
         {dniMsg ? <p className="text-sm text-muted-foreground">{dniMsg}</p> : null}

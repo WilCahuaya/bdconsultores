@@ -96,7 +96,7 @@ type EmpresaFormParsed =
       ruc: string | null;
       direccion: string | null;
       adminNombre: string;
-      adminEmail: string;
+      adminEmail: string | null;
       adminTelefono: string | null;
       adminDni: string;
       usaInventarios: boolean;
@@ -112,7 +112,7 @@ function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   const ruc = String(formData.get("ruc") ?? "").trim() || null;
   const direccion = String(formData.get("direccion") ?? "").trim() || null;
   const adminNombre = String(formData.get("admin_nombre") ?? "").trim();
-  const adminEmail = String(formData.get("admin_email") ?? "").trim();
+  const adminEmail = String(formData.get("admin_email") ?? "").trim() || null;
   const adminTelefono = String(formData.get("admin_telefono") ?? "").trim() || null;
   const adminDni = normalizeResponsableDni(String(formData.get("admin_dni") ?? ""));
   const usaInventarios = formData.get("usa_inventarios") === "on";
@@ -122,7 +122,9 @@ function parseEmpresaForm(formData: FormData): EmpresaFormParsed {
   if (numeroError || !numeroInterno) return { error: numeroError ?? "El número de proyecto es obligatorio." };
   const codigoError = validarPeCodigo(peCodigo);
   if (codigoError || !peCodigo) return { error: codigoError ?? "El código de proyecto es obligatorio." };
-  if (!adminEmail) return { error: "El correo del administrador es obligatorio." };
+  if (adminEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+    return { error: "El correo del administrador no es válido." };
+  }
   if (!adminNombre) return { error: "El nombre del administrador es obligatorio." };
   const dniError = validarAdminEntidadDni(adminDni);
   if (dniError) return { error: dniError };
@@ -157,7 +159,7 @@ async function syncEmpresaRelacionados(
     supabase,
     entidadId,
     parsed.adminNombre,
-    parsed.adminEmail,
+    parsed.adminEmail ?? "",
     parsed.adminTelefono,
     parsed.adminDni,
   );
@@ -166,11 +168,13 @@ async function syncEmpresaRelacionados(
     supabase,
     entidadId,
     parsed.adminNombre,
-    parsed.adminEmail,
+    parsed.adminEmail ?? "",
     parsed.adminTelefono,
     parsed.adminDni,
   );
   if (planillas.error) return { error: planillas.error };
+
+  if (!parsed.adminEmail) return { inviteMessage: null };
 
   const invite = await inviteEntidadAdmin(
     entidadId,
@@ -263,8 +267,8 @@ export async function updateEntidadPlanillas(
   if (!entidadAnterior) return { error: "Empresa no encontrada." };
 
   const adminEmailAnterior = entidadAnterior.admin_email?.trim().toLowerCase() ?? null;
-  const inviteMode =
-    adminEmailAnterior && adminEmailAnterior === parsed.adminEmail.toLowerCase() ? "resend" : "invite";
+  const adminEmailActual = parsed.adminEmail?.toLowerCase() ?? null;
+  const inviteMode = adminEmailAnterior && adminEmailAnterior === adminEmailActual ? "resend" : "invite";
 
   const { data, error } = await supabase
     .from("entidades")
