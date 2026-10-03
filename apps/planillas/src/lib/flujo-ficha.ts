@@ -238,6 +238,23 @@ export function fechaFinUltimoContratoValidado(
   return fin || null;
 }
 
+export type TonoEstadoContrato = "gris" | "verde" | "neutro";
+
+export function tonoEstadoContrato(
+  estado: EstadoContratoPlanilla,
+  respaldo: "Elaborado" | "Validado por contrato" | "Solicitud",
+): TonoEstadoContrato {
+  if (estado === "RECOGIDO" || estado === "COMPLETO" || respaldo === "Validado por contrato") return "verde";
+  if (respaldo === "Elaborado" || estado === "ELABORADO") return "gris";
+  return "neutro";
+}
+
+export function claseTonoEstadoContrato(tono: TonoEstadoContrato): string {
+  if (tono === "verde") return "bg-emerald-100 text-emerald-950";
+  if (tono === "gris") return "bg-muted text-muted-foreground";
+  return "bg-sky-100 text-sky-950";
+}
+
 export function etiquetaEstadoRespaldoContrato(
   contrato: Pick<FlujoContrato, "estado" | "datos_confirmados" | "documento_id" | "solicitud_storage_path">,
   docs: Pick<FlujoDocumento, "id" | "estado" | "storage_path">[],

@@ -4,10 +4,12 @@ import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
+import { VersionesContratoButton, type VersionContratoLista } from "@/components/ficha/VersionesContratoButton";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import {
+  claseTonoEstadoContrato,
   contratoMasReciente,
   documentoCargado,
   etiquetaEstadoRespaldoContrato,
@@ -20,6 +22,7 @@ import {
   pensionAltaLista,
   resolverEtapaContrato,
   tRegistroAltaLista,
+  tonoEstadoContrato,
 } from "@/lib/flujo-ficha";
 import { ESTADO_CONTRATO_LABEL, compareTrabajadoresPorNumero, formatFechaPlanilla, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
@@ -30,18 +33,6 @@ function Marca({ listo }: { listo: boolean }) {
       <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
         <path d="M3.5 8.5 6.5 11.5 12.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-    </span>
-  );
-}
-
-function IconVersiones() {
-  return (
-    <span className="inline-flex text-muted-foreground" title="Hay versiones anteriores">
-      <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-        <path d="M5 2.5h6.5V12H5z" />
-        <path d="M3.5 4.5H4V13.5h7" />
-      </svg>
-      <span className="sr-only">Hay versiones anteriores</span>
     </span>
   );
 }
@@ -80,13 +71,25 @@ export default async function ContratosPage({
       const flujo = flujoDesdeTrabajador(trabajador);
       const faltas = faltasPorPaso(flujo);
       const ultimo = contratoMasReciente(flujo.contratos);
-      const anteriores = flujo.contratos.filter((c) => c.estado !== "BAJA" && c !== ultimo).length;
+      const versiones: VersionContratoLista[] = flujo.contratos
+        .filter((contrato) => contrato.estado !== "BAJA")
+        .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))
+        .map((contrato) => {
+          const respaldo = etiquetaEstadoRespaldoContrato(contrato, flujo.documentos);
+          return {
+            version: contrato.version ?? 0,
+            fechas: `${formatFechaPlanilla(contrato.fecha_inicio)} – ${formatFechaPlanilla(contrato.fecha_fin)}`,
+            estado: `${ESTADO_CONTRATO_LABEL[contrato.estado]} · ${respaldo}`,
+            tono: tonoEstadoContrato(contrato.estado, respaldo),
+            vigente: contrato.es_vigente,
+          };
+        });
       return {
         trabajador,
         flujo,
         faltas,
         ultimo,
-        anteriores,
+        versiones,
         etapa: resolverEtapaContrato(trabajador, esEstudio, { hoy, limite }),
       };
     })
@@ -168,7 +171,7 @@ export default async function ContratosPage({
                       </td>
                     </tr>
                   ) : (
-                    visibles.map(({ trabajador, flujo, faltas, ultimo, anteriores, etapa }) => (
+                    visibles.map(({ trabajador, flujo, faltas, ultimo, versiones, etapa }) => (
                       <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-3 py-2 font-mono">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
                         <td className="px-3 py-2 font-mono">{trabajador.persona.dni}</td>
@@ -198,7 +201,7 @@ export default async function ContratosPage({
                         <td className="whitespace-nowrap px-3 py-2">
                           {ultimo?.fecha_inicio || ultimo?.fecha_fin ? (
                             <span className="inline-flex items-center gap-1.5">
-                              {anteriores > 0 ? <IconVersiones /> : null}
+                              <VersionesContratoButton versiones={versiones} />
                               {formatFechaPlanilla(ultimo.fecha_inicio)} – {formatFechaPlanilla(ultimo.fecha_fin)}
                             </span>
                           ) : (
@@ -212,9 +215,15 @@ export default async function ContratosPage({
                           <Marca listo={tRegistroAltaLista(flujo)} />
                         </td>
                         <td className="px-3 py-2">
-                          {ultimo
-                            ? `${ESTADO_CONTRATO_LABEL[ultimo.estado]} · ${etiquetaEstadoRespaldoContrato(ultimo, flujo.documentos)}`
-                            : "Falta"}
+                          {ultimo ? (
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseTonoEstadoContrato(tonoEstadoContrato(ultimo.estado, etiquetaEstadoRespaldoContrato(ultimo, flujo.documentos)))}`}
+                            >
+                              {ESTADO_CONTRATO_LABEL[ultimo.estado]} · {etiquetaEstadoRespaldoContrato(ultimo, flujo.documentos)}
+                            </span>
+                          ) : (
+                            "Falta"
+                          )}
                         </td>
                       </tr>
                     ))
