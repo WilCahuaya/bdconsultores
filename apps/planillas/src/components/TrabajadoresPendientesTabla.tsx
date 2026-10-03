@@ -11,6 +11,7 @@ import type {
   ContratoGeneradoAviso,
   FilaPendienteTrabajador,
 } from "@/lib/actions/pendientes";
+import { MostrarBajasCheck } from "@/components/MostrarBajasCheck";
 import { formatNumeroTrabajador } from "@/lib/planillas-labels";
 
 const COLOR_CLASS: Record<ColorPendiente, string> = {
@@ -193,26 +194,52 @@ function CeldaVista({ celda }: { celda: CeldaPendiente }) {
 export function TrabajadoresPendientesTabla({
   filas,
   esEstudio,
+  entidadId = "",
+  mostrarBajasInicial = false,
   acciones,
   filtroExtra,
   vacioMensaje,
+  conteo = { uno: "trabajador", varios: "trabajadores" },
 }: {
   filas: FilaPendienteTrabajador[];
   esEstudio: boolean;
+  entidadId?: string;
+  mostrarBajasInicial?: boolean;
   acciones?: ReactNode;
   filtroExtra?: ReactNode;
   vacioMensaje?: string;
+  conteo?: { uno: string; varios: string };
 }) {
   const [consulta, setConsulta] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
+  const [mostrarBajas, setMostrarBajas] = useState(mostrarBajasInicial);
+  const [bajasInicialPrev, setBajasInicialPrev] = useState(mostrarBajasInicial);
+  if (mostrarBajasInicial !== bajasInicialPrev) {
+    setBajasInicialPrev(mostrarBajasInicial);
+    setMostrarBajas(mostrarBajasInicial);
+  }
   const columnas = useMemo(() => COLUMNAS.filter((col) => !col.estudio || esEstudio), [esEstudio]);
+  const porBaja = useMemo(
+    () => filas.filter((fila) => fila.cesada === mostrarBajas),
+    [filas, mostrarBajas],
+  );
   const visibles = useMemo(() => {
-    return filas.filter((fila) => {
+    return porBaja.filter((fila) => {
       if (soloPendientes && !tienePendiente(fila, columnas)) return false;
       return coincide(fila, consulta);
     });
-  }, [filas, consulta, soloPendientes, columnas]);
+  }, [porBaja, consulta, soloPendientes, columnas]);
   const filtrando = consulta.trim().length > 0 || soloPendientes;
+  const hayBajas = filas.some((fila) => fila.cesada);
+  const conteoVisible = mostrarBajas ? { uno: "baja", varios: "bajas" } : conteo;
+  const mensajeVacio =
+    porBaja.length === 0
+      ? mostrarBajas
+        ? "No hay bajas"
+        : hayBajas
+          ? "No hay trabajadores activos. Marque Mostrar bajas para ver a los cesados."
+          : vacioMensaje ?? "No hay trabajadores en esta empresa."
+      : "Ningún trabajador coincide con el filtro.";
 
   return (
     <div className="space-y-3">
@@ -230,11 +257,15 @@ export function TrabajadoresPendientesTabla({
           />
           Solo con pendientes
         </label>
+        <MostrarBajasCheck entidadId={entidadId} checked={mostrarBajas} onCheckedChange={setMostrarBajas} />
+        {hayBajas && !mostrarBajas ? (
+          <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</span>
+        ) : null}
         {filtroExtra}
         <p className="ml-auto shrink-0 whitespace-nowrap text-sm text-muted-foreground">
           {filtrando
-            ? `${visibles.length} de ${filas.length}`
-            : `${filas.length} ${filas.length === 1 ? "trabajador" : "trabajadores"}`}
+            ? `${visibles.length} de ${porBaja.length}`
+            : `${porBaja.length} ${porBaja.length === 1 ? conteoVisible.uno : conteoVisible.varios}`}
         </p>
       </div>
 
@@ -280,9 +311,7 @@ export function TrabajadoresPendientesTabla({
               {visibles.length === 0 ? (
                 <tr>
                   <td className="px-4 py-8 text-muted-foreground" colSpan={columnas.length + DATOS.length + 2}>
-                    {filas.length === 0
-                      ? vacioMensaje ?? "No hay trabajadores en esta empresa."
-                      : "Ningún trabajador coincide con el filtro."}
+                    {mensajeVacio}
                   </td>
                 </tr>
               ) : (

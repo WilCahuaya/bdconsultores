@@ -11,7 +11,6 @@ import {
 } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listFilasPendientesTrabajadores } from "@/lib/actions/pendientes";
-import { MostrarBajasCheck } from "@/components/MostrarBajasCheck";
 import { ImportarTrabajadoresButton } from "@/components/ImportarTrabajadoresButton";
 import { TrabajadoresPendientesTabla } from "@/components/TrabajadoresPendientesTabla";
 
@@ -27,9 +26,7 @@ export default async function PlanillasHomePage({
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
   const mostrarBajas = searchParams.bajas === "1";
-  const todos = selectedId ? await listFilasPendientesTrabajadores(selectedId) : [];
-  const trabajadores = mostrarBajas ? todos : todos.filter((t) => !t.cesada);
-  const hayBajas = todos.some((t) => t.cesada);
+  const trabajadores = selectedId ? await listFilasPendientesTrabajadores(selectedId) : [];
   const canCreateTrabajador = puedeCrearTrabajador(profile);
   const canCreate = puedeCrearEntidad(profile);
   const esEstudio = puedeEscribirPlanillas(profile);
@@ -95,6 +92,8 @@ export default async function PlanillasHomePage({
             <TrabajadoresPendientesTabla
               filas={trabajadores}
               esEstudio={esEstudio}
+              entidadId={selectedId}
+              mostrarBajasInicial={mostrarBajas}
               acciones={
                 <>
                   {canCreate ? (
@@ -128,19 +127,7 @@ export default async function PlanillasHomePage({
                   ) : null}
                 </>
               }
-              filtroExtra={
-                <>
-                  <MostrarBajasCheck entidadId={selectedId} checked={mostrarBajas} />
-                  {hayBajas && !mostrarBajas ? (
-                    <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</span>
-                  ) : null}
-                </>
-              }
-              vacioMensaje={
-                hayBajas && !mostrarBajas
-                  ? "No hay trabajadores activos. Marque Mostrar bajas para ver a los cesados."
-                  : "No hay trabajadores en esta empresa. El listado arranca en blanco."
-              }
+              vacioMensaje="No hay trabajadores en esta empresa. El listado arranca en blanco."
             />
           </>
         )}

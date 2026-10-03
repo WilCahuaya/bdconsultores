@@ -1,16 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-
 export function MostrarBajasCheck({
   entidadId,
   checked,
+  onCheckedChange,
 }: {
   entidadId: string;
   checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
 }) {
-  const router = useRouter();
-
   return (
     <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-sm">
       <input
@@ -18,10 +16,13 @@ export function MostrarBajasCheck({
         className="h-4 w-4 rounded border-input"
         checked={checked}
         onChange={(event) => {
-          const query = new URLSearchParams();
-          if (entidadId) query.set("entidadId", entidadId);
-          if (event.target.checked) query.set("bajas", "1");
-          router.push(`/?${query.toString()}`);
+          const next = event.target.checked;
+          onCheckedChange(next);
+          const url = new URL(window.location.href);
+          if (entidadId) url.searchParams.set("entidadId", entidadId);
+          if (next) url.searchParams.set("bajas", "1");
+          else url.searchParams.delete("bajas");
+          window.history.replaceState(window.history.state, "", url);
         }}
       />
       Mostrar bajas

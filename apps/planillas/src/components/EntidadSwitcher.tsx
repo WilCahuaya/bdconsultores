@@ -31,8 +31,15 @@ export function EntidadSwitcher({
       value={selectedId}
       disabled={locked || entidades.length === 0}
       onChange={(event) => {
-        const extra = queryExtra ? `&${queryExtra.replace(/^&/, "")}` : "";
-        router.push(`${hrefBase}?entidadId=${event.target.value}${extra}`);
+        const params = new URLSearchParams();
+        params.set("entidadId", event.target.value);
+        if (new URLSearchParams(window.location.search).get("bajas") === "1") params.set("bajas", "1");
+        if (queryExtra) {
+          new URLSearchParams(queryExtra.replace(/^&/, "")).forEach((value, key) => {
+            params.set(key, value);
+          });
+        }
+        router.push(`${hrefBase}?${params.toString()}`);
       }}
     >
         {entidades.map((entidad) => (
