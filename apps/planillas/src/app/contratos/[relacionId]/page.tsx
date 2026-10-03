@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { entidadEtiqueta } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
+import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
 import { AltaPasosNav } from "@/components/ficha/FichaTabs";
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
@@ -18,7 +20,7 @@ import {
   requirePlanillasProfile,
 } from "@/lib/auth/access";
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
-import { getTrabajador } from "@/lib/actions/trabajadores";
+import { getTrabajador, listTrabajadores } from "@/lib/actions/trabajadores";
 import { listAdendas } from "@/lib/actions/adendas";
 import {
   asegurarDocumentoTrAlta,
@@ -68,29 +70,38 @@ export default async function ContratoProcesoPage({
       asegurarDocumentoTrAlta(params.relacionId),
     ]);
   }
-  const [contratos, documentos, adendas, pension, tRegistro, entidad, solicitudesCtx, hijosAsignacion] = await Promise.all([
-    listContratos(params.relacionId),
-    listDocumentos(params.relacionId),
-    paso === "contratos" ? listAdendas(params.relacionId) : Promise.resolve([]),
-    paso === "documentos" || paso === "alta" ? getPension(params.relacionId) : Promise.resolve(null),
-    paso === "alta" ? listTRegistro(params.relacionId) : Promise.resolve([]),
-    paso === "alta" ? getEntidadPlanillas(trabajador.entidad_id) : Promise.resolve(null),
-    paso === "contratos"
-      ? contextoSolicitudesRegistro(trabajador.entidad_id)
-      : Promise.resolve({ solicitudes: [], enlazables: [] }),
-    paso === "documentos" ? listHijosAsignacion(params.relacionId) : Promise.resolve([]),
-  ]);
+  const [contratos, documentos, adendas, pension, tRegistro, entidad, solicitudesCtx, hijosAsignacion, companeros] =
+    await Promise.all([
+      listContratos(params.relacionId),
+      listDocumentos(params.relacionId),
+      paso === "contratos" ? listAdendas(params.relacionId) : Promise.resolve([]),
+      paso === "documentos" || paso === "alta" ? getPension(params.relacionId) : Promise.resolve(null),
+      paso === "alta" ? listTRegistro(params.relacionId) : Promise.resolve([]),
+      getEntidadPlanillas(trabajador.entidad_id),
+      paso === "contratos"
+        ? contextoSolicitudesRegistro(trabajador.entidad_id)
+        : Promise.resolve({ solicitudes: [], enlazables: [] }),
+      paso === "documentos" ? listHijosAsignacion(params.relacionId) : Promise.resolve([]),
+      listTrabajadores(trabajador.entidad_id),
+    ]);
+  const opcionesTrabajador = companeros.map((item) => ({
+    id: item.id,
+    etiqueta: `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
+  }));
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
       <div className="space-y-6">
         <div>
-          <Link
-            href={`/contratos?entidadId=${trabajador.entidad_id}`}
-            className="text-sm text-primary hover:underline"
-          >
-            ← Contratos
-          </Link>
+          <FichaRutaTrabajador
+            entidadId={trabajador.entidad_id}
+            empresa={entidad ? entidadEtiqueta(entidad) : "Empresa"}
+            trabajadores={opcionesTrabajador}
+            relacionId={params.relacionId}
+            raiz="Contrato"
+            hrefRaiz={`/contratos?entidadId=${trabajador.entidad_id}`}
+            hrefDestino={(id) => `/contratos/${id}?paso=${paso}`}
+          />
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{etiquetaTrabajador(trabajador.persona, trabajador.numero)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             DNI {trabajador.persona.dni} · {ESTADO_RELACION_LABEL[trabajador.estado]}

@@ -3,7 +3,7 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
-import { ProcesoResumenCard, SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
+import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
@@ -17,7 +17,6 @@ import {
   HORIZONTE_VENCIMIENTO_DIAS,
   parseEtapaContratoFiltro,
   resolverEtapaContrato,
-  type EtapaContratoId,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, compareTrabajadoresPorNumero, formatFechaPlanilla, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
@@ -65,99 +64,39 @@ export default async function ContratosPage({
       if (a.trabajador.estado !== b.trabajador.estado) return a.trabajador.estado === "ACTIVA" ? -1 : 1;
       return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
     });
-  const conteo = filas.reduce(
-    (acc, fila) => {
-      acc[fila.etapa.id] += 1;
-      if (fila.etapa.pendiente) acc.pendientes += 1;
-      return acc;
-    },
-    {
-      pendientes: 0,
-      alta: 0,
-      generar: 0,
-      firmar: 0,
-      confirmar: 0,
-      validar: 0,
-      afp: 0,
-      "t-registro": 0,
-      recoger: 0,
-      vence: 0,
-      revisar: 0,
-      listo: 0,
-    } as Record<EtapaContratoId | "pendientes", number>,
-  );
   const visibles =
     filtro === "todos"
       ? filas
       : filtro === "pendientes"
         ? filas.filter((fila) => fila.etapa.pendiente)
         : filas.filter((fila) => fila.etapa.id === filtro);
-  const tarjetas: { id: EtapaContratoId | "pendientes"; hint: string }[] = [
-    { id: "pendientes", hint: "Ver proceso" },
-    { id: "alta", hint: "Docs, persona o puesto" },
-    { id: "generar", hint: "Armar Word" },
-    { id: "firmar", hint: "Subir PDF" },
-    { id: "confirmar", hint: "Guardar datos" },
-    { id: "recoger", hint: esEstudio ? "Marcar recogido" : "Revisión del estudio" },
-    { id: "vence", hint: "30 días" },
-    { id: "listo", hint: "Vigentes" },
-  ];
-  if (conteo.validar > 0) {
-    tarjetas.splice(5, 0, { id: "validar", hint: esEstudio ? "Aceptar alta" : "En revisión" });
-  }
-  const extrasAlta: { id: EtapaContratoId; hint: string }[] = [];
-  if (conteo.afp > 0) {
-    extrasAlta.push({ id: "afp", hint: esEstudio ? "AFP y T-Registro" : "Estudio" });
-  }
-  if (conteo["t-registro"] > 0) {
-    extrasAlta.push({ id: "t-registro", hint: esEstudio ? "T-Registro" : "Estudio" });
-  }
-  if (conteo.revisar > 0) {
-    extrasAlta.push({ id: "revisar", hint: "Otro estado" });
-  }
-  if (extrasAlta.length > 0) {
-    const venceIdx = tarjetas.findIndex((tarjeta) => tarjeta.id === "vence");
-    tarjetas.splice(venceIdx === -1 ? tarjetas.length : venceIdx, 0, ...extrasAlta);
-  }
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-bold text-primary sm:text-2xl">Contratos</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Proceso por empresa: los cinco pasos se hacen aquí. El nombre abre documentos, persona, puesto, contrato y
-            el alta AFP y T-Registro de esa persona.
-          </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-bold text-primary sm:text-2xl">Contrato</h1>
+          {entidades.length > 0 ? (
+            <>
+              <span className="text-muted-foreground" aria-hidden>
+                &gt;
+              </span>
+              <EntidadSwitcher
+                entidades={entidades}
+                selectedId={selectedId}
+                locked={esUsuarioEntidad(profile.rol)}
+                hrefBase="/contratos"
+                queryExtra={filtro === "todos" ? undefined : `etapa=${filtro}`}
+                inline
+              />
+            </>
+          ) : null}
         </div>
 
         {entidades.length === 0 ? (
           <SinEmpresasPlanillas canCreate={canCreate} />
         ) : (
           <>
-            <EntidadSwitcher
-              entidades={entidades}
-              selectedId={selectedId}
-              locked={esUsuarioEntidad(profile.rol)}
-              hrefBase="/contratos"
-              queryExtra={filtro === "todos" ? undefined : `etapa=${filtro}`}
-            />
-
-            {selectedId ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {tarjetas.map((tarjeta) => (
-                  <ProcesoResumenCard
-                    key={tarjeta.id}
-                    href={hrefContratos(selectedId, tarjeta.id)}
-                    titulo={ETAPA_CONTRATO_FILTRO_LABEL[tarjeta.id]}
-                    cantidad={conteo[tarjeta.id]}
-                    hint={tarjeta.hint}
-                    active={filtro === tarjeta.id}
-                  />
-                ))}
-              </div>
-            ) : null}
-
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-medium text-foreground">
                 {filtro === "todos" ? "Todos los contratos" : ETAPA_CONTRATO_FILTRO_LABEL[filtro]}

@@ -9,20 +9,26 @@ export function FichaRutaTrabajador({
   trabajadores,
   relacionId,
   query,
+  raiz = "Trabajador",
+  hrefRaiz,
+  hrefDestino,
 }: {
   entidadId: string;
   empresa: string;
   trabajadores: { id: string; etiqueta: string }[];
   relacionId: string;
   query?: string;
+  raiz?: string;
+  hrefRaiz?: string;
+  hrefDestino?: (relacionId: string) => string;
 }) {
   const router = useRouter();
   const sufijo = query ? `?${query.replace(/^\?/, "")}` : "";
 
   return (
     <nav aria-label="Ruta" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
-      <Link href={`/?entidadId=${entidadId}`} className="shrink-0 text-primary hover:underline">
-        Trabajador
+      <Link href={hrefRaiz ?? `/?entidadId=${entidadId}`} className="shrink-0 text-primary hover:underline">
+        {raiz}
       </Link>
       <span className="shrink-0 text-muted-foreground" aria-hidden>
         ›
@@ -41,7 +47,10 @@ export function FichaRutaTrabajador({
           disabled={trabajadores.length < 2}
           onChange={(event) => {
             if (event.target.value === relacionId) return;
-            router.push(`/trabajadores/${event.target.value}${sufijo}`);
+            const destino = hrefDestino
+              ? hrefDestino(event.target.value)
+              : `/trabajadores/${event.target.value}${sufijo}`;
+            router.push(destino);
           }}
         >
           {trabajadores.map((trabajador) => (
