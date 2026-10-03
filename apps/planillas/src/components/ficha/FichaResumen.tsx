@@ -1,16 +1,20 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { tiposDocumentosAltaRequeridos } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
-import type { ContratoRow, DocumentoRow } from "@/lib/actions/ficha";
+import type { ContratoRow, DocumentoRow, VidaLeyRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import type { VacacionRow } from "@/lib/actions/vacaciones";
 import { VerHorario } from "@/components/ficha/VerHorario";
-import { contratoConfirmado, contratoVigente, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
-import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
+import { documentoCargado, etiquetaEstadoRespaldoContrato, fechaFinUltimoContratoValidado } from "@/lib/flujo-ficha";
+import { etiquetaMesAsistencia } from "@/lib/horario-asistencia";
 import {
   CLASIFICACION_LABEL,
-  ESTADO_CONTRATO_LABEL,
   JORNADA_LABEL,
+  TIPO_DOCUMENTO_LABEL,
+  TRAMITE_PENSION_LABEL,
+  armarDireccionPersona,
+  etiquetaEstadoVidaLey,
   etiquetaTrabajador,
   formatFechaPlanilla,
   formatNumeroTrabajador,
@@ -24,7 +28,7 @@ import {
   resumenPeriodoVacacion,
 } from "@/lib/vacaciones";
 
-type Linea = { texto: string; href?: string };
+type Linea = { texto: string; href?: string; destacada?: boolean };
 
 function iconClass() {
   return "h-4 w-4 shrink-0 text-foreground";
@@ -54,6 +58,53 @@ function IconPuesto() {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass()} aria-hidden>
       <rect x="2" y="7" width="20" height="14" rx="2" />
       <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+    </svg>
+  );
+}
+
+function IconPago() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass()} aria-hidden>
+      <rect x="2" y="6" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M16 15h2" />
+    </svg>
+  );
+}
+
+function IconPension() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass()} aria-hidden>
+      <path d="M12 3v18" />
+      <path d="M17 8a5 5 0 0 0-5-2c-2.8 0-5 1.8-5 4s2.2 4 5 4 5 1.8 5 4-2.2 4-5 4a5 5 0 0 1-5-2" />
+    </svg>
+  );
+}
+
+function IconRegistro() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass()} aria-hidden>
+      <path d="M4 4h16v16H4z" />
+      <path d="M8 9h8" />
+      <path d="M8 13h8" />
+      <path d="M8 17h5" />
+    </svg>
+  );
+}
+
+function IconDocumentos() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass()} aria-hidden>
+      <path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8l-5-5H8Z" />
+      <path d="M14 3v6h6" />
+    </svg>
+  );
+}
+
+function IconVidaLey() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={iconClass()} aria-hidden>
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
     </svg>
   );
 }
@@ -96,6 +147,11 @@ function IconVacaciones() {
   );
 }
 
+function valorOSinDato(etiqueta: string, valor: string | null | undefined): string {
+  const texto = valor?.trim();
+  return texto ? texto : `${etiqueta}: Sin dato`;
+}
+
 function Grupo({
   icon,
   title,
@@ -116,7 +172,14 @@ function Grupo({
       </h2>
       <ul className="mt-1 pl-6">
         {lineas.map((linea, index) => (
-          <li key={`${linea.texto}-${index}`} className="text-sm leading-6 text-muted-foreground">
+          <li
+            key={`${linea.texto}-${index}`}
+            className={
+              linea.destacada
+                ? "text-sm font-semibold leading-6 text-foreground"
+                : "text-sm leading-6 text-muted-foreground"
+            }
+          >
             {linea.href ? (
               <Link href={linea.href} className="text-primary hover:underline">
                 {linea.texto}
@@ -139,6 +202,9 @@ export function FichaResumen({
   contratos,
   documentos,
   vacaciones,
+  vidaLey,
+  mostrarVidaLey,
+  vidaLeyHref,
 }: {
   relacionId: string;
   entidadId: string;
@@ -146,66 +212,153 @@ export function FichaResumen({
   contratos: ContratoRow[];
   documentos: DocumentoRow[];
   vacaciones: VacacionRow[];
+  vidaLey: VidaLeyRow | null;
+  mostrarVidaLey: boolean;
+  vidaLeyHref: string;
 }) {
   const p = trabajador.persona;
-  const flujo = flujoDesdeTrabajador(trabajador);
-  const vigente = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
-  const contrato = contratos.find((c) => c.es_vigente) ?? contratos[0] ?? null;
-  const mes = mesActualLima();
+  const ordenados = [...contratos].sort((a, b) => b.version - a.version);
+  const ultimo = ordenados[0] ?? null;
   const periodo = anioActualLima();
   const asistencias = documentos
     .filter((d) => d.tipo === "ASISTENCIA")
     .slice()
     .sort((a, b) => String(b.observaciones ?? "").localeCompare(String(a.observaciones ?? "")));
   const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodo);
-  const contratoEstado = contrato
-    ? ESTADO_CONTRATO_LABEL[contrato.estado]
-    : vigente
-      ? ESTADO_CONTRATO_LABEL[vigente.estado]
-      : "Sin contrato";
-  const contratoFechas = contrato
-    ? `${formatFechaPlanilla(contrato.fecha_inicio)} – ${formatFechaPlanilla(contrato.fecha_fin)}`
-    : vigente
-      ? `${formatFechaPlanilla(vigente.fecha_inicio)} – ${formatFechaPlanilla(vigente.fecha_fin)}`
-      : null;
+  function estadoContrato(item: ContratoRow) {
+    const respaldo = trabajador.contratos.find((c) => c.version === item.version);
+    return etiquetaEstadoRespaldoContrato(
+      {
+        estado: item.estado,
+        datos_confirmados: item.datos_confirmados,
+        documento_id: item.documento_id,
+        solicitud_storage_path: respaldo?.solicitud_storage_path ?? null,
+      },
+      documentos,
+    );
+  }
+  const fechasUltimo = ultimo
+    ? ultimo.fecha_inicio || ultimo.fecha_fin
+      ? `${formatFechaPlanilla(ultimo.fecha_inicio)} – ${formatFechaPlanilla(ultimo.fecha_fin)}`
+      : "Fechas: Sin dato"
+    : null;
+  const finValidado = fechaFinUltimoContratoValidado(contratos);
+  const hrefDocumentos = `/contratos/${relacionId}?paso=documentos`;
+  const hrefAlta = `/contratos/${relacionId}?paso=alta`;
+  const altaRegistro = trabajador.tRegistro.find((item) => item.tipo === "ALTA");
+  const bajaRegistro = trabajador.tRegistro.find((item) => item.tipo === "BAJA");
 
   const persona: Linea[] = [
     { texto: etiquetaTrabajador(p, trabajador.numero) },
-    { texto: p.dni },
-    ...(p.fecha_nacimiento ? [{ texto: formatFechaPlanilla(p.fecha_nacimiento) }] : []),
+    { texto: valorOSinDato("DNI", p.dni) },
+    { texto: p.fecha_nacimiento ? formatFechaPlanilla(p.fecha_nacimiento) : "Nacimiento: Sin dato" },
   ];
   const contacto: Linea[] = [
-    ...(p.celular ? [{ texto: p.celular }] : []),
-    ...(p.correo ? [{ texto: p.correo }] : []),
-    ...(p.direccion ? [{ texto: p.direccion }] : []),
+    { texto: valorOSinDato("Celular", p.celular) },
+    { texto: valorOSinDato("Correo", p.correo) },
+    {
+      texto: valorOSinDato(
+        "Dirección",
+        armarDireccionPersona({
+          tipo_via: p.tipo_via,
+          via_nombre: p.via_nombre,
+          via_numero: p.via_numero,
+          referencia: p.referencia,
+          distrito: p.distrito,
+          provincia: p.provincia,
+          region: p.region,
+          direccion: p.direccion,
+        }),
+      ),
+    },
   ];
   const numero = formatNumeroTrabajador(trabajador.numero);
   const puesto: Linea[] = [
-    ...(numero ? [{ texto: `Nº ${numero}` }] : []),
-    ...(trabajador.cargo ? [{ texto: trabajador.cargo }] : []),
-    ...(trabajador.clasificacion ? [{ texto: CLASIFICACION_LABEL[trabajador.clasificacion] }] : []),
-    ...(trabajador.jornada ? [{ texto: JORNADA_LABEL[trabajador.jornada] }] : []),
-    ...(trabajador.fecha_ingreso ? [{ texto: `Ingreso a la empresa ${formatFechaPlanilla(trabajador.fecha_ingreso)}` }] : []),
-    ...(trabajador.fecha_cese ? [{ texto: `Cese ${formatFechaPlanilla(trabajador.fecha_cese)}` }] : []),
+    { texto: numero ? `Nº ${numero}` : "Nº: Sin dato" },
+    { texto: valorOSinDato("Cargo", trabajador.cargo) },
+    { texto: valorOSinDato("Clasificación", trabajador.clasificacion ? CLASIFICACION_LABEL[trabajador.clasificacion] : null) },
+    { texto: valorOSinDato("Jornada", trabajador.jornada ? JORNADA_LABEL[trabajador.jornada] : null) },
+    {
+      texto: trabajador.fecha_ingreso
+        ? `Ingreso a la empresa ${formatFechaPlanilla(trabajador.fecha_ingreso)}`
+        : "Ingreso: Sin dato",
+    },
+    { texto: finValidado ? `Cese ${formatFechaPlanilla(finValidado)}` : "Cese: Sin dato" },
     { texto: "Ir a puesto", href: `/contratos/${relacionId}?paso=puesto` },
   ];
-  const puestoPago: Linea[] = [
-    ...(trabajador.remuneracion != null ? [{ texto: `S/ ${formatRemuneracion(trabajador.remuneracion)}` }] : []),
-    ...(trabajador.recibe_asignacion_familiar === true
-      ? [{ texto: `Asignación familiar S/ ${formatRemuneracion(montoAsignacionFamiliar(true))}` }]
-      : trabajador.recibe_asignacion_familiar === false
-        ? [{ texto: "Sin asignación familiar" }]
-        : []),
+  const pago: Linea[] = [
+    {
+      texto:
+        trabajador.remuneracion != null
+          ? `S/ ${formatRemuneracion(trabajador.remuneracion)}`
+          : "Remuneración: Sin dato",
+    },
+    {
+      texto:
+        trabajador.recibe_asignacion_familiar === true
+          ? `Asignación familiar S/ ${formatRemuneracion(montoAsignacionFamiliar(true))}`
+          : trabajador.recibe_asignacion_familiar === false
+            ? "Sin asignación familiar"
+            : "Asignación familiar: Sin dato",
+    },
   ];
-  const contratoLineas: Linea[] = [
-    { texto: contratoEstado },
-    ...(contratoFechas ? [{ texto: contratoFechas }] : []),
-    ...(contratos.length > 1
-      ? contratos.map((item) => ({
-          texto: `Versión ${item.version}${item.es_vigente ? " vigente" : ""} · ${ESTADO_CONTRATO_LABEL[item.estado]}`,
-        }))
+  const pension = trabajador.pension;
+  const pensionLineas: Linea[] = pension?.tipo
+    ? [
+        {
+          texto:
+            pension.tipo === "ONP"
+              ? "ONP"
+              : pension.afp_nombre?.trim()
+                ? `AFP ${pension.afp_nombre.trim()}`
+                : "AFP: Sin dato",
+        },
+        ...(pension.tipo === "AFP" ? [{ texto: valorOSinDato("CUSPP", pension.cuspp) }] : []),
+        {
+          texto: pension.tramite_estado ? TRAMITE_PENSION_LABEL[pension.tramite_estado] : "Trámite: Sin dato",
+        },
+        { texto: "Ir a dar de alta", href: hrefAlta },
+      ]
+    : [
+        { texto: "Pensión: Sin dato" },
+        { texto: "Ir a dar de alta", href: hrefAlta },
+      ];
+  const tRegistroLineas: Linea[] = [
+    { texto: altaRegistro?.realizado ? "Alta hecha" : "Alta pendiente" },
+    ...(trabajador.estado === "CESADA"
+      ? [{ texto: bajaRegistro?.realizado ? "Baja hecha" : "Baja pendiente" }]
       : []),
-    { texto: "Ir al trámite", href: `/contratos/${relacionId}` },
+    { texto: "Ir a dar de alta", href: hrefAlta },
+  ];
+  const documentosAlta: Linea[] = tiposDocumentosAltaRequeridos(trabajador.recibe_asignacion_familiar).map((tipo) => ({
+    texto: `${TIPO_DOCUMENTO_LABEL[tipo]} · ${documentoCargado(documentos, tipo) ? "cargado" : "pendiente"}`,
+    href: hrefDocumentos,
+  }));
+  const contratoLineas: Linea[] = ultimo
+    ? [
+        {
+          texto: `Versión ${ultimo.version}${ultimo.es_vigente ? " vigente" : ""} · ${estadoContrato(ultimo)}`,
+          destacada: true,
+        },
+        ...(fechasUltimo ? [{ texto: fechasUltimo }] : []),
+        ...ordenados.slice(1).map((item) => ({
+          texto: `Versión ${item.version}${item.es_vigente ? " vigente" : ""} · ${estadoContrato(item)}`,
+        })),
+        { texto: "Ir al trámite", href: `/contratos/${relacionId}` },
+      ]
+    : [
+        { texto: "Sin contrato", destacada: true },
+        { texto: "Ir al trámite", href: `/contratos/${relacionId}` },
+      ];
+  const vidaLeyFechas =
+    vidaLey?.fecha_inicio || vidaLey?.fecha_fin
+      ? `${formatFechaPlanilla(vidaLey.fecha_inicio)} – ${formatFechaPlanilla(vidaLey.fecha_fin)}`
+      : null;
+  const vidaLeyLineas: Linea[] = [
+    { texto: vidaLey ? etiquetaEstadoVidaLey(vidaLey.estado) : "Vida Ley: Sin dato", destacada: true },
+    ...(vidaLey?.numero_poliza ? [{ texto: `Póliza ${vidaLey.numero_poliza}` }] : []),
+    ...(vidaLeyFechas ? [{ texto: vidaLeyFechas }] : []),
+    { texto: "Ir al trámite", href: vidaLeyHref },
   ];
   const asistenciaLineas: Linea[] =
     asistencias.length === 0
@@ -234,25 +387,27 @@ export function FichaResumen({
   return (
     <div className="columns-1 lg:columns-2 lg:gap-x-6">
       <Grupo icon={<IconPersona />} title="Persona" lineas={persona} />
-      <Grupo icon={<IconContacto />} title="Contacto" lineas={contacto.length ? contacto : [{ texto: "Sin datos de contacto" }]} />
+      <Grupo icon={<IconContacto />} title="Contacto" lineas={contacto} />
       <Grupo
         icon={<IconPuesto />}
         title="Puesto"
         lineas={puesto}
         extra={
-          <>
+          trabajador.horario?.trim() ? (
             <VerHorario value={trabajador.horario} />
-            {puestoPago.map((linea) => (
-              <li key={linea.texto} className="text-sm leading-6 text-muted-foreground">
-                {linea.texto}
-              </li>
-            ))}
-          </>
+          ) : (
+            <li className="text-sm leading-6 text-muted-foreground">Horario: Sin dato</li>
+          )
         }
       />
+      <Grupo icon={<IconPago />} title="Pago" lineas={pago} />
       <Grupo icon={<IconContrato />} title="Contrato" lineas={contratoLineas} />
+      <Grupo icon={<IconPension />} title="Pensión" lineas={pensionLineas} />
+      <Grupo icon={<IconRegistro />} title="T-Registro" lineas={tRegistroLineas} />
+      {mostrarVidaLey ? <Grupo icon={<IconVidaLey />} title="Vida Ley" lineas={vidaLeyLineas} /> : null}
       <Grupo icon={<IconAsistencia />} title="Asistencias" lineas={asistenciaLineas} />
       <Grupo icon={<IconVacaciones />} title="Vacaciones" lineas={vacacionLineas} />
+      <Grupo icon={<IconDocumentos />} title="Documentos" lineas={documentosAlta} />
     </div>
   );
 }

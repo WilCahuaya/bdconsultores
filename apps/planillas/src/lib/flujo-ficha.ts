@@ -195,6 +195,60 @@ export function contratoVigente(contratos: FlujoContrato[]): FlujoContrato | nul
   return contratos.find((c) => c.es_vigente) ?? contratos[0];
 }
 
+export function contratoMasReciente<T extends { version?: number; estado: string }>(contratos: T[]): T | null {
+  const vivos = contratos.filter((c) => c.estado !== "BAJA");
+  const lista = vivos.length > 0 ? vivos : contratos;
+  if (lista.length === 0) return null;
+  return [...lista].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
+}
+
+export function contratoTienePdfPropio(
+  contrato: Pick<FlujoContrato, "documento_id"> | null | undefined,
+  docs: Pick<FlujoDocumento, "id" | "estado" | "storage_path">[],
+): boolean {
+  if (!contrato?.documento_id) return false;
+  return docs.some((d) => d.id === contrato.documento_id && d.estado === "SI" && Boolean(d.storage_path));
+}
+
+const ESTADOS_CONTRATO_VALIDADO = new Set<EstadoContratoPlanilla>([
+  "FIRMADO",
+  "PRESENTADO_MTPE",
+  "RECEPCIONADO",
+  "RECOGIDO",
+  "REGISTRADO",
+  "ALTA_TR",
+  "COMPLETO",
+]);
+
+export function esContratoValidado(
+  contrato: Pick<FlujoContrato, "estado" | "datos_confirmados">,
+): boolean {
+  if (contrato.estado === "BAJA") return false;
+  return Boolean(contrato.datos_confirmados) || ESTADOS_CONTRATO_VALIDADO.has(contrato.estado);
+}
+
+/** Fecha de fin del contrato validado de mayor versión. El generado, sin confirmar, no cuenta. */
+export function fechaFinUltimoContratoValidado(
+  contratos: Pick<FlujoContrato, "estado" | "datos_confirmados" | "version" | "fecha_fin">[],
+): string | null {
+  const ultimo = [...contratos]
+    .filter(esContratoValidado)
+    .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
+  const fin = ultimo?.fecha_fin?.trim();
+  return fin || null;
+}
+
+export function etiquetaEstadoRespaldoContrato(
+  contrato: Pick<FlujoContrato, "estado" | "datos_confirmados" | "documento_id" | "solicitud_storage_path">,
+  docs: Pick<FlujoDocumento, "id" | "estado" | "storage_path">[],
+): "Elaborado" | "Validado por contrato" | "Solicitud" {
+  const validado = Boolean(contrato.datos_confirmados) || ESTADOS_CONTRATO_VALIDADO.has(contrato.estado);
+  if (!validado) return "Elaborado";
+  if (contratoTienePdfPropio(contrato, docs)) return "Validado por contrato";
+  if (contrato.solicitud_storage_path?.trim()) return "Solicitud";
+  return "Elaborado";
+}
+
 export function contratoBorrador(contratos: FlujoContrato[]): FlujoContrato | null {
   return (
     contratos.find(

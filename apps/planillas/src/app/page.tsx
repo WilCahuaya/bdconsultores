@@ -61,37 +61,18 @@ export default async function PlanillasHomePage({
               Hola, {profile.nombre}. El nombre abre la ficha. Cada pastilla abre ese pendiente.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {canCreate ? (
-              <>
+          {entidades.length === 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {canCreate ? (
                 <Link
                   href="/empresas/nueva"
                   className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
                 >
                   Nueva empresa
                 </Link>
-                {selectedId ? (
-                  <Link
-                    href={`/empresas/${selectedId}/editar`}
-                    className="inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
-                  >
-                    Editar empresa
-                  </Link>
-                ) : null}
-              </>
-            ) : null}
-            {canCreateTrabajador && selectedId ? (
-              <>
-                <ImportarTrabajadoresButton entidadId={selectedId} />
-                <Link
-                  href={`/trabajadores/nuevo?entidadId=${selectedId}`}
-                  className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-                >
-                  Nuevo trabajador
-                </Link>
-              </>
-            ) : null}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         {aviso ? (
@@ -114,11 +95,44 @@ export default async function PlanillasHomePage({
             <TrabajadoresPendientesTabla
               filas={trabajadores}
               esEstudio={esEstudio}
+              acciones={
+                <>
+                  {canCreate ? (
+                    <>
+                      <Link
+                        href="/empresas/nueva"
+                        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+                      >
+                        Nueva empresa
+                      </Link>
+                      {selectedId ? (
+                        <Link
+                          href={`/empresas/${selectedId}/editar`}
+                          className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent"
+                        >
+                          Editar empresa
+                        </Link>
+                      ) : null}
+                    </>
+                  ) : null}
+                  {canCreateTrabajador && selectedId ? (
+                    <>
+                      <ImportarTrabajadoresButton entidadId={selectedId} />
+                      <Link
+                        href={`/trabajadores/nuevo?entidadId=${selectedId}`}
+                        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+                      >
+                        Nuevo trabajador
+                      </Link>
+                    </>
+                  ) : null}
+                </>
+              }
               filtroExtra={
                 <>
                   <MostrarBajasCheck entidadId={selectedId} checked={mostrarBajas} />
                   {hayBajas && !mostrarBajas ? (
-                    <span className="text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</span>
+                    <span className="shrink-0 whitespace-nowrap text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</span>
                   ) : null}
                 </>
               }

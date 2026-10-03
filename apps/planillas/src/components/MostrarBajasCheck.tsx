@@ -12,7 +12,7 @@ export function MostrarBajasCheck({
   const router = useRouter();
 
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+    <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-sm">
       <input
         type="checkbox"
         className="h-4 w-4 rounded border-input"

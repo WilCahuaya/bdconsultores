@@ -180,11 +180,13 @@ function CeldaVista({ celda }: { celda: CeldaPendiente }) {
 export function TrabajadoresPendientesTabla({
   filas,
   esEstudio,
+  acciones,
   filtroExtra,
   vacioMensaje,
 }: {
   filas: FilaPendienteTrabajador[];
   esEstudio: boolean;
+  acciones?: ReactNode;
   filtroExtra?: ReactNode;
   vacioMensaje?: string;
 }) {
@@ -201,23 +203,22 @@ export function TrabajadoresPendientesTabla({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-full min-w-[16rem] sm:w-80">
-            <PanelSearchInput value={consulta} onChange={setConsulta} placeholder="Buscar número, nombre o DNI…" />
-          </div>
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-input"
-              checked={soloPendientes}
-              onChange={(event) => setSoloPendientes(event.target.checked)}
-            />
-            Solo con pendientes
-          </label>
-          {filtroExtra}
+      <div className="flex flex-nowrap items-center gap-3 overflow-x-auto">
+        {acciones ? <div className="flex shrink-0 items-center gap-2">{acciones}</div> : null}
+        <div className="w-72 shrink-0">
+          <PanelSearchInput value={consulta} onChange={setConsulta} placeholder="Buscar número, nombre o DNI…" />
         </div>
-        <p className="text-sm text-muted-foreground">
+        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-input"
+            checked={soloPendientes}
+            onChange={(event) => setSoloPendientes(event.target.checked)}
+          />
+          Solo con pendientes
+        </label>
+        {filtroExtra}
+        <p className="ml-auto shrink-0 whitespace-nowrap text-sm text-muted-foreground">
           {filtrando
             ? `${visibles.length} de ${filas.length}`
             : `${filas.length} ${filas.length === 1 ? "trabajador" : "trabajadores"}`}

@@ -27,6 +27,8 @@ import { mesActualLima } from "@/lib/horario-asistencia";
 import {
   HORIZONTE_VENCIMIENTO_DIAS,
   contratoConfirmado,
+  contratoMasReciente,
+  contratoTienePdfPropio,
   contratoVigente,
   documentosAltaFaltantes,
   enlaceProcesoOperativo,
@@ -81,7 +83,7 @@ export default async function FichaTrabajadorPage({
   }
   const [documentos, vidaLey, vacaciones, contratos, entidad, companeros] = await Promise.all([
     listDocumentos(params.relacionId),
-    esEstudio && (tab === "vida-ley" || !tab)
+    esEstudio && (!tab || tab === "vida-ley")
       ? getVidaLey(params.relacionId)
       : Promise.resolve(null),
     !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
@@ -101,14 +103,27 @@ export default async function FichaTrabajadorPage({
   const periodo = anioActualLima();
   const hoy = new Date().toISOString().slice(0, 10);
   const pendientes: PendienteFicha[] = [];
+  const ultimoContrato = contratoMasReciente(flujo.contratos);
+  const faltaContratoFirmado = !contratoTienePdfPropio(ultimoContrato, flujo.documentos);
   if (!fichaCesada) {
     const docsHref = hrefAltaTrabajador(params.relacionId, "documentos");
     for (const tipo of documentosAltaFaltantes(flujo)) {
       pendientes.push({ id: tipo, etiqueta: TIPO_DOCUMENTO_LABEL[tipo], href: docsHref });
     }
+    if (faltaContratoFirmado) {
+      pendientes.push({
+        id: "CONTRATO_FIRMADO",
+        etiqueta: "Falta contrato firmado",
+        href: hrefAltaTrabajador(params.relacionId),
+      });
+    }
     if (siguiente.rol !== "alerta" && siguiente.paso !== "listo") {
       const enlace = enlaceProcesoPendiente(params.relacionId, siguiente);
-      if (enlace) pendientes.push({ id: `paso-${siguiente.paso}`, etiqueta: enlace.etiqueta, href: enlace.href });
+      const yaAvisaFirmado =
+        faltaContratoFirmado && enlace?.etiqueta === "Subir contrato firmado o solicitud de registro";
+      if (enlace && !yaAvisaFirmado) {
+        pendientes.push({ id: `paso-${siguiente.paso}`, etiqueta: enlace.etiqueta, href: enlace.href });
+      }
     } else if (siguiente.paso === "listo") {
       const operativo = enlaceProcesoOperativo({
         entidadId: trabajador.entidad_id,
@@ -186,6 +201,9 @@ export default async function FichaTrabajadorPage({
             contratos={contratos}
             documentos={documentos}
             vacaciones={vacaciones}
+            vidaLey={vidaLey}
+            mostrarVidaLey={esEstudio}
+            vidaLeyHref={`/trabajadores/${params.relacionId}?tab=vida-ley`}
           />
         ) : null}
         {esEstudio && tab === "vida-ley" ? (
