@@ -11,7 +11,8 @@ export function FichaRutaTrabajador({
   query,
   raiz = "Trabajador",
   hrefRaiz,
-  hrefDestino,
+  destinoPrefijo,
+  destinoSufijo = "",
 }: {
   entidadId: string;
   empresa: string;
@@ -20,7 +21,8 @@ export function FichaRutaTrabajador({
   query?: string;
   raiz?: string;
   hrefRaiz?: string;
-  hrefDestino?: (relacionId: string) => string;
+  destinoPrefijo?: string;
+  destinoSufijo?: string;
 }) {
   const router = useRouter();
   const sufijo = query ? `?${query.replace(/^\?/, "")}` : "";
@@ -47,8 +49,8 @@ export function FichaRutaTrabajador({
           disabled={trabajadores.length < 2}
           onChange={(event) => {
             if (event.target.value === relacionId) return;
-            const destino = hrefDestino
-              ? hrefDestino(event.target.value)
+            const destino = destinoPrefijo
+              ? `${destinoPrefijo}${event.target.value}${destinoSufijo}`
               : `/trabajadores/${event.target.value}${sufijo}`;
             router.push(destino);
           }}

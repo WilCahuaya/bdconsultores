@@ -49,12 +49,23 @@ export default async function VacacionesPage({
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
       <div className="space-y-6">
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Vacaciones</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            30 días por año de servicio. Controle el goce del periodo y registre las fechas con el documento de
-            respaldo firmado.
-          </p>
+          {entidades.length > 0 ? (
+            <>
+              <span className="text-muted-foreground" aria-hidden>
+                &gt;
+              </span>
+              <EntidadSwitcher
+                entidades={entidades}
+                selectedId={selectedId}
+                locked={esUsuarioEntidad(profile.rol)}
+                hrefBase="/vacaciones"
+                queryExtra={`periodo=${periodo}`}
+                inline
+              />
+            </>
+          ) : null}
         </div>
 
         {entidades.length === 0 ? (
@@ -70,13 +81,6 @@ export default async function VacacionesPage({
           </div>
         ) : (
           <>
-            <EntidadSwitcher
-              entidades={entidades}
-              selectedId={selectedId}
-              locked={esUsuarioEntidad(profile.rol)}
-              hrefBase="/vacaciones"
-              queryExtra={`periodo=${periodo}`}
-            />
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <Link

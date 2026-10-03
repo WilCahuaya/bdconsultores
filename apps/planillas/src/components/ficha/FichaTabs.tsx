@@ -2,8 +2,6 @@ import Link from "next/link";
 import {
   PASOS_ALTA,
   hrefAltaTrabajador,
-  hrefFichaTrabajador,
-  hrefListaProceso,
   type FaltaPaso,
   type FlujoTab,
   type PasoAltaId,
@@ -134,41 +132,6 @@ export function AltaPasosNav({
         );
       })}
     </ol>
-  );
-}
-
-const PROCESO_LABEL: Partial<Record<FlujoTab, string>> = {
-  "vida-ley": "Vida Ley",
-  asistencia: "Asistencias",
-  vacaciones: "Vacaciones",
-  pensiones: "Sistema de pensión",
-  "t-registro": "T-Registro",
-};
-
-export function ProcesoDesdeFichaHeader({
-  relacionId,
-  entidadId,
-  tab,
-}: {
-  relacionId: string;
-  entidadId: string;
-  tab: FlujoTab;
-}) {
-  const lista = hrefListaProceso(tab, entidadId);
-  const label = PROCESO_LABEL[tab] ?? "Proceso";
-  return (
-    <div className="flex flex-wrap items-center gap-3 text-sm">
-      {lista ? (
-        <Link href={lista} className="text-primary hover:underline">
-          ← {label}
-        </Link>
-      ) : (
-        <span className="text-muted-foreground">{label}</span>
-      )}
-      <Link href={hrefFichaTrabajador(relacionId)} className="text-primary hover:underline">
-        Ver ficha
-      </Link>
-    </div>
   );
 }
 

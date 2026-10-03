@@ -47,12 +47,23 @@ export default async function AsistenciasPage({
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
       <div className="space-y-6">
-        <div>
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Asistencias</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Un Excel de la empresa (una hoja por persona) y un Excel por trabajador. Controle quién ya subió el
-            PDF firmado y anote observaciones del mes.
-          </p>
+          {entidades.length > 0 ? (
+            <>
+              <span className="text-muted-foreground" aria-hidden>
+                &gt;
+              </span>
+              <EntidadSwitcher
+                entidades={entidades}
+                selectedId={selectedId}
+                locked={esUsuarioEntidad(profile.rol)}
+                hrefBase="/asistencias"
+                queryExtra={`mes=${mes}`}
+                inline
+              />
+            </>
+          ) : null}
         </div>
 
         {entidades.length === 0 ? (
@@ -68,13 +79,6 @@ export default async function AsistenciasPage({
           </div>
         ) : (
           <>
-            <EntidadSwitcher
-              entidades={entidades}
-              selectedId={selectedId}
-              locked={esUsuarioEntidad(profile.rol)}
-              hrefBase="/asistencias"
-              queryExtra={`mes=${mes}`}
-            />
             {selectedId ? (
               <AsistenciasMesBar
                 key={`${selectedId}-${mes}`}

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { entidadEtiqueta } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
+import { parseFichaTab } from "@/components/ficha/FichaTabs";
 import { FichaResumen } from "@/components/ficha/FichaResumen";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
 import { FichaAsistencia } from "@/components/ficha/FichaAsistencia";
@@ -98,6 +98,17 @@ export default async function FichaTrabajadorPage({
   const queryFicha = new URLSearchParams();
   if (tab) queryFicha.set("tab", tab);
   if (searchParams.periodo) queryFicha.set("periodo", searchParams.periodo);
+  const rutaProceso =
+    tab === "vida-ley"
+      ? { raiz: "Vida Ley", hrefRaiz: `/vida-ley?entidadId=${trabajador.entidad_id}` }
+      : tab === "asistencia"
+        ? { raiz: "Asistencias", hrefRaiz: `/asistencias?entidadId=${trabajador.entidad_id}` }
+        : tab === "vacaciones"
+          ? {
+              raiz: "Vacaciones",
+              hrefRaiz: `/vacaciones?entidadId=${trabajador.entidad_id}&periodo=${periodoVacacion}`,
+            }
+          : null;
   const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodoVacacion);
   const mes = mesActualLima();
   const periodo = anioActualLima();
@@ -162,6 +173,8 @@ export default async function FichaTrabajadorPage({
               trabajadores={opcionesTrabajador}
               relacionId={params.relacionId}
               query={queryFicha.toString()}
+              raiz={rutaProceso?.raiz}
+              hrefRaiz={rutaProceso?.hrefRaiz}
             />
             <div className="flex shrink-0 items-center gap-2">
               <PendientesFichaButton pendientes={pendientes} />
@@ -180,18 +193,16 @@ export default async function FichaTrabajadorPage({
             {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
+          {tab ? (
+            <Link href={`/trabajadores/${params.relacionId}`} className="mt-2 inline-block text-sm text-primary hover:underline">
+              Ver ficha
+            </Link>
+          ) : null}
         </div>
         {fichaCesada ? (
           <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
             Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
           </p>
-        ) : null}
-        {tab ? (
-          <ProcesoDesdeFichaHeader
-            relacionId={params.relacionId}
-            entidadId={trabajador.entidad_id}
-            tab={tab}
-          />
         ) : null}
         {!tab ? (
           <FichaResumen

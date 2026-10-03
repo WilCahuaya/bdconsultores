@@ -100,7 +100,8 @@ export default async function ContratoProcesoPage({
             relacionId={params.relacionId}
             raiz="Contrato"
             hrefRaiz={`/contratos?entidadId=${trabajador.entidad_id}`}
-            hrefDestino={(id) => `/contratos/${id}?paso=${paso}`}
+            destinoPrefijo="/contratos/"
+            destinoSufijo={`?paso=${paso}`}
           />
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{etiquetaTrabajador(trabajador.persona, trabajador.numero)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">

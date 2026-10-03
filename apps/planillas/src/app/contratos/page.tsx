@@ -8,17 +8,43 @@ import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } fr
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import {
-  claseBadgePaso,
-  contratoConfirmado,
-  contratoVigente,
+  contratoMasReciente,
+  documentoCargado,
+  etiquetaEstadoRespaldoContrato,
   ETAPA_CONTRATO_FILTRO_LABEL,
+  faltasPorPaso,
   flujoDesdeTrabajador,
   hrefPasoTrabajador,
   HORIZONTE_VENCIMIENTO_DIAS,
   parseEtapaContratoFiltro,
+  pensionAltaLista,
   resolverEtapaContrato,
+  tRegistroAltaLista,
 } from "@/lib/flujo-ficha";
-import { ESTADO_RELACION_LABEL, compareTrabajadoresPorNumero, formatFechaPlanilla, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
+import { ESTADO_CONTRATO_LABEL, compareTrabajadoresPorNumero, formatFechaPlanilla, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
+
+function Marca({ listo }: { listo: boolean }) {
+  if (!listo) return <span className="text-amber-800">Falta</span>;
+  return (
+    <span className="inline-flex text-emerald-700" title="Listo" aria-label="Listo">
+      <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M3.5 8.5 6.5 11.5 12.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
+function IconVersiones() {
+  return (
+    <span className="inline-flex text-muted-foreground" title="Hay versiones anteriores">
+      <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+        <path d="M5 2.5h6.5V12H5z" />
+        <path d="M3.5 4.5H4V13.5h7" />
+      </svg>
+      <span className="sr-only">Hay versiones anteriores</span>
+    </span>
+  );
+}
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -52,18 +78,19 @@ export default async function ContratosPage({
   const filas = trabajadores
     .map((trabajador) => {
       const flujo = flujoDesdeTrabajador(trabajador);
-      const vigente = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
+      const faltas = faltasPorPaso(flujo);
+      const ultimo = contratoMasReciente(flujo.contratos);
+      const anteriores = flujo.contratos.filter((c) => c.estado !== "BAJA" && c !== ultimo).length;
       return {
         trabajador,
-        vigente,
+        flujo,
+        faltas,
+        ultimo,
+        anteriores,
         etapa: resolverEtapaContrato(trabajador, esEstudio, { hoy, limite }),
       };
     })
-    .sort((a, b) => {
-      if (a.etapa.pendiente !== b.etapa.pendiente) return a.etapa.pendiente ? -1 : 1;
-      if (a.trabajador.estado !== b.trabajador.estado) return a.trabajador.estado === "ACTIVA" ? -1 : 1;
-      return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
-    });
+    .sort((a, b) => compareTrabajadoresPorNumero(a.trabajador, b.trabajador));
   const visibles =
     filtro === "todos"
       ? filas
@@ -114,34 +141,38 @@ export default async function ContratosPage({
             </div>
 
             <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[760px] text-left text-sm">
+              <table className="w-full min-w-[1180px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2 font-medium">Nº</th>
-                    <th className="px-4 py-2 font-medium">DNI</th>
-                    <th className="px-4 py-2 font-medium">Nombre</th>
-                    <th className="px-4 py-2 font-medium">Estado</th>
-                    <th className="px-4 py-2 font-medium">Paso</th>
-                    <th className="px-4 py-2 font-medium">Inicio</th>
-                    <th className="px-4 py-2 font-medium">Fin</th>
-                    <th className="px-4 py-2 font-medium">Guardado</th>
+                    <th className="px-3 py-2 font-medium">Nº</th>
+                    <th className="px-3 py-2 font-medium">DNI</th>
+                    <th className="px-3 py-2 font-medium">Nombre</th>
+                    <th className="px-3 py-2 font-medium">Doc. DNI</th>
+                    <th className="px-3 py-2 font-medium">Ficha</th>
+                    <th className="px-3 py-2 font-medium">Pensiones</th>
+                    <th className="px-3 py-2 font-medium">Persona</th>
+                    <th className="px-3 py-2 font-medium">Puesto</th>
+                    <th className="px-3 py-2 font-medium">Contrato</th>
+                    <th className="px-3 py-2 font-medium">AFP</th>
+                    <th className="px-3 py-2 font-medium">T-Registro</th>
+                    <th className="px-3 py-2 font-medium">Estado</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibles.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={8}>
+                      <td className="px-3 py-8 text-muted-foreground" colSpan={12}>
                         {filas.length === 0
                           ? "No hay trabajadores en esta empresa."
                           : "No hay contratos en este paso."}
                       </td>
                     </tr>
                   ) : (
-                    visibles.map(({ trabajador, vigente, etapa }) => (
+                    visibles.map(({ trabajador, flujo, faltas, ultimo, anteriores, etapa }) => (
                       <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
-                        <td className="px-4 py-2 font-mono">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
-                        <td className="px-4 py-2 font-mono">{trabajador.persona.dni}</td>
-                        <td className="px-4 py-2">
+                        <td className="px-3 py-2 font-mono">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
+                        <td className="px-3 py-2 font-mono">{trabajador.persona.dni}</td>
+                        <td className="px-3 py-2">
                           <Link
                             href={hrefPasoTrabajador(trabajador.id, etapa.tab)}
                             className="font-medium text-primary hover:underline"
@@ -149,17 +180,42 @@ export default async function ContratosPage({
                             {nombreCompleto(trabajador.persona)}
                           </Link>
                         </td>
-                        <td className="px-4 py-2">{ESTADO_RELACION_LABEL[trabajador.estado]}</td>
-                        <td className="px-4 py-2">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseBadgePaso(etapa.rol)}`}
-                          >
-                            {etapa.etiqueta}
-                          </span>
+                        <td className="px-3 py-2">
+                          <Marca listo={documentoCargado(flujo.documentos, "DNI")} />
                         </td>
-                        <td className="px-4 py-2">{formatFechaPlanilla(vigente?.fecha_inicio)}</td>
-                        <td className="px-4 py-2">{formatFechaPlanilla(vigente?.fecha_fin)}</td>
-                        <td className="px-4 py-2">{vigente?.datos_confirmados ? "Sí" : "No"}</td>
+                        <td className="px-3 py-2">
+                          <Marca listo={documentoCargado(flujo.documentos, "FICHA_DATOS")} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Marca listo={documentoCargado(flujo.documentos, "PENSIONES_FIRMADO")} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Marca listo={faltas.persona.length === 0} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Marca listo={faltas.puesto.length === 0} />
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {ultimo?.fecha_inicio || ultimo?.fecha_fin ? (
+                            <span className="inline-flex items-center gap-1.5">
+                              {anteriores > 0 ? <IconVersiones /> : null}
+                              {formatFechaPlanilla(ultimo.fecha_inicio)} – {formatFechaPlanilla(ultimo.fecha_fin)}
+                            </span>
+                          ) : (
+                            <span className="text-amber-800">Falta</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Marca listo={pensionAltaLista(flujo)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Marca listo={tRegistroAltaLista(flujo)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          {ultimo
+                            ? `${ESTADO_CONTRATO_LABEL[ultimo.estado]} · ${etiquetaEstadoRespaldoContrato(ultimo, flujo.documentos)}`
+                            : "Falta"}
+                        </td>
                       </tr>
                     ))
                   )}

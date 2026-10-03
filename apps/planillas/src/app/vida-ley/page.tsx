@@ -4,7 +4,7 @@ import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { GenerarVidaLeyGrupoButton } from "@/components/ficha/GenerarVidaLeyGrupoButton";
-import { ProcesoResumenCard, SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
+import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listVidaLeyEmpresa } from "@/lib/actions/ficha";
@@ -66,21 +66,6 @@ export default async function VidaLeyPage({
       if (a.etapa.pendiente !== b.etapa.pendiente) return a.etapa.pendiente ? -1 : 1;
       return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
     });
-  const conteo = filas.reduce(
-    (acc, fila) => {
-      acc[fila.etapa.id] += 1;
-      if (fila.etapa.pendiente) acc.pendientes += 1;
-      return acc;
-    },
-    {
-      pendientes: 0,
-      sin: 0,
-      elaborado: 0,
-      recepcionado: 0,
-      vence: 0,
-      registrado: 0,
-    } as Record<EtapaVidaLeyId | "pendientes", number>,
-  );
   const visibles =
     filtro === "todos"
       ? filas
@@ -92,13 +77,24 @@ export default async function VidaLeyPage({
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-bold text-primary sm:text-2xl">Vida Ley</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Trámite por empresa: elaborar el Word, recepcionar documentos de la aseguradora y registrar el
-              comprobante de envío.
-            </p>
+            {entidades.length > 0 ? (
+              <>
+                <span className="text-muted-foreground" aria-hidden>
+                  &gt;
+                </span>
+                <EntidadSwitcher
+                  entidades={entidades}
+                  selectedId={selectedId}
+                  locked={esUsuarioEntidad(profile.rol)}
+                  hrefBase="/vida-ley"
+                  queryExtra={filtro === "todos" ? undefined : `etapa=${filtro}`}
+                  inline
+                />
+              </>
+            ) : null}
           </div>
           {esEstudio && selectedId ? (
             <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
@@ -114,38 +110,6 @@ export default async function VidaLeyPage({
           </p>
         ) : (
           <>
-            <EntidadSwitcher
-              entidades={entidades}
-              selectedId={selectedId}
-              locked={esUsuarioEntidad(profile.rol)}
-              hrefBase="/vida-ley"
-              queryExtra={filtro === "todos" ? undefined : `etapa=${filtro}`}
-            />
-
-            {selectedId ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {(
-                  [
-                    ["pendientes", "Bandeja del trámite"],
-                    ["sin", "Aún no se elaboró"],
-                    ["elaborado", "Falta respuesta"],
-                    ["recepcionado", "Falta comprobante"],
-                    ["vence", "30 días"],
-                    ["registrado", "Trámite cerrado"],
-                  ] as const
-                ).map(([id, hint]) => (
-                  <ProcesoResumenCard
-                    key={id}
-                    href={hrefVidaLey(selectedId, id)}
-                    titulo={ETAPA_VIDA_LEY_FILTRO_LABEL[id]}
-                    cantidad={conteo[id]}
-                    hint={hint}
-                    active={filtro === id}
-                  />
-                ))}
-              </div>
-            ) : null}
-
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-medium text-foreground">
                 {filtro === "todos" ? "Todos los trámites" : ETAPA_VIDA_LEY_FILTRO_LABEL[filtro]}
