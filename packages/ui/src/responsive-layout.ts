@@ -45,4 +45,4 @@ export const panelDataCardsWrapClass = "panel-data-cards-wrap";
 export const scrollbarThemedClass = "scrollbar-themed";
 
 export const panelMainScrollClass =
-  "scrollbar-none min-w-0 flex-1 overflow-x-clip overflow-y-auto panel-main-padding";
+  "scrollbar-none min-h-0 min-w-0 flex-1 overflow-x-clip overflow-y-auto panel-main-padding";

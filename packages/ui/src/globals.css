@@ -1080,4 +1080,31 @@
     min-height: 0;
     overflow: hidden;
   }
+
+  /* Ficha de contrato: la cabecera queda fija; solo el formulario scrollea. */
+  main.panel-main-padding:has(.ficha-proceso-page) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .panel-page:has(.ficha-proceso-page) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .ficha-proceso-page {
+    display: flex;
+    min-height: 0;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 0%;
+    flex-direction: column;
+    overflow: hidden;
+  }
 }

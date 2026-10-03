@@ -150,7 +150,7 @@ function CapturaDesplegable({
           <p className="text-sm text-muted-foreground">{hint}</p>
           {datos}
         </div>
-        <div className="lg:sticky lg:top-[var(--ficha-cabecera-offset,1rem)]">{preview}</div>
+        <div className="lg:sticky lg:top-4">{preview}</div>
       </div>
     </details>
   );

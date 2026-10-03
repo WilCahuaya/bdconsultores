@@ -6,11 +6,13 @@ import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
   generarVidaLey,
-  marcarDocumentoNoAplica,
+  marcarFacturaLoteNoEnviada,
   saveVidaLey,
   setDocumentoArchivo,
   setEstadoVidaLey,
+  setVidaLeyLoteArchivo,
   type DocumentoRow,
+  type VidaLeyLoteRow,
   type VidaLeyRow,
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
@@ -19,25 +21,24 @@ import { etiquetaEstadoVidaLey, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-lab
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
-import { uploadDocumentoFile } from "@/lib/upload-documento";
+import { uploadDocumentoFile, uploadVidaLeyLoteFile } from "@/lib/upload-documento";
+import type { ArchivoVidaLeyLote } from "@/lib/documento-storage";
 
 export function FichaVidaLey({
   relacionId,
   trabajador,
   vidaLey,
   documentoCertificado,
-  documentoConstancia,
-  documentoFactura,
-  documentoComprobante,
+  lote,
+  companerosLote,
   canWrite,
 }: {
   relacionId: string;
   trabajador: TrabajadorListItem;
   vidaLey: VidaLeyRow | null;
   documentoCertificado: DocumentoRow | null;
-  documentoConstancia: DocumentoRow | null;
-  documentoFactura: DocumentoRow | null;
-  documentoComprobante: DocumentoRow | null;
+  lote: VidaLeyLoteRow | null;
+  companerosLote: string[];
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -82,20 +83,39 @@ export function FichaVidaLey({
     router.refresh();
   }
 
-  async function subirAdjunto(file: File | null, documento: DocumentoRow | null, etiqueta: string) {
+  async function subirCertificado(file: File | null) {
     if (!file) return null;
-    if (!documento) return `No se pudo registrar ${etiqueta}. Recargue la página.`;
+    if (!documentoCertificado) return "No se pudo registrar el certificado. Recargue la página.";
     const upload = await uploadDocumentoFile(
       trabajador.entidad_id,
       relacionId,
-      documento.id,
+      documentoCertificado.id,
       file,
-      documento.storage_path,
+      documentoCertificado.storage_path,
     );
     if (upload.error || !upload.path) {
-      return upload.error ?? `No se pudo subir ${etiqueta}.`;
+      return upload.error ?? "No se pudo subir el certificado de seguro.";
     }
-    const saved = await setDocumentoArchivo(relacionId, documento.id, upload.path);
+    const saved = await setDocumentoArchivo(relacionId, documentoCertificado.id, upload.path);
+    return saved.error ?? null;
+  }
+
+  function loteParaArchivo(): { loteId: string } | { error: string } {
+    if (lote?.id) return { loteId: lote.id };
+    return { error: "Elabore el trámite de Vida Ley antes de guardar estos archivos." };
+  }
+
+  async function subirLote(
+    file: File | null,
+    tipo: ArchivoVidaLeyLote,
+    previousPath: string | null,
+    loteId: string,
+    etiqueta: string,
+  ) {
+    if (!file) return null;
+    const upload = await uploadVidaLeyLoteFile(trabajador.entidad_id, loteId, tipo, file, previousPath);
+    if (upload.error || !upload.path) return upload.error ?? `No se pudo subir ${etiqueta}.`;
+    const saved = await setVidaLeyLoteArchivo(relacionId, tipo, upload.path);
     return saved.error ?? null;
   }
 
@@ -105,61 +125,91 @@ export function FichaVidaLey({
       return;
     }
     setGuardandoDocs(true);
-    const errorConstancia = await subirAdjunto(
-      fileConstancia,
-      documentoConstancia,
-      TIPO_DOCUMENTO_LABEL.VIDA_LEY_CONSTANCIA,
-    );
-    if (errorConstancia) {
+    const destino = fileConstancia || fileFactura ? loteParaArchivo() : null;
+    if (destino && "error" in destino) {
       setGuardandoDocs(false);
-      pushToast(errorConstancia, "error");
+      pushToast(destino.error, "error");
       return;
     }
-    const errorCertificado = await subirAdjunto(
-      fileCertificado,
-      documentoCertificado,
-      TIPO_DOCUMENTO_LABEL.VIDA_LEY,
-    );
+    const loteId = destino && "loteId" in destino ? destino.loteId : lote?.id;
+    if ((fileConstancia || fileFactura) && loteId) {
+      const errorConstancia = await subirLote(
+        fileConstancia,
+        "constancia",
+        lote?.constancia_storage_path ?? null,
+        loteId,
+        TIPO_DOCUMENTO_LABEL.VIDA_LEY_CONSTANCIA,
+      );
+      if (errorConstancia) {
+        setGuardandoDocs(false);
+        pushToast(errorConstancia, "error");
+        return;
+      }
+      const errorFactura = await subirLote(
+        fileFactura,
+        "factura",
+        lote?.factura_storage_path ?? null,
+        loteId,
+        TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA,
+      );
+      if (errorFactura) {
+        setGuardandoDocs(false);
+        pushToast(errorFactura, "error");
+        return;
+      }
+    }
+    const errorCertificado = await subirCertificado(fileCertificado);
     if (errorCertificado) {
       setGuardandoDocs(false);
       pushToast(errorCertificado, "error");
       return;
     }
-    const errorFactura = await subirAdjunto(fileFactura, documentoFactura, TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA);
-    if (errorFactura) {
-      setGuardandoDocs(false);
-      pushToast(errorFactura, "error");
-      return;
-    }
-    const recepcionado = await setEstadoVidaLey(relacionId, "Recepcionado");
-    if (recepcionado.error) {
-      setGuardandoDocs(false);
-      pushToast(recepcionado.error, "error");
-      return;
+    const hayConstancia = Boolean(fileConstancia || lote?.constancia_storage_path);
+    if (hayConstancia) {
+      const recepcionado = await setEstadoVidaLey(relacionId, "Recepcionado");
+      if (recepcionado.error) {
+        setGuardandoDocs(false);
+        pushToast(recepcionado.error, "error");
+        return;
+      }
     }
     setFileCertificado(null);
     setFileConstancia(null);
     setFileFactura(null);
     setGuardandoDocs(false);
-    pushToast("Documentos recepcionados.");
+    pushToast(
+      hayConstancia
+        ? "Documentos del envío recepcionados."
+        : "Archivo guardado. Falta la constancia de asegurados para pasar a Recepcionado.",
+    );
     router.refresh();
   }
 
   async function onGuardarComprobante() {
-    if (!fileComprobante && !documentoComprobante?.storage_path) {
+    if (!fileComprobante && !lote?.comprobante_storage_path) {
       pushToast("Suba el comprobante de envío.", "error");
       return;
     }
     setGuardandoComprobante(true);
-    const errorComprobante = await subirAdjunto(
-      fileComprobante,
-      documentoComprobante,
-      TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE,
-    );
-    if (errorComprobante) {
-      setGuardandoComprobante(false);
-      pushToast(errorComprobante, "error");
-      return;
+    if (fileComprobante) {
+      const destino = loteParaArchivo();
+      if ("error" in destino) {
+        setGuardandoComprobante(false);
+        pushToast(destino.error, "error");
+        return;
+      }
+      const errorComprobante = await subirLote(
+        fileComprobante,
+        "comprobante",
+        lote?.comprobante_storage_path ?? null,
+        destino.loteId,
+        TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE,
+      );
+      if (errorComprobante) {
+        setGuardandoComprobante(false);
+        pushToast(errorComprobante, "error");
+        return;
+      }
     }
     const registrado = await setEstadoVidaLey(relacionId, "Registrado");
     if (registrado.error) {
@@ -169,28 +219,24 @@ export function FichaVidaLey({
     }
     setFileComprobante(null);
     setGuardandoComprobante(false);
-    pushToast("Vida Ley registrada.");
+    pushToast(companerosLote.length > 0 ? "Vida Ley registrada para el envío." : "Vida Ley registrada.");
     router.refresh();
   }
 
   async function onNoEnviaronFactura() {
-    if (!documentoFactura) {
-      pushToast("No se pudo registrar la factura. Recargue la página.", "error");
-      return;
-    }
     setMarcandoFactura(true);
-    const result = await marcarDocumentoNoAplica(relacionId, documentoFactura.id);
+    const result = await marcarFacturaLoteNoEnviada(relacionId);
     setMarcandoFactura(false);
     if (result.error) {
       pushToast(result.error, "error");
       return;
     }
-    pushToast("Factura marcada como no enviada.");
+    pushToast("Factura marcada como no enviada para el envío.");
     router.refresh();
   }
 
   const ocupado = pending || generando || guardandoDocs || guardandoComprobante || marcandoFactura;
-  const facturaNoEnviada = documentoFactura?.estado === "NA" && !documentoFactura.storage_path && !fileFactura;
+  const facturaNoEnviada = Boolean(lote?.factura_no_enviada) && !lote?.factura_storage_path && !fileFactura;
   const yaGenerado = Boolean(vidaLey?.estado);
 
   return (
@@ -199,8 +245,8 @@ export function FichaVidaLey({
         <div>
           <p className="text-sm font-medium">Trámite para la aseguradora</p>
           <p className="text-sm text-muted-foreground">
-            Se genera el Word con los datos de {trabajador.persona.nombres} y la empresa. Al generar, el estado pasa a
-            Elaborado.
+            Se genera el Word con los datos de {trabajador.persona.nombres} y la empresa. Al generar por primera vez
+            desde aquí, el envío queda solo con este trabajador. Para compartir archivos, elabore el grupo en Vida Ley.
           </p>
         </div>
         {canWrite ? (
@@ -241,13 +287,16 @@ export function FichaVidaLey({
         <div className={`${panelCardClass} space-y-1 p-5`}>
           <p className="text-sm font-medium">Respuesta de la aseguradora</p>
           <p className="text-sm text-muted-foreground">
-            Guarde la constancia de asegurados, el certificado de este trabajador y, si llega, la factura electrónica. Al
-            guardar, el estado pasa a Recepcionado.
+            La constancia y la factura son del envío. El certificado es solo de este trabajador. La factura puede no
+            llegar. Con la constancia guardada, el envío pasa a Recepcionado.
           </p>
+          {companerosLote.length > 0 ? (
+            <p className="text-sm text-muted-foreground">Comparte este envío con {companerosLote.join(", ")}.</p>
+          ) : null}
         </div>
         <DocumentoPrevisualizacion
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_CONSTANCIA}
-          storagePath={fileConstancia ? null : documentoConstancia?.storage_path}
+          storagePath={fileConstancia ? null : lote?.constancia_storage_path}
           file={fileConstancia}
           vacio="Suba la constancia con la lista de asegurados."
           extra={
@@ -257,7 +306,7 @@ export function FichaVidaLey({
                 disabled={ocupado}
                 file={fileConstancia}
                 buttonLabel={
-                  fileConstancia || documentoConstancia?.storage_path
+                  fileConstancia || lote?.constancia_storage_path
                     ? "Cambiar constancia de asegurados"
                     : "Subir constancia de asegurados"
                 }
@@ -291,7 +340,7 @@ export function FichaVidaLey({
         />
         <DocumentoPrevisualizacion
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA}
-          storagePath={fileFactura ? null : documentoFactura?.storage_path}
+          storagePath={fileFactura ? null : lote?.factura_storage_path}
           file={fileFactura}
           vacio={
             facturaNoEnviada
@@ -306,14 +355,14 @@ export function FichaVidaLey({
                   disabled={ocupado}
                   file={fileFactura}
                   buttonLabel={
-                    fileFactura || documentoFactura?.storage_path
+                    fileFactura || lote?.factura_storage_path
                       ? "Cambiar factura electrónica"
                       : "Subir factura electrónica"
                   }
                   emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
                   onFileChange={setFileFactura}
                 />
-                {documentoFactura && documentoFactura.estado !== "NA" ? (
+                {!lote?.factura_no_enviada ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -337,12 +386,13 @@ export function FichaVidaLey({
         <div className={`${panelCardClass} space-y-1 p-5`}>
           <p className="text-sm font-medium">Registro de Vida Ley</p>
           <p className="text-sm text-muted-foreground">
-            Después de tramitar Vida Ley, suba el comprobante de envío. Al guardar, el estado pasa a Registrado.
+            Después de tramitar Vida Ley, suba el comprobante de envío. Es el mismo archivo para todo el lote. Al
+            guardar, el envío pasa a Registrado.
           </p>
         </div>
         <DocumentoPrevisualizacion
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE}
-          storagePath={fileComprobante ? null : documentoComprobante?.storage_path}
+          storagePath={fileComprobante ? null : lote?.comprobante_storage_path}
           file={fileComprobante}
           vacio="Suba el comprobante de envío."
           extra={
@@ -352,7 +402,7 @@ export function FichaVidaLey({
                 disabled={ocupado}
                 file={fileComprobante}
                 buttonLabel={
-                  fileComprobante || documentoComprobante?.storage_path
+                  fileComprobante || lote?.comprobante_storage_path
                     ? "Cambiar comprobante de envío"
                     : "Subir comprobante de envío"
                 }

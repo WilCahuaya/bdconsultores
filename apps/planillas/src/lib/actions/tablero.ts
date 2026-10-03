@@ -9,7 +9,6 @@ import { trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import {
   afpConNombreYCuspp,
   contratoTieneFirmado,
-  documentoCargado,
   tRegistroAltaLista,
   type FlujoDocumento,
   type FlujoTRegistro,
@@ -91,7 +90,8 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
   if (entidades.length === 0) return { mes, calendario, filas: [] };
 
   const entidadIds = entidades.map((e) => e.id);
-  const [relaciones, contratos, documentos, pensiones, tRegistros, vidaLey, marcasMes, excelMes] = await Promise.all([
+  const [relaciones, contratos, documentos, pensiones, tRegistros, vidaLey, lotesVidaLey, marcasMes, excelMes] =
+    await Promise.all([
     selectIn<{
       id: string;
       entidad_id: string;
@@ -128,7 +128,18 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       "entidad_id",
       entidadIds,
     ),
-    selectIn<{ relacion_id: string; fecha_fin: string | null }>("vida_ley", "relacion_id, fecha_fin", "entidad_id", entidadIds),
+    selectIn<{ relacion_id: string; fecha_fin: string | null; lote_id: string | null }>(
+      "vida_ley",
+      "relacion_id, fecha_fin, lote_id",
+      "entidad_id",
+      entidadIds,
+    ),
+    selectIn<{ id: string; comprobante_storage_path: string | null }>(
+      "vida_ley_lotes",
+      "id, comprobante_storage_path",
+      "entidad_id",
+      entidadIds,
+    ),
     selectInMes<{ entidad_id: string; clave: string; hecho: boolean }>(
       "tablero_marcas",
       "entidad_id, clave, hecho",
@@ -172,7 +183,10 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       realizado: Boolean(row.realizado),
     });
   }
-  const vidaLeyPorRelacion = new Map(vidaLey.map((v) => [v.relacion_id, v.fecha_fin]));
+  const vidaLeyPorRelacion = new Map(vidaLey.map((v) => [v.relacion_id, v]));
+  const loteConComprobante = new Set(
+    lotesVidaLey.filter((lote) => Boolean(lote.comprobante_storage_path)).map((lote) => lote.id),
+  );
   const excelSet = new Set(excelMes.map((row) => row.relacion_id));
   const marcasPorEntidad = new Map<string, Partial<Record<TableroMarcaClave, boolean>>>();
   for (const row of marcasMes) {
@@ -195,9 +209,9 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       pensionTipo: pensionPorRelacion.get(rel.id)?.tipo ?? null,
       tRegistroOk: tRegistroAltaLista({ documentos: flujoDocs, tRegistro }),
       afpDocOk: afpConNombreYCuspp(pensionPorRelacion.get(rel.id)),
-      vidaLeyComprobanteOk: documentoCargado(flujoDocs, "VIDA_LEY_COMPROBANTE"),
+      vidaLeyComprobanteOk: loteConComprobante.has(vidaLeyPorRelacion.get(rel.id)?.lote_id ?? ""),
       excelGenerado: excelSet.has(rel.id),
-      vidaLeyFechaFin: vidaLeyPorRelacion.get(rel.id) ?? null,
+      vidaLeyFechaFin: vidaLeyPorRelacion.get(rel.id)?.fecha_fin ?? null,
       contratos: (contratosPorRelacion.get(rel.id) ?? []).map((c) => {
         const solicitud = c.solicitud_registro_id ? solicitudPorId.get(c.solicitud_registro_id) : undefined;
         const solicitudPath = solicitud?.storage_path ?? null;

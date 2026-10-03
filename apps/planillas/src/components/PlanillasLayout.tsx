@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { MODULE_PLANILLAS, PLATFORM_NAME } from "@inventario/types";
 import {
   IconMenu,
@@ -28,8 +28,17 @@ export function PlanillasLayout({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, []);
+
   return (
-    <div className="panel-shell flex h-dvh w-full max-w-full flex-col overflow-hidden bg-muted/30">
+    <div className="panel-shell flex h-dvh max-h-dvh min-h-0 w-full max-w-full flex-col overflow-hidden bg-muted/30">
       <header className="border-b border-border/70 bg-card shadow-sm">
         <div className={panelShellHeaderClass}>
           <div className="flex min-w-0 items-center gap-3">

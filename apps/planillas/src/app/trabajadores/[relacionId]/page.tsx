@@ -17,6 +17,7 @@ import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador, listTrabajadores } from "@/lib/actions/trabajadores";
 import {
   getVidaLey,
+  getVidaLeyLote,
   listContratos,
   listDocumentos,
   asegurarDocumentosVidaLey,
@@ -81,11 +82,12 @@ export default async function FichaTrabajadorPage({
   if (esEstudio && tab === "vida-ley" && !fichaCesada) {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [documentos, vidaLey, vacaciones, contratos, entidad, companeros] = await Promise.all([
+  const [documentos, vidaLey, lote, vacaciones, contratos, entidad, companeros] = await Promise.all([
     listDocumentos(params.relacionId),
     esEstudio && (!tab || tab === "vida-ley")
       ? getVidaLey(params.relacionId)
       : Promise.resolve(null),
+    esEstudio && tab === "vida-ley" ? getVidaLeyLote(params.relacionId) : Promise.resolve(null),
     !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
     !tab ? listContratos(params.relacionId) : Promise.resolve([]),
     getEntidadPlanillas(trabajador.entidad_id),
@@ -235,9 +237,14 @@ export default async function FichaTrabajadorPage({
             trabajador={trabajador}
             vidaLey={vidaLey}
             documentoCertificado={documentos.find((d) => d.tipo === "VIDA_LEY") ?? null}
-            documentoConstancia={documentos.find((d) => d.tipo === "VIDA_LEY_CONSTANCIA") ?? null}
-            documentoFactura={documentos.find((d) => d.tipo === "VIDA_LEY_FACTURA") ?? null}
-            documentoComprobante={documentos.find((d) => d.tipo === "VIDA_LEY_COMPROBANTE") ?? null}
+            lote={lote}
+            companerosLote={
+              lote
+                ? companeros
+                    .filter((item) => lote.relacionIds.includes(item.id) && item.id !== params.relacionId)
+                    .map((item) => etiquetaTrabajador(item.persona, item.numero))
+                : []
+            }
             canWrite={esEstudio && !fichaCesada}
           />
         ) : null}

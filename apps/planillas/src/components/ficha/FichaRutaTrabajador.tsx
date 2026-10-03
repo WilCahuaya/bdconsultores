@@ -28,7 +28,7 @@ export function FichaRutaTrabajador({
   const sufijo = query ? `?${query.replace(/^\?/, "")}` : "";
 
   return (
-    <nav aria-label="Ruta" className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
+    <nav aria-label="Ruta" className="flex min-w-0 flex-1 items-center gap-1.5 text-xs sm:text-sm">
       <Link href={hrefRaiz ?? `/?entidadId=${entidadId}`} className="shrink-0 text-primary hover:underline">
         {raiz}
       </Link>
@@ -44,7 +44,7 @@ export function FichaRutaTrabajador({
       <div className="relative min-w-0 max-w-[16rem] flex-1 sm:max-w-xs">
         <select
           aria-label="Trabajador"
-          className="h-8 w-full cursor-pointer appearance-none truncate rounded-md bg-transparent py-1 pl-1 pr-6 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="h-7 w-full cursor-pointer appearance-none truncate rounded-md bg-transparent py-0.5 pl-1 pr-6 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
           value={relacionId}
           disabled={trabajadores.length < 2}
           onChange={(event) => {

@@ -37,6 +37,30 @@ export function pathSolicitudRegistro(entidadId: string, solicitudId: string, ex
   return `${entidadId}/solicitudes/${solicitudId}.${ext}`;
 }
 
+export type ArchivoVidaLeyLote = "constancia" | "factura" | "comprobante";
+
+export function pathVidaLeyLote(
+  entidadId: string,
+  loteId: string,
+  tipo: ArchivoVidaLeyLote,
+  ext: string,
+): string {
+  return `${entidadId}/vida-ley/${loteId}/${tipo}.${ext}`;
+}
+
+export function pathPerteneceAVidaLeyLote(
+  entidadId: string,
+  loteId: string,
+  tipo: ArchivoVidaLeyLote,
+  path: string,
+): boolean {
+  if (!isUuid(entidadId) || !isUuid(loteId)) return false;
+  const prefix = `${entidadId}/vida-ley/${loteId}/${tipo}.`;
+  if (!path.startsWith(prefix)) return false;
+  const ext = path.slice(prefix.length).toLowerCase();
+  return ALLOWED_EXT.has(ext) && !ext.includes("/");
+}
+
 export function pathPerteneceASolicitud(entidadId: string, solicitudId: string, path: string): boolean {
   if (!isUuid(entidadId) || !isUuid(solicitudId)) return false;
   const prefix = `${entidadId}/solicitudes/${solicitudId}.`;

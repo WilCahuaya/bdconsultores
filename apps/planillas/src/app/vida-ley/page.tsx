@@ -97,7 +97,13 @@ export default async function VidaLeyPage({
             ) : null}
           </div>
           {esEstudio && selectedId ? (
-            <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
+            <div className="flex max-w-xl flex-col items-end gap-2">
+              <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
+              <p className="text-right text-sm text-muted-foreground">
+                Los trabajadores de este envío comparten la constancia, la factura y el comprobante. El certificado se
+                sube en cada ficha. Quienes ya tenían un envío no se mueven.
+              </p>
+            </div>
           ) : null}
         </div>
 
