@@ -150,7 +150,7 @@ function CapturaDesplegable({
           <p className="text-sm text-muted-foreground">{hint}</p>
           {datos}
         </div>
-        <div className="lg:sticky lg:top-4">{preview}</div>
+        <div className="lg:sticky lg:top-[var(--ficha-cabecera-offset,1rem)]">{preview}</div>
       </div>
     </details>
   );
@@ -518,6 +518,7 @@ function CapturaPension({
     router.refresh();
   }
 
+  const alerta = !file && !documento?.storage_path;
   const preview = (
     <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
   );
@@ -525,9 +526,9 @@ function CapturaPension({
   return (
     <CapturaDesplegable
       titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
-      alerta={false}
-      alertaNombre="sistema de pensiones"
-      hint="El escaneo es opcional. Aquí solo se indica AFP u ONP. Si es AFP, con el nombre de AFP y el CUSPP en Dar de alta ya queda completo."
+      alerta={alerta}
+      alertaNombre="sistema de pensiones firmado"
+      hint="Suba el sistema de pensiones firmado e indique AFP u ONP. Si es AFP, el alta queda válida con el nombre de AFP y el CUSPP. El documento de alta AFP es opcional."
       preview={preview}
       datos={
         <>

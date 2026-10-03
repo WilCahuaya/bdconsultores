@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { entidadEtiqueta } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
+import { FichaCabeceraFija } from "@/components/ficha/FichaCabeceraFija";
 import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
 import { AltaPasosNav } from "@/components/ficha/FichaTabs";
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
@@ -92,50 +93,61 @@ export default async function ContratoProcesoPage({
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
       <div className="space-y-6">
-        <div>
-          <FichaRutaTrabajador
-            entidadId={trabajador.entidad_id}
-            empresa={entidad ? entidadEtiqueta(entidad) : "Empresa"}
-            trabajadores={opcionesTrabajador}
-            relacionId={params.relacionId}
-            raiz="Contrato"
-            hrefRaiz={`/contratos?entidadId=${trabajador.entidad_id}`}
-            destinoPrefijo="/contratos/"
-            destinoSufijo={`?paso=${paso}`}
-          />
-          <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{etiquetaTrabajador(trabajador.persona, trabajador.numero)}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            DNI {trabajador.persona.dni} · {ESTADO_RELACION_LABEL[trabajador.estado]}
-            {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}
-            {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
-          </p>
-          <Link
-            href={`/trabajadores/${params.relacionId}`}
-            className="mt-2 inline-block text-sm text-primary hover:underline"
-          >
-            Ver ficha
-          </Link>
-        </div>
-        {fichaCesada ? (
-          <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
-            Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
-          </p>
-        ) : null}
-        {porValidar ? (
-          <div className={`${panelCardClass} space-y-3 p-5`}>
-            <p className="text-sm text-foreground">
-              {esEstudio
-                ? "Alta pendiente de validación. Revise el contrato y acepte el alta cuando corresponda."
-                : "Alta pendiente de validación. Complete el contrato; el estudio aceptará el alta."}
+        <FichaCabeceraFija>
+          <div>
+            <FichaRutaTrabajador
+              entidadId={trabajador.entidad_id}
+              empresa={entidad ? entidadEtiqueta(entidad) : "Empresa"}
+              trabajadores={opcionesTrabajador}
+              relacionId={params.relacionId}
+              raiz="Contrato"
+              hrefRaiz={`/contratos?entidadId=${trabajador.entidad_id}`}
+              destinoPrefijo="/contratos/"
+              destinoSufijo={`?paso=${paso}`}
+            />
+            <div className="mt-2 flex items-center gap-2">
+              <h1 className="text-xl font-bold text-primary sm:text-2xl">
+                {etiquetaTrabajador(trabajador.persona, trabajador.numero)}
+              </h1>
+              <Link
+                href={`/trabajadores/${params.relacionId}`}
+                title="Ver ficha"
+                aria-label="Ver ficha"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-primary hover:bg-accent"
+              >
+                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              </Link>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              DNI {trabajador.persona.dni} · {ESTADO_RELACION_LABEL[trabajador.estado]}
+              {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}
+              {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
             </p>
-            {puedeValidarAlta(profile) ? (
-              <AceptarAltaButton relacionId={params.relacionId} />
-            ) : (
-              <p className="text-sm text-muted-foreground">El contador o el asistente deben aceptar este alta.</p>
-            )}
           </div>
-        ) : null}
-        <AltaPasosNav tab={paso} completados={completados} faltas={faltas} relacionId={params.relacionId} />
+          {fichaCesada ? (
+            <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
+              Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
+            </p>
+          ) : null}
+          {porValidar ? (
+            <div className={`${panelCardClass} space-y-3 p-5`}>
+              <p className="text-sm text-foreground">
+                {esEstudio
+                  ? "Alta pendiente de validación. Revise el contrato y acepte el alta cuando corresponda."
+                  : "Alta pendiente de validación. Complete el contrato; el estudio aceptará el alta."}
+              </p>
+              {puedeValidarAlta(profile) ? (
+                <AceptarAltaButton relacionId={params.relacionId} />
+              ) : (
+                <p className="text-sm text-muted-foreground">El contador o el asistente deben aceptar este alta.</p>
+              )}
+            </div>
+          ) : null}
+          <AltaPasosNav tab={paso} completados={completados} faltas={faltas} relacionId={params.relacionId} />
+        </FichaCabeceraFija>
         {paso === "documentos" ? (
           <FichaAltaDocumentos
             relacionId={params.relacionId}

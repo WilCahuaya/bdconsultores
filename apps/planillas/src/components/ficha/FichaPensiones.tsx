@@ -124,10 +124,13 @@ export function FichaPensiones({
 
   return (
     <div className="space-y-4">
+      {!documentoPension?.storage_path ? (
+        <p className="text-sm font-medium text-amber-900">Alerta: falta el documento de sistema de pensiones firmado.</p>
+      ) : null}
       <DocumentoPrevisualizacion
         titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
         storagePath={documentoPension?.storage_path}
-        vacio="Suba el sistema de pensiones en Documentos para verlo aquí."
+        vacio="Súbalo en Documentos para verlo aquí."
       />
 
       {!tipo ? (
