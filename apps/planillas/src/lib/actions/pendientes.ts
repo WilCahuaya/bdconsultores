@@ -12,12 +12,12 @@ import {
   remuneracionBruta,
   resolverEtapaVidaLey,
   TIEMPO_LABEL,
-  type EtapaVidaLeyId,
   type PendienteItem,
 } from "@/lib/planillas-labels";
 import {
   altasAfiliacionListas,
   contratoMasReciente,
+  documentoCargado,
   estadoVisibleContrato,
   flujoDesdeTrabajador,
   hrefPasoTrabajador,
@@ -44,11 +44,18 @@ export type ControlEmpresa = {
 
 export type ColorPendiente = "gris" | "ambar" | "rojo" | "verde" | "azul";
 
+export type MarcaPendiente = {
+  color: ColorPendiente;
+  texto: string;
+  titulo: string;
+};
+
 export type CeldaPendiente = {
   color: ColorPendiente;
   texto: string;
   titulo: string;
   href?: string;
+  marcas?: MarcaPendiente[];
 };
 
 export type ColumnaPendienteId = "contrato" | "vidaLey" | "asistencia" | "vacaciones";
@@ -90,21 +97,59 @@ const TITULO_ESTADO_CONTRATO: Record<EtiquetaEstadoContratoTabla, string> = {
   Alta: "Alta en T-Registro.",
 };
 
-const VIDA_LEY_CORTO: Record<EtapaVidaLeyId, string> = {
-  sin: "Sin",
-  elaborado: "Docs",
-  recepcionado: "Envío",
-  vence: "Vence",
-  registrado: "Listo",
-};
-
 function celdaPendiente(
   color: ColorPendiente,
   texto: string,
   titulo: string,
   href?: string,
+  marcas?: MarcaPendiente[],
 ): CeldaPendiente {
-  return href ? { color, texto, titulo, href } : { color, texto, titulo };
+  return href ? { color, texto, titulo, href, marcas } : { color, texto, titulo, marcas };
+}
+
+function celdaVidaLeyTrabajador(
+  trabajador: TrabajadorListItem,
+  registro: { estado?: string | null; fecha_fin?: string | null } | undefined,
+  href: string,
+  hoy: string,
+  limite: string,
+): CeldaPendiente {
+  const estado = registro?.estado?.trim() ?? "";
+  const elaborado = estado.length > 0;
+  const alta = estado === "Registrado" || estado === "Tramitado";
+  const certificado = documentoCargado(trabajador.documentos, "VIDA_LEY");
+  const fin = registro?.fecha_fin ?? null;
+  const vencida = alta && Boolean(fin && fin <= limite);
+  if (!elaborado && !certificado && !alta) {
+    return celdaPendiente("ambar", "Falta", "Vida Ley sin elaborar.", href);
+  }
+  const marcas: MarcaPendiente[] = [];
+  if (elaborado && !alta) {
+    marcas.push({ color: "ambar", texto: "Elaborado", titulo: "Trámite de Vida Ley elaborado." });
+  }
+  if (certificado) {
+    marcas.push({ color: "verde", texto: "Certificado", titulo: "Certificado de seguro subido." });
+  }
+  if (vencida && fin) {
+    marcas.push({
+      color: "rojo",
+      texto: "Alta vencida",
+      titulo:
+        fin < hoy
+          ? `Alta vencida el ${formatFechaPlanilla(fin)}.`
+          : `Alta vence el ${formatFechaPlanilla(fin)}.`,
+    });
+  } else if (alta) {
+    marcas.push({ color: "azul", texto: "Alta", titulo: "Dado de alta en el comprobante de envío." });
+  }
+  const color: ColorPendiente = vencida ? "rojo" : alta ? "verde" : "ambar";
+  return celdaPendiente(
+    color,
+    marcas.map((marca) => marca.texto).join(" · "),
+    marcas.map((marca) => marca.titulo).join(" "),
+    href,
+    marcas,
+  );
 }
 
 function celdaEstadoContrato(trabajador: TrabajadorListItem): CeldaPendiente {
@@ -304,12 +349,7 @@ async function cargarPendientes(entidadId: string): Promise<{
           tab: "vida-ley",
         });
       }
-      celdaVida = celdaPendiente(
-        etapa.pendiente ? (etapa.id === "vence" ? "rojo" : "ambar") : "verde",
-        etapa.pendiente ? VIDA_LEY_CORTO[etapa.id] : "Listo",
-        etapa.etiqueta,
-        paso("vida-ley"),
-      );
+      celdaVida = celdaVidaLeyTrabajador(trabajador, vidaLeyPorId.get(trabajador.id), paso("vida-ley"), hoy, limite);
     } else {
       celdaVida = celdaPendiente("gris", "—", "Aún no corresponde.");
     }

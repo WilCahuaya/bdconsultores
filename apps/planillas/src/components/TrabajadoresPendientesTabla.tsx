@@ -165,7 +165,19 @@ function CeldaCese({ laboral }: { laboral: FilaPendienteTrabajador["laboral"] })
 }
 
 function CeldaVista({ celda }: { celda: CeldaPendiente }) {
-  const inner = (
+  const inner = celda.marcas?.length ? (
+    <div className="flex min-h-8 flex-wrap items-center justify-center gap-1">
+      {celda.marcas.map((marca) => (
+        <span
+          key={marca.texto}
+          title={marca.titulo}
+          className={`rounded-md px-1.5 py-1 text-center text-[11px] leading-none ${COLOR_CLASS[marca.color]}`}
+        >
+          {marca.texto}
+        </span>
+      ))}
+    </div>
+  ) : (
     <div className={`flex min-h-8 items-center justify-center rounded-md px-1 py-1 text-center text-xs leading-none ${COLOR_CLASS[celda.color]}`}>
       {celda.texto}
     </div>
