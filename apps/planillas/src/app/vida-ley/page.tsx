@@ -8,7 +8,7 @@ import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listVidaLeyEmpresa } from "@/lib/actions/ficha";
-import { HORIZONTE_VENCIMIENTO_DIAS } from "@/lib/flujo-ficha";
+import { documentoCargado, HORIZONTE_VENCIMIENTO_DIAS } from "@/lib/flujo-ficha";
 import {
   ETAPA_VIDA_LEY_FILTRO_LABEL,
   etiquetaEstadoVidaLey,
@@ -32,6 +32,28 @@ function hrefVidaLey(entidadId: string, etapa?: string) {
   const query = new URLSearchParams({ entidadId });
   if (etapa && etapa !== "todos") query.set("etapa", etapa);
   return `/vida-ley?${query.toString()}`;
+}
+
+function altaVidaLey(estado?: string | null): boolean {
+  const value = estado?.trim();
+  return value === "Registrado" || value === "Tramitado";
+}
+
+function Marca({ listo, etiqueta }: { listo: boolean; etiqueta: string }) {
+  if (!listo) {
+    return (
+      <span className="text-amber-800" aria-label={`Falta ${etiqueta}`}>
+        Falta
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex text-emerald-700" title="Listo" aria-label={`${etiqueta} listo`}>
+      <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+        <path d="M3.5 8.5 6.5 11.5 12.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
 }
 
 function claseEtapaVidaLey(id: EtapaVidaLeyId) {
@@ -133,7 +155,7 @@ export default async function VidaLeyPage({
             </div>
 
             <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[840px] text-left text-sm">
+              <table className="w-full min-w-[1040px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 font-medium">Nº</th>
@@ -141,6 +163,8 @@ export default async function VidaLeyPage({
                     <th className="px-4 py-2 font-medium">Nombre</th>
                     <th className="px-4 py-2 font-medium">Paso</th>
                     <th className="px-4 py-2 font-medium">Estado</th>
+                    <th className="px-4 py-2 font-medium">Certificado</th>
+                    <th className="px-4 py-2 font-medium">Alta</th>
                     <th className="px-4 py-2 font-medium">Póliza</th>
                     <th className="px-4 py-2 font-medium">Inicio</th>
                     <th className="px-4 py-2 font-medium">Fin</th>
@@ -149,7 +173,7 @@ export default async function VidaLeyPage({
                 <tbody>
                   {visibles.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={8}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={10}>
                         {filas.length === 0
                           ? "No hay trabajadores con alta validada en esta empresa."
                           : "No hay trámites en este paso."}
@@ -176,6 +200,15 @@ export default async function VidaLeyPage({
                           </span>
                         </td>
                         <td className="px-4 py-2">{etiquetaEstadoVidaLey(registro?.estado)}</td>
+                        <td className="px-4 py-2">
+                          <Marca
+                            listo={documentoCargado(trabajador.documentos, "VIDA_LEY")}
+                            etiqueta="certificado"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <Marca listo={altaVidaLey(registro?.estado)} etiqueta="alta" />
+                        </td>
                         <td className="px-4 py-2 font-mono">{registro?.numero_poliza?.trim() || "—"}</td>
                         <td className="px-4 py-2">{formatFechaPlanilla(registro?.fecha_inicio)}</td>
                         <td className="px-4 py-2">{formatFechaPlanilla(registro?.fecha_fin)}</td>
