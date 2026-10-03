@@ -15,6 +15,7 @@ export async function descargarAsistenciaExcel(params: {
   const res = await fetch(urlAsistenciaExcel(params), {
     credentials: "same-origin",
     redirect: "manual",
+    cache: "no-store",
   });
   if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
     return { error: "La sesión expiró. Vuelva a iniciar sesión." };

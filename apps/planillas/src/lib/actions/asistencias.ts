@@ -17,10 +17,12 @@ type ContratoHorario = {
   version: number;
 };
 
-function horarioDeContratos(contratos: ContratoHorario[], fallback: string | null): string | null {
-  const vigente = contratos.find((c) => c.es_vigente);
-  const elegido = vigente ?? [...contratos].sort((a, b) => b.version - a.version)[0];
-  return elegido?.horario ?? fallback;
+function horarioParaAsistencia(contratos: ContratoHorario[], ficha: string | null): string | null {
+  const vigenteEnFicha = ficha?.trim();
+  if (vigenteEnFicha) return vigenteEnFicha;
+  const contrato =
+    contratos.find((c) => c.es_vigente) ?? [...contratos].sort((a, b) => b.version - a.version)[0];
+  return contrato?.horario ?? null;
 }
 
 function aFilaExcel(t: TrabajadorListItem, horario: string | null): AsistenciaExcelTrabajador {
@@ -98,6 +100,7 @@ export async function datosAsistenciaEmpresa(
         .from("contratos")
         .select("relacion_id, horario, jornada, es_vigente, version")
         .in("relacion_id", ids)
+        .neq("estado", "BAJA")
     : { data: [], error: null };
   if (error) return { error: error.message };
   const porRelacion = new Map<string, ContratoHorario[]>();
@@ -113,7 +116,7 @@ export async function datosAsistenciaEmpresa(
   }
   const filas = trabajadores
     .filter((t) => trabajadorActivoEnMes(mes, t.fecha_ingreso, t.fecha_cese))
-    .map((t) => aFilaExcel(t, horarioDeContratos(porRelacion.get(t.id) ?? [], t.horario)))
+    .map((t) => aFilaExcel(t, horarioParaAsistencia(porRelacion.get(t.id) ?? [], t.horario)))
     .sort((a, b) => {
       const an = a.numero ?? Number.MAX_SAFE_INTEGER;
       const bn = b.numero ?? Number.MAX_SAFE_INTEGER;
@@ -157,7 +160,8 @@ export async function datosAsistenciaTrabajador(
   const { data: contratos, error } = await db
     .from("contratos")
     .select("horario, jornada, es_vigente, version")
-    .eq("relacion_id", relacionId);
+    .eq("relacion_id", relacionId)
+    .neq("estado", "BAJA");
   if (error) return { error: error.message };
   let feriados: string[] = [];
   try {
@@ -171,7 +175,7 @@ export async function datosAsistenciaTrabajador(
     empresa: { nombre: empresa.nombre, ruc: empresa.ruc, direccion: empresa.direccion ?? null },
     trabajador: aFilaExcel(
       trabajador,
-      horarioDeContratos((contratos ?? []) as ContratoHorario[], trabajador.horario),
+      horarioParaAsistencia((contratos ?? []) as ContratoHorario[], trabajador.horario),
     ),
     feriados,
   };
