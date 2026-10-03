@@ -25,7 +25,7 @@ import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
-function PreviewEscaneo({
+export function PreviewEscaneo({
   file,
   remoteUrl,
   esPdf,
@@ -77,7 +77,7 @@ function AlertaFaltaDocumento({ nombre }: { nombre: string }) {
   return <p className="text-sm font-medium text-amber-900">Alerta: falta el documento de {nombre}.</p>;
 }
 
-function CapturaDesplegable({
+export function CapturaDesplegable({
   titulo,
   alerta,
   alertaNombre,
