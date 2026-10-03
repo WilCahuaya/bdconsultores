@@ -12,7 +12,7 @@ import {
   claseTonoEstadoContrato,
   contratoMasReciente,
   documentoCargado,
-  etiquetaEstadoRespaldoContrato,
+  estadoVisibleContrato,
   ETAPA_CONTRATO_FILTRO_LABEL,
   faltasPorPaso,
   flujoDesdeTrabajador,
@@ -22,9 +22,8 @@ import {
   pensionAltaLista,
   resolverEtapaContrato,
   tRegistroAltaLista,
-  tonoEstadoContrato,
 } from "@/lib/flujo-ficha";
-import { ESTADO_CONTRATO_LABEL, compareTrabajadoresPorNumero, formatFechaPlanilla, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
+import { compareTrabajadoresPorNumero, formatFechaPlanilla, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function Marca({ listo }: { listo: boolean }) {
   if (!listo) return <span className="text-amber-800">Falta</span>;
@@ -71,16 +70,17 @@ export default async function ContratosPage({
       const flujo = flujoDesdeTrabajador(trabajador);
       const faltas = faltasPorPaso(flujo);
       const ultimo = contratoMasReciente(flujo.contratos);
+      const alta = tRegistroAltaLista(flujo);
       const versiones: VersionContratoLista[] = flujo.contratos
         .filter((contrato) => contrato.estado !== "BAJA")
         .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))
-        .map((contrato) => {
-          const respaldo = etiquetaEstadoRespaldoContrato(contrato, flujo.documentos);
+        .map((contrato, index) => {
+          const visible = estadoVisibleContrato(contrato, flujo.documentos, alta && index === 0);
           return {
             version: contrato.version ?? 0,
             fechas: `${formatFechaPlanilla(contrato.fecha_inicio)} – ${formatFechaPlanilla(contrato.fecha_fin)}`,
-            estado: `${ESTADO_CONTRATO_LABEL[contrato.estado]} · ${respaldo}`,
-            tono: tonoEstadoContrato(contrato.estado, respaldo),
+            estado: visible.etiqueta,
+            tono: visible.tono,
             vigente: contrato.es_vigente,
           };
         });
@@ -215,11 +215,11 @@ export default async function ContratosPage({
                           <Marca listo={tRegistroAltaLista(flujo)} />
                         </td>
                         <td className="px-3 py-2">
-                          {ultimo ? (
+                          {versiones[0] ? (
                             <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseTonoEstadoContrato(tonoEstadoContrato(ultimo.estado, etiquetaEstadoRespaldoContrato(ultimo, flujo.documentos)))}`}
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseTonoEstadoContrato(versiones[0].tono)}`}
                             >
-                              {ESTADO_CONTRATO_LABEL[ultimo.estado]} · {etiquetaEstadoRespaldoContrato(ultimo, flujo.documentos)}
+                              {versiones[0].estado}
                             </span>
                           ) : (
                             "Falta"

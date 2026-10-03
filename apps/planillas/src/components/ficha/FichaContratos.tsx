@@ -193,13 +193,7 @@ export function FichaContratos({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        El contrato es opcional. Generar crea una versión nueva aunque la anterior no tenga respaldo ni esté recogida.
-        En esa versión queda el representante legal de la empresa en ese momento. Un cambio posterior en la empresa no reescribe este documento.
-        Cada Word guarda su respaldo: el PDF firmado, la solicitud de registro, o ambos. La solicitud se sube una vez
-        y la ven los trabajadores que la comparten. Al generar, el formulario se cierra; el de confirmar solo se abre
-        cuando sube el respaldo de esa versión. Las fechas del papel no tienen que coincidir con el ingreso a la empresa.
-      </p>
+      <p className="text-sm text-muted-foreground">Generar abre una versión nueva.</p>
 
       {canWrite ? (
         <div className="flex flex-wrap gap-2">

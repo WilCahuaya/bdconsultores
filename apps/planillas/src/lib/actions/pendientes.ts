@@ -17,11 +17,14 @@ import {
 } from "@/lib/planillas-labels";
 import {
   altasAfiliacionListas,
+  contratoMasReciente,
+  estadoVisibleContrato,
   flujoDesdeTrabajador,
   hrefPasoTrabajador,
   resolverEtapaContrato,
+  tRegistroAltaLista,
   HORIZONTE_VENCIMIENTO_DIAS,
-  type EtapaContratoId,
+  type EtiquetaEstadoContratoTabla,
   type FlujoContrato,
   type FlujoDocumento,
   type FlujoTab,
@@ -39,7 +42,7 @@ export type ControlEmpresa = {
   vacaciones: PendienteItem[];
 };
 
-export type ColorPendiente = "gris" | "ambar" | "rojo" | "verde";
+export type ColorPendiente = "gris" | "ambar" | "rojo" | "verde" | "azul";
 
 export type CeldaPendiente = {
   color: ColorPendiente;
@@ -81,18 +84,10 @@ export type FilaPendienteTrabajador = {
   celdas: Record<ColumnaPendienteId, CeldaPendiente>;
 };
 
-const CONTRATO_CORTO: Record<EtapaContratoId, string> = {
-  alta: "Alta",
-  generar: "Generar",
-  firmar: "Firmar",
-  confirmar: "Confirmar",
-  validar: "Validar",
-  recoger: "Recoger",
-  afp: "AFP",
-  "t-registro": "T-Reg.",
-  vence: "Vence",
-  revisar: "Revisar",
-  listo: "Listo",
+const TITULO_ESTADO_CONTRATO: Record<EtiquetaEstadoContratoTabla, string> = {
+  Elaborado: "Contrato elaborado. Falta el PDF firmado o la solicitud de registro.",
+  Validado: "Contrato validado con PDF firmado o solicitud de registro.",
+  Alta: "Alta en T-Registro.",
 };
 
 const VIDA_LEY_CORTO: Record<EtapaVidaLeyId, string> = {
@@ -110,6 +105,17 @@ function celdaPendiente(
   href?: string,
 ): CeldaPendiente {
   return href ? { color, texto, titulo, href } : { color, texto, titulo };
+}
+
+function celdaEstadoContrato(trabajador: TrabajadorListItem): CeldaPendiente {
+  const flujo = flujoDesdeTrabajador(trabajador);
+  const href = hrefPasoTrabajador(trabajador.id, "contratos");
+  const ultimo = contratoMasReciente(flujo.contratos);
+  if (!ultimo) return celdaPendiente("ambar", "Falta", "Sin contrato elaborado.", href);
+  const visible = estadoVisibleContrato(ultimo, flujo.documentos, tRegistroAltaLista(flujo));
+  const color: ColorPendiente =
+    visible.etiqueta === "Alta" ? "azul" : visible.etiqueta === "Validado" ? "verde" : "ambar";
+  return celdaPendiente(color, visible.etiqueta, TITULO_ESTADO_CONTRATO[visible.etiqueta], href);
 }
 
 function mesInicioEmpresa(iso: string | null | undefined): string {
@@ -280,12 +286,7 @@ async function cargarPendientes(entidadId: string): Promise<{
         tab: contrato.tab as PendienteItem["tab"],
       });
     }
-    const celdaContrato = celdaPendiente(
-      contrato.pendiente ? (contrato.id === "vence" ? "rojo" : "ambar") : "verde",
-      contrato.pendiente ? CONTRATO_CORTO[contrato.id] : "Listo",
-      contrato.etiqueta,
-      paso(contrato.tab),
-    );
+    const celdaContrato = celdaEstadoContrato(trabajador);
 
     let celdaVida: CeldaPendiente;
     if (

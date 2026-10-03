@@ -238,21 +238,24 @@ export function fechaFinUltimoContratoValidado(
   return fin || null;
 }
 
-export type TonoEstadoContrato = "gris" | "verde" | "neutro";
+export type TonoEstadoContrato = "gris" | "verde" | "azul";
+export type EtiquetaEstadoContratoTabla = "Elaborado" | "Validado" | "Alta";
 
-export function tonoEstadoContrato(
-  estado: EstadoContratoPlanilla,
-  respaldo: "Elaborado" | "Validado por contrato" | "Solicitud",
-): TonoEstadoContrato {
-  if (estado === "RECOGIDO" || estado === "COMPLETO" || respaldo === "Validado por contrato") return "verde";
-  if (respaldo === "Elaborado" || estado === "ELABORADO") return "gris";
-  return "neutro";
+/** Elaborado sin respaldo, validado al subir PDF o solicitud, alta si el T-Registro ya se dio. */
+export function estadoVisibleContrato(
+  contrato: Pick<FlujoContrato, "documento_id" | "solicitud_storage_path">,
+  docs: FlujoDocumento[],
+  alta: boolean,
+): { etiqueta: EtiquetaEstadoContratoTabla; tono: TonoEstadoContrato } {
+  if (alta) return { etiqueta: "Alta", tono: "azul" };
+  if (contratoTieneFirmado(contrato, docs)) return { etiqueta: "Validado", tono: "verde" };
+  return { etiqueta: "Elaborado", tono: "gris" };
 }
 
 export function claseTonoEstadoContrato(tono: TonoEstadoContrato): string {
   if (tono === "verde") return "bg-emerald-100 text-emerald-950";
-  if (tono === "gris") return "bg-muted text-muted-foreground";
-  return "bg-sky-100 text-sky-950";
+  if (tono === "azul") return "bg-sky-100 text-sky-950";
+  return "bg-muted text-muted-foreground";
 }
 
 export function etiquetaEstadoRespaldoContrato(

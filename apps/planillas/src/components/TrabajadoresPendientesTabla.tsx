@@ -18,6 +18,7 @@ const COLOR_CLASS: Record<ColorPendiente, string> = {
   ambar: "bg-amber-100 text-amber-950 dark:bg-amber-900/70 dark:text-amber-50",
   rojo: "bg-red-100 font-semibold text-red-800 dark:bg-red-900/80 dark:text-red-50",
   verde: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/70 dark:text-emerald-50",
+  azul: "bg-sky-100 text-sky-950 dark:bg-sky-900/70 dark:text-sky-50",
 };
 
 type DatoLaboralKey =
@@ -230,6 +231,7 @@ export function TrabajadoresPendientesTabla({
         <span className={`rounded px-2 py-1 ${COLOR_CLASS.ambar}`}>Ámbar: pendiente</span>
         <span className={`rounded px-2 py-1 ${COLOR_CLASS.rojo}`}>Rojo: vence o vencido</span>
         <span className={`rounded px-2 py-1 ${COLOR_CLASS.gris}`}>Gris: no aplica</span>
+        <span className={`rounded px-2 py-1 ${COLOR_CLASS.azul}`}>Azul: alta</span>
       </div>
 
       <div className={panelCardClass}>
