@@ -39,8 +39,24 @@ export default async function PlanillasHomePage({
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-primary sm:text-2xl">Trabajadores</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl font-bold text-primary sm:text-2xl">Trabajadores</h1>
+              {entidades.length > 0 ? (
+                <>
+                  <span className="text-muted-foreground" aria-hidden>
+                    &gt;
+                  </span>
+                  <EntidadSwitcher
+                    entidades={entidades}
+                    selectedId={selectedId}
+                    locked={esUsuarioEntidad(profile.rol)}
+                    queryExtra={mostrarBajas ? "bajas=1" : undefined}
+                    inline
+                  />
+                </>
+              ) : null}
+            </div>
             <p className="mt-1 text-sm text-muted-foreground">
               Hola, {profile.nombre}. El nombre abre la ficha. Cada pastilla abre ese pendiente.
             </p>
@@ -95,27 +111,23 @@ export default async function PlanillasHomePage({
           </div>
         ) : (
           <>
-            <EntidadSwitcher
-              entidades={entidades}
-              selectedId={selectedId}
-              locked={esUsuarioEntidad(profile.rol)}
-              queryExtra={mostrarBajas ? "bajas=1" : undefined}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <MostrarBajasCheck entidadId={selectedId} checked={mostrarBajas} />
-              {hayBajas && !mostrarBajas ? (
-                <p className="text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</p>
-              ) : null}
-            </div>
-            {trabajadores.length === 0 ? (
-              <p className={`${panelCardClass} px-4 py-8 text-sm text-muted-foreground`}>
-                {hayBajas && !mostrarBajas
+            <TrabajadoresPendientesTabla
+              filas={trabajadores}
+              esEstudio={esEstudio}
+              filtroExtra={
+                <>
+                  <MostrarBajasCheck entidadId={selectedId} checked={mostrarBajas} />
+                  {hayBajas && !mostrarBajas ? (
+                    <span className="text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</span>
+                  ) : null}
+                </>
+              }
+              vacioMensaje={
+                hayBajas && !mostrarBajas
                   ? "No hay trabajadores activos. Marque Mostrar bajas para ver a los cesados."
-                  : "No hay trabajadores en esta empresa. El listado arranca en blanco."}
-              </p>
-            ) : (
-              <TrabajadoresPendientesTabla filas={trabajadores} esEstudio={esEstudio} />
-            )}
+                  : "No hay trabajadores en esta empresa. El listado arranca en blanco."
+              }
+            />
           </>
         )}
       </div>

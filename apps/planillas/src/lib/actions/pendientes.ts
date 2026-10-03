@@ -3,7 +3,7 @@
 import { entidadAlcance, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
 import { listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { cargoSigla } from "@/lib/cargos-funciones";
-import { esMesAsistencia, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import { esMesAsistencia, hoyIsoLima, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import {
   ASIGNACION_FAMILIAR_SOLES,
   formatFechaPlanilla,
@@ -22,9 +22,12 @@ import {
   resolverEtapaContrato,
   HORIZONTE_VENCIMIENTO_DIAS,
   type EtapaContratoId,
+  type FlujoContrato,
+  type FlujoDocumento,
   type FlujoTab,
 } from "@/lib/flujo-ficha";
 import { planillasDb } from "@/lib/supabase/planillas";
+import { contratoFueGenerado } from "@/lib/tablero";
 import { anioActualLima, saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
 
 const HORIZONTE_DIAS = HORIZONTE_VENCIMIENTO_DIAS;
@@ -47,12 +50,20 @@ export type CeldaPendiente = {
 
 export type ColumnaPendienteId = "contrato" | "vidaLey" | "asistencia" | "vacaciones";
 
+export type ContratoGeneradoAviso = {
+  inicio: string;
+  fin: string;
+};
+
 export type DatosLaboralesFila = {
   cargoSigla: string;
   cargoTitulo: string;
   mesInicio: string;
   fechaIngreso: string;
   fechaCese: string;
+  ceseAlerta: boolean;
+  ceseTitulo: string;
+  contratoGenerado: ContratoGeneradoAviso | null;
   tiempo: string;
   remuneracion: string;
   asignacion: string;
@@ -108,14 +119,41 @@ function mesInicioEmpresa(iso: string | null | undefined): string {
   return abrev ? abrev.toUpperCase() : "—";
 }
 
-function fechaFinUltimoContrato(trabajador: TrabajadorListItem): string | null {
-  const vivos = trabajador.contratos.filter((c) => c.estado !== "BAJA");
-  const lista = vivos.length > 0 ? vivos : trabajador.contratos;
-  const ultimo = [...lista].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
-  return ultimo?.fecha_fin ?? null;
+function contratoConRespaldo(contrato: FlujoContrato, docs: FlujoDocumento[]): boolean {
+  if (contrato.solicitud_storage_path) return true;
+  if (!contrato.documento_id) return false;
+  return docs.some((d) => d.id === contrato.documento_id && d.estado === "SI" && Boolean(d.storage_path));
 }
 
-function datosLaborales(trabajador: TrabajadorListItem): DatosLaboralesFila {
+function resumenCese(trabajador: TrabajadorListItem, hoy: string) {
+  const vivos = trabajador.contratos
+    .filter((c) => c.estado !== "BAJA")
+    .sort((a, b) => (b.version ?? 0) - (a.version ?? 0));
+  const conRespaldo = vivos.find((c) => contratoConRespaldo(c, trabajador.documentos));
+  const generado = vivos.find((c) => contratoFueGenerado(c.estado) && !contratoConRespaldo(c, trabajador.documentos));
+  const avisarGenerado = Boolean(generado && (!conRespaldo || (generado.version ?? 0) > (conRespaldo.version ?? 0)));
+  const iso = conRespaldo?.fecha_fin?.slice(0, 10) ?? null;
+  const alerta = Boolean(iso && iso.slice(0, 7) <= hoy.slice(0, 7));
+  const fecha = formatFechaPlanilla(iso);
+  let ceseTitulo = "Fin del último contrato firmado o con solicitud de registro.";
+  if (!iso) ceseTitulo = "Sin contrato firmado ni solicitud de registro.";
+  else if (iso < hoy) ceseTitulo = `Vencido el ${fecha}.`;
+  else if (alerta) ceseTitulo = `Vence este mes, el ${fecha}.`;
+  return {
+    fechaCese: fecha,
+    ceseAlerta: alerta,
+    ceseTitulo,
+    contratoGenerado:
+      generado && avisarGenerado
+        ? {
+            inicio: formatFechaPlanilla(generado.fecha_inicio),
+            fin: formatFechaPlanilla(generado.fecha_fin),
+          }
+        : null,
+  };
+}
+
+function datosLaborales(trabajador: TrabajadorListItem, hoy: string): DatosLaboralesFila {
   const bruta = remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar);
   const asignacion = trabajador.recibe_asignacion_familiar === true ? ASIGNACION_FAMILIAR_SOLES : null;
   return {
@@ -123,16 +161,12 @@ function datosLaborales(trabajador: TrabajadorListItem): DatosLaboralesFila {
     cargoTitulo: trabajador.cargo?.trim() || "Sin cargo",
     mesInicio: mesInicioEmpresa(trabajador.fecha_ingreso),
     fechaIngreso: formatFechaPlanilla(trabajador.fecha_ingreso),
-    fechaCese: formatFechaPlanilla(fechaFinUltimoContrato(trabajador)),
+    ...resumenCese(trabajador, hoy),
     tiempo: trabajador.jornada ? TIEMPO_LABEL[trabajador.jornada] : "—",
     remuneracion: formatRemuneracion(trabajador.remuneracion),
     asignacion: formatRemuneracion(asignacion),
     bruta: formatRemuneracion(bruta),
   };
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function plusDays(iso: string, days: number): string {
@@ -170,7 +204,7 @@ async function cargarPendientes(entidadId: string): Promise<{
   const ids = trabajadores.map((t) => t.id);
   const mes = mesActualLima();
   const periodo = anioActualLima();
-  const hoy = todayIso();
+  const hoy = hoyIsoLima();
   const limite = plusDays(hoy, HORIZONTE_DIAS);
   const db = await planillasDb();
 
@@ -225,7 +259,7 @@ async function cargarPendientes(entidadId: string): Promise<{
         nombre: base.nombre,
         cargo: trabajador.cargo,
         cesada: true,
-        laboral: datosLaborales(trabajador),
+        laboral: datosLaborales(trabajador, hoy),
         celdas: {
           contrato: celdaPendiente("gris", "Baja", titulo),
           vidaLey: celdaPendiente("gris", "—", titulo),
@@ -327,7 +361,7 @@ async function cargarPendientes(entidadId: string): Promise<{
       nombre: base.nombre,
       cargo: trabajador.cargo,
       cesada: false,
-      laboral: datosLaborales(trabajador),
+      laboral: datosLaborales(trabajador, hoy),
       celdas: {
         contrato: celdaContrato,
         vidaLey: celdaVida,
