@@ -10,7 +10,7 @@ import {
   type HorarioParcial,
   type HorarioTramo,
 } from "@/lib/horario-laboral";
-import { armarDireccionPersona, montoAsignacionFamiliar, parseNumeroTrabajador } from "@/lib/planillas-labels";
+import { armarDireccionPersona, ASIGNACION_FAMILIAR_SOLES, montoAsignacionFamiliar, parseNumeroTrabajador } from "@/lib/planillas-labels";
 
 const SIGLA_CARGO: Record<string, CargoTrabajador> = {
   ADM: "Administrador",
@@ -596,7 +596,7 @@ function leerFila(row: string[], cols: Columnas, fila: number): FilaLeida {
   if (nacimientoRaw && !nacimiento) avisos.push("La fecha de nacimiento no es válida y no se guardará.");
   if (correoRaw && !correoRaw.includes("@")) avisos.push("El correo no tiene un formato válido y no se guardará.");
   if (asignacion != null && asignacion > 0 && asignacion !== montoAsignacionFamiliar(true)) {
-    avisos.push("La asignación familiar de la ficha es S/ 113.");
+    avisos.push(`La asignación familiar de la ficha es S/ ${ASIGNACION_FAMILIAR_SOLES}.`);
   }
   if (remuneracion != null && bruta != null) {
     const suma = remuneracion + (asignacion != null && asignacion > 0 ? asignacion : 0);

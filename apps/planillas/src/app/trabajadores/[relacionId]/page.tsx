@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { entidadEtiqueta } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
-import { AlertaDocumentosAlta, ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
+import { ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
 import { FichaResumen } from "@/components/ficha/FichaResumen";
 import { FichaVidaLey } from "@/components/ficha/FichaVidaLey";
 import { FichaAsistencia } from "@/components/ficha/FichaAsistencia";
@@ -28,15 +28,17 @@ import {
   HORIZONTE_VENCIMIENTO_DIAS,
   contratoConfirmado,
   contratoVigente,
-  etiquetaAlertaDocumentos,
+  documentosAltaFaltantes,
   enlaceProcesoOperativo,
   enlaceProcesoPendiente,
+  hrefAltaTrabajador,
   flujoDesdeTrabajador,
   resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
 import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorButton";
 import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
-import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto } from "@/lib/planillas-labels";
+import { PendientesFichaButton, type PendienteFicha } from "@/components/ficha/PendientesFichaButton";
+import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -69,7 +71,6 @@ export default async function FichaTrabajadorPage({
 
   const flujo = flujoDesdeTrabajador(trabajador);
   const siguiente = resolverSiguientePaso(flujo, esEstudio);
-  const alertaDocumentos = etiquetaAlertaDocumentos(flujo);
   const contratoVig = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
   const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
@@ -99,32 +100,41 @@ export default async function FichaTrabajadorPage({
   const mes = mesActualLima();
   const periodo = anioActualLima();
   const hoy = new Date().toISOString().slice(0, 10);
-  const proceso =
-    enlaceProcesoPendiente(params.relacionId, siguiente) ??
-    (!tab
-      ? enlaceProcesoOperativo({
-          entidadId: trabajador.entidad_id,
-          relacionId: params.relacionId,
-          esEstudio,
-          estado: trabajador.estado,
-          validacion: trabajador.validacion,
-          fechaIngreso: trabajador.fecha_ingreso,
-          fechaCese: trabajador.fecha_cese,
-          pension: trabajador.pension,
-          tRegistro: trabajador.tRegistro,
-          documentos: trabajador.documentos,
-          contratoCerrado: contratoVig?.estado === "RECOGIDO" || contratoVig?.estado === "COMPLETO",
-          vidaLey,
-          pdfAsistenciaMes: documentos.some(
-            (d) => d.tipo === "ASISTENCIA" && d.observaciones === mes && Boolean(d.storage_path),
-          ),
-          diasVacacionPeriodo: vacaciones.filter((row) => row.periodo === periodo).reduce((sum, row) => sum + row.dias, 0),
-          mes,
-          periodo,
-          hoy,
-          limite: plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS),
-        })
-      : null);
+  const pendientes: PendienteFicha[] = [];
+  if (!fichaCesada) {
+    const docsHref = hrefAltaTrabajador(params.relacionId, "documentos");
+    for (const tipo of documentosAltaFaltantes(flujo)) {
+      pendientes.push({ id: tipo, etiqueta: TIPO_DOCUMENTO_LABEL[tipo], href: docsHref });
+    }
+    if (siguiente.rol !== "alerta" && siguiente.paso !== "listo") {
+      const enlace = enlaceProcesoPendiente(params.relacionId, siguiente);
+      if (enlace) pendientes.push({ id: `paso-${siguiente.paso}`, etiqueta: enlace.etiqueta, href: enlace.href });
+    } else if (siguiente.paso === "listo") {
+      const operativo = enlaceProcesoOperativo({
+        entidadId: trabajador.entidad_id,
+        relacionId: params.relacionId,
+        esEstudio,
+        estado: trabajador.estado,
+        validacion: trabajador.validacion,
+        fechaIngreso: trabajador.fecha_ingreso,
+        fechaCese: trabajador.fecha_cese,
+        pension: trabajador.pension,
+        tRegistro: trabajador.tRegistro,
+        documentos: trabajador.documentos,
+        contratoCerrado: contratoVig?.estado === "RECOGIDO" || contratoVig?.estado === "COMPLETO",
+        vidaLey,
+        pdfAsistenciaMes: documentos.some(
+          (d) => d.tipo === "ASISTENCIA" && d.observaciones === mes && Boolean(d.storage_path),
+        ),
+        diasVacacionPeriodo: vacaciones.filter((row) => row.periodo === periodo).reduce((sum, row) => sum + row.dias, 0),
+        mes,
+        periodo,
+        hoy,
+        limite: plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS),
+      });
+      if (operativo) pendientes.push({ id: "operativo", etiqueta: operativo.etiqueta, href: operativo.href });
+    }
+  }
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
@@ -138,13 +148,16 @@ export default async function FichaTrabajadorPage({
               relacionId={params.relacionId}
               query={queryFicha.toString()}
             />
-            {esEstudio ? (
-              <EliminarTrabajadorButton
-                relacionId={params.relacionId}
-                entidadId={trabajador.entidad_id}
-                nombre={nombreCompleto(trabajador.persona)}
-              />
-            ) : null}
+            <div className="flex shrink-0 items-center gap-2">
+              <PendientesFichaButton pendientes={pendientes} />
+              {esEstudio ? (
+                <EliminarTrabajadorButton
+                  relacionId={params.relacionId}
+                  entidadId={trabajador.entidad_id}
+                  nombre={nombreCompleto(trabajador.persona)}
+                />
+              ) : null}
+            </div>
           </div>
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{etiquetaTrabajador(trabajador.persona, trabajador.numero)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -158,22 +171,12 @@ export default async function FichaTrabajadorPage({
             Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
           </p>
         ) : null}
-        {alertaDocumentos && !fichaCesada ? (
-          <AlertaDocumentosAlta relacionId={params.relacionId} etiqueta={alertaDocumentos} />
-        ) : null}
         {tab ? (
           <ProcesoDesdeFichaHeader
             relacionId={params.relacionId}
             entidadId={trabajador.entidad_id}
             tab={tab}
           />
-        ) : proceso && !fichaCesada ? (
-          <p className={`${panelCardClass} flex flex-wrap items-center gap-2 p-4 text-sm`}>
-            <span className="text-muted-foreground">Proceso pendiente</span>
-            <Link href={proceso.href} className="font-medium text-primary hover:underline">
-              {proceso.etiqueta}
-            </Link>
-          </p>
         ) : null}
         {!tab ? (
           <FichaResumen

@@ -402,7 +402,7 @@ export function formatRemuneracion(value: number | null | undefined): string {
 }
 
 /** 10 % de la RMV vigente. */
-export const ASIGNACION_FAMILIAR_SOLES = 113;
+export const ASIGNACION_FAMILIAR_SOLES = 123;
 
 export function montoAsignacionFamiliar(recibe: boolean | null | undefined): number {
   return recibe === true ? ASIGNACION_FAMILIAR_SOLES : 0;

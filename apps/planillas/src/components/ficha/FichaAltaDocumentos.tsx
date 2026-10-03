@@ -438,13 +438,13 @@ function CapturaFicha({
               allowEmpty
               disabled={!canWrite}
               options={[
-                { value: "si", label: "Sí · S/ 113.00" },
+                { value: "si", label: `Sí · S/ ${ASIGNACION_FAMILIAR_SOLES.toFixed(2)}` },
                 { value: "no", label: "No" },
               ]}
               onChange={(event) => setRecibe(event.target.value)}
             />
             <p className="text-xs text-muted-foreground sm:col-span-2">
-              Si marca Sí, registre los hijos en Asignación familiar. Los S/ 113.00 quedan solo cuando al menos uno corresponde.
+              Si marca Sí, registre los hijos en Asignación familiar. Los S/ {ASIGNACION_FAMILIAR_SOLES.toFixed(2)} quedan solo cuando al menos uno corresponde.
             </p>
           </div>
           {canWrite ? (
@@ -518,7 +518,6 @@ function CapturaPension({
     router.refresh();
   }
 
-  const alerta = !file && !documento?.storage_path;
   const preview = (
     <PreviewEscaneo file={file} remoteUrl={file ? null : remoteUrl} esPdf={archivoEsPdf(file, documento?.storage_path ?? null)} />
   );
@@ -526,9 +525,9 @@ function CapturaPension({
   return (
     <CapturaDesplegable
       titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
-      alerta={alerta}
+      alerta={false}
       alertaNombre="sistema de pensiones"
-      hint="En el alta solo se indica AFP u ONP. Si es AFP, el estudio registra el alta, CUSPP y fecha de afiliación en Sistema de pensión."
+      hint="El escaneo es opcional. Aquí solo se indica AFP u ONP. Si es AFP, con el nombre de AFP y el CUSPP en Dar de alta ya queda completo."
       preview={preview}
       datos={
         <>

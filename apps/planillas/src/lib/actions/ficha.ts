@@ -790,7 +790,6 @@ export async function savePension(relacionId: string, formData: FormData): Promi
   if (tipo === "AFP" && tramiteEstado === "TRAMITADO") {
     if (!afpNombre) return { error: "Indique la AFP (Habitat, Integra, Prima o Profuturo)." };
     if (!cuspp) return { error: "Indique el CUSPP." };
-    if (!fechaTramite.value) return { error: "Indique la fecha de afiliación." };
   }
   const payload = {
     relacion_id: relacionId,

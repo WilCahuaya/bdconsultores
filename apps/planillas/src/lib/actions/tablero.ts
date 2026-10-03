@@ -7,6 +7,7 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { planillasDb } from "@/lib/supabase/planillas";
 import { trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import {
+  afpConNombreYCuspp,
   contratoTieneFirmado,
   documentoCargado,
   tRegistroAltaLista,
@@ -115,7 +116,12 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       storage_path: string | null;
       updated_at: string | null;
     }>("documentos", "id, relacion_id, tipo, estado, storage_path, updated_at", "entidad_id", entidadIds),
-    selectIn<{ relacion_id: string; tipo: string | null }>("pensiones", "relacion_id, tipo", "entidad_id", entidadIds),
+    selectIn<{ relacion_id: string; tipo: string | null; afp_nombre: string | null; cuspp: string | null }>(
+      "pensiones",
+      "relacion_id, tipo, afp_nombre, cuspp",
+      "entidad_id",
+      entidadIds,
+    ),
     selectIn<{ relacion_id: string; tipo: string; realizado: boolean }>(
       "t_registro",
       "relacion_id, tipo, realizado",
@@ -158,7 +164,7 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
   const contratosPorRelacion = new Map<string, typeof contratos>();
   for (const c of contratos) pushMap(contratosPorRelacion, c.relacion_id, c);
 
-  const pensionPorRelacion = new Map(pensiones.map((p) => [p.relacion_id, p.tipo]));
+  const pensionPorRelacion = new Map(pensiones.map((p) => [p.relacion_id, p]));
   const tRegPorRelacion = new Map<string, FlujoTRegistro[]>();
   for (const row of tRegistros) {
     pushMap(tRegPorRelacion, row.relacion_id, {
@@ -186,9 +192,9 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       fechaIngreso: rel.fecha_ingreso,
       fechaCese: rel.fecha_cese,
       estado: rel.estado,
-      pensionTipo: pensionPorRelacion.get(rel.id) ?? null,
+      pensionTipo: pensionPorRelacion.get(rel.id)?.tipo ?? null,
       tRegistroOk: tRegistroAltaLista({ documentos: flujoDocs, tRegistro }),
-      afpDocOk: documentoCargado(flujoDocs, "TRAMITE_AFP"),
+      afpDocOk: afpConNombreYCuspp(pensionPorRelacion.get(rel.id)),
       vidaLeyComprobanteOk: documentoCargado(flujoDocs, "VIDA_LEY_COMPROBANTE"),
       excelGenerado: excelSet.has(rel.id),
       vidaLeyFechaFin: vidaLeyPorRelacion.get(rel.id) ?? null,

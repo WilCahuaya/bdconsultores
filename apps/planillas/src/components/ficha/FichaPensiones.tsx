@@ -78,15 +78,13 @@ export function FichaPensiones({
   async function onSubmit(formData: FormData) {
     const afpNombre = String(formData.get("afp_nombre") ?? "").trim();
     const cuspp = String(formData.get("cuspp") ?? "").trim();
-    const fechaAfiliacion = String(formData.get("fecha_tramite") ?? "").trim();
-    const tieneDocumentoAlta = Boolean(fileAlta || documentoTramiteAfp?.storage_path);
-    const afiliacionCompleta = Boolean(afpNombre && cuspp && fechaAfiliacion);
-    if (tieneDocumentoAlta && !afiliacionCompleta) {
-      pushToast("Complete el nombre de AFP, CUSPP y fecha de afiliación.", "error");
+    const afiliacionCompleta = Boolean(afpNombre && cuspp);
+    if (!afiliacionCompleta) {
+      pushToast("Indique el nombre de AFP y el CUSPP.", "error");
       return;
     }
     formData.set("tipo", "AFP");
-    formData.set("tramite_estado", tieneDocumentoAlta || afiliacionCompleta ? "TRAMITADO" : "PENDIENTE");
+    formData.set("tramite_estado", "TRAMITADO");
     setPending(true);
     if (fileAlta) {
       if (!documentoTramiteAfp) {
@@ -120,12 +118,7 @@ export function FichaPensiones({
       return;
     }
     setFileAlta(null);
-    if (tieneDocumentoAlta || afiliacionCompleta) {
-      pushToast("Sistema de pensión guardado. Siga con T-Registro.");
-      router.refresh();
-      return;
-    }
-    pushToast("Sistema de pensión guardado.");
+    pushToast("Sistema de pensión guardado. Siga con T-Registro.");
     router.refresh();
   }
 
@@ -160,8 +153,8 @@ export function FichaPensiones({
             <div>
               <p className="text-sm font-medium">Iniciar el trámite AFP</p>
               <p className="text-sm text-muted-foreground">
-                Abra AFPNet, copie el DNI y los datos de abajo y péguelos en el alta. Si el alta ya está hecha, suba el
-                documento más abajo.
+                Abra AFPNet, copie el DNI y los datos de abajo y péguelos en el alta. El documento de alta es opcional:
+                con el nombre de AFP y el CUSPP ya queda registrado.
               </p>
             </div>
             <EnlaceAfpnet afpNombre={pension?.afp_nombre} />
@@ -195,7 +188,7 @@ export function FichaPensiones({
               titulo={TIPO_DOCUMENTO_LABEL.TRAMITE_AFP}
               storagePath={fileAlta ? null : documentoTramiteAfp?.storage_path}
               file={fileAlta}
-              vacio="O suba el documento de alta AFP y complete AFP, CUSPP y fecha de afiliación."
+              vacio="El documento de alta AFP es opcional. Puede subirlo si lo tiene."
               extra={
                 canWrite ? (
                   <FileInput
@@ -213,7 +206,7 @@ export function FichaPensiones({
             />
             <FormSection
               title="Datos de afiliación AFP"
-              hint="Nombre de AFP (Profuturo, Integra, Habitat o Prima), CUSPP y fecha de afiliación."
+              hint="Nombre de AFP (Profuturo, Integra, Habitat o Prima) y CUSPP. La fecha de afiliación es opcional."
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <SelectField

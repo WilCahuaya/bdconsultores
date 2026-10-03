@@ -164,16 +164,17 @@ export function etiquetaAlertaDocumentos(
   return `Alerta: faltan ${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
 }
 
+export function afpConNombreYCuspp(
+  pension: { afp_nombre?: string | null; cuspp?: string | null } | null | undefined,
+): boolean {
+  return Boolean(pension?.afp_nombre?.trim()) && Boolean(pension?.cuspp?.trim());
+}
+
 export function pensionAltaLista(input: Pick<FlujoFichaInput, "pension">): boolean {
   const pension = input.pension;
   if (pension?.tipo === "ONP") return true;
   if (pension?.tipo !== "AFP") return false;
-  return (
-    pension.tramite_estado === "TRAMITADO" &&
-    Boolean(pension.afp_nombre?.trim()) &&
-    Boolean(pension.cuspp?.trim()) &&
-    Boolean(pension.fecha_tramite)
-  );
+  return afpConNombreYCuspp(pension);
 }
 
 export function tRegistroAltaLista(input: Pick<FlujoFichaInput, "documentos" | "tRegistro">): boolean {

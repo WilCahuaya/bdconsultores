@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { panelCardClass } from "@inventario/ui/panel";
 import {
   PASOS_ALTA,
   hrefAltaTrabajador,
@@ -170,23 +169,6 @@ export function ProcesoDesdeFichaHeader({
         Ver ficha
       </Link>
     </div>
-  );
-}
-
-export function AlertaDocumentosAlta({
-  relacionId,
-  etiqueta,
-}: {
-  relacionId: string;
-  etiqueta: string;
-}) {
-  return (
-    <p className={`${panelCardClass} border-amber-400 bg-amber-50 p-4 text-sm text-amber-950`}>
-      {etiqueta}. Puede seguir el contrato; el recuadro del documento queda en alerta hasta que lo suba.{" "}
-      <Link href={hrefAltaTrabajador(relacionId, "documentos")} className="font-medium underline">
-        Ir a documentos
-      </Link>
-    </p>
   );
 }
 

@@ -21,6 +21,7 @@ import {
   etiquetaCodigoOcupacion,
   formatFechaPlanilla,
   LEYENDA_CODIGO_OCUPACION,
+  ASIGNACION_FAMILIAR_SOLES,
   montoAsignacionFamiliar,
   remuneracionBruta,
 } from "@/lib/planillas-labels";
@@ -146,7 +147,7 @@ export function FichaTRegistro({
         <div>
           <p className="text-sm font-medium">Datos para pegar en T-Registro</p>
           <p className="text-sm text-muted-foreground">
-            Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta. La remuneración bruta es la remuneración más S/ 113 si tiene asignación familiar.
+            Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta. La remuneración bruta es la remuneración más S/ {ASIGNACION_FAMILIAR_SOLES} si tiene asignación familiar.
           </p>
         </div>
         <a

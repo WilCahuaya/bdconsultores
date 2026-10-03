@@ -2114,11 +2114,10 @@ export type TipoPension = "AFP" | "ONP";
 export type EstadoTramitePension = "PENDIENTE" | "TRAMITADO" | "NO_APLICA";
 export type TipoTRegistro = "ALTA" | "BAJA";
 
-/** Documentos que se piden al inicio del alta (la asignación familiar solo si la ficha dice que la recibe). */
+/** Documentos que alertan si faltan al inicio del alta. El sistema de pensiones es opcional: con nombre de AFP y CUSPP basta. La asignación familiar solo si la ficha dice que la recibe. */
 export const CHECKLIST_DOCUMENTOS_ALTA_PLANILLAS: TipoDocumentoPlanilla[] = [
   "DNI",
   "FICHA_DATOS",
-  "PENSIONES_FIRMADO",
 ];
 
 export const TIPOS_DOCUMENTO_ALTA_INICIALES: TipoDocumentoPlanilla[] = [
