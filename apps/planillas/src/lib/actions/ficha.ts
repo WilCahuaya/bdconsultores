@@ -563,6 +563,10 @@ export async function asegurarDocumentoTrAlta(relacionId: string): Promise<void>
   await asegurarDocumentoTramite(relacionId, "TR_ALTA");
 }
 
+export async function asegurarDocumentoTrBaja(relacionId: string): Promise<void> {
+  await asegurarDocumentoTramite(relacionId, "TR_BAJA");
+}
+
 export async function asegurarDocumentosVidaLey(relacionId: string): Promise<void> {
   await asegurarDocumentoTramite(relacionId, "VIDA_LEY");
 }
@@ -573,6 +577,7 @@ async function asegurarDocumentoTramite(
     TipoDocumentoPlanilla,
     | "TRAMITE_AFP"
     | "TR_ALTA"
+    | "TR_BAJA"
     | "VIDA_LEY"
   >,
 ): Promise<void> {

@@ -24,6 +24,7 @@ import { getTrabajador, listTrabajadores } from "@/lib/actions/trabajadores";
 import { listAdendas } from "@/lib/actions/adendas";
 import {
   asegurarDocumentoTrAlta,
+  asegurarDocumentoTrBaja,
   asegurarDocumentoTramiteAfp,
   asegurarDocumentosAlta,
   getPension,
@@ -68,6 +69,7 @@ export default async function ContratoProcesoPage({
     await Promise.all([
       asegurarDocumentoTramiteAfp(params.relacionId),
       asegurarDocumentoTrAlta(params.relacionId),
+      asegurarDocumentoTrBaja(params.relacionId),
     ]);
   }
   const [contratos, documentos, adendas, pension, tRegistro, entidad, solicitudesCtx, hijosAsignacion, companeros] =
@@ -209,6 +211,7 @@ export default async function ContratoProcesoPage({
               documentoDni={documentos.find((d) => d.tipo === "DNI") ?? null}
               documentoFicha={documentos.find((d) => d.tipo === "FICHA_DATOS") ?? null}
               documentoTrAlta={documentos.find((d) => d.tipo === "TR_ALTA") ?? null}
+              documentoTrBaja={documentos.find((d) => d.tipo === "TR_BAJA") ?? null}
               canWrite={esEstudio && !fichaCesada}
             />
           </div>

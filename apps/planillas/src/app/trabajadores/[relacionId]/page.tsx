@@ -78,8 +78,8 @@ export default async function FichaTrabajadorPage({
   const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const fichaCesada = trabajador.estado === "CESADA";
-  const canEditFicha = puedeEditarFichaLaboral(profile) && !fichaCesada;
-  if (esEstudio && tab === "vida-ley" && !fichaCesada) {
+  const canEditFicha = puedeEditarFichaLaboral(profile);
+  if (esEstudio && tab === "vida-ley") {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
   const [documentos, vidaLey, lote, vacaciones, contratos, entidad, companeros] = await Promise.all([
@@ -215,7 +215,7 @@ export default async function FichaTrabajadorPage({
         </div>
         {fichaCesada ? (
           <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
-            Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
+            Esta ficha está de baja. Puede cargar Vida Ley, asistencias y vacaciones.
           </p>
         ) : null}
         {!tab ? (
@@ -248,7 +248,7 @@ export default async function FichaTrabajadorPage({
                     )
                 : []
             }
-            canWrite={esEstudio && !fichaCesada}
+            canWrite={esEstudio}
           />
         ) : null}
         {tab === "asistencia" ? (

@@ -27,6 +27,7 @@ import {
 } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField } from "@/components/fields";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
+import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
@@ -50,6 +51,7 @@ export function FichaTRegistro({
   documentoDni,
   documentoFicha,
   documentoTrAlta,
+  documentoTrBaja,
   canWrite,
 }: {
   relacionId: string;
@@ -59,13 +61,16 @@ export function FichaTRegistro({
   documentoDni: DocumentoRow | null;
   documentoFicha: DocumentoRow | null;
   documentoTrAlta: DocumentoRow | null;
+  documentoTrBaja: DocumentoRow | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [pendingAlta, setPendingAlta] = useState(false);
+  const [pendingBaja, setPendingBaja] = useState(false);
   const [pending, setPending] = useState(false);
   const [fileAlta, setFileAlta] = useState<File | null>(null);
+  const [fileBaja, setFileBaja] = useState<File | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const persona = trabajador.persona;
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
@@ -115,6 +120,44 @@ export function FichaTRegistro({
     setFileAlta(null);
     setPendingAlta(false);
     pushToast("Alta de T-Registro guardada.");
+    router.refresh();
+  }
+
+  async function guardarBaja() {
+    if (!fileBaja && !documentoTrBaja?.storage_path) {
+      pushToast("Suba la baja de T-Registro.", "error");
+      return;
+    }
+    if (!fileBaja) {
+      pushToast("La baja de T-Registro ya está guardada.");
+      return;
+    }
+    setPendingBaja(true);
+    if (!documentoTrBaja) {
+      setPendingBaja(false);
+      pushToast("No se pudo registrar la baja. Recargue la página.", "error");
+      return;
+    }
+    const upload = await uploadDocumentoFile(
+      trabajador.entidad_id,
+      relacionId,
+      documentoTrBaja.id,
+      fileBaja,
+      documentoTrBaja.storage_path,
+    );
+    if (upload.error || !upload.path) {
+      setPendingBaja(false);
+      pushToast(upload.error ?? "No se pudo subir la baja de T-Registro.", "error");
+      return;
+    }
+    const savedFile = await setDocumentoArchivo(relacionId, documentoTrBaja.id, upload.path);
+    setPendingBaja(false);
+    if (savedFile.error) {
+      pushToast(savedFile.error, "error");
+      return;
+    }
+    setFileBaja(null);
+    pushToast("Baja de T-Registro guardada.");
     router.refresh();
   }
 
@@ -225,6 +268,39 @@ export function FichaTRegistro({
           <p className="text-sm text-muted-foreground">Solo consulta.</p>
         )}
       </form>
+
+      <div className="space-y-4">
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.TR_BAJA}
+          storagePath={fileBaja ? null : documentoTrBaja?.storage_path}
+          file={fileBaja}
+          vacio="Suba la baja de T-Registro cuando la tenga en SUNAT."
+          extra={
+            canWrite ? (
+              <FileInput
+                accept={DOCUMENTO_ACCEPT}
+                disabled={pendingBaja}
+                file={fileBaja}
+                buttonLabel={
+                  fileBaja || documentoTrBaja?.storage_path
+                    ? "Cambiar baja de T-Registro"
+                    : "Subir baja de T-Registro"
+                }
+                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                onFileChange={setFileBaja}
+              />
+            ) : null
+          }
+        />
+        {canWrite ? (
+          <div className="space-y-4">
+            <Button type="button" disabled={pendingBaja} onClick={() => void guardarBaja()}>
+              {pendingBaja ? "Guardando…" : "Guardar baja de T-Registro"}
+            </Button>
+            <DarDeBajaControl trabajador={trabajador} />
+          </div>
+        ) : null}
+      </div>
 
       <ul className={`${panelCardClass} divide-y p-0`}>
         {items.length === 0 ? (

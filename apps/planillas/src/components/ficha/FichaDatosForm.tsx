@@ -21,7 +21,6 @@ import {
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
-import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
 
 export function FichaPersonaForm({
   trabajador,
@@ -168,9 +167,6 @@ export function FichaPuestoForm({
                 defaultValue={trabajador.fecha_ingreso}
                 readOnly={!canWrite}
                 hint="De la empresa, no del PDF de contrato."
-                action={
-                  !cesada && canWrite ? <DarDeBajaControl trabajador={trabajador} compact /> : undefined
-                }
               />
             </div>
             {cesada ? (

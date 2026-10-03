@@ -34,7 +34,6 @@ export default async function VacacionesPage({
     porRelacion.set(row.relacion_id, lista);
   }
   const filas = trabajadores
-    .filter((t) => t.estado === "ACTIVA")
     .map((t) => ({
       trabajador: t,
       resumen: resumenPeriodoVacacion(porRelacion.get(t.id) ?? [], t.fecha_ingreso, periodo),
@@ -117,7 +116,7 @@ export default async function VacacionesPage({
                   {filas.length === 0 ? (
                     <tr>
                       <td className="px-4 py-8 text-muted-foreground" colSpan={6}>
-                        No hay trabajadores activos en esta empresa.
+                        No hay trabajadores en esta empresa.
                       </td>
                     </tr>
                   ) : (
@@ -131,6 +130,7 @@ export default async function VacacionesPage({
                             className="font-medium text-primary hover:underline"
                           >
                             {nombreCompleto(trabajador.persona)}
+                            {trabajador.estado === "CESADA" ? " · Baja" : ""}
                           </Link>
                         </td>
                         <td className="px-4 py-2">
