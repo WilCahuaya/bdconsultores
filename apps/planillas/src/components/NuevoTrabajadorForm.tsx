@@ -35,11 +35,6 @@ export function NuevoTrabajadorForm({
   const [apellidoMaterno, setApellidoMaterno] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [entidadId, setEntidadId] = useState(defaultEntidadId);
-  const [yaBaja, setYaBaja] = useState(false);
-  const [fechaIngreso, setFechaIngreso] = useState("");
-  const [fechaCese, setFechaCese] = useState("");
-  const [motivoBaja, setMotivoBaja] = useState<"CARTA_RENUNCIA" | "TERMINO_CONTRATO">("CARTA_RENUNCIA");
-  const [bajaFile, setBajaFile] = useState<File | null>(null);
 
   async function buscarPorDni() {
     setBuscando(true);
@@ -58,54 +53,31 @@ export function NuevoTrabajadorForm({
   }
 
   async function onSubmit(formData: FormData) {
-    if (yaBaja && !bajaFile) {
-      pushToast(
-        motivoBaja === "CARTA_RENUNCIA" ? "Suba la carta de renuncia." : "Suba el documento de T-Registro baja.",
-        "error",
-      );
-      return;
-    }
     setPending(true);
     const result = await createTrabajador(formData);
-    const empresaId = lockEntidad ? defaultEntidadId : entidadId;
     if (result.error && !result.relacionId) {
       setPending(false);
       pushToast(result.error, "error");
       return;
     }
-    if (result.relacionId && result.dniDocumentoId && dniFile) {
-      const upload = await uploadDocumentoFile(empresaId, result.relacionId, result.dniDocumentoId, dniFile, null);
-      if (upload.path) await setDocumentoArchivo(result.relacionId, result.dniDocumentoId, upload.path);
+    if (result.error && result.relacionId) {
+      pushToast(result.error, "error");
+      router.push(`/contratos/${result.relacionId}?paso=documentos`);
+      return;
     }
-    if (result.relacionId && result.bajaDocumentoId && bajaFile) {
-      const upload = await uploadDocumentoFile(empresaId, result.relacionId, result.bajaDocumentoId, bajaFile, null);
-      if (upload.error || !upload.path) {
-        setPending(false);
-        pushToast(upload.error ?? "No se pudo subir el documento de baja.", "error");
-        router.push(`/?entidadId=${empresaId}&bajas=1`);
-        return;
-      }
-      const saved = await setDocumentoArchivo(result.relacionId, result.bajaDocumentoId, upload.path);
-      if (saved.error) {
-        setPending(false);
-        pushToast(saved.error, "error");
-        router.push(`/?entidadId=${empresaId}&bajas=1`);
-        return;
+    if (result.relacionId && result.dniDocumentoId && dniFile) {
+      const upload = await uploadDocumentoFile(
+        lockEntidad ? defaultEntidadId : entidadId,
+        result.relacionId,
+        result.dniDocumentoId,
+        dniFile,
+        null,
+      );
+      if (upload.path) {
+        await setDocumentoArchivo(result.relacionId, result.dniDocumentoId, upload.path);
       }
     }
     setPending(false);
-    if (result.error) {
-      pushToast(result.error, "error");
-      if (result.relacionId) {
-        router.push(yaBaja ? `/?entidadId=${empresaId}&bajas=1` : `/contratos/${result.relacionId}?paso=documentos`);
-      }
-      return;
-    }
-    if (yaBaja) {
-      pushToast("Trabajador de baja guardado. Aparece al marcar Mostrar bajas.");
-      router.push(`/?entidadId=${empresaId}&bajas=1`);
-      return;
-    }
     pushToast("Siga con documentos, persona y puesto en Contratos.");
     if (result.relacionId) router.push(`/contratos/${result.relacionId}?paso=documentos`);
   }
@@ -122,7 +94,6 @@ export function NuevoTrabajadorForm({
       <input type="hidden" name="apellido_paterno" value={apellidoPaterno} />
       <input type="hidden" name="apellido_materno" value={apellidoMaterno} />
       <input type="hidden" name="fecha_nacimiento" value={fechaNacimiento} />
-      {yaBaja ? <input type="hidden" name="ya_baja" value="1" /> : null}
 
       <AltaPasosNav tab="documentos" />
 
@@ -197,69 +168,12 @@ export function NuevoTrabajadorForm({
                 title="Número del trabajador, por ejemplo 01"
               />
             </div>
-            <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-input"
-                checked={yaBaja}
-                onChange={(event) => setYaBaja(event.target.checked)}
-              />
-              Ya está de baja
-            </label>
-            {yaBaja ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <p className="text-sm text-muted-foreground sm:col-span-2">
-                  El número puede coincidir con el de un trabajador activo. Esta ficha no entra en la lista de actuales.
-                </p>
-                <DateField
-                  label="Fecha de ingreso a la empresa"
-                  name="fecha_ingreso"
-                  required
-                  value={fechaIngreso}
-                  onChange={setFechaIngreso}
-                />
-                <DateField
-                  label="Fecha de cese en la empresa"
-                  name="fecha_cese"
-                  required
-                  value={fechaCese}
-                  onChange={setFechaCese}
-                />
-                <SelectField
-                  label="Motivo de baja"
-                  name="tipo_baja"
-                  value={motivoBaja}
-                  options={[
-                    { value: "CARTA_RENUNCIA", label: TIPO_DOCUMENTO_LABEL.CARTA_RENUNCIA },
-                    { value: "TERMINO_CONTRATO", label: TIPO_DOCUMENTO_LABEL.TERMINO_CONTRATO },
-                  ]}
-                  onChange={(event) => {
-                    setMotivoBaja(event.target.value as "CARTA_RENUNCIA" | "TERMINO_CONTRATO");
-                    setBajaFile(null);
-                  }}
-                />
-                <FileInput
-                  accept={DOCUMENTO_ACCEPT}
-                  disabled={pending}
-                  file={bajaFile}
-                  buttonLabel={
-                    bajaFile
-                      ? "Cambiar archivo"
-                      : motivoBaja === "CARTA_RENUNCIA"
-                        ? "Subir carta de renuncia"
-                        : "Subir T-Registro baja"
-                  }
-                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                  onFileChange={setBajaFile}
-                />
-              </div>
-            ) : null}
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" disabled={buscando || pending || (dni.length !== 8 && dni.length !== 9)} onClick={() => void buscarPorDni()}>
                 {buscando ? "Consultando…" : "Buscar en RENIEC"}
               </Button>
               <Button type="submit" disabled={pending || buscando}>
-                {pending ? "Guardando…" : yaBaja ? "Guardar baja" : "Guardar datos del DNI"}
+                {pending ? "Guardando…" : "Guardar datos del DNI"}
               </Button>
             </div>
           </>

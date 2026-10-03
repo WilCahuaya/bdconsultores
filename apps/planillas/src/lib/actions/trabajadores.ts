@@ -134,7 +134,7 @@ function normalizeDni(value: string): string {
 function mensajeErrorNumero(error: { code?: string; message?: string }): string | null {
   const message = error.message ?? "";
   if (error.code === "23505" && message.includes("relaciones_numero")) {
-    return "Ya hay un trabajador activo con ese número en esta empresa.";
+    return "Ya hay un trabajador con ese número en esta empresa.";
   }
   if (error.code === "23514" && message.includes("relaciones_numero_positivo")) {
     return "Use un número como 01 o 15.";
@@ -247,9 +247,7 @@ function mapTrabajadorRow(row: {
   };
 }
 
-export async function createTrabajador(
-  formData: FormData,
-): Promise<{ error?: string; relacionId?: string; dniDocumentoId?: string; bajaDocumentoId?: string }> {
+export async function createTrabajador(formData: FormData): Promise<{ error?: string; relacionId?: string; dniDocumentoId?: string }> {
   const profile = await requirePlanillasProfile();
   if (!puedeCrearTrabajador(profile)) return { error: "No tiene permiso para registrar trabajadores." };
 
@@ -273,21 +271,6 @@ export async function createTrabajador(
   if (cargo.error) return { error: cargo.error };
   const numero = parseNumeroTrabajador(String(formData.get("numero") ?? ""));
   if (numero.error || numero.value == null) return { error: numero.error ?? "El número del trabajador es obligatorio." };
-  const yaBaja = String(formData.get("ya_baja") ?? "") === "1";
-  let fechaCese: string | null = null;
-  let tipoBajaDoc: "CARTA_RENUNCIA" | "TR_BAJA" | null = null;
-  if (yaBaja) {
-    if (!ingreso.value) return { error: "Indique la fecha de ingreso a la empresa." };
-    const cese = parseFechaCampo(String(formData.get("fecha_cese") ?? ""), "Fecha de cese en la empresa");
-    if (cese.error) return { error: cese.error };
-    if (!cese.value) return { error: "Indique la fecha de cese en la empresa." };
-    if (cese.value < ingreso.value) return { error: "El cese no puede ser anterior al ingreso a la empresa." };
-    const motivo = String(formData.get("tipo_baja") ?? "").trim();
-    if (motivo === "CARTA_RENUNCIA") tipoBajaDoc = "CARTA_RENUNCIA";
-    else if (motivo === "TERMINO_CONTRATO") tipoBajaDoc = "TR_BAJA";
-    else return { error: "Indique si la baja es por carta de renuncia o término de contrato." };
-    fechaCese = cese.value;
-  }
 
   const db = await planillasDb();
   const admin = createAdminClient();
@@ -335,8 +318,7 @@ export async function createTrabajador(
       jornada: (String(formData.get("jornada") ?? "").trim() || null) as JornadaLaboral | null,
       horario: String(formData.get("horario") ?? "").trim() || null,
       fecha_ingreso: ingreso.value,
-      fecha_cese: fechaCese,
-      estado: yaBaja ? "CESADA" : "ACTIVA",
+      estado: "ACTIVA",
       validacion: esPersonalEstudio(profile.rol) ? "ACEPTADA" : "PENDIENTE",
     })
     .select("id")
@@ -370,29 +352,7 @@ export async function createTrabajador(
     .eq("tipo", "DNI")
     .maybeSingle();
 
-  let bajaDocumentoId: string | undefined;
-  if (yaBaja && tipoBajaDoc && fechaCese) {
-    const { data: bajaDoc, error: bajaDocError } = await db
-      .from("documentos")
-      .insert({
-        relacion_id: relacion.id,
-        tipo: tipoBajaDoc,
-        estado: "PENDIENTE",
-      })
-      .select("id")
-      .single();
-    if (bajaDocError) return { error: bajaDocError.message, relacionId: relacion.id };
-    bajaDocumentoId = bajaDoc.id as string;
-    const { error: trError } = await db.from("t_registro").insert({
-      relacion_id: relacion.id,
-      tipo: "BAJA",
-      realizado: true,
-      fecha: fechaCese,
-    });
-    if (trError) return { error: trError.message, relacionId: relacion.id, bajaDocumentoId };
-  }
-
-  return { relacionId: relacion.id, dniDocumentoId: dniDoc?.id as string | undefined, bajaDocumentoId };
+  return { relacionId: relacion.id, dniDocumentoId: dniDoc?.id as string | undefined };
 }
 
 export async function updatePersonaTrabajador(
@@ -534,6 +494,7 @@ export async function darDeBajaTrabajador(
     .update({
       fecha_cese: cese.value,
       estado: "CESADA",
+      numero: null,
     })
     .eq("id", relacionId);
   if (error) return { error: error.message };

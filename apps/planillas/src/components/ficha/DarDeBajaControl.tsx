@@ -103,8 +103,8 @@ export function DarDeBajaControl({
         title="Dar de baja"
         description={
           esCarta
-            ? "La ficha pasa a cesada. Con carta de renuncia solo se sube ese documento."
-            : "La ficha pasa a cesada. En término de contrato solo se sube la baja de T-Registro."
+            ? "La ficha pasa a cesada y suelta el número. Con carta de renuncia solo se sube ese documento."
+            : "La ficha pasa a cesada y suelta el número. En término de contrato solo se sube la baja de T-Registro."
         }
         confirmLabel="Dar de baja"
         confirmVariant="destructive"

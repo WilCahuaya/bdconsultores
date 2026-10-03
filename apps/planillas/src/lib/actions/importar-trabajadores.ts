@@ -106,7 +106,7 @@ function revalidar() {
 
 function mensajeNumero(message: string): string | null {
   if (message.includes("relaciones_numero")) {
-    return "Ya hay un trabajador activo con ese número en esta empresa.";
+    return "Ya hay un trabajador con ese número en esta empresa.";
   }
   return null;
 }
@@ -265,7 +265,7 @@ async function clasificar(
   const relaciones = new Map<string, RelacionExistente>();
   const numerosEmpresa = new Set<number>();
   for (const row of relacionesRes.data ?? []) {
-    if (typeof row.numero === "number" && !row.fecha_cese) numerosEmpresa.add(row.numero);
+    if (typeof row.numero === "number") numerosEmpresa.add(row.numero);
     const anidada = Array.isArray(row.personas) ? row.personas[0] : row.personas;
     if (!anidada || typeof anidada !== "object" || !("dni" in anidada)) continue;
     const persona = anidada as PersonaExistente;
@@ -377,7 +377,7 @@ async function clasificar(
       return {
         ...vacia,
         estado: "omitido" as const,
-        detalle: "Ya hay un trabajador activo con ese número en esta empresa.",
+        detalle: "Ya hay un trabajador con ese número en esta empresa.",
       };
     }
     const notas = [...leida.avisos];
