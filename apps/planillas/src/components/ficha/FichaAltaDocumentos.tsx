@@ -96,7 +96,7 @@ function CapturaDesplegable({
   datos: ReactNode;
   preview: ReactNode;
 }) {
-  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const abiertoAlInicio = useRef(defaultOpen ?? alerta);
   const inicioAplicado = useRef(false);
   const asignarDetails = useCallback((node: HTMLDetailsElement | null) => {
