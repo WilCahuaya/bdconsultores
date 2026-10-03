@@ -48,7 +48,7 @@ export function EliminarTrabajadorButton({
           setOpen(true);
         }}
       >
-        Eliminar trabajador
+        Eliminar
       </Button>
       <ConfirmDialog
         open={open}

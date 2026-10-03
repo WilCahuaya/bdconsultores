@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { entidadEtiqueta } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { AlertaDocumentosAlta, ProcesoDesdeFichaHeader, parseFichaTab } from "@/components/ficha/FichaTabs";
@@ -12,6 +13,7 @@ import {
   puedeEscribirPlanillas,
   requirePlanillasProfile,
 } from "@/lib/auth/access";
+import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador, listTrabajadores } from "@/lib/actions/trabajadores";
 import {
   getVidaLey,
@@ -32,8 +34,8 @@ import {
   flujoDesdeTrabajador,
   resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
-import { CambiarTrabajadorSelect } from "@/components/ficha/CambiarTrabajadorSelect";
 import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorButton";
+import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
@@ -76,13 +78,14 @@ export default async function FichaTrabajadorPage({
   if (esEstudio && tab === "vida-ley" && !fichaCesada) {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [documentos, vidaLey, vacaciones, contratos, companeros] = await Promise.all([
+  const [documentos, vidaLey, vacaciones, contratos, entidad, companeros] = await Promise.all([
     listDocumentos(params.relacionId),
     esEstudio && (tab === "vida-ley" || !tab)
       ? getVidaLey(params.relacionId)
       : Promise.resolve(null),
     !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
     !tab ? listContratos(params.relacionId) : Promise.resolve([]),
+    getEntidadPlanillas(trabajador.entidad_id),
     listTrabajadores(trabajador.entidad_id),
   ]);
   const opcionesTrabajador = companeros.map((item) => ({
@@ -127,29 +130,28 @@ export default async function FichaTrabajadorPage({
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
       <div className="space-y-6">
         <div>
-          <Link href={`/?entidadId=${trabajador.entidad_id}`} className="text-sm text-primary hover:underline">
-            ← Trabajadores
-          </Link>
-          <CambiarTrabajadorSelect
-            trabajadores={opcionesTrabajador}
-            relacionId={params.relacionId}
-            query={queryFicha.toString()}
-          />
+          <div className="flex items-center justify-between gap-3">
+            <FichaRutaTrabajador
+              entidadId={trabajador.entidad_id}
+              empresa={entidad ? entidadEtiqueta(entidad) : "Empresa"}
+              trabajadores={opcionesTrabajador}
+              relacionId={params.relacionId}
+              query={queryFicha.toString()}
+            />
+            {esEstudio ? (
+              <EliminarTrabajadorButton
+                relacionId={params.relacionId}
+                entidadId={trabajador.entidad_id}
+                nombre={nombreCompleto(trabajador.persona)}
+              />
+            ) : null}
+          </div>
           <h1 className="mt-2 text-xl font-bold text-primary sm:text-2xl">{etiquetaTrabajador(trabajador.persona, trabajador.numero)}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             DNI {trabajador.persona.dni} · {ESTADO_RELACION_LABEL[trabajador.estado]}
             {trabajador.cargo ? ` · ${trabajador.cargo}` : ""}
             {` · ${ESTADO_VALIDACION_ALTA_LABEL[trabajador.validacion]}`}
           </p>
-          {esEstudio ? (
-            <div className="mt-3">
-              <EliminarTrabajadorButton
-                relacionId={params.relacionId}
-                entidadId={trabajador.entidad_id}
-                nombre={nombreCompleto(trabajador.persona)}
-              />
-            </div>
-          ) : null}
         </div>
         {fichaCesada ? (
           <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
