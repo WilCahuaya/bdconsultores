@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import type { EstadoContratoPlanilla, JornadaLaboral, TipoAdendaPlanilla } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { representanteDesdeEntidad } from "@/lib/representante-contrato";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { parseCargoCampo, parseFechaCampo } from "@/lib/planillas-labels";
@@ -27,10 +29,14 @@ export type AdendaRow = {
   estado: EstadoContratoPlanilla;
   datos_confirmados: boolean;
   storage_path: string | null;
+  representante_legal_nombre: string | null;
+  representante_legal_dni: string | null;
+  representante_legal_cargo: string | null;
+  representante_legal_guardado: boolean;
 };
 
 const ADENDA_SELECT =
-  "id, contrato_id, numero, tipo, fecha_vigencia, fecha_suscripcion, cargo_anterior, cargo_nuevo, remuneracion_anterior, remuneracion_nueva, horario_anterior, horario_nuevo, jornada_anterior, jornada_nueva, estado, datos_confirmados, storage_path";
+  "id, contrato_id, numero, tipo, fecha_vigencia, fecha_suscripcion, cargo_anterior, cargo_nuevo, remuneracion_anterior, remuneracion_nueva, horario_anterior, horario_nuevo, jornada_anterior, jornada_nueva, estado, datos_confirmados, storage_path, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, representante_legal_guardado";
 
 function adendaCerrada(estado: EstadoContratoPlanilla): boolean {
   return estado === "RECOGIDO" || estado === "BAJA" || estado === "COMPLETO";
@@ -89,11 +95,17 @@ export async function generarAdenda(
 
   const cargoActual = trabajador.cargo?.trim() || null;
   if (!cargoActual) return { error: "El trabajador no tiene cargo vigente." };
+  const entidad = await getEntidadPlanillas(trabajador.entidad_id);
+  const representante = representanteDesdeEntidad(entidad);
 
   const campos: Record<string, unknown> = {
     tipo,
     fecha_vigencia: fechaVigencia.value,
     fecha_suscripcion: fechaSuscripcion.value,
+    representante_legal_nombre: representante.nombre,
+    representante_legal_dni: representante.dni,
+    representante_legal_cargo: representante.cargo,
+    representante_legal_guardado: true,
     cargo_anterior: cargoActual,
     cargo_nuevo: null,
     remuneracion_anterior: trabajador.remuneracion,

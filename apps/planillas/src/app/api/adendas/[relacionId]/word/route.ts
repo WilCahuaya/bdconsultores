@@ -4,6 +4,7 @@ import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { listContratos } from "@/lib/actions/ficha";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { bufferAdendaWord, nombreArchivoAdenda, type AdendaWordDatos } from "@/lib/adenda-word";
+import { representanteDesdeEntidad, representanteLegalDelDocumento } from "@/lib/representante-contrato";
 import { getProfile } from "@/lib/auth/profile";
 
 export const runtime = "nodejs";
@@ -53,15 +54,24 @@ export async function GET(
     return NextResponse.json({ error: "La adenda no tiene el cargo anterior." }, { status: 400 });
   }
 
+  const representante = representanteLegalDelDocumento(
+    {
+      guardado: adenda.representante_legal_guardado,
+      nombre: adenda.representante_legal_nombre,
+      dni: adenda.representante_legal_dni,
+      cargo: adenda.representante_legal_cargo,
+    },
+    representanteDesdeEntidad(entidad),
+  );
   const datos: AdendaWordDatos = {
     tipo: adenda.tipo,
     jornadaContrato: jornada,
     entidadNombre: entidad.nombre,
     ruc: entidad.ruc,
     domicilio: entidad.direccion,
-    rlNombre: entidad.representante_legal_nombre ?? null,
-    rlDni: entidad.representante_legal_dni ?? null,
-    rlCargo: entidad.representante_legal_cargo ?? null,
+    rlNombre: representante.nombre,
+    rlDni: representante.dni,
+    rlCargo: representante.cargo,
     personaNombres: trabajador.persona.nombres,
     apellidoPaterno: trabajador.persona.apellido_paterno,
     apellidoMaterno: trabajador.persona.apellido_materno,

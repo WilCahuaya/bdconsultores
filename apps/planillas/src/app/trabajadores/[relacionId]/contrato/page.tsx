@@ -7,6 +7,7 @@ import { listContratos } from "@/lib/actions/ficha";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { requirePlanillasProfile } from "@/lib/auth/access";
 import { cargoCanonico, funcionesDeCargo } from "@/lib/cargos-funciones";
+import { representanteDesdeEntidad, representanteLegalDelDocumento } from "@/lib/representante-contrato";
 import { HorarioContratoVista } from "@/components/ficha/HorarioContratoVista";
 import {
   JORNADA_LABEL,
@@ -45,6 +46,15 @@ export default async function ContratoDocumentoPage({
   const funciones = funcionesDeCargo(cargo);
   const jornada = contrato.jornada ?? trabajador.jornada;
   const horario = contrato.horario ?? trabajador.horario;
+  const representante = representanteLegalDelDocumento(
+    {
+      guardado: contrato.representante_legal_guardado,
+      nombre: contrato.representante_legal_nombre,
+      dni: contrato.representante_legal_dni,
+      cargo: contrato.representante_legal_cargo,
+    },
+    representanteDesdeEntidad(entidad),
+  );
   const wordHref = `${webAppById("planillas").basePath}/api/contratos/${params.relacionId}/word?contratoId=${contrato.id}`;
 
   return (
@@ -66,11 +76,11 @@ export default async function ContratoDocumentoPage({
         <p>{entidad.nombre}</p>
         {entidad.ruc ? <p>RUC {entidad.ruc}</p> : null}
         {entidad.direccion ? <p>{entidad.direccion}</p> : null}
-        {entidad.representante_legal_nombre ? (
+        {representante.nombre || representante.dni || representante.cargo ? (
           <p>
-            Representante legal: {entidad.representante_legal_nombre}
-            {entidad.representante_legal_dni ? ` · DNI ${entidad.representante_legal_dni}` : ""}
-            {entidad.representante_legal_cargo ? ` · ${entidad.representante_legal_cargo}` : ""}
+            Representante legal: {representante.nombre ?? "—"}
+            {representante.dni ? ` · DNI ${representante.dni}` : ""}
+            {representante.cargo ? ` · ${representante.cargo}` : ""}
           </p>
         ) : null}
       </section>

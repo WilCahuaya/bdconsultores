@@ -12,7 +12,9 @@ import type {
 } from "@inventario/types";
 import { TIPOS_DOCUMENTO_ALTA_INICIALES } from "@inventario/types";
 import { puedeEditarFichaLaboral, puedeEscribirPlanillas, requirePlanillasProfile } from "@/lib/auth/access";
+import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { representanteDesdeEntidad } from "@/lib/representante-contrato";
 import { altasAfiliacionListas, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
 import { pathPerteneceAlDocumento } from "@/lib/documento-storage";
 import { parseFechaCampo, parseCargoCampo, armarDireccionPersona, montoAsignacionFamiliar, vidaLeyPendienteRecepcion } from "@/lib/planillas-labels";
@@ -56,6 +58,10 @@ export type ContratoRow = {
   datos_confirmados: boolean;
   documento_id: string | null;
   solicitud_registro_id: string | null;
+  representante_legal_nombre: string | null;
+  representante_legal_dni: string | null;
+  representante_legal_cargo: string | null;
+  representante_legal_guardado: boolean;
 };
 
 export type DocumentoRow = {
@@ -98,7 +104,7 @@ export async function listContratos(relacionId: string): Promise<ContratoRow[]> 
   const db = await planillasDb();
   const { data, error } = await db
     .from("contratos")
-    .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados, documento_id, solicitud_registro_id")
+    .select("id, version, numero_contrato, cargo, horario, fecha_inicio, fecha_fin, remuneracion, asignacion_familiar, jornada, es_vigente, estado, datos_confirmados, documento_id, solicitud_registro_id, representante_legal_nombre, representante_legal_dni, representante_legal_cargo, representante_legal_guardado")
     .eq("relacion_id", relacionId)
     .neq("estado", "BAJA")
     .order("version", { ascending: false });
@@ -246,6 +252,8 @@ export async function generarContratoParaFirma(
   if (parsed.error || !parsed.value) return { error: parsed.error ?? "Datos incompletos." };
   const snapshot = parsed.value;
   const asignacionFamiliar = montoAsignacionFamiliar(gate.trabajador.recibe_asignacion_familiar);
+  const entidad = await getEntidadPlanillas(gate.trabajador.entidad_id);
+  const representante = representanteDesdeEntidad(entidad);
 
   const db = await planillasDb();
   const { data: existentes, error: listError } = await db
@@ -268,6 +276,10 @@ export async function generarContratoParaFirma(
     fecha_fin: snapshot.fecha_fin,
     remuneracion: snapshot.remuneracion,
     asignacion_familiar: asignacionFamiliar,
+    representante_legal_nombre: representante.nombre,
+    representante_legal_dni: representante.dni,
+    representante_legal_cargo: representante.cargo,
+    representante_legal_guardado: true,
     datos_confirmados: false,
     es_vigente: false,
   };

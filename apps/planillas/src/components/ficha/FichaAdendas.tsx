@@ -157,7 +157,8 @@ export function FichaAdendas({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        La adenda modifica una sola cláusula del contrato vigente: cargo, sueldo u horario. El contrato original y la
+        La adenda modifica una sola cláusula del contrato vigente: cargo, sueldo u horario. También guarda el
+        representante legal de la empresa en ese momento. El contrato original y la
         fecha de ingreso no cambian. Al confirmar el PDF firmado, esa condición pasa a ser la vigente.
       </p>
 

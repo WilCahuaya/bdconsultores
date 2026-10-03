@@ -43,6 +43,36 @@ export async function listEntidadesPlanillas(): Promise<Entidad[]> {
   return sortEntidadesByNumero((data ?? []) as Entidad[]);
 }
 
+/** Si la empresa no tiene correo o teléfono, los toma de la ficha del administrador (mismo DNI). */
+async function completarContactoAdminDesdeFicha(
+  supabase: SupabaseClient,
+  entidades: Pick<Entidad, "admin_dni" | "admin_email" | "admin_telefono">[],
+) {
+  const pendientes = entidades.filter(
+    (entidad) =>
+      entidad.admin_dni?.trim() &&
+      (!entidad.admin_email?.trim() || !entidad.admin_telefono?.trim()),
+  );
+  if (pendientes.length === 0) return;
+
+  const dnis = [...new Set(pendientes.map((entidad) => entidad.admin_dni!.trim()))];
+  const { data } = await supabase
+    .schema("planillas")
+    .from("personas")
+    .select("dni, correo, celular")
+    .in("dni", dnis);
+  const porDni = new Map((data ?? []).map((persona) => [persona.dni as string, persona]));
+
+  for (const entidad of pendientes) {
+    const persona = porDni.get(entidad.admin_dni!.trim());
+    if (!persona) continue;
+    const correo = typeof persona.correo === "string" ? persona.correo.trim() : "";
+    const celular = typeof persona.celular === "string" ? persona.celular.trim() : "";
+    if (!entidad.admin_email?.trim() && correo) entidad.admin_email = correo;
+    if (!entidad.admin_telefono?.trim() && celular) entidad.admin_telefono = celular;
+  }
+}
+
 export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | null> {
   const profile = await requirePlanillasProfile();
   const alcance = entidadAlcance(profile);
@@ -58,7 +88,9 @@ export async function getEntidadPlanillas(entidadId: string): Promise<Entidad | 
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data || data.usa_planillas !== true) return null;
-  return data as Entidad;
+  const entidad = data as Entidad;
+  await completarContactoAdminDesdeFicha(supabase, [entidad]);
+  return entidad;
 }
 
 export async function consultarRuc(ruc: string): Promise<{

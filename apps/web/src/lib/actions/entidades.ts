@@ -12,6 +12,7 @@ import {
   validarNumeroInterno,
   validarPeCodigo,
 } from "@inventario/types";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { inviteEntidadAdmin } from "@/lib/auth/entidad-admin";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
@@ -29,6 +30,36 @@ export interface CreateEntidadInput {
   admin_email?: string;
   admin_dni?: string;
   admin_telefono?: string;
+}
+
+/** Si la empresa no tiene correo o teléfono, los toma de la ficha del administrador (mismo DNI). */
+async function completarContactoAdminDesdeFicha(
+  supabase: SupabaseClient,
+  entidades: Pick<Entidad, "admin_dni" | "admin_email" | "admin_telefono">[],
+) {
+  const pendientes = entidades.filter(
+    (entidad) =>
+      entidad.admin_dni?.trim() &&
+      (!entidad.admin_email?.trim() || !entidad.admin_telefono?.trim()),
+  );
+  if (pendientes.length === 0) return;
+
+  const dnis = [...new Set(pendientes.map((entidad) => entidad.admin_dni!.trim()))];
+  const { data } = await supabase
+    .schema("planillas")
+    .from("personas")
+    .select("dni, correo, celular")
+    .in("dni", dnis);
+  const porDni = new Map((data ?? []).map((persona) => [persona.dni as string, persona]));
+
+  for (const entidad of pendientes) {
+    const persona = porDni.get(entidad.admin_dni!.trim());
+    if (!persona) continue;
+    const correo = typeof persona.correo === "string" ? persona.correo.trim() : "";
+    const celular = typeof persona.celular === "string" ? persona.celular.trim() : "";
+    if (!entidad.admin_email?.trim() && correo) entidad.admin_email = correo;
+    if (!entidad.admin_telefono?.trim() && celular) entidad.admin_telefono = celular;
+  }
 }
 
 export async function createEntidad(input: CreateEntidadInput) {
@@ -146,13 +177,13 @@ export async function listEntidades(): Promise<EntidadConConteo[]> {
     activoCountByEntidad.set(entidadId, (activoCountByEntidad.get(entidadId) ?? 0) + 1);
   }
 
-  return sortEntidadesByNumero(
-    ((data ?? []) as Entidad[]).map((entidad) => ({
-      ...entidad,
-      ambiente_count: ambienteCountByEntidad.get(entidad.id) ?? 0,
-      activo_count: activoCountByEntidad.get(entidad.id) ?? 0,
-    })),
-  );
+  const entidades = ((data ?? []) as Entidad[]).map((entidad) => ({
+    ...entidad,
+    ambiente_count: ambienteCountByEntidad.get(entidad.id) ?? 0,
+    activo_count: activoCountByEntidad.get(entidad.id) ?? 0,
+  }));
+  await completarContactoAdminDesdeFicha(supabase, entidades);
+  return sortEntidadesByNumero(entidades);
 }
 
 export async function updateEntidad(entidadId: string, input: CreateEntidadInput) {

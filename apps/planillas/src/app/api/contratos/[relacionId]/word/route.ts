@@ -4,6 +4,7 @@ import { listContratos } from "@/lib/actions/ficha";
 import { getTrabajador } from "@/lib/actions/trabajadores";
 import { getProfile } from "@/lib/auth/profile";
 import { bufferContratoWord, nombreArchivoContrato, type ContratoWordDatos } from "@/lib/contrato-word";
+import { representanteDesdeEntidad, representanteLegalDelDocumento } from "@/lib/representante-contrato";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,14 +58,23 @@ export async function GET(
     return NextResponse.json({ error: "El contrato no tiene remuneración." }, { status: 400 });
   }
 
+  const representante = representanteLegalDelDocumento(
+    {
+      guardado: contrato.representante_legal_guardado,
+      nombre: contrato.representante_legal_nombre,
+      dni: contrato.representante_legal_dni,
+      cargo: contrato.representante_legal_cargo,
+    },
+    representanteDesdeEntidad(entidad),
+  );
   const datos: ContratoWordDatos = {
     jornada,
     entidadNombre: entidad.nombre,
     ruc: entidad.ruc,
     domicilio: entidad.direccion,
-    rlNombre: entidad.representante_legal_nombre ?? null,
-    rlDni: entidad.representante_legal_dni ?? null,
-    rlCargo: entidad.representante_legal_cargo ?? null,
+    rlNombre: representante.nombre,
+    rlDni: representante.dni,
+    rlCargo: representante.cargo,
     personaNombres: trabajador.persona.nombres,
     apellidoPaterno: trabajador.persona.apellido_paterno,
     apellidoMaterno: trabajador.persona.apellido_materno,
