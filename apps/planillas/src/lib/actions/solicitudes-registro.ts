@@ -123,8 +123,10 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
   }[];
 
   function etiquetaContrato(relacionId: string, version: number): string {
-    const base = relaciones.get(relacionId)?.etiqueta ?? "Trabajador";
-    return `${base} · versión ${version}`;
+    const relacion = relaciones.get(relacionId);
+    const base = relacion?.etiqueta ?? "Trabajador";
+    const baja = relacion?.estado === "CESADA" ? " · Baja" : "";
+    return `${base}${baja} · versión ${version}`;
   }
 
   const solicitudes: SolicitudRegistroVista[] = ((solicitudesRes.data ?? []) as SolicitudRegistroVista[]).map((solicitud) => ({
@@ -143,9 +145,9 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
 
   const abiertos = new Map<string, (typeof contratos)[number]>();
   for (const contrato of contratos) {
-    if (CERRADOS.has(contrato.estado)) continue;
     const relacion = relaciones.get(contrato.relacion_id);
-    if (!relacion || relacion.estado !== "ACTIVA") continue;
+    if (!relacion) continue;
+    if (relacion.estado !== "CESADA" && CERRADOS.has(contrato.estado)) continue;
     const previo = abiertos.get(contrato.relacion_id);
     if (!previo || contrato.version > previo.version) abiertos.set(contrato.relacion_id, contrato);
   }
@@ -185,8 +187,24 @@ async function contratosDeLaEmpresa(
   const rows = (data ?? []) as FilaContratoEmpresa[];
   if (rows.length !== ids.length) return { error: "Hay un contrato que no existe." };
   if (rows.some((row) => row.entidad_id !== entidadId)) return { error: "El contrato no es de esta empresa." };
-  if (rows.some((row) => CERRADOS.has(row.estado))) {
-    return { error: "Un contrato cerrado no se puede enlazar a la solicitud." };
+  const cerrados = rows.filter((row) => CERRADOS.has(row.estado));
+  if (cerrados.length > 0) {
+    const { data: relaciones, error: relError } = await db
+      .from("relaciones_laborales")
+      .select("id, estado")
+      .in(
+        "id",
+        cerrados.map((row) => row.relacion_id),
+      );
+    if (relError) return { error: relError.message };
+    const cesada = new Set(
+      ((relaciones ?? []) as { id: string; estado: string }[])
+        .filter((row) => row.estado === "CESADA")
+        .map((row) => row.id),
+    );
+    if (cerrados.some((row) => row.estado === "BAJA" || !cesada.has(row.relacion_id))) {
+      return { error: "Un contrato cerrado no se puede enlazar a la solicitud." };
+    }
   }
   return { rows };
 }

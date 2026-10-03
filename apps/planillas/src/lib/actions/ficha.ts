@@ -1039,9 +1039,7 @@ export async function listVidaLeyEmpresa(entidadId: string): Promise<
 > {
   const profile = await requirePlanillasProfile();
   if (!puedeEscribirPlanillas(profile)) return [];
-  const trabajadores = (await listTrabajadores(entidadId)).filter(
-    (t) => t.estado === "ACTIVA" && t.validacion !== "PENDIENTE",
-  );
+  const trabajadores = (await listTrabajadores(entidadId)).filter((t) => t.validacion !== "PENDIENTE");
   if (trabajadores.length === 0) return [];
   const db = await planillasDb();
   const { data, error } = await db

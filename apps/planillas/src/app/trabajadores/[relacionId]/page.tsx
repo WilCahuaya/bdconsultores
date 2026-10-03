@@ -242,7 +242,10 @@ export default async function FichaTrabajadorPage({
               lote
                 ? companeros
                     .filter((item) => lote.relacionIds.includes(item.id) && item.id !== params.relacionId)
-                    .map((item) => etiquetaTrabajador(item.persona, item.numero))
+                    .map(
+                      (item) =>
+                        `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
+                    )
                 : []
             }
             canWrite={esEstudio && !fichaCesada}

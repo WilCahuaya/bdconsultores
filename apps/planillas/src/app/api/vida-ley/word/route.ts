@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     if (ids.length > 0) {
       const todos = await listTrabajadores(entidadId);
       const pedido = new Set(ids);
-      trabajadores = todos.filter((t) => pedido.has(t.id) && t.estado === "ACTIVA");
+      trabajadores = todos.filter((t) => pedido.has(t.id));
     } else {
       trabajadores = await listTrabajadoresVidaLeyPendienteRecepcion(entidadId);
     }

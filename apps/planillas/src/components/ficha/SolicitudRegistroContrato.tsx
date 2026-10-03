@@ -177,7 +177,7 @@ export function SolicitudRegistroContrato({
       <div>
         <h3 className="text-sm font-medium text-foreground">Solicitud de registro de contratos</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          También valida el contrato. Si el documento incluye a varias personas, súbalo una vez y márquelas: cada una lo ve en su contrato.
+          También valida el contrato. Si el documento incluye a varias personas, súbalo una vez y márquelas, incluidas las que ya están de baja: cada una lo ve en su contrato.
         </p>
       </div>
 

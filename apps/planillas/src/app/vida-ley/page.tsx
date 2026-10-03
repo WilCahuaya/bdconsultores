@@ -122,8 +122,8 @@ export default async function VidaLeyPage({
             <div className="flex max-w-xl flex-col items-end gap-2">
               <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
               <p className="text-right text-sm text-muted-foreground">
-                Los trabajadores de este envío comparten la constancia, la factura y el comprobante. El certificado se
-                sube en cada ficha. Quienes ya tenían un envío no se mueven.
+                Los trabajadores de este envío comparten la constancia, la factura y el comprobante, también quienes ya
+                están de baja. El certificado se sube en cada ficha. Quienes ya tenían un envío no se mueven.
               </p>
             </div>
           ) : null}
@@ -190,6 +190,7 @@ export default async function VidaLeyPage({
                             className="font-medium text-primary hover:underline"
                           >
                             {nombreCompleto(trabajador.persona)}
+                            {trabajador.estado === "CESADA" ? " · Baja" : ""}
                           </Link>
                         </td>
                         <td className="px-4 py-2">
