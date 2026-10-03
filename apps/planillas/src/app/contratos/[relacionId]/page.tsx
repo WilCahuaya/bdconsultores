@@ -69,8 +69,10 @@ export default async function ContratoProcesoPage({
     await Promise.all([
       asegurarDocumentoTramiteAfp(params.relacionId),
       asegurarDocumentoTrAlta(params.relacionId),
-      asegurarDocumentoTrBaja(params.relacionId),
     ]);
+  }
+  if (paso === "alta" && esEstudio) {
+    await asegurarDocumentoTrBaja(params.relacionId);
   }
   const [contratos, documentos, adendas, pension, tRegistro, entidad, solicitudesCtx, hijosAsignacion, companeros] =
     await Promise.all([
@@ -131,7 +133,7 @@ export default async function ContratoProcesoPage({
           </p>
           {fichaCesada ? (
             <p className={`${panelCardClass} px-3 py-1.5 text-xs text-muted-foreground`}>
-              Esta ficha está de baja. Puede ver los datos y documentos; no se editan.
+              Esta ficha está de baja. Puede subir la baja de T-Registro.
             </p>
           ) : null}
           {porValidar ? (
@@ -213,6 +215,7 @@ export default async function ContratoProcesoPage({
               documentoTrAlta={documentos.find((d) => d.tipo === "TR_ALTA") ?? null}
               documentoTrBaja={documentos.find((d) => d.tipo === "TR_BAJA") ?? null}
               canWrite={esEstudio && !fichaCesada}
+              canWriteTrBaja={esEstudio}
             />
           </div>
         ) : null}

@@ -53,6 +53,7 @@ export function FichaTRegistro({
   documentoTrAlta,
   documentoTrBaja,
   canWrite,
+  canWriteTrBaja = canWrite,
 }: {
   relacionId: string;
   items: TRegistroRow[];
@@ -63,6 +64,7 @@ export function FichaTRegistro({
   documentoTrAlta: DocumentoRow | null;
   documentoTrBaja: DocumentoRow | null;
   canWrite: boolean;
+  canWriteTrBaja?: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -276,7 +278,7 @@ export function FichaTRegistro({
           file={fileBaja}
           vacio="Suba la baja de T-Registro cuando la tenga en SUNAT."
           extra={
-            canWrite ? (
+            canWriteTrBaja ? (
               <FileInput
                 accept={DOCUMENTO_ACCEPT}
                 disabled={pendingBaja}
@@ -292,14 +294,12 @@ export function FichaTRegistro({
             ) : null
           }
         />
-        {canWrite ? (
-          <div className="space-y-4">
-            <Button type="button" disabled={pendingBaja} onClick={() => void guardarBaja()}>
-              {pendingBaja ? "Guardando…" : "Guardar baja de T-Registro"}
-            </Button>
-            <DarDeBajaControl trabajador={trabajador} />
-          </div>
+        {canWriteTrBaja ? (
+          <Button type="button" disabled={pendingBaja} onClick={() => void guardarBaja()}>
+            {pendingBaja ? "Guardando…" : "Guardar baja de T-Registro"}
+          </Button>
         ) : null}
+        {canWrite ? <DarDeBajaControl trabajador={trabajador} /> : null}
       </div>
 
       <ul className={`${panelCardClass} divide-y p-0`}>
