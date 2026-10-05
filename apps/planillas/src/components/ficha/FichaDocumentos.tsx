@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FileInput, useToast } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
+import { DocumentoPrevisualizacion, MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { panelCardClass } from "@inventario/ui/panel";
 import { addDocumento, setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
@@ -11,7 +13,6 @@ import type { TipoDocumentoPlanilla } from "@inventario/types";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
-import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { Field, SelectField } from "@/components/fields";
 
 export function FichaDocumentos({
@@ -116,49 +117,54 @@ export function FichaDocumentos({
         </Button>
       ) : null}
       {canWrite && permitirAgregar && mostrarNuevo ? (
-        <form action={onSubmit} key={visibles.length} className={`${panelCardClass} space-y-4 p-5`}>
-          <p className="text-sm font-medium">Registrar documento</p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField
-              label="Tipo"
-              name="tipo"
-              options={tipoOptions}
-            />
-            <SelectField
-              label="Estado"
-              name="estado"
-              defaultValue="PENDIENTE"
-              options={Object.entries(ESTADO_DOCUMENTO_LABEL).map(([value, label]) => ({ value, label }))}
-            />
-            <Field label="Observaciones" name="observaciones" />
-          </div>
-          <div className="space-y-1">
-            <span className="text-sm font-medium">Archivo</span>
-            <FileInput
-              accept={DOCUMENTO_ACCEPT}
-              disabled={pending}
-              file={nuevoArchivo}
-              buttonLabel={nuevoArchivo ? "Cambiar archivo" : "Seleccionar PDF o imagen"}
-              emptyLabel="Opcional. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
-              onFileChange={setNuevoArchivo}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando…" : "Agregar"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={pending}
-              onClick={() => {
-                setNuevoArchivo(null);
-                setMostrarNuevo(visibles.length === 0);
-              }}
-            >
-              Cancelar
-            </Button>
-          </div>
+        <form action={onSubmit} key={visibles.length}>
+          <DocumentoPrevisualizacion
+            titulo="Registrar documento"
+            storagePath={null}
+            file={nuevoArchivo}
+            vacio="Elija el archivo para verlo aquí."
+            extra={
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <SelectField label="Tipo" name="tipo" options={tipoOptions} />
+                  <SelectField
+                    label="Estado"
+                    name="estado"
+                    defaultValue="PENDIENTE"
+                    options={Object.entries(ESTADO_DOCUMENTO_LABEL).map(([value, label]) => ({ value, label }))}
+                  />
+                  <Field label="Observaciones" name="observaciones" />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-sm font-medium">Archivo</span>
+                  <DocumentoFileInput
+                    accept={DOCUMENTO_ACCEPT}
+                    disabled={pending}
+                    file={nuevoArchivo}
+                    buttonLabel={nuevoArchivo ? "Cambiar archivo" : "Seleccionar archivo"}
+                    emptyLabel="Opcional. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+                    onFileChange={setNuevoArchivo}
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={pending}>
+                    {pending ? "Guardando…" : "Agregar"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => {
+                      setNuevoArchivo(null);
+                      setMostrarNuevo(visibles.length === 0);
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            }
+          />
         </form>
       ) : null}
     </div>
@@ -238,25 +244,14 @@ function DocumentoItem({
             </Button>
           </>
         ) : canWrite ? (
-          <label className="inline-flex">
-            <input
-              type="file"
-              accept={DOCUMENTO_ACCEPT}
-              disabled={disabled}
-              className="sr-only"
-              aria-label={tieneArchivo ? "Reemplazar archivo" : "Subir archivo"}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = "";
-                if (file) setArchivoPendiente(file);
-              }}
-            />
-            <span
-              className={`inline-flex h-9 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent ${disabled ? "pointer-events-none opacity-50" : ""}`}
-            >
-              {tieneArchivo ? "Reemplazar" : "Subir archivo"}
-            </span>
-          </label>
+          <DocumentoFileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={disabled}
+            file={archivoPendiente}
+            buttonLabel={tieneArchivo || archivoPendiente ? "Reemplazar" : "Subir archivo"}
+            emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF."
+            onFileChange={setArchivoPendiente}
+          />
         ) : null}
         {canWrite && tieneArchivo ? (
           <EliminarDocumentoGuardado

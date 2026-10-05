@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FileInput, useToast } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { panelCardClass } from "@inventario/ui/panel";
 import type { TipoPension } from "@inventario/types";
 import { consultarDni } from "@/lib/actions/entidades";
@@ -302,7 +303,7 @@ function CapturaDni({
       datos={
         <>
           {canWrite ? (
-            <FileInput
+            <DocumentoFileInput
               accept={DOCUMENTO_ACCEPT}
               disabled={pending}
               file={file}
@@ -433,7 +434,7 @@ function CapturaFicha({
       datos={
         <>
           {canWrite ? (
-            <FileInput
+            <DocumentoFileInput
               accept={DOCUMENTO_ACCEPT}
               disabled={pending}
               file={file}
@@ -556,7 +557,7 @@ function CapturaPension({
       datos={
         <>
           {canWrite ? (
-            <FileInput
+            <DocumentoFileInput
               accept={DOCUMENTO_ACCEPT}
               disabled={pending}
               file={file}
@@ -839,7 +840,7 @@ function CapturaAsignacion({
             </Button>
           ) : null}
           {canWrite && (corresponde || file || documento?.storage_path) ? (
-            <FileInput
+            <DocumentoFileInput
               accept={DOCUMENTO_ACCEPT}
               disabled={pending}
               file={file}

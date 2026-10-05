@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, FileInput, useToast } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
   addTRegistro,
@@ -247,7 +248,7 @@ export function FichaTRegistro({
           extra={
             canWrite ? (
               <div className="space-y-4">
-                <FileInput
+                <DocumentoFileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={pendingAlta}
                   file={fileAlta}
@@ -291,7 +292,7 @@ export function FichaTRegistro({
           extra={
             canWriteTrBaja ? (
               <div className="space-y-4">
-                <FileInput
+                <DocumentoFileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={pendingBaja}
                   file={fileBaja}

@@ -42,6 +42,10 @@ function useVistaDocumento(
   }, [hayArchivo]);
 
   useEffect(() => {
+    if (file) setVisible(true);
+  }, [file]);
+
+  useEffect(() => {
     if (!file) {
       setLocalUrl(null);
       return;

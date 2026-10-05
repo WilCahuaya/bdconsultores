@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ConfirmDialog, FileInput, useToast } from "@inventario/ui";
+import { Button, ConfirmDialog, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { panelCardClass } from "@inventario/ui/panel";
 import { addVacacion, crearDocumentoVacacion, deleteVacacion, type VacacionRow } from "@/lib/actions/vacaciones";
 import { setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
@@ -209,7 +210,7 @@ export function FichaVacaciones({
                   />
                   <Field label="Observaciones" name="observaciones" />
                 </div>
-                <FileInput
+                <DocumentoFileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={pending}
                   file={file}

@@ -295,6 +295,8 @@ export default async function FichaTrabajadorPage({
           <FichaAsistencia
             relacionId={params.relacionId}
             entidadId={trabajador.entidad_id}
+            fechaIngreso={trabajador.fecha_ingreso}
+            fechaCese={trabajador.fecha_cese}
             documentos={documentos}
             canWrite={canEditFicha}
           />

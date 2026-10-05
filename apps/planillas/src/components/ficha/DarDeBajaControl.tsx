@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, ConfirmDialog, FileInput, useToast } from "@inventario/ui";
+import { Button, ConfirmDialog, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import type { TipoDocumentoPlanilla } from "@inventario/types";
 import { darDeBajaTrabajador, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { addDocumento, setDocumentoArchivo } from "@/lib/actions/ficha";
@@ -126,7 +127,7 @@ export function DarDeBajaControl({
             setArchivo(null);
           }}
         />
-        <FileInput
+        <DocumentoFileInput
           accept={DOCUMENTO_ACCEPT}
           disabled={pending}
           file={archivo}

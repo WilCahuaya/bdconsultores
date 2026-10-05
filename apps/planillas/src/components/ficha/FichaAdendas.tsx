@@ -20,6 +20,7 @@ import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { EliminarPdfAdenda } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { DocumentoPrevisualizacion, MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { descargarAdendaWord } from "@/lib/descargar-adenda-word";
 import {
   ESTADO_CONTRATO_LABEL,
@@ -61,6 +62,7 @@ export function FichaAdendas({
   const [editando, setEditando] = useState(false);
   const [eliminando, setEliminando] = useState<AdendaRow | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const [archivoAdenda, setArchivoAdenda] = useState<File | null>(null);
 
   async function onGenerar(formData: FormData) {
     setPending("generar");
@@ -194,26 +196,30 @@ export function FichaAdendas({
           <p className="text-xs text-muted-foreground">
             Suba el PDF firmado y confirme. Hasta entonces no cambian cargo, sueldo ni horario.
           </p>
-          <MarcoPrevisualizacion titulo={`PDF firmado de la adenda ${abierto.numero}`} storagePath={abierto.storage_path}>
+          <MarcoPrevisualizacion
+            titulo={`PDF firmado de la adenda ${abierto.numero}`}
+            storagePath={archivoAdenda ? null : abierto.storage_path}
+            file={archivoAdenda}
+          >
           <div className="flex flex-wrap items-center gap-2">
-            {abierto.storage_path ? null : <span className="text-sm text-muted-foreground">Sin PDF</span>}
-            <label className="inline-flex">
-              <input
-                type="file"
-                accept={DOCUMENTO_ACCEPT}
-                className="sr-only"
-                aria-label="Subir PDF firmado"
-                disabled={pending !== null}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  event.target.value = "";
-                  if (file) void onSubir(abierto, file);
-                }}
-              />
-              <span className="inline-flex h-9 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent">
-                {pending === `pdf-${abierto.id}` ? "Subiendo…" : abierto.storage_path ? "Reemplazar PDF" : "Subir PDF"}
-              </span>
-            </label>
+            {abierto.storage_path || archivoAdenda ? null : <span className="text-sm text-muted-foreground">Sin PDF</span>}
+            <DocumentoFileInput
+              accept={DOCUMENTO_ACCEPT}
+              disabled={pending !== null}
+              file={archivoAdenda}
+              buttonLabel={
+                pending === `pdf-${abierto.id}`
+                  ? "Subiendo…"
+                  : abierto.storage_path || archivoAdenda
+                    ? "Reemplazar PDF"
+                    : "Subir PDF"
+              }
+              emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF."
+              onFileChange={(file) => {
+                setArchivoAdenda(file);
+                if (file) void onSubir(abierto, file);
+              }}
+            />
             <Button
               type="button"
               size="sm"

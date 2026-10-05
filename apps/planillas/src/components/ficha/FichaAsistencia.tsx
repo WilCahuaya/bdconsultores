@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FileInput, useToast } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { panelCardClass } from "@inventario/ui/panel";
 import { asegurarDocumentoAsistenciaMes } from "@/lib/actions/asistencias";
 import { setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { descargarAsistenciaExcel } from "@/lib/descargar-asistencia-excel";
-import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
+import { etiquetaMesAsistencia, mesActualLima, mesesLaboradosEnAnio } from "@/lib/horario-asistencia";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
@@ -15,23 +16,41 @@ import { FeriadosMesPicker } from "@/components/ficha/FeriadosMesPicker";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
+function excelDelMes(documentos: DocumentoRow[], mes: string): boolean {
+  return Boolean(documentos.find((d) => d.tipo === "ASISTENCIA" && d.observaciones === mes)?.storage_path);
+}
+
 export function FichaAsistencia({
   relacionId,
   entidadId,
+  fechaIngreso,
+  fechaCese,
   documentos,
   canWrite,
 }: {
   relacionId: string;
   entidadId: string;
+  fechaIngreso: string | null;
+  fechaCese: string | null;
   documentos: DocumentoRow[];
   canWrite: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
-  const [mes, setMes] = useState(mesActualLima());
+  const mesHoy = mesActualLima();
+  const anio = Number(mesHoy.slice(0, 4));
+  const mesesAnio = mesesLaboradosEnAnio(anio, fechaIngreso, fechaCese);
+  const mesesConExcel = mesesAnio.filter((item) => item <= mesHoy);
+  const excelSubidos = mesesConExcel.filter((item) => excelDelMes(documentos, item)).length;
+  const [mes, setMes] = useState(mesHoy);
   const [pending, setPending] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const documento = documentos.find((d) => d.tipo === "ASISTENCIA" && d.observaciones === mes) ?? null;
+
+  function elegirMes(siguiente: string) {
+    setMes(siguiente);
+    setFile(null);
+  }
 
   async function onDescargar() {
     setPending(true);
@@ -75,6 +94,67 @@ export function FichaAsistencia({
 
   return (
     <div className="space-y-4">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-medium text-foreground">Meses laborados en {anio}</h2>
+          <p className="text-sm text-muted-foreground">
+            {mesesConExcel.length > 0
+              ? `Excel subidos: ${excelSubidos} de ${mesesConExcel.length}`
+              : "Aún no hay meses con Excel por subir."}
+          </p>
+        </div>
+        <div className={`${panelCardClass} overflow-x-auto p-0`}>
+          <table className="w-full min-w-[420px] text-left text-sm">
+            <thead className="border-b bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2 font-medium">Mes</th>
+                <th className="px-4 py-2 font-medium">Excel</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mesesAnio.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-8 text-muted-foreground" colSpan={2}>
+                    Este trabajador no registra meses laborados en {anio}.
+                  </td>
+                </tr>
+              ) : (
+                mesesAnio.map((item) => {
+                  const subido = excelDelMes(documentos, item);
+                  const futuro = item > mesHoy;
+                  const seleccionado = item === mes;
+                  return (
+                    <tr
+                      key={item}
+                      className={`border-b last:border-0 hover:bg-muted/30 ${seleccionado ? "bg-muted/40" : ""}`}
+                    >
+                      <td className="px-4 py-2">
+                        <button
+                          type="button"
+                          onClick={() => elegirMes(item)}
+                          className="font-medium text-primary hover:underline"
+                          aria-current={seleccionado ? "true" : undefined}
+                        >
+                          {etiquetaMesAsistencia(item)}
+                        </button>
+                      </td>
+                      <td className="px-4 py-2">
+                        {subido ? (
+                          <span className="font-medium text-emerald-700">Subido</span>
+                        ) : futuro ? (
+                          <span className="text-muted-foreground">Aún no corresponde</span>
+                        ) : (
+                          <span className="text-amber-800">Pendiente</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
       <section className={`${panelCardClass} space-y-4 p-5`}>
         <div>
           <p className="text-sm font-medium">Asistencia del mes</p>
@@ -89,10 +169,7 @@ export function FichaAsistencia({
           <input
             type="month"
             value={mes}
-            onChange={(event) => {
-              setMes(event.target.value);
-              setFile(null);
-            }}
+            onChange={(event) => elegirMes(event.target.value)}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm shadow-sm"
           />
         </label>
@@ -132,7 +209,7 @@ export function FichaAsistencia({
         extra={
           canWrite ? (
             <div className="flex flex-wrap items-end gap-2">
-              <FileInput
+              <DocumentoFileInput
                 accept={DOCUMENTO_ACCEPT}
                 disabled={pending}
                 file={file}

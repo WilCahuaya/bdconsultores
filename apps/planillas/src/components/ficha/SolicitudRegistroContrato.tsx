@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FileInput, useToast } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import {
   desvincularSolicitudContrato,
   guardarArchivoSolicitud,
@@ -210,7 +211,7 @@ export function SolicitudRegistroContrato({
           </div>
           {canWrite ? (
             <div className="space-y-2">
-              <FileInput
+              <DocumentoFileInput
                 accept={DOCUMENTO_ACCEPT}
                 disabled={pending !== null}
                 file={reemplazo}
@@ -276,7 +277,7 @@ export function SolicitudRegistroContrato({
               placeholder="Opcional. Por ejemplo, el mes del registro."
               onChange={(event) => setNota(event.target.value)}
             />
-            <FileInput
+            <DocumentoFileInput
               accept={DOCUMENTO_ACCEPT}
               disabled={pending !== null}
               file={archivo}

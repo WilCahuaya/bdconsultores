@@ -231,3 +231,18 @@ export function trabajadorActivoEnMes(
   if (cese && cese < first) return false;
   return true;
 }
+
+/** Meses AAAA-MM del año en los que el trabajador estuvo en planilla. */
+export function mesesLaboradosEnAnio(
+  anio: number,
+  fechaIngreso: string | null | undefined,
+  fechaCese: string | null | undefined,
+): string[] {
+  if (!Number.isInteger(anio) || anio < 1900 || anio > 9999) return [];
+  const out: string[] = [];
+  for (let month = 1; month <= 12; month += 1) {
+    const mes = `${anio}-${String(month).padStart(2, "0")}`;
+    if (trabajadorActivoEnMes(mes, fechaIngreso, fechaCese)) out.push(mes);
+  }
+  return out;
+}

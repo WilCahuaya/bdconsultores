@@ -2,7 +2,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FileInput, useToast } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
   compartirEnvioVidaLey,
@@ -339,7 +340,7 @@ export function FichaVidaLey({
           extra={
             canWrite ? (
               <div className="flex flex-wrap items-end gap-2">
-                <FileInput
+                <DocumentoFileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={ocupado}
                   file={fileCertificado}
@@ -420,7 +421,7 @@ export function FichaVidaLey({
                   placeholder="Cantidad"
                   onChange={(event) => setCantidadTexto(event.target.value)}
                 />
-                <FileInput
+                <DocumentoFileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={ocupado}
                   file={fileComprobante}
@@ -638,7 +639,7 @@ function ArchivoCompartidoVidaLey({
           </div>
           {canWrite ? (
             <div className="space-y-2">
-              <FileInput
+              <DocumentoFileInput
                 accept={DOCUMENTO_ACCEPT}
                 disabled={ocupado}
                 file={reemplazo}
@@ -684,7 +685,7 @@ function ArchivoCompartidoVidaLey({
         </p>
       ) : canWrite ? (
         <div className="space-y-3">
-          <FileInput
+          <DocumentoFileInput
             accept={DOCUMENTO_ACCEPT}
             disabled={ocupado}
             file={archivo}

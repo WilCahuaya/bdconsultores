@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, FileInput, useToast } from "@inventario/ui";
+import { Button, useToast } from "@inventario/ui";
+import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { panelCardClass } from "@inventario/ui/panel";
 import { savePension, setDocumentoArchivo, type DocumentoRow, type PensionRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
@@ -205,7 +206,7 @@ export function FichaPensiones({
               extra={
                 <div className="space-y-4">
                   {canWrite ? (
-                    <FileInput
+                    <DocumentoFileInput
                       accept={DOCUMENTO_ACCEPT}
                       disabled={pending}
                       file={fileAlta}
