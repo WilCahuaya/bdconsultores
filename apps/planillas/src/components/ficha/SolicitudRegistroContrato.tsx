@@ -16,6 +16,7 @@ import { formatFechaPlanilla } from "@/lib/planillas-labels";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { quitarArchivoSolicitud, uploadSolicitudFile } from "@/lib/upload-documento";
 import { Field } from "@/components/fields";
+import { EliminarArchivoSolicitud } from "@/components/ficha/ConfirmarEliminarArchivo";
 
 function etiquetaSolicitud(solicitud: SolicitudRegistroVista): string {
   const fecha = formatFechaPlanilla(solicitud.created_at);
@@ -206,6 +207,9 @@ export function SolicitudRegistroContrato({
               <Button type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => void onQuitar()}>
                 {pending === "quitar" ? "Quitando…" : "Quitar de este contrato"}
               </Button>
+            ) : null}
+            {canWrite ? (
+              <EliminarArchivoSolicitud relacionId={relacionId} solicitudId={solicitud.id} disabled={pending !== null} />
             ) : null}
           </div>
           {canWrite ? (

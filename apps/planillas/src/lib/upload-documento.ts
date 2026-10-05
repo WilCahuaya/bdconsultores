@@ -119,6 +119,10 @@ export async function uploadSolicitudFile(
 }
 
 export async function quitarArchivoSolicitud(path: string): Promise<void> {
+  await quitarArchivoStorage(path);
+}
+
+export async function quitarArchivoStorage(path: string): Promise<void> {
   const supabase = createClient();
   await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove([path]);
 }

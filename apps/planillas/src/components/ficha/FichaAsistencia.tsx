@@ -9,6 +9,7 @@ import { setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { descargarAsistenciaExcel } from "@/lib/descargar-asistencia-excel";
 import { etiquetaMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
 import { FeriadosMesPicker } from "@/components/ficha/FeriadosMesPicker";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
@@ -142,6 +143,14 @@ export function FichaAsistencia({
               <Button type="button" disabled={pending || !file} onClick={() => void onSubir()}>
                 {pending ? "Guardando…" : "Guardar PDF"}
               </Button>
+              {documento?.storage_path ? (
+                <EliminarDocumentoGuardado
+                  relacionId={relacionId}
+                  documentoId={documento.id}
+                  descripcion={`¿Eliminar el horario firmado de ${etiquetaMesAsistencia(mes)}? Dejará de verse en esta ficha.`}
+                  disabled={pending}
+                />
+              ) : null}
             </div>
           ) : null
         }

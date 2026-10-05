@@ -29,6 +29,7 @@ import { Field, DateField, SelectField } from "@/components/fields";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
@@ -254,6 +255,14 @@ export function FichaTRegistro({
             ) : null
           }
         />
+        {canWrite && documentoTrAlta?.storage_path ? (
+          <EliminarDocumentoGuardado
+            relacionId={relacionId}
+            documentoId={documentoTrAlta.id}
+            descripcion="¿Eliminar el alta de T-Registro? Dejará de verse en esta ficha."
+            disabled={pendingAlta}
+          />
+        ) : null}
         {canWrite ? (
           <div className={`${panelCardClass} space-y-4 p-5`}>
             <DateField
@@ -294,6 +303,14 @@ export function FichaTRegistro({
             ) : null
           }
         />
+        {canWriteTrBaja && documentoTrBaja?.storage_path ? (
+          <EliminarDocumentoGuardado
+            relacionId={relacionId}
+            documentoId={documentoTrBaja.id}
+            descripcion="¿Eliminar la baja de T-Registro? Dejará de verse en esta ficha."
+            disabled={pendingBaja}
+          />
+        ) : null}
         {canWriteTrBaja ? (
           <Button type="button" disabled={pendingBaja} onClick={() => void guardarBaja()}>
             {pendingBaja ? "Guardando…" : "Guardar baja de T-Registro"}

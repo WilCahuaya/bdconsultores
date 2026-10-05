@@ -15,6 +15,7 @@ import {
   type PensionRow,
 } from "@/lib/actions/ficha";
 import { guardarHijosAsignacion, type HijoAsignacionRow } from "@/lib/actions/hijos-asignacion";
+import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { evaluarHijo, hintArchivoAsignacion, textoResultadoHijo } from "@/lib/asignacion-familiar";
 import { ASIGNACION_FAMILIAR_SOLES } from "@/lib/planillas-labels";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
@@ -304,6 +305,14 @@ function CapturaDni({
               onFileChange={setFile}
             />
           ) : null}
+          {canWrite && documento?.storage_path ? (
+            <EliminarDocumentoGuardado
+              relacionId={relacionId}
+              documentoId={documento.id}
+              descripcion="¿Eliminar el escaneo del DNI? Dejará de verse en esta ficha."
+              disabled={pending}
+            />
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="DNI o carné" name="dni_leido" value={dni} copyable onChange={(event) => setDni(event.target.value.replace(/\D/g, "").slice(0, 9))} readOnly={!canWrite} />
             <Field label="Nombres" name="nombres" value={nombres} onChange={(event) => setNombres(event.target.value)} readOnly={!canWrite} />
@@ -427,6 +436,14 @@ function CapturaFicha({
               onFileChange={setFile}
             />
           ) : null}
+          {canWrite && documento?.storage_path ? (
+            <EliminarDocumentoGuardado
+              relacionId={relacionId}
+              documentoId={documento.id}
+              descripcion="¿Eliminar la ficha escaneada? Dejará de verse en esta ficha."
+              disabled={pending}
+            />
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Celular" name="celular" value={celular} inputMode="tel" onChange={(event) => setCelular(event.target.value)} readOnly={!canWrite} />
             <Field label="Correo" name="correo" type="email" value={correo} onChange={(event) => setCorreo(event.target.value)} readOnly={!canWrite} />
@@ -540,6 +557,14 @@ function CapturaPension({
               buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir sistema de pensiones"}
               emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
               onFileChange={setFile}
+            />
+          ) : null}
+          {canWrite && documento?.storage_path ? (
+            <EliminarDocumentoGuardado
+              relacionId={relacionId}
+              documentoId={documento.id}
+              descripcion="¿Eliminar el sistema de pensiones firmado? Dejará de verse en esta ficha."
+              disabled={pending}
             />
           ) : null}
           <SelectField
@@ -815,6 +840,14 @@ function CapturaAsignacion({
               buttonLabel={file || documento?.storage_path ? "Cambiar archivo" : "Subir asignación familiar"}
               emptyLabel="Un solo archivo. PDF, JPG, PNG o WEBP. Máximo 10 MB."
               onFileChange={setFile}
+            />
+          ) : null}
+          {canWrite && documento?.storage_path ? (
+            <EliminarDocumentoGuardado
+              relacionId={relacionId}
+              documentoId={documento.id}
+              descripcion="¿Eliminar el archivo de asignación familiar? Dejará de verse en esta ficha."
+              disabled={pending}
             />
           ) : null}
           {canWrite ? (

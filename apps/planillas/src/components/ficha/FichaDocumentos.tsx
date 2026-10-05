@@ -10,6 +10,7 @@ import { ESTADO_DOCUMENTO_LABEL, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-la
 import type { TipoDocumentoPlanilla } from "@inventario/types";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
+import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { Field, SelectField } from "@/components/fields";
 
 export function FichaDocumentos({
@@ -88,6 +89,7 @@ export function FichaDocumentos({
           visibles.map((d) => (
             <DocumentoItem
               key={d.id}
+              relacionId={relacionId}
               documento={d}
               canWrite={canWrite}
               disabled={pending}
@@ -163,11 +165,13 @@ export function FichaDocumentos({
 }
 
 function DocumentoItem({
+  relacionId,
   documento,
   canWrite,
   disabled,
   onUpload,
 }: {
+  relacionId: string;
   documento: DocumentoRow;
   canWrite: boolean;
   disabled: boolean;
@@ -252,6 +256,14 @@ function DocumentoItem({
               {tieneArchivo ? "Reemplazar" : "Subir archivo"}
             </span>
           </label>
+        ) : null}
+        {canWrite && tieneArchivo ? (
+          <EliminarDocumentoGuardado
+            relacionId={relacionId}
+            documentoId={documento.id}
+            descripcion={`¿Eliminar ${TIPO_DOCUMENTO_LABEL[documento.tipo]}? Dejará de verse en esta ficha.`}
+            disabled={disabled}
+          />
         ) : null}
       </div>
       {linkError ? <p className="text-destructive">{linkError}</p> : null}

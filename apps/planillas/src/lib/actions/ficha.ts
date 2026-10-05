@@ -787,6 +787,43 @@ export async function setDocumentoArchivo(
   return {};
 }
 
+export async function quitarDocumentoArchivo(
+  relacionId: string,
+  documentoId: string,
+): Promise<{ error?: string; path?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("documentos")
+    .select("id, storage_path, estado")
+    .eq("id", documentoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!actual) return { error: "Documento no encontrado." };
+  const path = (actual.storage_path as string | null) ?? null;
+  if (!path) return { error: "Este documento no tiene archivo." };
+  const { error } = await db
+    .from("documentos")
+    .update({
+      storage_path: null,
+      estado: actual.estado === "SI" ? "PENDIENTE" : actual.estado,
+    })
+    .eq("id", documentoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath(`/contratos/${relacionId}`);
+  revalidatePath("/");
+  revalidatePath("/contratos");
+  revalidatePath("/pendientes");
+  revalidatePath("/asistencias");
+  revalidatePath("/vacaciones");
+  revalidatePath("/tablero");
+  return { path };
+}
+
 export async function getPension(relacionId: string): Promise<PensionRow | null> {
   await requirePlanillasProfile();
   const db = await planillasDb();
@@ -1186,6 +1223,68 @@ export async function setVidaLeyLoteArchivo(
   if (miembrosError) return { error: miembrosError.message };
   revalidarFichasVidaLey((miembros ?? []).map((row) => row.relacion_id as string));
   return {};
+}
+
+export async function quitarVidaLeyLoteArchivo(
+  relacionId: string,
+  tipo: ArchivoVidaLeyLote,
+): Promise<{ error?: string; path?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("vida_ley")
+    .select("lote_id")
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  const loteId = actual?.lote_id as string | null | undefined;
+  if (!loteId) return { error: "Este trabajador no tiene un grupo de Vida Ley." };
+  const columna = COLUMNA_ARCHIVO_LOTE[tipo];
+  const { data: lote, error: loteError } = await db
+    .from("vida_ley_lotes")
+    .select("id, constancia_storage_path, factura_storage_path, factura_no_enviada")
+    .eq("id", loteId)
+    .eq("entidad_id", gate.trabajador.entidad_id)
+    .maybeSingle();
+  if (loteError) return { error: loteError.message };
+  if (!lote) return { error: "Grupo no encontrado." };
+  const path = (lote[columna] as string | null) ?? null;
+  if (!path) return { error: "Este grupo no tiene ese archivo." };
+  const { error } = await db.from("vida_ley_lotes").update({ [columna]: null }).eq("id", loteId);
+  if (error) return { error: error.message };
+  const { data: miembros } = await db.from("vida_ley").select("relacion_id").eq("lote_id", loteId);
+  const ids = (miembros ?? []).map((row) => row.relacion_id as string);
+  const quedaConstancia = tipo === "constancia" ? null : lote.constancia_storage_path;
+  const quedaFactura = tipo === "factura" ? null : lote.factura_storage_path;
+  if (!quedaConstancia && !quedaFactura && !lote.factura_no_enviada) {
+    await descartarGrupoVidaLeyVacio(relacionId, loteId);
+  }
+  revalidarFichasVidaLey(ids.length > 0 ? ids : [relacionId]);
+  return { path };
+}
+
+export async function quitarComprobanteVidaLeyEmpresa(
+  relacionId: string,
+): Promise<{ error?: string; path?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("vida_ley_comprobante_empresa")
+    .select("storage_path")
+    .eq("entidad_id", gate.trabajador.entidad_id)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  const path = (actual?.storage_path as string | null) ?? null;
+  if (!path) return { error: "La empresa no tiene comprobante de envío." };
+  const { error } = await db
+    .from("vida_ley_comprobante_empresa")
+    .update({ storage_path: null })
+    .eq("entidad_id", gate.trabajador.entidad_id);
+  if (error) return { error: error.message };
+  revalidarFichasVidaLey([relacionId]);
+  return { path };
 }
 
 export async function saveVidaLey(relacionId: string, formData: FormData): Promise<{ error?: string }> {

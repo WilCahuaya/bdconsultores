@@ -18,6 +18,7 @@ import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { DateField, Field, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
+import { EliminarPdfAdenda } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { descargarAdendaWord } from "@/lib/descargar-adenda-word";
 import {
   ESTADO_CONTRATO_LABEL,
@@ -245,6 +246,9 @@ export function FichaAdendas({
             <Button type="button" size="sm" variant="outline" onClick={() => setEliminando(abierto)}>
               Eliminar
             </Button>
+            {abierto.storage_path ? (
+              <EliminarPdfAdenda relacionId={relacionId} adendaId={abierto.id} disabled={pending !== null} />
+            ) : null}
           </div>
         </section>
       ) : null}

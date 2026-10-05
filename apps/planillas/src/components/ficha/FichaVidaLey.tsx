@@ -25,6 +25,11 @@ import { Field, DateField } from "@/components/fields";
 import { etiquetaEstadoVidaLey, etiquetaTrabajador, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import {
+  EliminarArchivoVidaLey,
+  EliminarComprobanteEmpresa,
+  EliminarDocumentoGuardado,
+} from "@/components/ficha/ConfirmarEliminarArchivo";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile, uploadVidaLeyComprobanteEmpresa, uploadVidaLeyLoteFile } from "@/lib/upload-documento";
@@ -322,6 +327,14 @@ export function FichaVidaLey({
                 <Button type="button" size="sm" disabled={ocupado || !fileCertificado} onClick={() => void onGuardarCertificado()}>
                   {guardandoCertificado ? "Guardando…" : "Guardar certificado"}
                 </Button>
+                {documentoCertificado?.storage_path ? (
+                  <EliminarDocumentoGuardado
+                    relacionId={relacionId}
+                    documentoId={documentoCertificado.id}
+                    descripcion="¿Eliminar el certificado de seguro de este trabajador?"
+                    disabled={ocupado}
+                  />
+                ) : null}
               </div>
             ) : null
           }
@@ -381,6 +394,9 @@ export function FichaVidaLey({
             ) : null
           }
         />
+        {canWrite && comprobanteEmpresa ? (
+          <EliminarComprobanteEmpresa relacionId={relacionId} disabled={ocupado} />
+        ) : null}
         {canWrite ? (
           <Button type="button" disabled={ocupado || !fileComprobante} onClick={() => void onGuardarComprobante()}>
             {guardandoComprobante
@@ -561,6 +577,18 @@ function ArchivoCompartidoVidaLey({
               <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onQuitar()}>
                 {pending === "quitar" ? "Quitando…" : "Quitar de este grupo"}
               </Button>
+            ) : null}
+            {canWrite ? (
+              <EliminarArchivoVidaLey
+                relacionId={relacionId}
+                tipo={tipo}
+                descripcion={
+                  tipo === "constancia"
+                    ? "¿Eliminar la constancia de asegurados? Deja de verse para todos los que comparten este grupo."
+                    : "¿Eliminar la factura? Deja de verse para todos los que comparten este grupo."
+                }
+                disabled={ocupado}
+              />
             ) : null}
           </div>
           {canWrite ? (

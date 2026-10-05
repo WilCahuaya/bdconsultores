@@ -246,6 +246,36 @@ export async function setAdendaArchivo(
   return {};
 }
 
+export async function quitarAdendaArchivo(
+  relacionId: string,
+  adendaId: string,
+): Promise<{ error?: string; path?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("adendas")
+    .select("id, estado, datos_confirmados, storage_path")
+    .eq("id", adendaId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!actual) return { error: "Adenda no encontrada." };
+  if (adendaCerrada(actual.estado as EstadoContratoPlanilla) || actual.datos_confirmados) {
+    return { error: "Esta adenda ya fue confirmada." };
+  }
+  const path = (actual.storage_path as string | null) ?? null;
+  if (!path) return { error: "Esta adenda no tiene PDF." };
+  const { error } = await db
+    .from("adendas")
+    .update({ storage_path: null })
+    .eq("id", adendaId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+  revalidar(relacionId);
+  return { path };
+}
+
 export async function confirmarAdenda(relacionId: string, adendaId: string): Promise<{ error?: string }> {
   const gate = await assertEscrituraFicha(relacionId);
   if ("error" in gate) return { error: gate.error };

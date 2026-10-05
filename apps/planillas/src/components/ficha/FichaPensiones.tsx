@@ -17,6 +17,7 @@ import {
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 import type { Entidad } from "@inventario/types";
@@ -207,6 +208,14 @@ export function FichaPensiones({
                 ) : null
               }
             />
+            {canWrite && documentoTramiteAfp?.storage_path ? (
+              <EliminarDocumentoGuardado
+                relacionId={relacionId}
+                documentoId={documentoTramiteAfp.id}
+                descripcion="¿Eliminar el documento de alta AFP? Dejará de verse en esta ficha."
+                disabled={pending}
+              />
+            ) : null}
             <FormSection
               title="Datos de afiliación AFP"
               hint="Nombre de AFP (Profuturo, Integra, Habitat o Prima) y CUSPP. La fecha de afiliación es opcional."

@@ -8,6 +8,7 @@ import { addVacacion, crearDocumentoVacacion, deleteVacacion, type VacacionRow }
 import { setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { DateField, Field, SelectField } from "@/components/fields";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { formatFechaPlanilla, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
@@ -170,6 +171,15 @@ export function FichaVacaciones({
           storagePath={visto.storage_path}
           defaultVisible
           vacio="Este goce no tiene respaldo firmado."
+          extra={
+            canWrite ? (
+              <EliminarDocumentoGuardado
+                relacionId={relacionId}
+                documentoId={visto.id}
+                descripcion="¿Eliminar el respaldo firmado de este goce? El goce sigue registrado."
+              />
+            ) : null
+          }
         />
       ) : null}
 

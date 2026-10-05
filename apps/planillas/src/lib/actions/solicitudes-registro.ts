@@ -280,6 +280,40 @@ export async function guardarArchivoSolicitud(
   return {};
 }
 
+export async function quitarArchivoSolicitudRegistro(
+  relacionId: string,
+  solicitudId: string,
+): Promise<{ error?: string; path?: string }> {
+  const gate = await assertEmpresa(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  if (!isUuid(solicitudId)) return { error: "Solicitud no válida." };
+  const db = await planillasDb();
+  const { data, error: loadError } = await db
+    .from("solicitudes_registro")
+    .select("id, storage_path")
+    .eq("id", solicitudId)
+    .eq("entidad_id", gate.entidadId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!data) return { error: "Solicitud no encontrada." };
+  const path = (data.storage_path as string | null) ?? null;
+  if (!path) return { error: "Esta solicitud no tiene archivo." };
+  const { error } = await db
+    .from("solicitudes_registro")
+    .update({ storage_path: null })
+    .eq("id", solicitudId)
+    .eq("entidad_id", gate.entidadId);
+  if (error) return { error: error.message };
+  const { data: ligados } = await db
+    .from("contratos")
+    .select("relacion_id")
+    .eq("solicitud_registro_id", solicitudId)
+    .eq("entidad_id", gate.entidadId);
+  const relaciones = [...new Set((ligados ?? []).map((row) => row.relacion_id as string))];
+  revalidarRelaciones(relaciones.length > 0 ? relaciones : [relacionId]);
+  return { path };
+}
+
 export async function vincularContratosASolicitud(
   relacionId: string,
   solicitudId: string,
