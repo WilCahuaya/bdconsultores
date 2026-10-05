@@ -90,7 +90,7 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
   if (entidades.length === 0) return { mes, calendario, filas: [] };
 
   const entidadIds = entidades.map((e) => e.id);
-  const [relaciones, contratos, documentos, pensiones, tRegistros, vidaLey, lotesVidaLey, marcasMes, excelMes] =
+  const [relaciones, contratos, documentos, pensiones, tRegistros, vidaLey, comprobantesEmpresa, marcasMes, excelMes] =
     await Promise.all([
     selectIn<{
       id: string;
@@ -134,9 +134,9 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       "entidad_id",
       entidadIds,
     ),
-    selectIn<{ id: string; comprobante_storage_path: string | null }>(
-      "vida_ley_lotes",
-      "id, comprobante_storage_path",
+    selectIn<{ entidad_id: string; storage_path: string | null }>(
+      "vida_ley_comprobante_empresa",
+      "entidad_id, storage_path",
       "entidad_id",
       entidadIds,
     ),
@@ -184,8 +184,8 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
     });
   }
   const vidaLeyPorRelacion = new Map(vidaLey.map((v) => [v.relacion_id, v]));
-  const loteConComprobante = new Set(
-    lotesVidaLey.filter((lote) => Boolean(lote.comprobante_storage_path)).map((lote) => lote.id),
+  const empresaConComprobante = new Set(
+    comprobantesEmpresa.filter((row) => Boolean(row.storage_path)).map((row) => row.entidad_id),
   );
   const excelSet = new Set(excelMes.map((row) => row.relacion_id));
   const marcasPorEntidad = new Map<string, Partial<Record<TableroMarcaClave, boolean>>>();
@@ -209,7 +209,7 @@ export async function listTableroMando(mes: string): Promise<TableroMando> {
       pensionTipo: pensionPorRelacion.get(rel.id)?.tipo ?? null,
       tRegistroOk: tRegistroAltaLista({ documentos: flujoDocs, tRegistro }),
       afpDocOk: afpConNombreYCuspp(pensionPorRelacion.get(rel.id)),
-      vidaLeyComprobanteOk: loteConComprobante.has(vidaLeyPorRelacion.get(rel.id)?.lote_id ?? ""),
+      vidaLeyComprobanteOk: empresaConComprobante.has(rel.entidad_id),
       excelGenerado: excelSet.has(rel.id),
       vidaLeyFechaFin: vidaLeyPorRelacion.get(rel.id)?.fecha_fin ?? null,
       contratos: (contratosPorRelacion.get(rel.id) ?? []).map((c) => {

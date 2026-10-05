@@ -5,12 +5,16 @@ import { useRouter } from "next/navigation";
 import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
+  compartirEnvioVidaLey,
   generarVidaLey,
+  nuevoGrupoVidaLey,
   marcarFacturaLoteNoEnviada,
   saveVidaLey,
+  setComprobanteVidaLeyEmpresa,
   setDocumentoArchivo,
   setEstadoVidaLey,
   setVidaLeyLoteArchivo,
+  usarEnvioVidaLey,
   type DocumentoRow,
   type VidaLeyLoteRow,
   type VidaLeyRow,
@@ -21,8 +25,20 @@ import { etiquetaEstadoVidaLey, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-lab
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
-import { uploadDocumentoFile, uploadVidaLeyLoteFile } from "@/lib/upload-documento";
+import { uploadDocumentoFile, uploadVidaLeyComprobanteEmpresa, uploadVidaLeyLoteFile } from "@/lib/upload-documento";
 import type { ArchivoVidaLeyLote } from "@/lib/documento-storage";
+
+export type CompaneroEnvioVidaLey = {
+  relacionId: string;
+  etiqueta: string;
+  enEsteEnvio: boolean;
+  otroEnvio: boolean;
+};
+
+export type EnvioVidaLeyExistente = {
+  loteId: string;
+  etiqueta: string;
+};
 
 export function FichaVidaLey({
   relacionId,
@@ -30,7 +46,9 @@ export function FichaVidaLey({
   vidaLey,
   documentoCertificado,
   lote,
-  companerosLote,
+  companerosEnvio,
+  enviosExistentes,
+  comprobanteEmpresa,
   canWrite,
 }: {
   relacionId: string;
@@ -38,7 +56,9 @@ export function FichaVidaLey({
   vidaLey: VidaLeyRow | null;
   documentoCertificado: DocumentoRow | null;
   lote: VidaLeyLoteRow | null;
-  companerosLote: string[];
+  companerosEnvio: CompaneroEnvioVidaLey[];
+  enviosExistentes: EnvioVidaLeyExistente[];
+  comprobanteEmpresa: string | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -52,6 +72,22 @@ export function FichaVidaLey({
   const [fileConstancia, setFileConstancia] = useState<File | null>(null);
   const [fileFactura, setFileFactura] = useState<File | null>(null);
   const [fileComprobante, setFileComprobante] = useState<File | null>(null);
+  const miembros = companerosEnvio
+    .filter((item) => item.enEsteEnvio)
+    .map((item) => item.relacionId)
+    .join("|");
+  const [marcados, setMarcados] = useState(() =>
+    companerosEnvio.filter((item) => item.enEsteEnvio).map((item) => item.relacionId),
+  );
+  const [miembrosPrev, setMiembrosPrev] = useState(miembros);
+  if (miembros !== miembrosPrev) {
+    setMiembrosPrev(miembros);
+    setMarcados(companerosEnvio.filter((item) => item.enEsteEnvio).map((item) => item.relacionId));
+  }
+  const [envioElegido, setEnvioElegido] = useState("");
+  const [compartiendo, setCompartiendo] = useState(false);
+  const [usandoEnvio, setUsandoEnvio] = useState(false);
+  const [creandoGrupo, setCreandoGrupo] = useState(false);
 
   async function onGenerar() {
     setGenerando(true);
@@ -100,9 +136,55 @@ export function FichaVidaLey({
     return saved.error ?? null;
   }
 
-  function loteParaArchivo(): { loteId: string } | { error: string } {
-    if (lote?.id) return { loteId: lote.id };
-    return { error: "Elabore el trámite de Vida Ley antes de guardar estos archivos." };
+  function toggleMarcado(id: string) {
+    setMarcados((actual) => (actual.includes(id) ? actual.filter((item) => item !== id) : [...actual, id]));
+  }
+
+  async function aplicarCompartidos(): Promise<string | null> {
+    const result = await compartirEnvioVidaLey(relacionId, marcados);
+    if (result.error || !result.loteId) {
+      pushToast(result.error ?? "No se pudo compartir el envío.", "error");
+      return null;
+    }
+    return result.loteId;
+  }
+
+  async function onCompartir() {
+    setCompartiendo(true);
+    const loteId = await aplicarCompartidos();
+    setCompartiendo(false);
+    if (!loteId) return;
+    pushToast(
+      marcados.length > 0
+        ? "La constancia y la factura quedan para los trabajadores marcados."
+        : "Este grupo queda solo para este trabajador.",
+    );
+    router.refresh();
+  }
+
+  async function onUsarEnvio() {
+    if (!envioElegido) return;
+    setUsandoEnvio(true);
+    const result = await usarEnvioVidaLey(relacionId, envioElegido);
+    setUsandoEnvio(false);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    pushToast("Este trabajador usa la constancia y la factura de ese grupo.");
+    router.refresh();
+  }
+
+  async function onNuevoGrupo() {
+    setCreandoGrupo(true);
+    const result = await nuevoGrupoVidaLey(relacionId);
+    setCreandoGrupo(false);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    pushToast("Grupo nuevo. Marque quién comparte su constancia y su factura.");
+    router.refresh();
   }
 
   async function subirLote(
@@ -125,13 +207,14 @@ export function FichaVidaLey({
       return;
     }
     setGuardandoDocs(true);
-    const destino = fileConstancia || fileFactura ? loteParaArchivo() : null;
-    if (destino && "error" in destino) {
-      setGuardandoDocs(false);
-      pushToast(destino.error, "error");
-      return;
+    let loteId = lote?.id ?? null;
+    if (fileConstancia || fileFactura) {
+      loteId = await aplicarCompartidos();
+      if (!loteId) {
+        setGuardandoDocs(false);
+        return;
+      }
     }
-    const loteId = destino && "loteId" in destino ? destino.loteId : lote?.id;
     if ((fileConstancia || fileFactura) && loteId) {
       const errorConstancia = await subirLote(
         fileConstancia,
@@ -186,40 +269,32 @@ export function FichaVidaLey({
   }
 
   async function onGuardarComprobante() {
-    if (!fileComprobante && !lote?.comprobante_storage_path) {
-      pushToast("Suba el comprobante de envío.", "error");
+    if (!fileComprobante) {
+      pushToast(
+        comprobanteEmpresa ? "Elija el comprobante nuevo para sustituir el de la empresa." : "Suba el comprobante de envío.",
+        "error",
+      );
       return;
     }
     setGuardandoComprobante(true);
-    if (fileComprobante) {
-      const destino = loteParaArchivo();
-      if ("error" in destino) {
-        setGuardandoComprobante(false);
-        pushToast(destino.error, "error");
-        return;
-      }
-      const errorComprobante = await subirLote(
-        fileComprobante,
-        "comprobante",
-        lote?.comprobante_storage_path ?? null,
-        destino.loteId,
-        TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE,
-      );
-      if (errorComprobante) {
-        setGuardandoComprobante(false);
-        pushToast(errorComprobante, "error");
-        return;
-      }
-    }
-    const registrado = await setEstadoVidaLey(relacionId, "Registrado");
-    if (registrado.error) {
+    const upload = await uploadVidaLeyComprobanteEmpresa(
+      trabajador.entidad_id,
+      fileComprobante,
+      comprobanteEmpresa,
+    );
+    if (upload.error || !upload.path) {
       setGuardandoComprobante(false);
-      pushToast(registrado.error, "error");
+      pushToast(upload.error ?? "No se pudo subir el comprobante de envío.", "error");
+      return;
+    }
+    const saved = await setComprobanteVidaLeyEmpresa(relacionId, upload.path);
+    setGuardandoComprobante(false);
+    if (saved.error) {
+      pushToast(saved.error, "error");
       return;
     }
     setFileComprobante(null);
-    setGuardandoComprobante(false);
-    pushToast(companerosLote.length > 0 ? "Vida Ley registrada para el envío." : "Vida Ley registrada.");
+    pushToast("Comprobante de la empresa sustituido. Cubre a todos los trabajadores.");
     router.refresh();
   }
 
@@ -235,7 +310,15 @@ export function FichaVidaLey({
     router.refresh();
   }
 
-  const ocupado = pending || generando || guardandoDocs || guardandoComprobante || marcandoFactura;
+  const ocupado =
+    pending ||
+    generando ||
+    guardandoDocs ||
+    guardandoComprobante ||
+    marcandoFactura ||
+    compartiendo ||
+    usandoEnvio ||
+    creandoGrupo;
   const facturaNoEnviada = Boolean(lote?.factura_no_enviada) && !lote?.factura_storage_path && !fileFactura;
   const yaGenerado = Boolean(vidaLey?.estado);
 
@@ -287,11 +370,65 @@ export function FichaVidaLey({
         <div className={`${panelCardClass} space-y-1 p-5`}>
           <p className="text-sm font-medium">Respuesta de la aseguradora</p>
           <p className="text-sm text-muted-foreground">
-            La constancia y la factura son del envío. El certificado es solo de este trabajador. La factura puede no
-            llegar. Con la constancia guardada, el envío pasa a Recepcionado.
+            Una empresa puede tener varios grupos. Cada grupo comparte su constancia y, si la mandan, su factura. Esos
+            archivos se suben una vez por grupo. El certificado es solo de este trabajador. Con la constancia guardada,
+            el grupo pasa a Recepcionado.
           </p>
-          {companerosLote.length > 0 ? (
-            <p className="text-sm text-muted-foreground">Comparte este envío con {companerosLote.join(", ")}.</p>
+          {canWrite && enviosExistentes.length > 0 ? (
+            <div className="space-y-2 pt-2">
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium">Entrar a un grupo que ya tiene constancia y factura</span>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={envioElegido}
+                  onChange={(event) => setEnvioElegido(event.target.value)}
+                >
+                  <option value="">Elegir grupo…</option>
+                  {enviosExistentes.map((envio) => (
+                    <option key={envio.loteId} value={envio.loteId}>
+                      {envio.etiqueta}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button type="button" size="sm" disabled={ocupado || !envioElegido} onClick={() => void onUsarEnvio()}>
+                {usandoEnvio ? "Aplicando…" : "Entrar a este grupo"}
+              </Button>
+            </div>
+          ) : null}
+          {canWrite ? (
+            <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onNuevoGrupo()}>
+              {creandoGrupo ? "Creando…" : "Crear otro grupo"}
+            </Button>
+          ) : null}
+          {canWrite && companerosEnvio.some((item) => item.enEsteEnvio || !item.otroEnvio) ? (
+            <div className="space-y-2 pt-2">
+              <p className="text-sm font-medium">Miembros de este grupo</p>
+              <p className="text-sm text-muted-foreground">
+                Marque a quienes entran en este grupo. Los demás grupos siguen con sus propios archivos.
+              </p>
+              <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3">
+                {companerosEnvio
+                  .filter((item) => item.enEsteEnvio || !item.otroEnvio)
+                  .map((item) => (
+                  <li key={item.relacionId}>
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={marcados.includes(item.relacionId)}
+                        disabled={ocupado}
+                        onChange={() => toggleMarcado(item.relacionId)}
+                      />
+                      <span>{item.etiqueta}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onCompartir()}>
+                {compartiendo ? "Guardando…" : "Guardar quién comparte"}
+              </Button>
+            </div>
           ) : null}
         </div>
         <DocumentoPrevisualizacion
@@ -384,17 +521,17 @@ export function FichaVidaLey({
       </section>
       <section className="space-y-4">
         <div className={`${panelCardClass} space-y-1 p-5`}>
-          <p className="text-sm font-medium">Registro de Vida Ley</p>
+          <p className="text-sm font-medium">Comprobante de envío de la empresa</p>
           <p className="text-sm text-muted-foreground">
-            Después de tramitar Vida Ley, suba el comprobante de envío. Es el mismo archivo para todo el lote. Al
-            guardar, el envío pasa a Registrado.
+            Hay un solo comprobante para todos los trabajadores. Cuando se da de alta a alguien, súbalo de nuevo: el
+            archivo anterior se sustituye y el nuevo cubre a toda la empresa.
           </p>
         </div>
         <DocumentoPrevisualizacion
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE}
-          storagePath={fileComprobante ? null : lote?.comprobante_storage_path}
+          storagePath={fileComprobante ? null : comprobanteEmpresa}
           file={fileComprobante}
-          vacio="Suba el comprobante de envío."
+          vacio="Suba el comprobante de envío de la empresa."
           extra={
             canWrite ? (
               <FileInput
@@ -402,8 +539,8 @@ export function FichaVidaLey({
                 disabled={ocupado}
                 file={fileComprobante}
                 buttonLabel={
-                  fileComprobante || lote?.comprobante_storage_path
-                    ? "Cambiar comprobante de envío"
+                  fileComprobante || comprobanteEmpresa
+                    ? "Sustituir comprobante de envío"
                     : "Subir comprobante de envío"
                 }
                 emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
@@ -413,8 +550,12 @@ export function FichaVidaLey({
           }
         />
         {canWrite ? (
-          <Button type="button" disabled={ocupado} onClick={() => void onGuardarComprobante()}>
-            {guardandoComprobante ? "Guardando…" : "Guardar comprobante de envío"}
+          <Button type="button" disabled={ocupado || !fileComprobante} onClick={() => void onGuardarComprobante()}>
+            {guardandoComprobante
+              ? "Guardando…"
+              : comprobanteEmpresa
+                ? "Sustituir comprobante de la empresa"
+                : "Guardar comprobante de la empresa"}
           </Button>
         ) : null}
       </section>

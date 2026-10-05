@@ -17,7 +17,9 @@ import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/
 import { representanteDesdeEntidad } from "@/lib/representante-contrato";
 import { altasAfiliacionListas, flujoDesdeTrabajador } from "@/lib/flujo-ficha";
 import {
+  isUuid,
   pathPerteneceAlDocumento,
+  pathPerteneceAComprobanteEmpresa,
   pathPerteneceAVidaLeyLote,
   type ArchivoVidaLeyLote,
 } from "@/lib/documento-storage";
@@ -100,8 +102,14 @@ export type VidaLeyLoteRow = {
   constancia_storage_path: string | null;
   factura_storage_path: string | null;
   factura_no_enviada: boolean;
-  comprobante_storage_path: string | null;
   relacionIds: string[];
+};
+
+export type EnvioVidaLeyOpcion = {
+  loteId: string;
+  relacionIds: string[];
+  constancia: boolean;
+  factura: boolean;
 };
 
 export type TRegistroRow = {
@@ -848,7 +856,7 @@ export async function getVidaLeyLote(relacionId: string): Promise<VidaLeyLoteRow
   const [loteRes, miembrosRes] = await Promise.all([
     db
       .from("vida_ley_lotes")
-      .select("id, constancia_storage_path, factura_storage_path, factura_no_enviada, comprobante_storage_path")
+      .select("id, constancia_storage_path, factura_storage_path, factura_no_enviada")
       .eq("id", loteId)
       .maybeSingle(),
     db.from("vida_ley").select("relacion_id").eq("lote_id", loteId),
@@ -861,16 +869,249 @@ export async function getVidaLeyLote(relacionId: string): Promise<VidaLeyLoteRow
     constancia_storage_path: (loteRes.data.constancia_storage_path as string | null) ?? null,
     factura_storage_path: (loteRes.data.factura_storage_path as string | null) ?? null,
     factura_no_enviada: Boolean(loteRes.data.factura_no_enviada),
-    comprobante_storage_path: (loteRes.data.comprobante_storage_path as string | null) ?? null,
     relacionIds: (miembrosRes.data ?? []).map((row) => row.relacion_id as string),
   };
 }
 
-const COLUMNA_ARCHIVO_LOTE: Record<ArchivoVidaLeyLote, "constancia_storage_path" | "factura_storage_path" | "comprobante_storage_path"> = {
+export async function contextoEnviosVidaLey(entidadId: string): Promise<{
+  porRelacion: { relacionId: string; loteId: string | null }[];
+  envios: EnvioVidaLeyOpcion[];
+}> {
+  const vacio = { porRelacion: [], envios: [] };
+  if (!isUuid(entidadId)) return vacio;
+  await requirePlanillasProfile();
+  const db = await planillasDb();
+  const [vidasRes, lotesRes] = await Promise.all([
+    db.from("vida_ley").select("relacion_id, lote_id").eq("entidad_id", entidadId),
+    db
+      .from("vida_ley_lotes")
+      .select("id, constancia_storage_path, factura_storage_path, created_at")
+      .eq("entidad_id", entidadId)
+      .order("created_at", { ascending: true }),
+  ]);
+  if (vidasRes.error) throw new Error(vidasRes.error.message);
+  if (lotesRes.error) throw new Error(lotesRes.error.message);
+  const porRelacion = (vidasRes.data ?? []).map((row) => ({
+    relacionId: row.relacion_id as string,
+    loteId: (row.lote_id as string | null) ?? null,
+  }));
+  const idsPorLote = new Map<string, string[]>();
+  for (const row of porRelacion) {
+    if (!row.loteId) continue;
+    const lista = idsPorLote.get(row.loteId) ?? [];
+    lista.push(row.relacionId);
+    idsPorLote.set(row.loteId, lista);
+  }
+  const envios = (lotesRes.data ?? [])
+    .map((row) => ({
+      loteId: row.id as string,
+      relacionIds: idsPorLote.get(row.id as string) ?? [],
+      constancia: Boolean(row.constancia_storage_path),
+      factura: Boolean(row.factura_storage_path),
+    }))
+    .filter((envio) => envio.constancia || envio.factura);
+  return { porRelacion, envios };
+}
+
+export async function compartirEnvioVidaLey(
+  relacionId: string,
+  relacionIds: string[],
+): Promise<{ error?: string; loteId?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const entidadId = gate.trabajador.entidad_id;
+  const ids = [...new Set(relacionIds.filter((id) => isUuid(id) && id !== relacionId))];
+  const db = await planillasDb();
+  if (ids.length > 0) {
+    const { data: relaciones, error: relError } = await db
+      .from("relaciones_laborales")
+      .select("id, entidad_id")
+      .in("id", ids);
+    if (relError) return { error: relError.message };
+    const filas = relaciones ?? [];
+    if (filas.length !== ids.length || filas.some((row) => row.entidad_id !== entidadId)) {
+      return { error: "Hay un trabajador que no es de esta empresa." };
+    }
+  }
+
+  const { data: actual, error: actualError } = await db
+    .from("vida_ley")
+    .select("lote_id, estado, numero_poliza, fecha_inicio, fecha_fin")
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (actualError) return { error: actualError.message };
+
+  let loteId = (actual?.lote_id as string | null) ?? null;
+  if (!loteId) {
+    const { data: lote, error: loteError } = await db
+      .from("vida_ley_lotes")
+      .insert({ entidad_id: entidadId })
+      .select("id")
+      .single();
+    if (loteError || !lote) return { error: loteError?.message ?? "No se pudo crear el envío de Vida Ley." };
+    loteId = lote.id as string;
+  }
+
+  const { data: miembrosActuales, error: miembrosError } = await db
+    .from("vida_ley")
+    .select("relacion_id")
+    .eq("lote_id", loteId);
+  if (miembrosError) return { error: miembrosError.message };
+  const quitar = (miembrosActuales ?? [])
+    .map((row) => row.relacion_id as string)
+    .filter((id) => id !== relacionId && !ids.includes(id));
+
+  const { data: existentes, error: existentesError } = await db
+    .from("vida_ley")
+    .select("relacion_id, estado, numero_poliza, fecha_inicio, fecha_fin")
+    .in("relacion_id", [relacionId, ...ids]);
+  if (existentesError) return { error: existentesError.message };
+  const porId = new Map((existentes ?? []).map((row) => [row.relacion_id as string, row]));
+  const payload = [relacionId, ...ids].map((id) => {
+    const row = porId.get(id);
+    return {
+      relacion_id: id,
+      entidad_id: entidadId,
+      lote_id: loteId,
+      estado: row?.estado ?? null,
+      numero_poliza: (row?.numero_poliza as string | null) ?? null,
+      fecha_inicio: (row?.fecha_inicio as string | null) ?? null,
+      fecha_fin: (row?.fecha_fin as string | null) ?? null,
+    };
+  });
+  const { error: saveError } = await db.from("vida_ley").upsert(payload, { onConflict: "relacion_id" });
+  if (saveError) return { error: saveError.message };
+  if (quitar.length > 0) {
+    const { error: quitarError } = await db.from("vida_ley").update({ lote_id: null }).in("relacion_id", quitar);
+    if (quitarError) return { error: quitarError.message };
+  }
+  revalidarFichasVidaLey([relacionId, ...ids, ...quitar]);
+  return { loteId };
+}
+
+export async function usarEnvioVidaLey(relacionId: string, loteId: string): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  if (!isUuid(loteId)) return { error: "Envío no válido." };
+  const db = await planillasDb();
+  const { data: lote, error: loteError } = await db
+    .from("vida_ley_lotes")
+    .select("id, entidad_id, constancia_storage_path, factura_storage_path")
+    .eq("id", loteId)
+    .maybeSingle();
+  if (loteError) return { error: loteError.message };
+  if (!lote || lote.entidad_id !== gate.trabajador.entidad_id) {
+    return { error: "Ese envío no es de esta empresa." };
+  }
+  if (!lote.constancia_storage_path && !lote.factura_storage_path) {
+    return { error: "Ese grupo no tiene constancia ni factura." };
+  }
+  const { data: actual, error: actualError } = await db
+    .from("vida_ley")
+    .select("estado, numero_poliza, fecha_inicio, fecha_fin")
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (actualError) return { error: actualError.message };
+  const { error } = await db.from("vida_ley").upsert(
+    {
+      relacion_id: relacionId,
+      entidad_id: gate.trabajador.entidad_id,
+      lote_id: loteId,
+      estado: actual?.estado ?? null,
+      numero_poliza: actual?.numero_poliza ?? null,
+      fecha_inicio: actual?.fecha_inicio ?? null,
+      fecha_fin: actual?.fecha_fin ?? null,
+    },
+    { onConflict: "relacion_id" },
+  );
+  if (error) return { error: error.message };
+  revalidarFichasVidaLey([relacionId]);
+  return {};
+}
+
+export async function nuevoGrupoVidaLey(relacionId: string): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { data: lote, error: loteError } = await db
+    .from("vida_ley_lotes")
+    .insert({ entidad_id: gate.trabajador.entidad_id })
+    .select("id")
+    .single();
+  if (loteError || !lote) return { error: loteError?.message ?? "No se pudo crear el grupo de Vida Ley." };
+  const { data: actual, error: actualError } = await db
+    .from("vida_ley")
+    .select("estado, numero_poliza, fecha_inicio, fecha_fin")
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (actualError) return { error: actualError.message };
+  const { error } = await db.from("vida_ley").upsert(
+    {
+      relacion_id: relacionId,
+      entidad_id: gate.trabajador.entidad_id,
+      lote_id: lote.id,
+      estado: actual?.estado ?? null,
+      numero_poliza: actual?.numero_poliza ?? null,
+      fecha_inicio: actual?.fecha_inicio ?? null,
+      fecha_fin: actual?.fecha_fin ?? null,
+    },
+    { onConflict: "relacion_id" },
+  );
+  if (error) return { error: error.message };
+  revalidarFichasVidaLey([relacionId]);
+  return {};
+}
+
+const COLUMNA_ARCHIVO_LOTE: Record<ArchivoVidaLeyLote, "constancia_storage_path" | "factura_storage_path"> = {
   constancia: "constancia_storage_path",
   factura: "factura_storage_path",
-  comprobante: "comprobante_storage_path",
 };
+
+export async function getComprobanteVidaLeyEmpresa(entidadId: string): Promise<string | null> {
+  if (!isUuid(entidadId)) return null;
+  await requirePlanillasProfile();
+  const db = await planillasDb();
+  const { data, error } = await db
+    .from("vida_ley_comprobante_empresa")
+    .select("storage_path")
+    .eq("entidad_id", entidadId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data?.storage_path as string | null) ?? null;
+}
+
+export async function setComprobanteVidaLeyEmpresa(
+  relacionId: string,
+  storagePath: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  if (!pathPerteneceAComprobanteEmpresa(gate.trabajador.entidad_id, storagePath)) {
+    return { error: "Ruta de archivo no válida." };
+  }
+  const db = await planillasDb();
+  const entidadId = gate.trabajador.entidad_id;
+  const { error } = await db.from("vida_ley_comprobante_empresa").upsert(
+    { entidad_id: entidadId, storage_path: storagePath },
+    { onConflict: "entidad_id" },
+  );
+  if (error) return { error: error.message };
+  const { data: miembros, error: miembrosError } = await db
+    .from("vida_ley")
+    .select("relacion_id")
+    .eq("entidad_id", entidadId);
+  if (miembrosError) return { error: miembrosError.message };
+  const ids = (miembros ?? []).map((row) => row.relacion_id as string);
+  if (ids.length > 0) {
+    const { error: estadoError } = await db
+      .from("vida_ley")
+      .update({ estado: "Registrado" })
+      .eq("entidad_id", entidadId);
+    if (estadoError) return { error: estadoError.message };
+  }
+  revalidarFichasVidaLey(ids.length > 0 ? ids : [relacionId]);
+  return {};
+}
 
 function revalidarFichasVidaLey(relacionIds: string[]) {
   for (const id of relacionIds) revalidatePath(`/trabajadores/${id}`);
@@ -903,7 +1144,6 @@ export async function setVidaLeyLoteArchivo(
   const patch: {
     constancia_storage_path?: string;
     factura_storage_path?: string;
-    comprobante_storage_path?: string;
     factura_no_enviada?: boolean;
   } = { [columna]: storagePath };
   if (tipo === "factura") patch.factura_no_enviada = false;
@@ -1085,10 +1325,7 @@ export async function listTrabajadoresVidaLeyPendienteRecepcion(
     .map((item) => item.trabajador);
 }
 
-async function marcarVidaLeyElaborado(
-  trabajadores: TrabajadorListItem[],
-  agruparPendientes: boolean,
-): Promise<{ error?: string }> {
+async function marcarVidaLeyElaborado(trabajadores: TrabajadorListItem[]): Promise<{ error?: string }> {
   if (trabajadores.length === 0) return { error: "No hay trabajadores para el trámite Vida Ley." };
   const db = await planillasDb();
   const ids = trabajadores.map((t) => t.id);
@@ -1100,24 +1337,7 @@ async function marcarVidaLeyElaborado(
     .in("relacion_id", ids);
   if (loadError) return { error: loadError.message };
   const actualPorId = new Map((existentes ?? []).map((row) => [row.relacion_id as string, row]));
-  const sinLote = trabajadores.filter((t) => {
-    const actual = actualPorId.get(t.id);
-    if (actual?.lote_id) return false;
-    if (agruparPendientes) return true;
-    return String(actual?.estado ?? "").trim() !== "Elaborado";
-  });
-  let nuevoLoteId: string | null = null;
-  if (sinLote.length > 0) {
-    const { data: lote, error: loteError } = await db
-      .from("vida_ley_lotes")
-      .insert({ entidad_id: trabajadores[0].entidad_id })
-      .select("id")
-      .single();
-    if (loteError || !lote) return { error: loteError?.message ?? "No se pudo crear el envío de Vida Ley." };
-    nuevoLoteId = lote.id as string;
-  }
   const hoy = new Date().toISOString().slice(0, 10);
-  const sinLoteIds = new Set(sinLote.map((t) => t.id));
   const payload = trabajadores.map((t) => {
     const actual = actualPorId.get(t.id);
     const inicio = actual?.fecha_inicio ?? t.fecha_ingreso ?? hoy;
@@ -1125,7 +1345,7 @@ async function marcarVidaLeyElaborado(
     return {
       relacion_id: t.id,
       entidad_id: t.entidad_id,
-      lote_id: (actual?.lote_id as string | null) ?? (sinLoteIds.has(t.id) ? nuevoLoteId : null),
+      lote_id: (actual?.lote_id as string | null) ?? null,
       estado: vidaLeyPendienteRecepcion(estadoActual) ? "Elaborado" : estadoActual,
       numero_poliza: actual?.numero_poliza ?? null,
       fecha_inicio: inicio,
@@ -1141,7 +1361,7 @@ async function marcarVidaLeyElaborado(
 export async function generarVidaLey(relacionId: string): Promise<{ error?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
-  return marcarVidaLeyElaborado([gate.trabajador], false);
+  return marcarVidaLeyElaborado([gate.trabajador]);
 }
 
 export async function generarVidaLeyGrupo(
@@ -1153,7 +1373,7 @@ export async function generarVidaLeyGrupo(
   if (pendientes.length === 0) {
     return { error: "No hay trabajadores pendientes de recepción de Vida Ley." };
   }
-  const marked = await marcarVidaLeyElaborado(pendientes, true);
+  const marked = await marcarVidaLeyElaborado(pendientes);
   if (marked.error) return { error: marked.error };
   return { ids: pendientes.map((t) => t.id), count: pendientes.length };
 }

@@ -16,6 +16,8 @@ import {
 import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador, listTrabajadores } from "@/lib/actions/trabajadores";
 import {
+  contextoEnviosVidaLey,
+  getComprobanteVidaLeyEmpresa,
   getVidaLey,
   getVidaLeyLote,
   listContratos,
@@ -82,12 +84,19 @@ export default async function FichaTrabajadorPage({
   if (esEstudio && tab === "vida-ley") {
     await asegurarDocumentosVidaLey(params.relacionId);
   }
-  const [documentos, vidaLey, lote, vacaciones, contratos, entidad, companeros] = await Promise.all([
+  const [documentos, vidaLey, lote, enviosCtx, comprobanteEmpresa, vacaciones, contratos, entidad, companeros] =
+    await Promise.all([
     listDocumentos(params.relacionId),
     esEstudio && (!tab || tab === "vida-ley")
       ? getVidaLey(params.relacionId)
       : Promise.resolve(null),
     esEstudio && tab === "vida-ley" ? getVidaLeyLote(params.relacionId) : Promise.resolve(null),
+    esEstudio && tab === "vida-ley"
+      ? contextoEnviosVidaLey(trabajador.entidad_id)
+      : Promise.resolve({ porRelacion: [], envios: [] }),
+    esEstudio && tab === "vida-ley"
+      ? getComprobanteVidaLeyEmpresa(trabajador.entidad_id)
+      : Promise.resolve(null),
     !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
     !tab ? listContratos(params.relacionId) : Promise.resolve([]),
     getEntidadPlanillas(trabajador.entidad_id),
@@ -238,16 +247,45 @@ export default async function FichaTrabajadorPage({
             vidaLey={vidaLey}
             documentoCertificado={documentos.find((d) => d.tipo === "VIDA_LEY") ?? null}
             lote={lote}
-            companerosLote={
-              lote
-                ? companeros
-                    .filter((item) => lote.relacionIds.includes(item.id) && item.id !== params.relacionId)
-                    .map(
-                      (item) =>
-                        `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
-                    )
-                : []
-            }
+            companerosEnvio={companeros
+              .filter((item) => item.id !== params.relacionId)
+              .map((item) => ({
+                relacionId: item.id,
+                etiqueta: `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
+                enEsteEnvio: Boolean(
+                  lote && enviosCtx.porRelacion.some((row) => row.relacionId === item.id && row.loteId === lote.id),
+                ),
+                otroEnvio: enviosCtx.porRelacion.some(
+                  (row) =>
+                    row.relacionId === item.id &&
+                    Boolean(row.loteId) &&
+                    row.loteId !== lote?.id &&
+                    enviosCtx.envios.some((envio) => envio.loteId === row.loteId),
+                ),
+              }))
+              .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"))}
+            enviosExistentes={enviosCtx.envios
+              .map((envio, index) => ({ ...envio, numero: index + 1 }))
+              .filter((envio) => envio.loteId !== lote?.id)
+              .map((envio) => {
+                const nombres = envio.relacionIds
+                  .map((id) => companeros.find((item) => item.id === id))
+                  .filter((item): item is (typeof companeros)[number] => Boolean(item))
+                  .map(
+                    (item) =>
+                      `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
+                  );
+                const quienes = nombres.slice(0, 3).join(", ");
+                const resto = nombres.length > 3 ? ` y ${nombres.length - 3} más` : "";
+                const archivos = [envio.constancia ? "constancia" : "", envio.factura ? "factura" : "sin factura"]
+                  .filter(Boolean)
+                  .join(", ");
+                return {
+                  loteId: envio.loteId,
+                  etiqueta: `Grupo ${envio.numero}: ${quienes || "sin nombres"}${resto} · ${archivos}`,
+                };
+              })}
+            comprobanteEmpresa={comprobanteEmpresa}
             canWrite={esEstudio}
           />
         ) : null}

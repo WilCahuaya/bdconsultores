@@ -37,7 +37,19 @@ export function pathSolicitudRegistro(entidadId: string, solicitudId: string, ex
   return `${entidadId}/solicitudes/${solicitudId}.${ext}`;
 }
 
-export type ArchivoVidaLeyLote = "constancia" | "factura" | "comprobante";
+export type ArchivoVidaLeyLote = "constancia" | "factura";
+
+export function pathVidaLeyComprobanteEmpresa(entidadId: string, ext: string): string {
+  return `${entidadId}/vida-ley/comprobante-empresa.${ext}`;
+}
+
+export function pathPerteneceAComprobanteEmpresa(entidadId: string, path: string): boolean {
+  if (!isUuid(entidadId)) return false;
+  const prefix = `${entidadId}/vida-ley/comprobante-empresa.`;
+  if (!path.startsWith(prefix)) return false;
+  const ext = path.slice(prefix.length).toLowerCase();
+  return ALLOWED_EXT.has(ext) && !ext.includes("/");
+}
 
 export function pathVidaLeyLote(
   entidadId: string,

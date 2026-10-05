@@ -122,8 +122,8 @@ export default async function VidaLeyPage({
             <div className="flex max-w-xl flex-col items-end gap-2">
               <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
               <p className="text-right text-sm text-muted-foreground">
-                Los trabajadores de este envío comparten la constancia, la factura y el comprobante, también quienes ya
-                están de baja. El certificado se sube en cada ficha. Quienes ya tenían un envío no se mueven.
+                Cada grupo comparte su constancia y, si llega, su factura. El comprobante de envío es uno para toda la
+                empresa y se sustituye cuando hay un alta nueva. El certificado se sube en cada ficha.
               </p>
             </div>
           ) : null}
