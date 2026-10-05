@@ -21,6 +21,33 @@ import {
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
+import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { contratoConfirmado, type FlujoContrato, type FlujoDocumento } from "@/lib/flujo-ficha";
+
+function rutaFirmadoDeContrato(contrato: FlujoContrato | null, documentos: FlujoDocumento[]): string | null {
+  if (!contrato) return null;
+  if (contrato.documento_id) {
+    const propio = documentos.find(
+      (documento) => documento.id === contrato.documento_id && documento.estado === "SI" && documento.storage_path,
+    );
+    if (propio?.storage_path) return propio.storage_path;
+  }
+  return contrato.solicitud_storage_path?.trim() || null;
+}
+
+function rutaFirmadoVigente(trabajador: TrabajadorListItem): string | null {
+  const confirmado = rutaFirmadoDeContrato(contratoConfirmado(trabajador.contratos), trabajador.documentos);
+  if (confirmado) return confirmado;
+  const delVigente = rutaFirmadoDeContrato(
+    trabajador.contratos.find((contrato) => contrato.es_vigente) ?? null,
+    trabajador.documentos,
+  );
+  if (delVigente) return delVigente;
+  return (
+    trabajador.documentos.find((documento) => documento.tipo === "CONTRATO_FIRMADO" && documento.estado === "SI")
+      ?.storage_path ?? null
+  );
+}
 
 export function FichaPersonaForm({
   trabajador,
@@ -96,6 +123,7 @@ export function FichaPuestoForm({
   const [pending, setPending] = useState(false);
   const [jornada, setJornada] = useState(trabajador.jornada ?? "");
   const cesada = trabajador.estado === "CESADA";
+  const firmadoVigente = rutaFirmadoVigente(trabajador);
 
   async function onSubmit(formData: FormData) {
     setPending(true);
@@ -110,6 +138,7 @@ export function FichaPuestoForm({
   }
 
   return (
+    <MarcoPrevisualizacion titulo="Contrato firmado vigente" storagePath={firmadoVigente}>
     <div className="space-y-4">
       {cesada ? (
         <p className="text-sm text-muted-foreground">
@@ -188,5 +217,6 @@ export function FichaPuestoForm({
         )}
       </form>
     </div>
+    </MarcoPrevisualizacion>
   );
 }

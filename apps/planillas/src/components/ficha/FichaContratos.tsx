@@ -20,6 +20,7 @@ import { descargarContratoWord } from "@/lib/descargar-contrato-word";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
+import { VistaDocumentoGuardado } from "@/components/ficha/DocumentoPrevisualizacion";
 import { SolicitudRegistroContrato } from "@/components/ficha/SolicitudRegistroContrato";
 import type { ContratoEnlazable, SolicitudRegistroVista } from "@/lib/actions/solicitudes-registro";
 
@@ -87,11 +88,18 @@ export function FichaContratos({
   const [editando, setEditando] = useState<ContratoRow | null>(null);
   const [eliminando, setEliminando] = useState<ContratoRow | null>(null);
   const [firmandoId, setFirmandoId] = useState<string | null>(null);
+  const [vistaFirmandoId, setVistaFirmandoId] = useState<string | null>(null);
   const firmando = contratos.find((c) => c.id === firmandoId) ?? null;
   const pdfFirmando = firmando ? documentoDeContrato(firmando, documentos) : null;
   const tienePdfFirmando = firmando ? contratoTienePdf(firmando, documentos) : false;
   const tieneSolicitudFirmando = firmando ? contratoTieneSolicitud(firmando, solicitudes) : false;
   const tieneRespaldoFirmando = tienePdfFirmando || tieneSolicitudFirmando;
+  const rutaContratoFirmado = tienePdfFirmando ? pdfFirmando?.storage_path ?? null : null;
+  const rutaSolicitudFirmando = firmando ? solicitudDeContrato(firmando, solicitudes)?.storage_path ?? null : null;
+  const verRespaldos = Boolean(
+    firmando && vistaFirmandoId === firmando.id && (rutaContratoFirmado || rutaSolicitudFirmando),
+  );
+  const ambosRespaldos = Boolean(rutaContratoFirmado && rutaSolicitudFirmando);
   const base = abierto ?? contratos.find((c) => c.datos_confirmados) ?? null;
 
   async function onGenerar(formData: FormData) {
@@ -266,13 +274,17 @@ export function FichaContratos({
       {firmando ? (
         <FormSection
           title={`Respaldo del contrato · versión ${firmando.version}`}
-          hint="Suba el PDF firmado, enlace una solicitud de registro, o ambos. Aquí confirma los datos de este contrato. El ingreso a la empresa no cambia."
+          hint={
+            firmando.datos_confirmados
+              ? "El contrato ya está guardado. Si después encuentra el PDF firmado o la solicitud, súbalo aquí. Los datos guardados no cambian."
+              : "Suba el PDF firmado, enlace una solicitud de registro, o ambos. Aquí confirma los datos de este contrato. El ingreso a la empresa no cambia."
+          }
         >
           <FichaDocumentos
             relacionId={relacionId}
             entidadId={entidadId}
             documentos={pdfFirmando ? [pdfFirmando] : []}
-            canWrite={canWrite && firmando.estado !== "RECOGIDO" && firmando.estado !== "COMPLETO"}
+            canWrite={canWrite && firmando.estado !== "BAJA"}
             tiposFiltro={["CONTRATO_FIRMADO"]}
             permitirAgregar={false}
             hint={`PDF firmado de la versión ${firmando.version}.`}
@@ -282,37 +294,71 @@ export function FichaContratos({
             entidadId={entidadId}
             contratoId={firmando.id}
             canWrite={canWrite}
-            cerrado={firmando.estado === "RECOGIDO" || firmando.estado === "COMPLETO"}
+            cerrado={firmando.estado === "BAJA"}
             solicitud={solicitudDeContrato(firmando, solicitudes)}
             solicitudes={solicitudes}
             enlazables={enlazables}
           />
           {canWrite && !firmando.datos_confirmados && firmando.estado !== "BAJA" ? (
             <form action={(formData) => void onConfirmar(firmando.id, formData)} className="space-y-4">
-              <p className="text-sm font-medium">Datos a guardar (del generado; se pueden cambiar)</p>
-              <DatosContratoFields
-                key={`conf-${firmando.id}-${firmando.horario}-${firmando.remuneracion}`}
-                trabajador={trabajador}
-                contrato={firmando}
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={pending === "confirmar" || !tieneRespaldoFirmando}>
-                  {pending === "confirmar" ? "Guardando…" : "Confirmar y guardar contrato"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={pending === "confirmar"}
-                  onClick={() => setFirmandoId(null)}
-                >
-                  Cerrar
-                </Button>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium">Datos a guardar (del generado; se pueden cambiar)</p>
+                {rutaContratoFirmado || rutaSolicitudFirmando ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setVistaFirmandoId(verRespaldos ? null : firmando.id)}
+                  >
+                    {verRespaldos ? "Ocultar previsualización" : ambosRespaldos ? "Ver contrato y solicitud" : "Ver previsualización"}
+                  </Button>
+                ) : null}
               </div>
-              {tieneRespaldoFirmando ? null : (
-                <p className="text-sm text-muted-foreground">
-                  Suba el contrato firmado o una solicitud de registro para poder confirmar.
-                </p>
-              )}
+              <div className={verRespaldos ? "grid items-start gap-4 lg:grid-cols-2" : "space-y-4"}>
+                <div className="space-y-4">
+                  <DatosContratoFields
+                    key={`conf-${firmando.id}-${firmando.horario}-${firmando.remuneracion}`}
+                    trabajador={trabajador}
+                    contrato={firmando}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={pending === "confirmar" || !tieneRespaldoFirmando}>
+                      {pending === "confirmar" ? "Guardando…" : "Confirmar y guardar contrato"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={pending === "confirmar"}
+                      onClick={() => setFirmandoId(null)}
+                    >
+                      Cerrar
+                    </Button>
+                  </div>
+                  {tieneRespaldoFirmando ? null : (
+                    <p className="text-sm text-muted-foreground">
+                      Suba el contrato firmado o una solicitud de registro para poder confirmar.
+                    </p>
+                  )}
+                </div>
+                {verRespaldos ? (
+                  <div className="space-y-4 lg:sticky lg:top-4">
+                    {rutaContratoFirmado ? (
+                      <VistaDocumentoGuardado
+                        titulo="Contrato firmado"
+                        storagePath={rutaContratoFirmado}
+                        compacto={ambosRespaldos}
+                      />
+                    ) : null}
+                    {rutaSolicitudFirmando ? (
+                      <VistaDocumentoGuardado
+                        titulo="Solicitud de registro"
+                        storagePath={rutaSolicitudFirmando}
+                        compacto={ambosRespaldos}
+                      />
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             </form>
           ) : (
             <Button type="button" variant="outline" onClick={() => setFirmandoId(null)}>
@@ -400,7 +446,13 @@ export function FichaContratos({
                           disabled={pending === `firm-${c.id}`}
                           onClick={() => void onSubirFirmado(c)}
                         >
-                          {pending === `firm-${c.id}` ? "…" : conRespaldo ? "Ver respaldo" : "Subir respaldo"}
+                          {pending === `firm-${c.id}`
+                            ? "…"
+                            : !conRespaldo
+                              ? "Subir respaldo"
+                              : c.datos_confirmados && (!conPdf || !conSolicitud)
+                                ? "Agregar respaldo"
+                                : "Ver respaldo"}
                         </Button>
                       ) : null}
                       {canWrite && !cerrado ? (

@@ -27,7 +27,7 @@ export type ContratoEnlazable = {
   solicitudId: string | null;
 };
 
-const CERRADOS = new Set(["RECOGIDO", "BAJA", "COMPLETO"]);
+const CERRADOS = new Set(["BAJA"]);
 
 type PersonaEmbed = {
   nombres: string;
@@ -188,7 +188,7 @@ async function contratosDeLaEmpresa(
   if (rows.length !== ids.length) return { error: "Hay un contrato que no existe." };
   if (rows.some((row) => row.entidad_id !== entidadId)) return { error: "El contrato no es de esta empresa." };
   if (rows.some((row) => CERRADOS.has(row.estado))) {
-    return { error: "Un contrato cerrado no se puede enlazar a la solicitud." };
+    return { error: "Un contrato dado de baja no se puede enlazar a la solicitud." };
   }
   const { data: relaciones, error: relError } = await db
     .from("relaciones_laborales")

@@ -30,6 +30,7 @@ function useVistaDocumento(
   storagePath: string | null | undefined,
   file: File | null,
   defaultVisible?: boolean,
+  alto = "h-[min(72vh,44rem)]",
 ) {
   const hayArchivo = Boolean(file || storagePath);
   const [visible, setVisible] = useState(Boolean(defaultVisible));
@@ -86,16 +87,35 @@ function useVistaDocumento(
     ) : !src ? (
       <p className="text-sm text-muted-foreground">Cargando vista previa…</p>
     ) : esPdf ? (
-      <iframe title={titulo} src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
+      <iframe title={titulo} src={src} className={`${alto} w-full rounded-md border bg-background`} />
     ) : esImagen ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt={titulo} className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
+      <img src={src} alt={titulo} className={`${alto} w-full rounded-md border bg-muted object-contain`} />
     ) : (
       <p className="text-sm text-muted-foreground">Este archivo se guardará como PDF.</p>
     )
   ) : null;
 
   return { hayArchivo, visible, setVisible, vista };
+}
+
+export function VistaDocumentoGuardado({
+  titulo,
+  storagePath,
+  compacto = false,
+}: {
+  titulo: string;
+  storagePath: string;
+  compacto?: boolean;
+}) {
+  const alto = compacto ? "h-[min(38vh,24rem)]" : "h-[min(72vh,44rem)]";
+  const { vista } = useVistaDocumento(titulo, storagePath, null, true, alto);
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">{titulo}</p>
+      {vista}
+    </div>
+  );
 }
 
 export function MarcoPrevisualizacion({
