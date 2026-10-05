@@ -918,8 +918,8 @@ export async function contextoEnviosVidaLey(entidadId: string): Promise<{
 export async function compartirEnvioVidaLey(
   relacionId: string,
   relacionIds: string[],
-  opciones?: { soloAgregar?: boolean },
-): Promise<{ error?: string; loteId?: string }> {
+  opciones?: { soloAgregar?: boolean; crearAlSubir?: boolean },
+): Promise<{ error?: string; loteId?: string; creado?: boolean }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
   const entidadId = gate.trabajador.entidad_id;
@@ -945,14 +945,19 @@ export async function compartirEnvioVidaLey(
   if (actualError) return { error: actualError.message };
 
   let loteId = (actual?.lote_id as string | null) ?? null;
+  let creado = false;
   if (!loteId) {
+    if (!opciones?.crearAlSubir) {
+      return { error: "Suba la constancia o la factura para crear el grupo." };
+    }
     const { data: lote, error: loteError } = await db
       .from("vida_ley_lotes")
       .insert({ entidad_id: entidadId })
       .select("id")
       .single();
-    if (loteError || !lote) return { error: loteError?.message ?? "No se pudo crear el envío de Vida Ley." };
+    if (loteError || !lote) return { error: loteError?.message ?? "No se pudo crear el grupo de Vida Ley." };
     loteId = lote.id as string;
+    creado = true;
   }
 
   const { data: miembrosActuales, error: miembrosError } = await db
@@ -1005,7 +1010,24 @@ export async function compartirEnvioVidaLey(
     if (quitarError) return { error: quitarError.message };
   }
   revalidarFichasVidaLey([relacionId, ...ids, ...quitar]);
-  return { loteId };
+  return { loteId, creado };
+}
+
+export async function descartarGrupoVidaLeyVacio(relacionId: string, loteId: string): Promise<void> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return;
+  if (!isUuid(loteId)) return;
+  const db = await planillasDb();
+  const { data: lote } = await db
+    .from("vida_ley_lotes")
+    .select("id, entidad_id, constancia_storage_path, factura_storage_path")
+    .eq("id", loteId)
+    .maybeSingle();
+  if (!lote || lote.entidad_id !== gate.trabajador.entidad_id) return;
+  if (lote.constancia_storage_path || lote.factura_storage_path) return;
+  await db.from("vida_ley").update({ lote_id: null }).eq("lote_id", loteId);
+  await db.from("vida_ley_lotes").delete().eq("id", loteId);
+  revalidarFichasVidaLey([relacionId]);
 }
 
 export async function quitarDeEnvioVidaLey(relacionId: string): Promise<{ error?: string }> {
@@ -1046,39 +1068,6 @@ export async function usarEnvioVidaLey(relacionId: string, loteId: string): Prom
       relacion_id: relacionId,
       entidad_id: gate.trabajador.entidad_id,
       lote_id: loteId,
-      estado: actual?.estado ?? null,
-      numero_poliza: actual?.numero_poliza ?? null,
-      fecha_inicio: actual?.fecha_inicio ?? null,
-      fecha_fin: actual?.fecha_fin ?? null,
-    },
-    { onConflict: "relacion_id" },
-  );
-  if (error) return { error: error.message };
-  revalidarFichasVidaLey([relacionId]);
-  return {};
-}
-
-export async function nuevoGrupoVidaLey(relacionId: string): Promise<{ error?: string }> {
-  const gate = await assertEscrituraTramite(relacionId);
-  if ("error" in gate) return { error: gate.error };
-  const db = await planillasDb();
-  const { data: lote, error: loteError } = await db
-    .from("vida_ley_lotes")
-    .insert({ entidad_id: gate.trabajador.entidad_id })
-    .select("id")
-    .single();
-  if (loteError || !lote) return { error: loteError?.message ?? "No se pudo crear el grupo de Vida Ley." };
-  const { data: actual, error: actualError } = await db
-    .from("vida_ley")
-    .select("estado, numero_poliza, fecha_inicio, fecha_fin")
-    .eq("relacion_id", relacionId)
-    .maybeSingle();
-  if (actualError) return { error: actualError.message };
-  const { error } = await db.from("vida_ley").upsert(
-    {
-      relacion_id: relacionId,
-      entidad_id: gate.trabajador.entidad_id,
-      lote_id: lote.id,
       estado: actual?.estado ?? null,
       numero_poliza: actual?.numero_poliza ?? null,
       fecha_inicio: actual?.fecha_inicio ?? null,

@@ -6,8 +6,8 @@ import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import {
   compartirEnvioVidaLey,
+  descartarGrupoVidaLeyVacio,
   generarVidaLey,
-  nuevoGrupoVidaLey,
   marcarFacturaLoteNoEnviada,
   quitarDeEnvioVidaLey,
   saveVidaLey,
@@ -74,7 +74,6 @@ export function FichaVidaLey({
   const [fileComprobante, setFileComprobante] = useState<File | null>(null);
   const [envioElegido, setEnvioElegido] = useState("");
   const [usandoEnvio, setUsandoEnvio] = useState(false);
-  const [creandoGrupo, setCreandoGrupo] = useState(false);
   const [guardandoCertificado, setGuardandoCertificado] = useState(false);
 
   async function onGenerar() {
@@ -134,18 +133,6 @@ export function FichaVidaLey({
       return;
     }
     pushToast("Este trabajador usa la constancia y la factura de ese grupo.");
-    router.refresh();
-  }
-
-  async function onNuevoGrupo() {
-    setCreandoGrupo(true);
-    const result = await nuevoGrupoVidaLey(relacionId);
-    setCreandoGrupo(false);
-    if (result.error) {
-      pushToast(result.error, "error");
-      return;
-    }
-    pushToast("Grupo nuevo. Marque quién comparte su constancia y su factura.");
     router.refresh();
   }
 
@@ -209,7 +196,7 @@ export function FichaVidaLey({
   }
 
   const ocupado =
-    pending || generando || guardandoCertificado || guardandoComprobante || marcandoFactura || usandoEnvio || creandoGrupo;
+    pending || generando || guardandoCertificado || guardandoComprobante || marcandoFactura || usandoEnvio;
   const facturaNoEnviada = Boolean(lote?.factura_no_enviada) && !lote?.factura_storage_path;
   const yaGenerado = Boolean(vidaLey?.estado);
   const laVen = [
@@ -225,7 +212,7 @@ export function FichaVidaLey({
           <p className="text-sm font-medium">Trámite para la aseguradora</p>
           <p className="text-sm text-muted-foreground">
             {canWrite
-              ? `Se genera el Word con los datos de ${trabajador.persona.nombres} y la empresa. Al generar por primera vez desde aquí, el envío queda solo con este trabajador. Para compartir archivos, elabore el grupo en Vida Ley.`
+              ? `Se genera el Word con los datos de ${trabajador.persona.nombres} y la empresa. El grupo de constancia y factura se crea al subir el documento.`
               : "Consulta del trámite de este trabajador."}
           </p>
         </div>
@@ -267,7 +254,7 @@ export function FichaVidaLey({
         <div>
           <p className="text-sm font-medium">Respuesta de la aseguradora</p>
           <p className="text-sm text-muted-foreground">
-            Cada grupo comparte su constancia y, si llega, su factura. El certificado es solo de este trabajador.
+            El grupo se crea al subir la constancia o la factura. Quienes se marcan en esa subida lo comparten. El certificado es solo de este trabajador.
           </p>
         </div>
         {canWrite && enviosExistentes.length > 0 && !lote?.constancia_storage_path && !lote?.factura_storage_path ? (
@@ -291,11 +278,6 @@ export function FichaVidaLey({
               {usandoEnvio ? "Aplicando…" : "Usar en este trabajador"}
             </Button>
           </div>
-        ) : null}
-        {canWrite && (lote?.constancia_storage_path || lote?.factura_storage_path) ? (
-          <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onNuevoGrupo()}>
-            {creandoGrupo ? "Creando…" : "Crear otro grupo"}
-          </Button>
         ) : null}
         <ArchivoCompartidoVidaLey
           relacionId={relacionId}
@@ -476,12 +458,18 @@ function ArchivoCompartidoVidaLey({
   }
 
   async function guardarArchivo(file: File, previousPath: string | null, ids: string[]) {
-    const grupo = await compartirEnvioVidaLey(relacionId, ids, { soloAgregar: true });
+    const grupo = await compartirEnvioVidaLey(relacionId, ids, { soloAgregar: true, crearAlSubir: !previousPath });
     if (grupo.error || !grupo.loteId) return grupo.error ?? "No se pudo armar el grupo.";
     const upload = await uploadVidaLeyLoteFile(entidadId, grupo.loteId, tipo, file, previousPath);
-    if (upload.error || !upload.path) return upload.error ?? "No se pudo subir el archivo.";
+    if (upload.error || !upload.path) {
+      if (grupo.creado) await descartarGrupoVidaLeyVacio(relacionId, grupo.loteId);
+      return upload.error ?? "No se pudo subir el archivo.";
+    }
     const saved = await setVidaLeyLoteArchivo(relacionId, tipo, upload.path);
-    if (saved.error) return saved.error;
+    if (saved.error) {
+      if (grupo.creado) await descartarGrupoVidaLeyVacio(relacionId, grupo.loteId);
+      return saved.error;
+    }
     if (alGuardar) {
       const extraError = await alGuardar();
       if (extraError) return extraError;
