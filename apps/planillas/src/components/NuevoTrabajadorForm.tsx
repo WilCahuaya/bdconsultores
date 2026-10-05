@@ -128,7 +128,7 @@ export function NuevoTrabajadorForm({
               disabled={pending}
               file={dniFile}
               buttonLabel={dniFile ? "Cambiar escaneo" : "Subir DNI escaneado"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setDniFile}
             />
             <div className="grid gap-4 sm:grid-cols-2">

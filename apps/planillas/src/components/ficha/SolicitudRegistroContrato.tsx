@@ -281,7 +281,7 @@ export function SolicitudRegistroContrato({
               disabled={pending !== null}
               file={archivo}
               buttonLabel={archivo ? "Cambiar archivo" : "Seleccionar PDF o imagen"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setArchivo}
             />
             {otras.length > 0 ? (

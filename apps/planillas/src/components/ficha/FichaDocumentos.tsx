@@ -81,7 +81,7 @@ export function FichaDocumentos({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        {hint ?? "Un archivo por documento (se puede reemplazar). PDF, JPG, PNG o WEBP. Máximo 10 MB."}
+        {hint ?? "Un archivo por documento (se puede reemplazar). PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."}
       </p>
       <ul className={`${panelCardClass} divide-y p-0`}>
         {visibles.length === 0 ? (
@@ -139,7 +139,7 @@ export function FichaDocumentos({
               disabled={pending}
               file={nuevoArchivo}
               buttonLabel={nuevoArchivo ? "Cambiar archivo" : "Seleccionar PDF o imagen"}
-              emptyLabel="Opcional. PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              emptyLabel="Opcional. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setNuevoArchivo}
             />
           </div>

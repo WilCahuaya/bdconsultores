@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -11,6 +11,7 @@ import {
   marcarFacturaLoteNoEnviada,
   quitarDeEnvioVidaLey,
   saveVidaLey,
+  setCantidadComprobanteVidaLeyEmpresa,
   setComprobanteVidaLeyEmpresa,
   setDocumentoArchivo,
   setEstadoVidaLey,
@@ -57,6 +58,7 @@ export function FichaVidaLey({
   companerosEnvio,
   enviosExistentes,
   comprobanteEmpresa,
+  cantidadComprobante,
   canWrite,
 }: {
   relacionId: string;
@@ -67,6 +69,7 @@ export function FichaVidaLey({
   companerosEnvio: CompaneroEnvioVidaLey[];
   enviosExistentes: EnvioVidaLeyExistente[];
   comprobanteEmpresa: string | null;
+  cantidadComprobante: number | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -77,9 +80,14 @@ export function FichaVidaLey({
   const [marcandoFactura, setMarcandoFactura] = useState(false);
   const [fileCertificado, setFileCertificado] = useState<File | null>(null);
   const [fileComprobante, setFileComprobante] = useState<File | null>(null);
+  const [cantidadTexto, setCantidadTexto] = useState(cantidadComprobante != null ? String(cantidadComprobante) : "");
   const [envioElegido, setEnvioElegido] = useState("");
   const [usandoEnvio, setUsandoEnvio] = useState(false);
   const [guardandoCertificado, setGuardandoCertificado] = useState(false);
+
+  useEffect(() => {
+    setCantidadTexto(cantidadComprobante != null ? String(cantidadComprobante) : "");
+  }, [cantidadComprobante]);
 
   async function onGenerar() {
     setGenerando(true);
@@ -159,14 +167,27 @@ export function FichaVidaLey({
   }
 
   async function onGuardarComprobante() {
-    if (!fileComprobante) {
-      pushToast(
-        comprobanteEmpresa ? "Elija el comprobante nuevo para sustituir el de la empresa." : "Suba el comprobante de envío.",
-        "error",
-      );
+    const cantidad = Number(cantidadTexto.trim());
+    if (!/^\d+$/.test(cantidadTexto.trim()) || !Number.isInteger(cantidad) || cantidad < 1 || cantidad > 9999) {
+      pushToast("Indique cuántos trabajadores abarca el comprobante.", "error");
+      return;
+    }
+    if (!fileComprobante && !comprobanteEmpresa) {
+      pushToast("Suba el comprobante de envío.", "error");
       return;
     }
     setGuardandoComprobante(true);
+    if (!fileComprobante) {
+      const saved = await setCantidadComprobanteVidaLeyEmpresa(relacionId, cantidad);
+      setGuardandoComprobante(false);
+      if (saved.error) {
+        pushToast(saved.error, "error");
+        return;
+      }
+      pushToast("Cantidad de trabajadores del comprobante guardada.");
+      router.refresh();
+      return;
+    }
     const upload = await uploadVidaLeyComprobanteEmpresa(
       trabajador.entidad_id,
       fileComprobante,
@@ -177,7 +198,7 @@ export function FichaVidaLey({
       pushToast(upload.error ?? "No se pudo subir el comprobante de envío.", "error");
       return;
     }
-    const saved = await setComprobanteVidaLeyEmpresa(relacionId, upload.path);
+    const saved = await setComprobanteVidaLeyEmpresa(relacionId, upload.path, cantidad);
     setGuardandoComprobante(false);
     if (saved.error) {
       pushToast(saved.error, "error");
@@ -202,6 +223,12 @@ export function FichaVidaLey({
 
   const ocupado =
     pending || generando || guardandoCertificado || guardandoComprobante || marcandoFactura || usandoEnvio;
+  const cantidadIngresada = /^\d+$/.test(cantidadTexto.trim()) ? Number(cantidadTexto.trim()) : null;
+  const cantidadCambio =
+    cantidadIngresada != null &&
+    cantidadIngresada >= 1 &&
+    cantidadIngresada <= 9999 &&
+    cantidadIngresada !== cantidadComprobante;
   const facturaNoEnviada = Boolean(lote?.factura_no_enviada) && !lote?.factura_storage_path;
   const yaGenerado = Boolean(vidaLey?.estado);
   const laVen = [
@@ -321,7 +348,7 @@ export function FichaVidaLey({
                       ? "Cambiar certificado de seguro"
                       : "Subir certificado de seguro"
                   }
-                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
                   onFileChange={setFileCertificado}
                 />
                 <Button type="button" size="sm" disabled={ocupado || !fileCertificado} onClick={() => void onGuardarCertificado()}>
@@ -369,9 +396,12 @@ export function FichaVidaLey({
           <p className="text-sm font-medium">Comprobante de envío de la empresa</p>
           <p className="text-sm text-muted-foreground">
             {canWrite
-              ? "Hay un solo comprobante para todos los trabajadores. Cuando se da de alta a alguien, súbalo de nuevo: el archivo anterior se sustituye y el nuevo cubre a toda la empresa."
+              ? "Hay un solo comprobante para la empresa. Indique cuántos trabajadores abarca. Al sustituirlo, el archivo anterior se reemplaza."
               : "Comprobante de envío de la empresa, en consulta."}
           </p>
+          {!canWrite && cantidadComprobante != null ? (
+            <p className="text-sm text-foreground">Abarca {cantidadComprobante} trabajadores.</p>
+          ) : null}
         </div>
         <DocumentoPrevisualizacion
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_COMPROBANTE}
@@ -380,18 +410,29 @@ export function FichaVidaLey({
           vacio="Suba el comprobante de envío de la empresa."
           extra={
             canWrite ? (
-              <FileInput
-                accept={DOCUMENTO_ACCEPT}
-                disabled={ocupado}
-                file={fileComprobante}
-                buttonLabel={
-                  fileComprobante || comprobanteEmpresa
-                    ? "Sustituir comprobante de envío"
-                    : "Subir comprobante de envío"
-                }
-                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                onFileChange={setFileComprobante}
-              />
+              <div className="space-y-3">
+                <Field
+                  label="Trabajadores que abarca"
+                  name="cantidad_trabajadores_comprobante"
+                  type="number"
+                  inputMode="numeric"
+                  value={cantidadTexto}
+                  placeholder="Cantidad"
+                  onChange={(event) => setCantidadTexto(event.target.value)}
+                />
+                <FileInput
+                  accept={DOCUMENTO_ACCEPT}
+                  disabled={ocupado}
+                  file={fileComprobante}
+                  buttonLabel={
+                    fileComprobante || comprobanteEmpresa
+                      ? "Sustituir comprobante de envío"
+                      : "Subir comprobante de envío"
+                  }
+                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+                  onFileChange={setFileComprobante}
+                />
+              </div>
             ) : null
           }
         />
@@ -399,12 +440,18 @@ export function FichaVidaLey({
           <EliminarComprobanteEmpresa relacionId={relacionId} disabled={ocupado} />
         ) : null}
         {canWrite ? (
-          <Button type="button" disabled={ocupado || !fileComprobante} onClick={() => void onGuardarComprobante()}>
+          <Button
+            type="button"
+            disabled={ocupado || (!fileComprobante && !(comprobanteEmpresa && cantidadCambio))}
+            onClick={() => void onGuardarComprobante()}
+          >
             {guardandoComprobante
               ? "Guardando…"
-              : comprobanteEmpresa
-                ? "Sustituir comprobante de la empresa"
-                : "Guardar comprobante de la empresa"}
+              : fileComprobante
+                ? comprobanteEmpresa
+                  ? "Sustituir comprobante de la empresa"
+                  : "Guardar comprobante de la empresa"
+                : "Guardar cantidad"}
           </Button>
         ) : null}
       </section>
@@ -642,7 +689,7 @@ function ArchivoCompartidoVidaLey({
             disabled={ocupado}
             file={archivo}
             buttonLabel={archivo ? "Cambiar archivo" : "Seleccionar PDF o imagen"}
-            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
             onFileChange={setArchivo}
           />
           {permitirAgregar && paraAgregar.length > 0 ? (

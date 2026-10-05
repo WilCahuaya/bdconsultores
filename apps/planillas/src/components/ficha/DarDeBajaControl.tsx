@@ -143,8 +143,8 @@ export function DarDeBajaControl({
                 ? "Ya hay carta de renuncia. Puede subir otra o usar la que está."
                 : "Ya hay T-Registro baja. Puede subir otro o usar el que está."
               : esCarta
-                ? "Solo este archivo. PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                : "Solo la constancia de baja en T-Registro. PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                ? "Solo este archivo. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+                : "Solo la constancia de baja en T-Registro. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
           }
           onFileChange={setArchivo}
         />

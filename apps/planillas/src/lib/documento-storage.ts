@@ -5,19 +5,60 @@ export const DOCUMENTO_ACCEPT = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/gif",
+  "image/bmp",
+  "image/tiff",
+  "image/avif",
+  "image/heic",
+  "image/heif",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   ".pdf",
   ".jpg",
   ".jpeg",
   ".png",
   ".webp",
+  ".gif",
+  ".bmp",
+  ".tif",
+  ".tiff",
+  ".avif",
+  ".heic",
+  ".heif",
+  ".doc",
+  ".docx",
+  ".xls",
+  ".xlsx",
 ].join(",");
+
+export const DOCUMENTO_AYUDA = "PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB.";
 
 export const DOCUMENTO_MAX_BYTES = 10 * 1024 * 1024;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const ALLOWED_EXT = new Set(["pdf", "jpg", "jpeg", "png", "webp"]);
+const EXTENSIONES_GUARDADAS = new Set(["pdf", "jpg", "jpeg", "png", "webp"]);
+const EXTENSIONES_ENTRADA = new Set([
+  "pdf",
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "gif",
+  "bmp",
+  "tif",
+  "tiff",
+  "avif",
+  "heic",
+  "heif",
+  "doc",
+  "docx",
+  "xls",
+  "xlsx",
+]);
 
 export function isUuid(value: string): boolean {
   return UUID_RE.test(value);
@@ -25,7 +66,7 @@ export function isUuid(value: string): boolean {
 
 export function extensionDocumento(fileName: string): string | null {
   const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
-  if (!ALLOWED_EXT.has(ext)) return null;
+  if (!EXTENSIONES_ENTRADA.has(ext)) return null;
   return ext === "jpeg" ? "jpg" : ext;
 }
 
@@ -48,7 +89,7 @@ export function pathPerteneceAComprobanteEmpresa(entidadId: string, path: string
   const prefix = `${entidadId}/vida-ley/comprobante-empresa.`;
   if (!path.startsWith(prefix)) return false;
   const ext = path.slice(prefix.length).toLowerCase();
-  return ALLOWED_EXT.has(ext) && !ext.includes("/");
+  return EXTENSIONES_GUARDADAS.has(ext) && !ext.includes("/");
 }
 
 export function pathVidaLeyLote(
@@ -70,7 +111,7 @@ export function pathPerteneceAVidaLeyLote(
   const prefix = `${entidadId}/vida-ley/${loteId}/${tipo}.`;
   if (!path.startsWith(prefix)) return false;
   const ext = path.slice(prefix.length).toLowerCase();
-  return ALLOWED_EXT.has(ext) && !ext.includes("/");
+  return EXTENSIONES_GUARDADAS.has(ext) && !ext.includes("/");
 }
 
 export function pathPerteneceASolicitud(entidadId: string, solicitudId: string, path: string): boolean {
@@ -78,7 +119,7 @@ export function pathPerteneceASolicitud(entidadId: string, solicitudId: string, 
   const prefix = `${entidadId}/solicitudes/${solicitudId}.`;
   if (!path.startsWith(prefix)) return false;
   const ext = path.slice(prefix.length).toLowerCase();
-  return ALLOWED_EXT.has(ext) && !ext.includes("/");
+  return EXTENSIONES_GUARDADAS.has(ext) && !ext.includes("/");
 }
 
 export function pathDocumentoValido(entidadId: string, relacionId: string, path: string): boolean {
@@ -87,7 +128,7 @@ export function pathDocumentoValido(entidadId: string, relacionId: string, path:
   if (!path.startsWith(prefix)) return false;
   const rest = path.slice(prefix.length);
   const [id, ext] = rest.split(".");
-  return Boolean(id && isUuid(id) && ext && ALLOWED_EXT.has(ext));
+  return Boolean(id && isUuid(id) && ext && EXTENSIONES_GUARDADAS.has(ext));
 }
 
 export function pathPerteneceAlDocumento(
@@ -113,6 +154,6 @@ export function nombreDescargaDocumento(tipoLabel: string, path: string): string
 
 export function errorArchivoDocumento(file: File): string | null {
   if (file.size > DOCUMENTO_MAX_BYTES) return "El archivo no puede superar 10 MB.";
-  if (!extensionDocumento(file.name)) return "Solo se admiten PDF, JPG, PNG o WEBP.";
+  if (!extensionDocumento(file.name)) return "Solo se admiten PDF, Word, Excel o imagen.";
   return null;
 }

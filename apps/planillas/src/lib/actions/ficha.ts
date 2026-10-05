@@ -1122,32 +1122,52 @@ const COLUMNA_ARCHIVO_LOTE: Record<ArchivoVidaLeyLote, "constancia_storage_path"
   factura: "factura_storage_path",
 };
 
-export async function getComprobanteVidaLeyEmpresa(entidadId: string): Promise<string | null> {
+export type ComprobanteEmpresaVidaLey = {
+  storagePath: string | null;
+  cantidadTrabajadores: number | null;
+};
+
+function cantidadComprobanteValida(cantidadTrabajadores: number): string | null {
+  if (!Number.isInteger(cantidadTrabajadores) || cantidadTrabajadores < 1 || cantidadTrabajadores > 9999) {
+    return "Indique cuántos trabajadores abarca el comprobante.";
+  }
+  return null;
+}
+
+export async function getComprobanteVidaLeyEmpresa(entidadId: string): Promise<ComprobanteEmpresaVidaLey | null> {
   if (!isUuid(entidadId)) return null;
   await requirePlanillasProfile();
   const db = await planillasDb();
   const { data, error } = await db
     .from("vida_ley_comprobante_empresa")
-    .select("storage_path")
+    .select("storage_path, cantidad_trabajadores")
     .eq("entidad_id", entidadId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return (data?.storage_path as string | null) ?? null;
+  if (!data) return null;
+  const cantidad = data.cantidad_trabajadores;
+  return {
+    storagePath: (data.storage_path as string | null) ?? null,
+    cantidadTrabajadores: typeof cantidad === "number" ? cantidad : null,
+  };
 }
 
 export async function setComprobanteVidaLeyEmpresa(
   relacionId: string,
   storagePath: string,
+  cantidadTrabajadores: number,
 ): Promise<{ error?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
+  const cantidadError = cantidadComprobanteValida(cantidadTrabajadores);
+  if (cantidadError) return { error: cantidadError };
   if (!pathPerteneceAComprobanteEmpresa(gate.trabajador.entidad_id, storagePath)) {
     return { error: "Ruta de archivo no válida." };
   }
   const db = await planillasDb();
   const entidadId = gate.trabajador.entidad_id;
   const { error } = await db.from("vida_ley_comprobante_empresa").upsert(
-    { entidad_id: entidadId, storage_path: storagePath },
+    { entidad_id: entidadId, storage_path: storagePath, cantidad_trabajadores: cantidadTrabajadores },
     { onConflict: "entidad_id" },
   );
   if (error) return { error: error.message };
@@ -1175,6 +1195,31 @@ export async function setComprobanteVidaLeyEmpresa(
     }
   }
   revalidarFichasVidaLey(ids.length > 0 ? ids : [relacionId]);
+  return {};
+}
+
+export async function setCantidadComprobanteVidaLeyEmpresa(
+  relacionId: string,
+  cantidadTrabajadores: number,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const cantidadError = cantidadComprobanteValida(cantidadTrabajadores);
+  if (cantidadError) return { error: cantidadError };
+  const db = await planillasDb();
+  const { data: actual, error: loadError } = await db
+    .from("vida_ley_comprobante_empresa")
+    .select("storage_path")
+    .eq("entidad_id", gate.trabajador.entidad_id)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!actual?.storage_path) return { error: "Suba el comprobante de envío antes de indicar la cantidad." };
+  const { error } = await db
+    .from("vida_ley_comprobante_empresa")
+    .update({ cantidad_trabajadores: cantidadTrabajadores })
+    .eq("entidad_id", gate.trabajador.entidad_id);
+  if (error) return { error: error.message };
+  revalidarFichasVidaLey([relacionId]);
   return {};
 }
 
@@ -1280,7 +1325,7 @@ export async function quitarComprobanteVidaLeyEmpresa(
   if (!path) return { error: "La empresa no tiene comprobante de envío." };
   const { error } = await db
     .from("vida_ley_comprobante_empresa")
-    .update({ storage_path: null })
+    .update({ storage_path: null, cantidad_trabajadores: null })
     .eq("entidad_id", gate.trabajador.entidad_id);
   if (error) return { error: error.message };
   revalidarFichasVidaLey([relacionId]);

@@ -48,12 +48,18 @@ export function PreviewEscaneo({
     return () => URL.revokeObjectURL(url);
   }, [file]);
   const src = localUrl ?? remoteUrl ?? null;
+  const esImagen =
+    !esPdf &&
+    (!file || file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|hei[cf])$/i.test(file.name));
   if (!src) {
     return (
       <div className="flex h-[min(56vh,36rem)] items-center justify-center rounded-md border border-dashed bg-muted/30 p-4">
         <p className="text-center text-sm text-muted-foreground">{vacio}</p>
       </div>
     );
+  }
+  if (!esPdf && !esImagen) {
+    return <p className="text-sm text-muted-foreground">Este archivo se guardará como PDF.</p>;
   }
   return esPdf ? (
     <iframe title="Vista previa" src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
@@ -301,7 +307,7 @@ function CapturaDni({
               disabled={pending}
               file={file}
               buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir DNI escaneado"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setFile}
             />
           ) : null}
@@ -432,7 +438,7 @@ function CapturaFicha({
               disabled={pending}
               file={file}
               buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir ficha escaneada"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setFile}
             />
           ) : null}
@@ -555,7 +561,7 @@ function CapturaPension({
               disabled={pending}
               file={file}
               buttonLabel={file || documento?.storage_path ? "Cambiar escaneo" : "Subir sistema de pensiones"}
-              emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setFile}
             />
           ) : null}
@@ -838,7 +844,7 @@ function CapturaAsignacion({
               disabled={pending}
               file={file}
               buttonLabel={file || documento?.storage_path ? "Cambiar archivo" : "Subir asignación familiar"}
-              emptyLabel="Un solo archivo. PDF, JPG, PNG o WEBP. Máximo 10 MB."
+              emptyLabel="Un solo archivo. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setFile}
             />
           ) : null}

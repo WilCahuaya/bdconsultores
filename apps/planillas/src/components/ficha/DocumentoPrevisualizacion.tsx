@@ -10,6 +10,13 @@ function archivoEsPdf(file: File | null, path: string | null): boolean {
   return Boolean(path?.toLowerCase().endsWith(".pdf"));
 }
 
+function archivoEsImagen(file: File | null, path: string | null): boolean {
+  if (file) {
+    return file.type.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp|tiff?|avif|hei[cf])$/i.test(file.name);
+  }
+  return Boolean(path && /\.(jpe?g|png|webp)$/i.test(path));
+}
+
 function BotonPrevisualizacion({ visible, onClick }: { visible: boolean; onClick: () => void }) {
   return (
     <Button type="button" size="sm" variant="outline" onClick={onClick}>
@@ -68,6 +75,7 @@ function useVistaDocumento(
 
   const src = localUrl ?? remoteUrl;
   const esPdf = archivoEsPdf(file, storagePath ?? null);
+  const esImagen = archivoEsImagen(file, storagePath ?? null);
   const vista = hayArchivo && visible ? (
     error && !src ? (
       <p className="text-sm text-muted-foreground">{error}</p>
@@ -75,9 +83,11 @@ function useVistaDocumento(
       <p className="text-sm text-muted-foreground">Cargando vista previa…</p>
     ) : esPdf ? (
       <iframe title={titulo} src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
-    ) : (
+    ) : esImagen ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={src} alt={titulo} className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
+    ) : (
+      <p className="text-sm text-muted-foreground">Este archivo se guardará como PDF.</p>
     )
   ) : null;
 

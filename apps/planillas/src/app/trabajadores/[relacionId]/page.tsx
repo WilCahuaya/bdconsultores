@@ -286,7 +286,8 @@ export default async function FichaTrabajadorPage({
                   etiqueta: `Grupo ${envio.numero}: ${quienes || "sin nombres"}${resto} · ${archivos}`,
                 };
               })}
-            comprobanteEmpresa={comprobanteEmpresa}
+            comprobanteEmpresa={comprobanteEmpresa?.storagePath ?? null}
+            cantidadComprobante={comprobanteEmpresa?.cantidadTrabajadores ?? null}
             canWrite={esEstudio && !fichaCesada}
           />
         ) : null}

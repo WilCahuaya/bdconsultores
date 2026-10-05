@@ -254,7 +254,7 @@ export function FichaTRegistro({
                   buttonLabel={
                     fileAlta || documentoTrAlta?.storage_path ? "Cambiar alta de T-Registro" : "Subir alta de T-Registro"
                   }
-                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
                   onFileChange={setFileAlta}
                 />
                 {documentoTrAlta?.storage_path ? (
@@ -300,7 +300,7 @@ export function FichaTRegistro({
                       ? "Cambiar baja de T-Registro"
                       : "Subir baja de T-Registro"
                   }
-                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
                   onFileChange={setFileBaja}
                 />
                 {documentoTrBaja?.storage_path ? (

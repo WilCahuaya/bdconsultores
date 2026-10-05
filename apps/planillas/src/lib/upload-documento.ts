@@ -1,14 +1,32 @@
 import { createClient } from "@/lib/supabase/client";
+import { archivoParaGuardar } from "@/lib/convertir-a-pdf";
 import {
   DOCUMENTOS_PLANILLAS_BUCKET,
-  errorArchivoDocumento,
-  extensionDocumento,
   pathDocumento,
   pathSolicitudRegistro,
   pathVidaLeyComprobanteEmpresa,
   pathVidaLeyLote,
   type ArchivoVidaLeyLote,
 } from "@/lib/documento-storage";
+
+async function subirPdf(
+  file: File,
+  path: string,
+  previousPath?: string | null,
+): Promise<{ path?: string; error?: string }> {
+  const preparado = await archivoParaGuardar(file);
+  if (preparado.error || !preparado.file) return { error: preparado.error ?? "No se pudo convertir el archivo a PDF." };
+  const supabase = createClient();
+  const { error } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).upload(path, preparado.file, {
+    upsert: true,
+    contentType: "application/pdf",
+  });
+  if (error) return { error: error.message };
+  if (previousPath && previousPath !== path) {
+    await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove([previousPath]);
+  }
+  return { path };
+}
 
 export async function uploadDocumentoFile(
   entidadId: string,
@@ -17,26 +35,7 @@ export async function uploadDocumentoFile(
   file: File,
   previousPath?: string | null,
 ): Promise<{ path?: string; error?: string }> {
-  const invalid = errorArchivoDocumento(file);
-  if (invalid) return { error: invalid };
-
-  const ext = extensionDocumento(file.name);
-  if (!ext) return { error: "Solo se admiten PDF, JPG, PNG o WEBP." };
-
-  const path = pathDocumento(entidadId, relacionId, documentoId, ext);
-  const supabase = createClient();
-  const { error } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).upload(path, file, {
-    upsert: true,
-    contentType: file.type || undefined,
-  });
-
-  if (error) return { error: error.message };
-
-  if (previousPath && previousPath !== path) {
-    await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove([previousPath]);
-  }
-
-  return { path };
+  return subirPdf(file, pathDocumento(entidadId, relacionId, documentoId, "pdf"), previousPath);
 }
 
 export async function uploadVidaLeyLoteFile(
@@ -46,26 +45,7 @@ export async function uploadVidaLeyLoteFile(
   file: File,
   previousPath?: string | null,
 ): Promise<{ path?: string; error?: string }> {
-  const invalid = errorArchivoDocumento(file);
-  if (invalid) return { error: invalid };
-
-  const ext = extensionDocumento(file.name);
-  if (!ext) return { error: "Solo se admiten PDF, JPG, PNG o WEBP." };
-
-  const path = pathVidaLeyLote(entidadId, loteId, tipo, ext);
-  const supabase = createClient();
-  const { error } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).upload(path, file, {
-    upsert: true,
-    contentType: file.type || undefined,
-  });
-
-  if (error) return { error: error.message };
-
-  if (previousPath && previousPath !== path) {
-    await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove([previousPath]);
-  }
-
-  return { path };
+  return subirPdf(file, pathVidaLeyLote(entidadId, loteId, tipo, "pdf"), previousPath);
 }
 
 export async function uploadVidaLeyComprobanteEmpresa(
@@ -73,21 +53,7 @@ export async function uploadVidaLeyComprobanteEmpresa(
   file: File,
   previousPath?: string | null,
 ): Promise<{ path?: string; error?: string }> {
-  const invalid = errorArchivoDocumento(file);
-  if (invalid) return { error: invalid };
-  const ext = extensionDocumento(file.name);
-  if (!ext) return { error: "Solo se admiten PDF, JPG, PNG o WEBP." };
-  const path = pathVidaLeyComprobanteEmpresa(entidadId, ext);
-  const supabase = createClient();
-  const { error } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).upload(path, file, {
-    upsert: true,
-    contentType: file.type || undefined,
-  });
-  if (error) return { error: error.message };
-  if (previousPath && previousPath !== path) {
-    await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove([previousPath]);
-  }
-  return { path };
+  return subirPdf(file, pathVidaLeyComprobanteEmpresa(entidadId, "pdf"), previousPath);
 }
 
 export async function uploadSolicitudFile(
@@ -96,26 +62,7 @@ export async function uploadSolicitudFile(
   file: File,
   previousPath?: string | null,
 ): Promise<{ path?: string; error?: string }> {
-  const invalid = errorArchivoDocumento(file);
-  if (invalid) return { error: invalid };
-
-  const ext = extensionDocumento(file.name);
-  if (!ext) return { error: "Solo se admiten PDF, JPG, PNG o WEBP." };
-
-  const path = pathSolicitudRegistro(entidadId, solicitudId, ext);
-  const supabase = createClient();
-  const { error } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).upload(path, file, {
-    upsert: true,
-    contentType: file.type || undefined,
-  });
-
-  if (error) return { error: error.message };
-
-  if (previousPath && previousPath !== path) {
-    await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove([previousPath]);
-  }
-
-  return { path };
+  return subirPdf(file, pathSolicitudRegistro(entidadId, solicitudId, "pdf"), previousPath);
 }
 
 export async function quitarArchivoSolicitud(path: string): Promise<void> {

@@ -214,7 +214,7 @@ export function FichaVacaciones({
                   disabled={pending}
                   file={file}
                   buttonLabel={file ? "Cambiar respaldo firmado" : "Subir respaldo firmado"}
-                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
                   onFileChange={setFile}
                 />
                 <Button type="submit" disabled={pending || !file}>
