@@ -78,6 +78,7 @@ export async function crearDocumentoVacacion(
   if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para registrar vacaciones." };
   const trabajador = await getTrabajador(relacionId);
   if (!trabajador) return { error: "Trabajador no encontrado." };
+  if (trabajador.estado === "CESADA") return { error: "Esta ficha está de baja. Los datos se consultan." };
   const db = await planillasDb();
   const { data, error } = await db
     .from("documentos")
@@ -122,6 +123,7 @@ export async function addVacacion(relacionId: string, formData: FormData): Promi
   if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para registrar vacaciones." };
   const trabajador = await getTrabajador(relacionId);
   if (!trabajador) return { error: "Trabajador no encontrado." };
+  if (trabajador.estado === "CESADA") return { error: "Esta ficha está de baja. Los datos se consultan." };
 
   const documentoId = String(formData.get("documento_id") ?? "").trim();
   if (!isUuid(documentoId)) return { error: "Suba el documento de respaldo firmado para guardar." };
@@ -174,6 +176,7 @@ export async function deleteVacacion(relacionId: string, vacacionId: string): Pr
   if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para quitar vacaciones." };
   const trabajador = await getTrabajador(relacionId);
   if (!trabajador) return { error: "Trabajador no encontrado." };
+  if (trabajador.estado === "CESADA") return { error: "Esta ficha está de baja. Los datos se consultan." };
   const db = await planillasDb();
   const { data: actual, error: loadError } = await db
     .from("vacaciones")

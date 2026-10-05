@@ -193,7 +193,7 @@ export function FichaContratos({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">Generar abre una versión nueva.</p>
+      {canWrite ? <p className="text-sm text-muted-foreground">Generar abre una versión nueva.</p> : null}
 
       {canWrite ? (
         <div className="flex flex-wrap gap-2">
@@ -358,7 +358,9 @@ export function FichaContratos({
             {contratos.length === 0 ? (
               <tr>
                 <td className="px-4 py-6 text-muted-foreground" colSpan={9}>
-                  Aún no hay contratos registrados. Puede dejarlo así, subir solo el firmado vigente o generar un Word.
+                  {canWrite
+                    ? "Aún no hay contratos registrados. Puede dejarlo así, subir solo el firmado vigente o generar un Word."
+                    : "Aún no hay contratos registrados."}
                 </td>
               </tr>
             ) : (

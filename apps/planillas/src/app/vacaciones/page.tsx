@@ -156,7 +156,7 @@ export default async function VacacionesPage({
             </div>
             {canWrite ? (
               <p className="text-sm text-muted-foreground">
-                Entre al trámite de la persona para registrar el goce (fechas, días y el documento de respaldo firmado).
+                Entre a la ficha de un trabajador activo para registrar el goce (fechas, días y el documento de respaldo firmado). En una ficha de baja el periodo se consulta.
               </p>
             ) : null}
           </>

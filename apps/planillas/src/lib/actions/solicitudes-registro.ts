@@ -146,8 +146,8 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
   const abiertos = new Map<string, (typeof contratos)[number]>();
   for (const contrato of contratos) {
     const relacion = relaciones.get(contrato.relacion_id);
-    if (!relacion) continue;
-    if (relacion.estado !== "CESADA" && CERRADOS.has(contrato.estado)) continue;
+    if (!relacion || relacion.estado !== "ACTIVA") continue;
+    if (CERRADOS.has(contrato.estado)) continue;
     const previo = abiertos.get(contrato.relacion_id);
     if (!previo || contrato.version > previo.version) abiertos.set(contrato.relacion_id, contrato);
   }
@@ -187,24 +187,19 @@ async function contratosDeLaEmpresa(
   const rows = (data ?? []) as FilaContratoEmpresa[];
   if (rows.length !== ids.length) return { error: "Hay un contrato que no existe." };
   if (rows.some((row) => row.entidad_id !== entidadId)) return { error: "El contrato no es de esta empresa." };
-  const cerrados = rows.filter((row) => CERRADOS.has(row.estado));
-  if (cerrados.length > 0) {
-    const { data: relaciones, error: relError } = await db
-      .from("relaciones_laborales")
-      .select("id, estado")
-      .in(
-        "id",
-        cerrados.map((row) => row.relacion_id),
-      );
-    if (relError) return { error: relError.message };
-    const cesada = new Set(
-      ((relaciones ?? []) as { id: string; estado: string }[])
-        .filter((row) => row.estado === "CESADA")
-        .map((row) => row.id),
+  if (rows.some((row) => CERRADOS.has(row.estado))) {
+    return { error: "Un contrato cerrado no se puede enlazar a la solicitud." };
+  }
+  const { data: relaciones, error: relError } = await db
+    .from("relaciones_laborales")
+    .select("id, estado")
+    .in(
+      "id",
+      rows.map((row) => row.relacion_id),
     );
-    if (cerrados.some((row) => row.estado === "BAJA" || !cesada.has(row.relacion_id))) {
-      return { error: "Un contrato cerrado no se puede enlazar a la solicitud." };
-    }
+  if (relError) return { error: relError.message };
+  if (((relaciones ?? []) as { estado: string }[]).some((row) => row.estado === "CESADA")) {
+    return { error: "Esta ficha está de baja. Los datos se consultan." };
   }
   return { rows };
 }

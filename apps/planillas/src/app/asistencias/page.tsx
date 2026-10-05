@@ -143,7 +143,7 @@ export default async function AsistenciasPage({
                                 relacionId={trabajador.id}
                                 mes={mes}
                                 nota={pdf?.nota ?? null}
-                                canWrite={canWrite}
+                                canWrite={canWrite && trabajador.estado !== "CESADA"}
                                 compact
                               />
                             </td>

@@ -94,7 +94,9 @@ export default async function VidaLeyPage({
       : filtro === "pendientes"
         ? filas.filter((fila) => fila.etapa.pendiente)
         : filas.filter((fila) => fila.etapa.id === filtro);
-  const cantidadGrupo = filas.filter((fila) => vidaLeyPendienteRecepcion(fila.registro?.estado)).length;
+  const cantidadGrupo = filas.filter(
+    (fila) => fila.trabajador.estado !== "CESADA" && vidaLeyPendienteRecepcion(fila.registro?.estado),
+  ).length;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>

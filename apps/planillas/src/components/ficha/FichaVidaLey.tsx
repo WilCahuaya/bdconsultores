@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, FileInput, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -9,6 +9,7 @@ import {
   generarVidaLey,
   nuevoGrupoVidaLey,
   marcarFacturaLoteNoEnviada,
+  quitarDeEnvioVidaLey,
   saveVidaLey,
   setComprobanteVidaLeyEmpresa,
   setDocumentoArchivo,
@@ -21,10 +22,11 @@ import {
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { Field, DateField } from "@/components/fields";
-import { etiquetaEstadoVidaLey, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import { etiquetaEstadoVidaLey, etiquetaTrabajador, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
-import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
+import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
+import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile, uploadVidaLeyComprobanteEmpresa, uploadVidaLeyLoteFile } from "@/lib/upload-documento";
 import type { ArchivoVidaLeyLote } from "@/lib/documento-storage";
 
@@ -33,6 +35,7 @@ export type CompaneroEnvioVidaLey = {
   etiqueta: string;
   enEsteEnvio: boolean;
   otroEnvio: boolean;
+  cesada: boolean;
 };
 
 export type EnvioVidaLeyExistente = {
@@ -65,29 +68,14 @@ export function FichaVidaLey({
   const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
   const [generando, setGenerando] = useState(false);
-  const [guardandoDocs, setGuardandoDocs] = useState(false);
   const [guardandoComprobante, setGuardandoComprobante] = useState(false);
   const [marcandoFactura, setMarcandoFactura] = useState(false);
   const [fileCertificado, setFileCertificado] = useState<File | null>(null);
-  const [fileConstancia, setFileConstancia] = useState<File | null>(null);
-  const [fileFactura, setFileFactura] = useState<File | null>(null);
   const [fileComprobante, setFileComprobante] = useState<File | null>(null);
-  const miembros = companerosEnvio
-    .filter((item) => item.enEsteEnvio)
-    .map((item) => item.relacionId)
-    .join("|");
-  const [marcados, setMarcados] = useState(() =>
-    companerosEnvio.filter((item) => item.enEsteEnvio).map((item) => item.relacionId),
-  );
-  const [miembrosPrev, setMiembrosPrev] = useState(miembros);
-  if (miembros !== miembrosPrev) {
-    setMiembrosPrev(miembros);
-    setMarcados(companerosEnvio.filter((item) => item.enEsteEnvio).map((item) => item.relacionId));
-  }
   const [envioElegido, setEnvioElegido] = useState("");
-  const [compartiendo, setCompartiendo] = useState(false);
   const [usandoEnvio, setUsandoEnvio] = useState(false);
   const [creandoGrupo, setCreandoGrupo] = useState(false);
+  const [guardandoCertificado, setGuardandoCertificado] = useState(false);
 
   async function onGenerar() {
     setGenerando(true);
@@ -136,32 +124,6 @@ export function FichaVidaLey({
     return saved.error ?? null;
   }
 
-  function toggleMarcado(id: string) {
-    setMarcados((actual) => (actual.includes(id) ? actual.filter((item) => item !== id) : [...actual, id]));
-  }
-
-  async function aplicarCompartidos(): Promise<string | null> {
-    const result = await compartirEnvioVidaLey(relacionId, marcados);
-    if (result.error || !result.loteId) {
-      pushToast(result.error ?? "No se pudo compartir el envío.", "error");
-      return null;
-    }
-    return result.loteId;
-  }
-
-  async function onCompartir() {
-    setCompartiendo(true);
-    const loteId = await aplicarCompartidos();
-    setCompartiendo(false);
-    if (!loteId) return;
-    pushToast(
-      marcados.length > 0
-        ? "La constancia y la factura quedan para los trabajadores marcados."
-        : "Este grupo queda solo para este trabajador.",
-    );
-    router.refresh();
-  }
-
   async function onUsarEnvio() {
     if (!envioElegido) return;
     setUsandoEnvio(true);
@@ -187,84 +149,20 @@ export function FichaVidaLey({
     router.refresh();
   }
 
-  async function subirLote(
-    file: File | null,
-    tipo: ArchivoVidaLeyLote,
-    previousPath: string | null,
-    loteId: string,
-    etiqueta: string,
-  ) {
-    if (!file) return null;
-    const upload = await uploadVidaLeyLoteFile(trabajador.entidad_id, loteId, tipo, file, previousPath);
-    if (upload.error || !upload.path) return upload.error ?? `No se pudo subir ${etiqueta}.`;
-    const saved = await setVidaLeyLoteArchivo(relacionId, tipo, upload.path);
-    return saved.error ?? null;
-  }
-
-  async function onGuardarRespuesta() {
-    if (!fileCertificado && !fileConstancia && !fileFactura) {
-      pushToast("Elija al menos un archivo para guardar.", "error");
+  async function onGuardarCertificado() {
+    if (!fileCertificado) {
+      pushToast("Elija el certificado de este trabajador.", "error");
       return;
     }
-    setGuardandoDocs(true);
-    let loteId = lote?.id ?? null;
-    if (fileConstancia || fileFactura) {
-      loteId = await aplicarCompartidos();
-      if (!loteId) {
-        setGuardandoDocs(false);
-        return;
-      }
-    }
-    if ((fileConstancia || fileFactura) && loteId) {
-      const errorConstancia = await subirLote(
-        fileConstancia,
-        "constancia",
-        lote?.constancia_storage_path ?? null,
-        loteId,
-        TIPO_DOCUMENTO_LABEL.VIDA_LEY_CONSTANCIA,
-      );
-      if (errorConstancia) {
-        setGuardandoDocs(false);
-        pushToast(errorConstancia, "error");
-        return;
-      }
-      const errorFactura = await subirLote(
-        fileFactura,
-        "factura",
-        lote?.factura_storage_path ?? null,
-        loteId,
-        TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA,
-      );
-      if (errorFactura) {
-        setGuardandoDocs(false);
-        pushToast(errorFactura, "error");
-        return;
-      }
-    }
+    setGuardandoCertificado(true);
     const errorCertificado = await subirCertificado(fileCertificado);
+    setGuardandoCertificado(false);
     if (errorCertificado) {
-      setGuardandoDocs(false);
       pushToast(errorCertificado, "error");
       return;
     }
-    const hayConstancia = Boolean(fileConstancia || lote?.constancia_storage_path);
-    if (hayConstancia) {
-      const recepcionado = await setEstadoVidaLey(relacionId, "Recepcionado");
-      if (recepcionado.error) {
-        setGuardandoDocs(false);
-        pushToast(recepcionado.error, "error");
-        return;
-      }
-    }
     setFileCertificado(null);
-    setFileConstancia(null);
-    setFileFactura(null);
-    setGuardandoDocs(false);
-    pushToast(
-      hayConstancia
-        ? "Documentos del envío recepcionados."
-        : "Archivo guardado. Falta la constancia de asegurados para pasar a Recepcionado.",
-    );
+    pushToast("Certificado de seguro guardado.");
     router.refresh();
   }
 
@@ -311,16 +209,14 @@ export function FichaVidaLey({
   }
 
   const ocupado =
-    pending ||
-    generando ||
-    guardandoDocs ||
-    guardandoComprobante ||
-    marcandoFactura ||
-    compartiendo ||
-    usandoEnvio ||
-    creandoGrupo;
-  const facturaNoEnviada = Boolean(lote?.factura_no_enviada) && !lote?.factura_storage_path && !fileFactura;
+    pending || generando || guardandoCertificado || guardandoComprobante || marcandoFactura || usandoEnvio || creandoGrupo;
+  const facturaNoEnviada = Boolean(lote?.factura_no_enviada) && !lote?.factura_storage_path;
   const yaGenerado = Boolean(vidaLey?.estado);
+  const laVen = [
+    `${etiquetaTrabajador(trabajador.persona, trabajador.numero)}${trabajador.estado === "CESADA" ? " · Baja" : ""}`,
+    ...companerosEnvio.filter((item) => item.enEsteEnvio).map((item) => item.etiqueta),
+  ];
+  const paraAgregar = companerosEnvio.filter((item) => !item.enEsteEnvio);
 
   return (
     <div className="space-y-4">
@@ -328,8 +224,9 @@ export function FichaVidaLey({
         <div>
           <p className="text-sm font-medium">Trámite para la aseguradora</p>
           <p className="text-sm text-muted-foreground">
-            Se genera el Word con los datos de {trabajador.persona.nombres} y la empresa. Al generar por primera vez
-            desde aquí, el envío queda solo con este trabajador. Para compartir archivos, elabore el grupo en Vida Ley.
+            {canWrite
+              ? `Se genera el Word con los datos de ${trabajador.persona.nombres} y la empresa. Al generar por primera vez desde aquí, el envío queda solo con este trabajador. Para compartir archivos, elabore el grupo en Vida Ley.`
+              : "Consulta del trámite de este trabajador."}
           </p>
         </div>
         {canWrite ? (
@@ -366,92 +263,59 @@ export function FichaVidaLey({
           <p className="text-sm text-muted-foreground">Solo consulta.</p>
         )}
       </form>
-      <section className="space-y-4">
-        <div className={`${panelCardClass} space-y-1 p-5`}>
+      <section className={`${panelCardClass} space-y-4 p-5`}>
+        <div>
           <p className="text-sm font-medium">Respuesta de la aseguradora</p>
           <p className="text-sm text-muted-foreground">
-            Una empresa puede tener varios grupos. Cada grupo comparte su constancia y, si la mandan, su factura. Esos
-            archivos se suben una vez por grupo. El certificado es solo de este trabajador. Con la constancia guardada,
-            el grupo pasa a Recepcionado.
+            Cada grupo comparte su constancia y, si llega, su factura. El certificado es solo de este trabajador.
           </p>
-          {canWrite && enviosExistentes.length > 0 ? (
-            <div className="space-y-2 pt-2">
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium">Entrar a un grupo que ya tiene constancia y factura</span>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                  value={envioElegido}
-                  onChange={(event) => setEnvioElegido(event.target.value)}
-                >
-                  <option value="">Elegir grupo…</option>
-                  {enviosExistentes.map((envio) => (
-                    <option key={envio.loteId} value={envio.loteId}>
-                      {envio.etiqueta}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Button type="button" size="sm" disabled={ocupado || !envioElegido} onClick={() => void onUsarEnvio()}>
-                {usandoEnvio ? "Aplicando…" : "Entrar a este grupo"}
-              </Button>
-            </div>
-          ) : null}
-          {canWrite ? (
-            <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onNuevoGrupo()}>
-              {creandoGrupo ? "Creando…" : "Crear otro grupo"}
-            </Button>
-          ) : null}
-          {canWrite && companerosEnvio.some((item) => item.enEsteEnvio || !item.otroEnvio) ? (
-            <div className="space-y-2 pt-2">
-              <p className="text-sm font-medium">Miembros de este grupo</p>
-              <p className="text-sm text-muted-foreground">
-                Marque a quienes entran en este grupo. Los demás grupos siguen con sus propios archivos.
-              </p>
-              <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3">
-                {companerosEnvio
-                  .filter((item) => item.enEsteEnvio || !item.otroEnvio)
-                  .map((item) => (
-                  <li key={item.relacionId}>
-                    <label className="flex items-start gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5"
-                        checked={marcados.includes(item.relacionId)}
-                        disabled={ocupado}
-                        onChange={() => toggleMarcado(item.relacionId)}
-                      />
-                      <span>{item.etiqueta}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-              <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onCompartir()}>
-                {compartiendo ? "Guardando…" : "Guardar quién comparte"}
-              </Button>
-            </div>
-          ) : null}
         </div>
-        <DocumentoPrevisualizacion
+        {canWrite && enviosExistentes.length > 0 && !lote?.constancia_storage_path && !lote?.factura_storage_path ? (
+          <div className="space-y-2">
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium">Usar un grupo que ya tiene constancia o factura</span>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={envioElegido}
+                onChange={(event) => setEnvioElegido(event.target.value)}
+              >
+                <option value="">Elegir grupo…</option>
+                {enviosExistentes.map((envio) => (
+                  <option key={envio.loteId} value={envio.loteId}>
+                    {envio.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button type="button" size="sm" disabled={ocupado || !envioElegido} onClick={() => void onUsarEnvio()}>
+              {usandoEnvio ? "Aplicando…" : "Usar en este trabajador"}
+            </Button>
+          </div>
+        ) : null}
+        {canWrite && (lote?.constancia_storage_path || lote?.factura_storage_path) ? (
+          <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onNuevoGrupo()}>
+            {creandoGrupo ? "Creando…" : "Crear otro grupo"}
+          </Button>
+        ) : null}
+        <ArchivoCompartidoVidaLey
+          relacionId={relacionId}
+          entidadId={trabajador.entidad_id}
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_CONSTANCIA}
-          storagePath={fileConstancia ? null : lote?.constancia_storage_path}
-          file={fileConstancia}
-          vacio="Suba la constancia con la lista de asegurados."
-          extra={
-            canWrite ? (
-              <FileInput
-                accept={DOCUMENTO_ACCEPT}
-                disabled={ocupado}
-                file={fileConstancia}
-                buttonLabel={
-                  fileConstancia || lote?.constancia_storage_path
-                    ? "Cambiar constancia de asegurados"
-                    : "Subir constancia de asegurados"
-                }
-                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                onFileChange={setFileConstancia}
-              />
-            ) : null
-          }
+          ayuda="Si el documento incluye a varias personas, súbalo una vez y márquelas, incluidas las que ya están de baja: cada una lo ve en su ficha."
+          storagePath={lote?.constancia_storage_path ?? null}
+          tipo="constancia"
+          laVen={laVen}
+          canWrite={canWrite}
+          paraAgregar={paraAgregar}
+          mostrarQuitar={Boolean(lote)}
+          permitirAgregar
+          ocupadoExterno={ocupado}
+          vacio="Esta ficha no tiene constancia de asegurados."
+          notaReemplazo="El reemplazo se ve en todos los que comparten esta constancia."
+          alGuardar={async () => {
+            const recepcionado = await setEstadoVidaLey(relacionId, "Recepcionado");
+            return recepcionado.error ?? null;
+          }}
         />
         <DocumentoPrevisualizacion
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY}
@@ -460,71 +324,57 @@ export function FichaVidaLey({
           vacio="Suba el certificado de seguro Vida Ley de este trabajador."
           extra={
             canWrite ? (
-              <FileInput
-                accept={DOCUMENTO_ACCEPT}
-                disabled={ocupado}
-                file={fileCertificado}
-                buttonLabel={
-                  fileCertificado || documentoCertificado?.storage_path
-                    ? "Cambiar certificado de seguro"
-                    : "Subir certificado de seguro"
-                }
-                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                onFileChange={setFileCertificado}
-              />
-            ) : null
-          }
-        />
-        <DocumentoPrevisualizacion
-          titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA}
-          storagePath={fileFactura ? null : lote?.factura_storage_path}
-          file={fileFactura}
-          vacio={
-            facturaNoEnviada
-              ? "Marcaste que no enviaron factura. Si llega después, súbala aquí."
-              : "Suba la factura electrónica si la enviaron."
-          }
-          extra={
-            canWrite ? (
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex flex-wrap items-end gap-2">
                 <FileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={ocupado}
-                  file={fileFactura}
+                  file={fileCertificado}
                   buttonLabel={
-                    fileFactura || lote?.factura_storage_path
-                      ? "Cambiar factura electrónica"
-                      : "Subir factura electrónica"
+                    fileCertificado || documentoCertificado?.storage_path
+                      ? "Cambiar certificado de seguro"
+                      : "Subir certificado de seguro"
                   }
                   emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                  onFileChange={setFileFactura}
+                  onFileChange={setFileCertificado}
                 />
-                {!lote?.factura_no_enviada ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={ocupado}
-                    onClick={() => void onNoEnviaronFactura()}
-                  >
-                    {marcandoFactura ? "Guardando…" : "No enviaron factura"}
-                  </Button>
-                ) : null}
+                <Button type="button" size="sm" disabled={ocupado || !fileCertificado} onClick={() => void onGuardarCertificado()}>
+                  {guardandoCertificado ? "Guardando…" : "Guardar certificado"}
+                </Button>
               </div>
             ) : null
           }
         />
-        {canWrite ? (
-          <Button type="button" disabled={ocupado} onClick={() => void onGuardarRespuesta()}>
-            {guardandoDocs ? "Guardando…" : "Guardar documentos de la aseguradora"}
-          </Button>
-        ) : null}
+        <ArchivoCompartidoVidaLey
+          relacionId={relacionId}
+          entidadId={trabajador.entidad_id}
+          titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_FACTURA}
+          ayuda="La factura es del mismo grupo que la constancia. Si no la mandan, puede dejarlo así."
+          storagePath={lote?.factura_storage_path ?? null}
+          tipo="factura"
+          laVen={laVen}
+          canWrite={canWrite}
+          paraAgregar={paraAgregar}
+          mostrarQuitar={Boolean(lote) && !lote?.constancia_storage_path}
+          permitirAgregar={!lote?.constancia_storage_path}
+          ocupadoExterno={ocupado}
+          vacio={facturaNoEnviada ? "No enviaron factura para este grupo." : "Esta ficha no tiene factura."}
+          notaReemplazo="El reemplazo se ve en todos los que comparten esta factura."
+          extra={
+            canWrite && lote && !lote.factura_storage_path && !lote.factura_no_enviada ? (
+              <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onNoEnviaronFactura()}>
+                {marcandoFactura ? "Guardando…" : "No enviaron factura"}
+              </Button>
+            ) : null
+          }
+        />
       </section>
       <section className="space-y-4">
         <div className={`${panelCardClass} space-y-1 p-5`}>
           <p className="text-sm font-medium">Comprobante de envío de la empresa</p>
           <p className="text-sm text-muted-foreground">
-            Hay un solo comprobante para todos los trabajadores. Cuando se da de alta a alguien, súbalo de nuevo: el
-            archivo anterior se sustituye y el nuevo cubre a toda la empresa.
+            {canWrite
+              ? "Hay un solo comprobante para todos los trabajadores. Cuando se da de alta a alguien, súbalo de nuevo: el archivo anterior se sustituye y el nuevo cubre a toda la empresa."
+              : "Comprobante de envío de la empresa, en consulta."}
           </p>
         </div>
         <DocumentoPrevisualizacion
@@ -560,5 +410,261 @@ export function FichaVidaLey({
         ) : null}
       </section>
     </div>
+  );
+}
+
+function ArchivoCompartidoVidaLey({
+  relacionId,
+  entidadId,
+  titulo,
+  ayuda,
+  storagePath,
+  tipo,
+  laVen,
+  canWrite,
+  paraAgregar,
+  mostrarQuitar,
+  permitirAgregar,
+  ocupadoExterno,
+  vacio,
+  notaReemplazo,
+  alGuardar,
+  extra,
+}: {
+  relacionId: string;
+  entidadId: string;
+  titulo: string;
+  ayuda: string;
+  storagePath: string | null;
+  tipo: ArchivoVidaLeyLote;
+  laVen: string[];
+  canWrite: boolean;
+  paraAgregar: CompaneroEnvioVidaLey[];
+  mostrarQuitar: boolean;
+  permitirAgregar: boolean;
+  ocupadoExterno: boolean;
+  vacio: string;
+  notaReemplazo: string;
+  alGuardar?: () => Promise<string | null>;
+  extra?: ReactNode;
+}) {
+  const router = useRouter();
+  const { pushToast } = useToast();
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [reemplazo, setReemplazo] = useState<File | null>(null);
+  const [marcados, setMarcados] = useState<string[]>([]);
+  const [pending, setPending] = useState<string | null>(null);
+  const [opening, setOpening] = useState<"ver" | "descargar" | null>(null);
+  const ocupado = ocupadoExterno || pending !== null;
+
+  function toggle(id: string) {
+    setMarcados((actual) => (actual.includes(id) ? actual.filter((item) => item !== id) : [...actual, id]));
+  }
+
+  async function abrir(modo: "ver" | "descargar") {
+    if (!storagePath) return;
+    setOpening(modo);
+    const result = await getSignedDocumentoUrl(storagePath, {
+      download: modo === "descargar" ? nombreDescargaDocumento(titulo, storagePath) : undefined,
+    });
+    setOpening(null);
+    if (result.error || !result.url) {
+      pushToast(result.error ?? "No se pudo abrir el archivo.", "error");
+      return;
+    }
+    window.open(result.url, "_blank", "noopener,noreferrer");
+  }
+
+  async function guardarArchivo(file: File, previousPath: string | null, ids: string[]) {
+    const grupo = await compartirEnvioVidaLey(relacionId, ids, { soloAgregar: true });
+    if (grupo.error || !grupo.loteId) return grupo.error ?? "No se pudo armar el grupo.";
+    const upload = await uploadVidaLeyLoteFile(entidadId, grupo.loteId, tipo, file, previousPath);
+    if (upload.error || !upload.path) return upload.error ?? "No se pudo subir el archivo.";
+    const saved = await setVidaLeyLoteArchivo(relacionId, tipo, upload.path);
+    if (saved.error) return saved.error;
+    if (alGuardar) {
+      const extraError = await alGuardar();
+      if (extraError) return extraError;
+    }
+    return null;
+  }
+
+  async function onSubir() {
+    if (!archivo) {
+      pushToast("Seleccione el archivo.", "error");
+      return;
+    }
+    setPending("subir");
+    const error = await guardarArchivo(archivo, storagePath, marcados);
+    setPending(null);
+    if (error) {
+      pushToast(error, "error");
+      return;
+    }
+    setArchivo(null);
+    setMarcados([]);
+    pushToast("Archivo guardado. Quienes lo comparten ya pueden verlo.");
+    router.refresh();
+  }
+
+  async function onReemplazar() {
+    if (!reemplazo || !storagePath) return;
+    setPending("reemplazar");
+    const error = await guardarArchivo(reemplazo, storagePath, []);
+    setPending(null);
+    if (error) {
+      pushToast(error, "error");
+      return;
+    }
+    setReemplazo(null);
+    pushToast("Archivo actualizado para todos los que comparten este grupo.");
+    router.refresh();
+  }
+
+  async function onAgregar() {
+    if (marcados.length === 0) return;
+    setPending("agregar");
+    const result = await compartirEnvioVidaLey(relacionId, marcados, { soloAgregar: true });
+    setPending(null);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    setMarcados([]);
+    pushToast("Trabajadores agregados. Ya ven este archivo.");
+    router.refresh();
+  }
+
+  async function onQuitar() {
+    setPending("quitar");
+    const result = await quitarDeEnvioVidaLey(relacionId);
+    setPending(null);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    pushToast("Este trabajador ya no usa ese grupo.");
+    router.refresh();
+  }
+
+  return (
+    <div className="space-y-3 border-t pt-4">
+      <div>
+        <h3 className="text-sm font-medium text-foreground">{titulo}</h3>
+        <p className="mt-1 text-sm text-muted-foreground">{ayuda}</p>
+      </div>
+      {storagePath ? (
+        <div className="space-y-3">
+          <p className="text-sm text-foreground">La ven: {laVen.join(", ")}.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={opening !== null} onClick={() => void abrir("ver")}>
+              {opening === "ver" ? "Abriendo…" : "Ver"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={opening !== null}
+              onClick={() => void abrir("descargar")}
+            >
+              {opening === "descargar" ? "Preparando…" : "Descargar"}
+            </Button>
+            {canWrite && mostrarQuitar ? (
+              <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onQuitar()}>
+                {pending === "quitar" ? "Quitando…" : "Quitar de este grupo"}
+              </Button>
+            ) : null}
+          </div>
+          {canWrite ? (
+            <div className="space-y-2">
+              <FileInput
+                accept={DOCUMENTO_ACCEPT}
+                disabled={ocupado}
+                file={reemplazo}
+                buttonLabel={reemplazo ? "Cambiar archivo" : "Reemplazar archivo"}
+                emptyLabel={notaReemplazo}
+                onFileChange={setReemplazo}
+              />
+              {reemplazo ? (
+                <Button type="button" size="sm" disabled={ocupado} onClick={() => void onReemplazar()}>
+                  {pending === "reemplazar" ? "Guardando…" : "Guardar reemplazo"}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          {canWrite && permitirAgregar && paraAgregar.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Agregar trabajadores a este grupo</p>
+              <ListaCompaneros items={paraAgregar} marcados={marcados} disabled={ocupado} onToggle={toggle} />
+              <Button type="button" size="sm" disabled={ocupado || marcados.length === 0} onClick={() => void onAgregar()}>
+                {pending === "agregar" ? "Agregando…" : "Agregar"}
+              </Button>
+            </div>
+          ) : null}
+          {extra}
+        </div>
+      ) : canWrite ? (
+        <div className="space-y-3">
+          <FileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={ocupado}
+            file={archivo}
+            buttonLabel={archivo ? "Cambiar archivo" : "Seleccionar PDF o imagen"}
+            emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+            onFileChange={setArchivo}
+          />
+          {permitirAgregar && paraAgregar.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Este trabajador queda incluido. Marque a quién más cubre el documento, incluidas las bajas.
+              </p>
+              <ListaCompaneros items={paraAgregar} marcados={marcados} disabled={ocupado} onToggle={toggle} />
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" disabled={ocupado || !archivo} onClick={() => void onSubir()}>
+              {pending === "subir" ? "Subiendo…" : "Subir"}
+            </Button>
+            {extra}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">{vacio}</p>
+      )}
+    </div>
+  );
+}
+
+function ListaCompaneros({
+  items,
+  marcados,
+  disabled,
+  onToggle,
+}: {
+  items: CompaneroEnvioVidaLey[];
+  marcados: string[];
+  disabled: boolean;
+  onToggle: (relacionId: string) => void;
+}) {
+  return (
+    <ul className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3">
+      {items.map((item) => (
+        <li key={item.relacionId}>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={marcados.includes(item.relacionId)}
+              disabled={disabled}
+              onChange={() => onToggle(item.relacionId)}
+            />
+            <span>
+              {item.etiqueta}
+              {item.otroEnvio ? " · ya está en otro grupo" : ""}
+            </span>
+          </label>
+        </li>
+      ))}
+    </ul>
   );
 }

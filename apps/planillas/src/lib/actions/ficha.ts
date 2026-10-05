@@ -35,6 +35,7 @@ async function assertEscrituraFicha(
   if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para editar." };
   const trabajador = await getTrabajador(relacionId);
   if (!trabajador) return { error: "Trabajador no encontrado." };
+  if (trabajador.estado === "CESADA") return { error: "Esta ficha está de baja. Los datos se consultan." };
   return { trabajador };
 }
 
@@ -45,6 +46,7 @@ async function assertEscrituraTramite(
   if (!puedeEscribirPlanillas(profile)) return { error: "No tiene permiso para editar." };
   const trabajador = await getTrabajador(relacionId);
   if (!trabajador) return { error: "Trabajador no encontrado." };
+  if (trabajador.estado === "CESADA") return { error: "Esta ficha está de baja. Los datos se consultan." };
   return { trabajador };
 }
 
@@ -916,6 +918,7 @@ export async function contextoEnviosVidaLey(entidadId: string): Promise<{
 export async function compartirEnvioVidaLey(
   relacionId: string,
   relacionIds: string[],
+  opciones?: { soloAgregar?: boolean },
 ): Promise<{ error?: string; loteId?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
@@ -925,10 +928,10 @@ export async function compartirEnvioVidaLey(
   if (ids.length > 0) {
     const { data: relaciones, error: relError } = await db
       .from("relaciones_laborales")
-      .select("id, entidad_id")
+      .select("id, entidad_id, estado")
       .in("id", ids);
     if (relError) return { error: relError.message };
-    const filas = relaciones ?? [];
+    const filas = (relaciones ?? []) as { id: string; entidad_id: string; estado: string }[];
     if (filas.length !== ids.length || filas.some((row) => row.entidad_id !== entidadId)) {
       return { error: "Hay un trabajador que no es de esta empresa." };
     }
@@ -957,9 +960,25 @@ export async function compartirEnvioVidaLey(
     .select("relacion_id")
     .eq("lote_id", loteId);
   if (miembrosError) return { error: miembrosError.message };
-  const quitar = (miembrosActuales ?? [])
-    .map((row) => row.relacion_id as string)
-    .filter((id) => id !== relacionId && !ids.includes(id));
+  const candidatosQuitar = opciones?.soloAgregar
+    ? []
+    : (miembrosActuales ?? [])
+        .map((row) => row.relacion_id as string)
+        .filter((id) => id !== relacionId && !ids.includes(id));
+  let quitar = candidatosQuitar;
+  if (candidatosQuitar.length > 0) {
+    const { data: estados, error: estadosError } = await db
+      .from("relaciones_laborales")
+      .select("id, estado")
+      .in("id", candidatosQuitar);
+    if (estadosError) return { error: estadosError.message };
+    const cesadas = new Set(
+      ((estados ?? []) as { id: string; estado: string }[])
+        .filter((row) => row.estado === "CESADA")
+        .map((row) => row.id),
+    );
+    quitar = candidatosQuitar.filter((id) => !cesadas.has(id));
+  }
 
   const { data: existentes, error: existentesError } = await db
     .from("vida_ley")
@@ -987,6 +1006,16 @@ export async function compartirEnvioVidaLey(
   }
   revalidarFichasVidaLey([relacionId, ...ids, ...quitar]);
   return { loteId };
+}
+
+export async function quitarDeEnvioVidaLey(relacionId: string): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const db = await planillasDb();
+  const { error } = await db.from("vida_ley").update({ lote_id: null }).eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+  revalidarFichasVidaLey([relacionId]);
+  return {};
 }
 
 export async function usarEnvioVidaLey(relacionId: string, loteId: string): Promise<{ error?: string }> {
@@ -1103,11 +1132,21 @@ export async function setComprobanteVidaLeyEmpresa(
   if (miembrosError) return { error: miembrosError.message };
   const ids = (miembros ?? []).map((row) => row.relacion_id as string);
   if (ids.length > 0) {
-    const { error: estadoError } = await db
-      .from("vida_ley")
-      .update({ estado: "Registrado" })
-      .eq("entidad_id", entidadId);
-    if (estadoError) return { error: estadoError.message };
+    const { data: estadosRelacion, error: estadosError } = await db
+      .from("relaciones_laborales")
+      .select("id, estado")
+      .in("id", ids);
+    if (estadosError) return { error: estadosError.message };
+    const activos = ((estadosRelacion ?? []) as { id: string; estado: string }[])
+      .filter((row) => row.estado !== "CESADA")
+      .map((row) => row.id);
+    if (activos.length > 0) {
+      const { error: estadoError } = await db
+        .from("vida_ley")
+        .update({ estado: "Registrado" })
+        .in("relacion_id", activos);
+      if (estadoError) return { error: estadoError.message };
+    }
   }
   revalidarFichasVidaLey(ids.length > 0 ? ids : [relacionId]);
   return {};
@@ -1252,7 +1291,19 @@ export async function setEstadoVidaLey(
     .select("relacion_id, entidad_id, estado, numero_poliza, fecha_inicio, fecha_fin")
     .eq("lote_id", loteId);
   if (miembrosError) return { error: miembrosError.message };
+  const miembroIds = (miembros ?? []).map((row) => row.relacion_id as string);
+  const { data: estadosRelacion, error: estadosError } =
+    miembroIds.length > 0
+      ? await db.from("relaciones_laborales").select("id, estado").in("id", miembroIds)
+      : { data: [], error: null };
+  if (estadosError) return { error: estadosError.message };
+  const cesadas = new Set(
+    ((estadosRelacion ?? []) as { id: string; estado: string }[])
+      .filter((row) => row.estado === "CESADA")
+      .map((row) => row.id),
+  );
   const payload = (miembros ?? [])
+    .filter((row) => !cesadas.has(row.relacion_id as string))
     .filter((row) => !(estado === "Recepcionado" && String(row.estado ?? "").trim() === "Registrado"))
     .map((row) => ({
       relacion_id: row.relacion_id as string,
@@ -1319,6 +1370,7 @@ export async function listTrabajadoresVidaLeyPendienteRecepcion(
   return items
     .filter(
       (item) =>
+        item.trabajador.estado !== "CESADA" &&
         altasAfiliacionListas(flujoDesdeTrabajador(item.trabajador)) &&
         vidaLeyPendienteRecepcion(item.registro?.estado),
     )

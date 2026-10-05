@@ -78,7 +78,9 @@ export function FichaAsistencia({
         <div>
           <p className="text-sm font-medium">Asistencia del mes</p>
           <p className="text-sm text-muted-foreground">
-            Descargue el Excel con las horas del contrato. Cuando lo devuelvan firmado, súbalo aquí.
+            {canWrite
+              ? "Descargue el Excel con las horas del contrato. Cuando lo devuelvan firmado, súbalo aquí."
+              : "Consulta del horario y del PDF firmado de este mes."}
           </p>
         </div>
         <label className="block max-w-xs space-y-1.5">
@@ -94,13 +96,11 @@ export function FichaAsistencia({
           />
         </label>
         <FeriadosMesPicker key={`${entidadId}-${mes}`} entidadId={entidadId} mes={mes} canWrite={canWrite} />
-        {canWrite ? (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={pending} onClick={() => void onDescargar()}>
-              {pending ? "Preparando…" : `Descargar Excel · ${etiquetaMesAsistencia(mes)}`}
-            </Button>
-          </div>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" disabled={pending} onClick={() => void onDescargar()}>
+            {pending ? "Preparando…" : `Descargar Excel · ${etiquetaMesAsistencia(mes)}`}
+          </Button>
+        </div>
       </section>
       <section className={`${panelCardClass} space-y-3 p-5`}>
         <div>

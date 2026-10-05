@@ -49,6 +49,7 @@ async function assertEscrituraFicha(
   if (!puedeEditarFichaLaboral(profile)) return { error: "No tiene permiso para editar." };
   const trabajador = await getTrabajador(relacionId);
   if (!trabajador) return { error: "Trabajador no encontrado." };
+  if (trabajador.estado === "CESADA") return { error: "Esta ficha está de baja. Los datos se consultan." };
   return { trabajador };
 }
 

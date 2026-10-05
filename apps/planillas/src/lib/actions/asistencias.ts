@@ -215,6 +215,7 @@ export async function asegurarDocumentoAsistenciaMes(
   if (!esMesAsistencia(mes)) return { error: "Indique el mes (AAAA-MM)." };
   const trabajador = await getTrabajador(relacionId);
   if (!trabajador) return { error: "Trabajador no encontrado." };
+  if (trabajador.estado === "CESADA") return { error: "Esta ficha está de baja. Los datos se consultan." };
   const db = await planillasDb();
   const { data: existente, error: loadError } = await db
     .from("documentos")
@@ -278,17 +279,20 @@ export async function registrarAsistenciaExcel(params: {
   const db = await planillasDb();
   const { data: relaciones, error: relError } = await db
     .from("relaciones_laborales")
-    .select("id, entidad_id")
+    .select("id, entidad_id, estado")
     .in("id", relacionIds);
   if (relError) return { error: relError.message };
-  const entidadPorRelacion = new Map((relaciones ?? []).map((row) => [row.id as string, row.entidad_id as string]));
+  const editables = ((relaciones ?? []) as { id: string; entidad_id: string; estado: string }[]).filter(
+    (row) => row.estado !== "CESADA",
+  );
+  const entidadPorRelacion = new Map(editables.map((row) => [row.id, row.entidad_id]));
   const now = new Date().toISOString();
-  const rows = relacionIds
-    .map((relacion_id) => {
-      const entidad_id = params.entidadId ?? entidadPorRelacion.get(relacion_id);
+  const rows = editables
+    .map((row) => {
+      const entidad_id = params.entidadId ?? entidadPorRelacion.get(row.id);
       if (!entidad_id) return null;
       return {
-        relacion_id,
+        relacion_id: row.id,
         entidad_id,
         mes: params.mes,
         generado_en: now,
