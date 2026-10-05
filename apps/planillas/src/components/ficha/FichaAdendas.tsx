@@ -17,8 +17,9 @@ import type { ContratoRow } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { DateField, Field, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
-import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
+import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { EliminarPdfAdenda } from "@/components/ficha/ConfirmarEliminarArchivo";
+import { DocumentoPrevisualizacion, MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { descargarAdendaWord } from "@/lib/descargar-adenda-word";
 import {
   ESTADO_CONTRATO_LABEL,
@@ -28,7 +29,6 @@ import {
   formatRemuneracion,
   opcionesCargo,
 } from "@/lib/planillas-labels";
-import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
 function cerrada(estado: AdendaRow["estado"]): boolean {
@@ -60,6 +60,7 @@ export function FichaAdendas({
   const [mostrarGenerar, setMostrarGenerar] = useState(adendas.length === 0);
   const [editando, setEditando] = useState(false);
   const [eliminando, setEliminando] = useState<AdendaRow | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   async function onGenerar(formData: FormData) {
     setPending("generar");
@@ -100,20 +101,6 @@ export function FichaAdendas({
     }
     pushToast("PDF firmado guardado.");
     router.refresh();
-  }
-
-  async function onVerPdf(adenda: AdendaRow) {
-    if (!adenda.storage_path) return;
-    setPending(`ver-${adenda.id}`);
-    const result = await getSignedDocumentoUrl(adenda.storage_path, {
-      download: nombreDescargaDocumento(`Adenda ${adenda.numero}`, adenda.storage_path),
-    });
-    setPending(null);
-    if (result.error || !result.url) {
-      pushToast(result.error ?? "No se pudo abrir el PDF.", "error");
-      return;
-    }
-    window.open(result.url, "_blank", "noopener,noreferrer");
   }
 
   async function onConfirmar(adendaId: string) {
@@ -207,14 +194,9 @@ export function FichaAdendas({
           <p className="text-xs text-muted-foreground">
             Suba el PDF firmado y confirme. Hasta entonces no cambian cargo, sueldo ni horario.
           </p>
+          <MarcoPrevisualizacion titulo={`PDF firmado de la adenda ${abierto.numero}`} storagePath={abierto.storage_path}>
           <div className="flex flex-wrap items-center gap-2">
-            {abierto.storage_path ? (
-              <Button type="button" size="sm" variant="outline" onClick={() => void onVerPdf(abierto)}>
-                Ver PDF
-              </Button>
-            ) : (
-              <span className="text-sm text-muted-foreground">Sin PDF</span>
-            )}
+            {abierto.storage_path ? null : <span className="text-sm text-muted-foreground">Sin PDF</span>}
             <label className="inline-flex">
               <input
                 type="file"
@@ -250,6 +232,7 @@ export function FichaAdendas({
               <EliminarPdfAdenda relacionId={relacionId} adendaId={abierto.id} disabled={pending !== null} />
             ) : null}
           </div>
+          </MarcoPrevisualizacion>
         </section>
       ) : null}
 
@@ -308,10 +291,9 @@ export function FichaAdendas({
                           type="button"
                           size="sm"
                           variant="outline"
-                          disabled={pending === `ver-${adenda.id}`}
-                          onClick={() => void onVerPdf(adenda)}
+                          onClick={() => setPreviewId((actual) => (actual === adenda.id ? null : adenda.id))}
                         >
-                          {pending === `ver-${adenda.id}` ? "…" : "Ver firmado"}
+                          {previewId === adenda.id ? "Ocultar" : "Ver firmado"}
                         </Button>
                       ) : null}
                     </div>
@@ -322,6 +304,16 @@ export function FichaAdendas({
           </tbody>
         </table>
       </div>
+      {adendas
+        .filter((item) => item.id === previewId && item.storage_path)
+        .map((item) => (
+          <DocumentoPrevisualizacion
+            key={item.id}
+            titulo={`PDF firmado · adenda ${item.numero}`}
+            storagePath={item.storage_path}
+            defaultVisible
+          />
+        ))}
 
       <ConfirmDialog
         open={eliminando != null}

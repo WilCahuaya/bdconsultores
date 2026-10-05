@@ -17,6 +17,7 @@ import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { quitarArchivoSolicitud, uploadSolicitudFile } from "@/lib/upload-documento";
 import { Field } from "@/components/fields";
 import { EliminarArchivoSolicitud } from "@/components/ficha/ConfirmarEliminarArchivo";
+import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 
 function etiquetaSolicitud(solicitud: SolicitudRegistroVista): string {
   const fecha = formatFechaPlanilla(solicitud.created_at);
@@ -53,7 +54,7 @@ export function SolicitudRegistroContrato({
   const [nota, setNota] = useState("");
   const [elegidaId, setElegidaId] = useState("");
   const [marcados, setMarcados] = useState<string[]>([]);
-  const [opening, setOpening] = useState<"ver" | "descargar" | null>(null);
+  const [opening, setOpening] = useState(false);
 
   const otras = enlazables.filter((item) => item.contratoId !== contratoId);
   const paraAgregar = otras.filter((item) => item.solicitudId !== solicitud?.id);
@@ -66,13 +67,13 @@ export function SolicitudRegistroContrato({
     );
   }
 
-  async function abrir(modo: "ver" | "descargar") {
+  async function descargar() {
     if (!solicitud?.storage_path) return;
-    setOpening(modo);
+    setOpening(true);
     const result = await getSignedDocumentoUrl(solicitud.storage_path, {
-      download: modo === "descargar" ? nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path) : undefined,
+      download: nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path),
     });
-    setOpening(null);
+    setOpening(false);
     if (result.error || !result.url) {
       pushToast(result.error ?? "No se pudo abrir el archivo.", "error");
       return;
@@ -181,7 +182,11 @@ export function SolicitudRegistroContrato({
           También valida el contrato. Si el documento incluye a varias personas, súbalo una vez y márquelas: cada una lo ve en su contrato.
         </p>
       </div>
-
+      <MarcoPrevisualizacion
+        titulo="Solicitud de registro de contratos"
+        storagePath={reemplazo || archivo ? null : solicitud?.storage_path}
+        file={reemplazo ?? archivo}
+      >
       {solicitud?.storage_path ? (
         <div className="space-y-3">
           <p className="text-sm text-foreground">
@@ -191,17 +196,8 @@ export function SolicitudRegistroContrato({
               : "."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={opening !== null} onClick={() => void abrir("ver")}>
-              {opening === "ver" ? "Abriendo…" : "Ver solicitud"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={opening !== null}
-              onClick={() => void abrir("descargar")}
-            >
-              {opening === "descargar" ? "Preparando…" : "Descargar"}
+            <Button type="button" size="sm" variant="outline" disabled={opening} onClick={() => void descargar()}>
+              {opening ? "Preparando…" : "Descargar"}
             </Button>
             {puedeEditar ? (
               <Button type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => void onQuitar()}>
@@ -302,6 +298,7 @@ export function SolicitudRegistroContrato({
       ) : (
         <p className="text-sm text-muted-foreground">Este contrato no tiene solicitud de registro.</p>
       )}
+      </MarcoPrevisualizacion>
     </div>
   );
 }

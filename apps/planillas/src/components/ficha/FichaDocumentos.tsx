@@ -11,6 +11,7 @@ import type { TipoDocumentoPlanilla } from "@inventario/types";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
+import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { Field, SelectField } from "@/components/fields";
 
 export function FichaDocumentos({
@@ -177,20 +178,20 @@ function DocumentoItem({
   disabled: boolean;
   onUpload: (file: File) => Promise<boolean>;
 }) {
-  const [opening, setOpening] = useState<"ver" | "descargar" | null>(null);
+  const [opening, setOpening] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [archivoPendiente, setArchivoPendiente] = useState<File | null>(null);
   const tieneArchivo = Boolean(documento.storage_path);
 
-  async function abrir(modo: "ver" | "descargar") {
+  async function descargar() {
     if (!documento.storage_path) return;
-    setOpening(modo);
+    setOpening(true);
     setLinkError(null);
     const downloadName = nombreDescargaDocumento(TIPO_DOCUMENTO_LABEL[documento.tipo], documento.storage_path);
     const result = await getSignedDocumentoUrl(documento.storage_path, {
-      download: modo === "descargar" ? downloadName : undefined,
+      download: downloadName,
     });
-    setOpening(null);
+    setOpening(false);
     if (result.error || !result.url) {
       setLinkError(result.error ?? "No se pudo abrir el archivo.");
       return;
@@ -213,16 +214,16 @@ function DocumentoItem({
       {documento.observaciones ? (
         <p className="text-muted-foreground">{documento.observaciones}</p>
       ) : null}
+      <MarcoPrevisualizacion
+        titulo={TIPO_DOCUMENTO_LABEL[documento.tipo]}
+        storagePath={archivoPendiente ? null : documento.storage_path}
+        file={archivoPendiente}
+      >
       <div className="flex flex-wrap items-center gap-2">
         {tieneArchivo ? (
-          <>
-            <Button type="button" size="sm" variant="outline" disabled={opening !== null} onClick={() => void abrir("ver")}>
-              {opening === "ver" ? "Abriendo…" : "Ver"}
-            </Button>
-            <Button type="button" size="sm" variant="outline" disabled={opening !== null} onClick={() => void abrir("descargar")}>
-              {opening === "descargar" ? "Preparando…" : "Descargar"}
-            </Button>
-          </>
+          <Button type="button" size="sm" variant="outline" disabled={opening} onClick={() => void descargar()}>
+            {opening ? "Preparando…" : "Descargar"}
+          </Button>
         ) : archivoPendiente ? null : (
           <span className="text-muted-foreground">Sin archivo</span>
         )}
@@ -267,6 +268,7 @@ function DocumentoItem({
         ) : null}
       </div>
       {linkError ? <p className="text-destructive">{linkError}</p> : null}
+      </MarcoPrevisualizacion>
     </li>
   );
 }

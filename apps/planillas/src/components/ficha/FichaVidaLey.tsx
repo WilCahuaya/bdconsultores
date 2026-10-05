@@ -24,7 +24,7 @@ import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { Field, DateField } from "@/components/fields";
 import { etiquetaEstadoVidaLey, etiquetaTrabajador, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
-import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { DocumentoPrevisualizacion, MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import {
   EliminarArchivoVidaLey,
   EliminarComprobanteEmpresa,
@@ -455,7 +455,7 @@ function ArchivoCompartidoVidaLey({
   const [reemplazo, setReemplazo] = useState<File | null>(null);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [pending, setPending] = useState<string | null>(null);
-  const [opening, setOpening] = useState<"ver" | "descargar" | null>(null);
+  const [descargando, setDescargando] = useState(false);
   const [buscarArchivo, setBuscarArchivo] = useState(false);
   const ocupado = ocupadoExterno || pending !== null;
 
@@ -463,13 +463,13 @@ function ArchivoCompartidoVidaLey({
     setMarcados((actual) => (actual.includes(id) ? actual.filter((item) => item !== id) : [...actual, id]));
   }
 
-  async function abrir(modo: "ver" | "descargar") {
+  async function descargar() {
     if (!storagePath) return;
-    setOpening(modo);
+    setDescargando(true);
     const result = await getSignedDocumentoUrl(storagePath, {
-      download: modo === "descargar" ? nombreDescargaDocumento(titulo, storagePath) : undefined,
+      download: nombreDescargaDocumento(titulo, storagePath),
     });
-    setOpening(null);
+    setDescargando(false);
     if (result.error || !result.url) {
       pushToast(result.error ?? "No se pudo abrir el archivo.", "error");
       return;
@@ -555,27 +555,21 @@ function ArchivoCompartidoVidaLey({
     router.refresh();
   }
 
+  const archivoVista = reemplazo ?? archivo;
+
   return (
     <div className="space-y-3 border-t pt-4">
       <div>
         <h3 className="text-sm font-medium text-foreground">{titulo}</h3>
         <p className="mt-1 text-sm text-muted-foreground">{ayuda}</p>
       </div>
+      <MarcoPrevisualizacion titulo={titulo} storagePath={archivoVista ? null : storagePath} file={archivoVista}>
       {storagePath ? (
         <div className="space-y-3">
           <p className="text-sm text-foreground">La ven: {laVen.join(", ")}.</p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={opening !== null} onClick={() => void abrir("ver")}>
-              {opening === "ver" ? "Abriendo…" : "Ver"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={opening !== null}
-              onClick={() => void abrir("descargar")}
-            >
-              {opening === "descargar" ? "Preparando…" : "Descargar"}
+            <Button type="button" size="sm" variant="outline" disabled={descargando} onClick={() => void descargar()}>
+              {descargando ? "Preparando…" : "Descargar"}
             </Button>
             {canWrite && mostrarQuitar ? (
               <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onQuitar()}>
@@ -669,6 +663,7 @@ function ArchivoCompartidoVidaLey({
       ) : (
         <p className="text-sm text-muted-foreground">{vacio}</p>
       )}
+      </MarcoPrevisualizacion>
     </div>
   );
 }

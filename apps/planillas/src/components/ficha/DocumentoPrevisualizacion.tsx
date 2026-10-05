@@ -10,21 +10,20 @@ function archivoEsPdf(file: File | null, path: string | null): boolean {
   return Boolean(path?.toLowerCase().endsWith(".pdf"));
 }
 
-export function DocumentoPrevisualizacion({
-  titulo,
-  storagePath,
-  file = null,
-  vacio = "Aún no hay escaneo en Documentos.",
-  defaultVisible,
-  extra,
-}: {
-  titulo: string;
-  storagePath: string | null | undefined;
-  file?: File | null;
-  vacio?: string;
-  defaultVisible?: boolean;
-  extra?: ReactNode;
-}) {
+function BotonPrevisualizacion({ visible, onClick }: { visible: boolean; onClick: () => void }) {
+  return (
+    <Button type="button" size="sm" variant="outline" onClick={onClick}>
+      {visible ? "Ocultar previsualización" : "Ver previsualización"}
+    </Button>
+  );
+}
+
+function useVistaDocumento(
+  titulo: string,
+  storagePath: string | null | undefined,
+  file: File | null,
+  defaultVisible?: boolean,
+) {
   const hayArchivo = Boolean(file || storagePath);
   const [visible, setVisible] = useState(Boolean(defaultVisible));
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
@@ -82,14 +81,64 @@ export function DocumentoPrevisualizacion({
     )
   ) : null;
 
+  return { hayArchivo, visible, setVisible, vista };
+}
+
+export function MarcoPrevisualizacion({
+  titulo,
+  storagePath,
+  file = null,
+  children,
+}: {
+  titulo: string;
+  storagePath: string | null | undefined;
+  file?: File | null;
+  children: ReactNode;
+}) {
+  const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(titulo, storagePath, file);
+
+  return (
+    <div className="space-y-3">
+      {hayArchivo ? (
+        <div className="flex justify-end">
+          <BotonPrevisualizacion visible={visible} onClick={() => setVisible((valor) => !valor)} />
+        </div>
+      ) : null}
+      {vista ? (
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <div className="space-y-3">{children}</div>
+          <div className="lg:sticky lg:top-4">{vista}</div>
+        </div>
+      ) : (
+        children
+      )}
+    </div>
+  );
+}
+
+export function DocumentoPrevisualizacion({
+  titulo,
+  storagePath,
+  file = null,
+  vacio = "Aún no hay escaneo en Documentos.",
+  defaultVisible,
+  extra,
+}: {
+  titulo: string;
+  storagePath: string | null | undefined;
+  file?: File | null;
+  vacio?: string;
+  defaultVisible?: boolean;
+  extra?: ReactNode;
+}) {
+  const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(titulo, storagePath, file, defaultVisible);
+
   return (
     <section className={`${panelCardClass} space-y-3 p-5`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">{titulo}</p>
         {hayArchivo ? (
-          <Button type="button" size="sm" variant="outline" onClick={() => setVisible((v) => !v)}>
-            {visible ? "Ocultar previsualización" : "Ver previsualización"}
-          </Button>
+          <BotonPrevisualizacion visible={visible} onClick={() => setVisible((valor) => !valor)} />
         ) : null}
       </div>
       {!hayArchivo ? <p className="text-sm text-muted-foreground">{vacio}</p> : null}
