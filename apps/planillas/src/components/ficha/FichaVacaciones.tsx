@@ -184,31 +184,31 @@ export function FichaVacaciones({
       ) : null}
 
       {canWrite ? (
-        <form key={formKey} action={onSubmit} className={`${panelCardClass} space-y-4 p-5`}>
-          <p className="text-sm font-medium">Registrar goce</p>
+        <form key={formKey} action={onSubmit}>
           <input type="hidden" name="periodo" value={String(periodo)} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <DateField label="Fecha de inicio" name="fecha_inicio" required />
-            <DateField label="Fecha de fin" name="fecha_fin" required />
-            <Field label="Días" name="dias" inputMode="numeric" placeholder="Se calcula si lo deja vacío" />
-            <SelectField
-              label="Estado"
-              name="estado"
-              defaultValue="PROGRAMADO"
-              options={ESTADO_VACACION.map((value) => ({
-                value,
-                label: ESTADO_VACACION_LABEL[value],
-              }))}
-            />
-            <Field label="Observaciones" name="observaciones" />
-          </div>
           <DocumentoPrevisualizacion
             titulo={TIPO_DOCUMENTO_LABEL.VACACIONES_FIRMADO}
             storagePath={null}
             file={file}
             vacio="Adjunte la solicitud o constancia firmada para poder guardar."
             extra={
-              <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-4">
+                <p className="text-sm font-medium">Registrar goce</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DateField label="Fecha de inicio" name="fecha_inicio" required />
+                  <DateField label="Fecha de fin" name="fecha_fin" required />
+                  <Field label="Días" name="dias" inputMode="numeric" placeholder="Se calcula si lo deja vacío" />
+                  <SelectField
+                    label="Estado"
+                    name="estado"
+                    defaultValue="PROGRAMADO"
+                    options={ESTADO_VACACION.map((value) => ({
+                      value,
+                      label: ESTADO_VACACION_LABEL[value],
+                    }))}
+                  />
+                  <Field label="Observaciones" name="observaciones" />
+                </div>
                 <FileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={pending}
@@ -217,12 +217,12 @@ export function FichaVacaciones({
                   emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
                   onFileChange={setFile}
                 />
+                <Button type="submit" disabled={pending || !file}>
+                  {pending ? "Guardando…" : "Agregar"}
+                </Button>
               </div>
             }
           />
-          <Button type="submit" disabled={pending || !file}>
-            {pending ? "Guardando…" : "Agregar"}
-          </Button>
         </form>
       ) : null}
 

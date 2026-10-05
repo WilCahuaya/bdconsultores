@@ -128,11 +128,13 @@ export function FichaPensiones({
       {!documentoPension?.storage_path ? (
         <p className="text-sm font-medium text-amber-900">Alerta: falta el documento de sistema de pensiones firmado.</p>
       ) : null}
-      <DocumentoPrevisualizacion
-        titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
-        storagePath={documentoPension?.storage_path}
-        vacio="Súbalo en Documentos para verlo aquí."
-      />
+      {esAfp ? null : (
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
+          storagePath={documentoPension?.storage_path}
+          vacio="Súbalo en Documentos para verlo aquí."
+        />
+      )}
 
       {!tipo ? (
         <p className={`${panelCardClass} p-4 text-sm text-muted-foreground`}>
@@ -153,6 +155,7 @@ export function FichaPensiones({
 
       {esAfp ? (
         <>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
           <section className={`${panelCardClass} space-y-3 p-5`}>
             <div>
               <p className="text-sm font-medium">Iniciar el trámite AFP</p>
@@ -186,6 +189,12 @@ export function FichaPensiones({
               <DatoAlta label="Fecha de inicio de labor" value={fechaInicioLabor} />
             </div>
           </section>
+          <DocumentoPrevisualizacion
+            titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
+            storagePath={documentoPension?.storage_path}
+            vacio="Súbalo en Documentos para verlo aquí."
+          />
+          </div>
 
           <form action={onSubmit} className="space-y-4">
             <DocumentoPrevisualizacion
@@ -194,28 +203,27 @@ export function FichaPensiones({
               file={fileAlta}
               vacio="El documento de alta AFP es opcional. Puede subirlo si lo tiene."
               extra={
-                canWrite ? (
-                  <FileInput
-                    accept={DOCUMENTO_ACCEPT}
-                    disabled={pending}
-                    file={fileAlta}
-                    buttonLabel={
-                      fileAlta || documentoTramiteAfp?.storage_path ? "Cambiar documento de alta AFP" : "Subir documento de alta AFP"
-                    }
-                    emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                    onFileChange={setFileAlta}
-                  />
-                ) : null
-              }
-            />
-            {canWrite && documentoTramiteAfp?.storage_path ? (
-              <EliminarDocumentoGuardado
-                relacionId={relacionId}
-                documentoId={documentoTramiteAfp.id}
-                descripcion="¿Eliminar el documento de alta AFP? Dejará de verse en esta ficha."
-                disabled={pending}
-              />
-            ) : null}
+                <div className="space-y-4">
+                  {canWrite ? (
+                    <FileInput
+                      accept={DOCUMENTO_ACCEPT}
+                      disabled={pending}
+                      file={fileAlta}
+                      buttonLabel={
+                        fileAlta || documentoTramiteAfp?.storage_path ? "Cambiar documento de alta AFP" : "Subir documento de alta AFP"
+                      }
+                      emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                      onFileChange={setFileAlta}
+                    />
+                  ) : null}
+                  {canWrite && documentoTramiteAfp?.storage_path ? (
+                    <EliminarDocumentoGuardado
+                      relacionId={relacionId}
+                      documentoId={documentoTramiteAfp.id}
+                      descripcion="¿Eliminar el documento de alta AFP? Dejará de verse en esta ficha."
+                      disabled={pending}
+                    />
+                  ) : null}
             <FormSection
               title="Datos de afiliación AFP"
               hint="Nombre de AFP (Profuturo, Integra, Habitat o Prima) y CUSPP. La fecha de afiliación es opcional."
@@ -250,6 +258,9 @@ export function FichaPensiones({
                 <p className="text-sm text-muted-foreground">Solo consulta.</p>
               )}
             </FormSection>
+                </div>
+              }
+            />
           </form>
         </>
       ) : null}

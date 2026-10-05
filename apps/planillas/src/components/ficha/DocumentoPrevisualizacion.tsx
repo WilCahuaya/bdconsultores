@@ -69,6 +69,18 @@ export function DocumentoPrevisualizacion({
 
   const src = localUrl ?? remoteUrl;
   const esPdf = archivoEsPdf(file, storagePath ?? null);
+  const vista = hayArchivo && visible ? (
+    error && !src ? (
+      <p className="text-sm text-muted-foreground">{error}</p>
+    ) : !src ? (
+      <p className="text-sm text-muted-foreground">Cargando vista previa…</p>
+    ) : esPdf ? (
+      <iframe title={titulo} src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={titulo} className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
+    )
+  ) : null;
 
   return (
     <section className={`${panelCardClass} space-y-3 p-5`}>
@@ -81,19 +93,17 @@ export function DocumentoPrevisualizacion({
         ) : null}
       </div>
       {!hayArchivo ? <p className="text-sm text-muted-foreground">{vacio}</p> : null}
-      {hayArchivo && visible ? (
-        error && !src ? (
-          <p className="text-sm text-muted-foreground">{error}</p>
-        ) : !src ? (
-          <p className="text-sm text-muted-foreground">Cargando vista previa…</p>
-        ) : esPdf ? (
-          <iframe title={titulo} src={src} className="h-[min(72vh,44rem)] w-full rounded-md border bg-background" />
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={src} alt={titulo} className="h-[min(72vh,44rem)] w-full rounded-md border bg-muted object-contain" />
-        )
-      ) : null}
-      {extra}
+      {vista && extra ? (
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <div className="space-y-3">{extra}</div>
+          <div className="lg:sticky lg:top-4">{vista}</div>
+        </div>
+      ) : (
+        <>
+          {vista ? <div>{vista}</div> : null}
+          {extra}
+        </>
+      )}
     </section>
   );
 }

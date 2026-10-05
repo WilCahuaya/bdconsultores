@@ -352,7 +352,8 @@ export function FichaVidaLey({
           mostrarQuitar={Boolean(lote) && !lote?.constancia_storage_path}
           permitirAgregar={!lote?.constancia_storage_path}
           ocupadoExterno={ocupado}
-          vacio={facturaNoEnviada ? "No enviaron factura para este grupo." : "Esta ficha no tiene factura."}
+          vacio="Esta ficha no tiene factura."
+          sinArchivo={facturaNoEnviada}
           notaReemplazo="El reemplazo se ve en todos los que comparten esta factura."
           extra={
             canWrite && lote && !lote.factura_storage_path && !lote.factura_no_enviada ? (
@@ -425,6 +426,7 @@ function ArchivoCompartidoVidaLey({
   permitirAgregar,
   ocupadoExterno,
   vacio,
+  sinArchivo = false,
   notaReemplazo,
   alGuardar,
   extra,
@@ -442,6 +444,7 @@ function ArchivoCompartidoVidaLey({
   permitirAgregar: boolean;
   ocupadoExterno: boolean;
   vacio: string;
+  sinArchivo?: boolean;
   notaReemplazo: string;
   alGuardar?: () => Promise<string | null>;
   extra?: ReactNode;
@@ -453,6 +456,7 @@ function ArchivoCompartidoVidaLey({
   const [marcados, setMarcados] = useState<string[]>([]);
   const [pending, setPending] = useState<string | null>(null);
   const [opening, setOpening] = useState<"ver" | "descargar" | null>(null);
+  const [buscarArchivo, setBuscarArchivo] = useState(false);
   const ocupado = ocupadoExterno || pending !== null;
 
   function toggle(id: string) {
@@ -619,6 +623,24 @@ function ArchivoCompartidoVidaLey({
           ) : null}
           {extra}
         </div>
+      ) : sinArchivo && !buscarArchivo ? (
+        <p className="text-sm text-muted-foreground">
+          No hay factura.
+          {canWrite ? (
+            <>
+              {" "}
+              Si ya lo encontraste,{" "}
+              <button
+                type="button"
+                className="font-medium text-foreground underline underline-offset-2"
+                onClick={() => setBuscarArchivo(true)}
+              >
+                pulsa aquí
+              </button>
+              .
+            </>
+          ) : null}
+        </p>
       ) : canWrite ? (
         <div className="space-y-3">
           <FileInput

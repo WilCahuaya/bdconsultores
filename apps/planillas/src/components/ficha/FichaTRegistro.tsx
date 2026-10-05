@@ -179,16 +179,7 @@ export function FichaTRegistro({
 
   return (
     <div id="t-registro" className="space-y-4">
-      <DocumentoPrevisualizacion
-        titulo={TIPO_DOCUMENTO_LABEL.DNI}
-        storagePath={documentoDni?.storage_path}
-        vacio="Suba el DNI en Documentos para verlo aquí."
-      />
-      <DocumentoPrevisualizacion
-        titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
-        storagePath={documentoFicha?.storage_path}
-        vacio="Suba la ficha en Documentos para verla aquí."
-      />
+      <div className="grid items-start gap-4 lg:grid-cols-2">
       <section className={`${panelCardClass} space-y-4 p-5`}>
         <div>
           <p className="text-sm font-medium">Datos para pegar en T-Registro</p>
@@ -233,6 +224,19 @@ export function FichaTRegistro({
           {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
         </p>
       </section>
+      <div className="space-y-4">
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.DNI}
+          storagePath={documentoDni?.storage_path}
+          vacio="Suba el DNI en Documentos para verlo aquí."
+        />
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
+          storagePath={documentoFicha?.storage_path}
+          vacio="Suba la ficha en Documentos para verla aquí."
+        />
+      </div>
+      </div>
 
       <form action={guardarAlta} className="space-y-4">
         <DocumentoPrevisualizacion
@@ -242,42 +246,40 @@ export function FichaTRegistro({
           vacio="Suba el alta de T-Registro cuando lo tenga en SUNAT."
           extra={
             canWrite ? (
-              <FileInput
-                accept={DOCUMENTO_ACCEPT}
-                disabled={pendingAlta}
-                file={fileAlta}
-                buttonLabel={
-                  fileAlta || documentoTrAlta?.storage_path ? "Cambiar alta de T-Registro" : "Subir alta de T-Registro"
-                }
-                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                onFileChange={setFileAlta}
-              />
-            ) : null
+              <div className="space-y-4">
+                <FileInput
+                  accept={DOCUMENTO_ACCEPT}
+                  disabled={pendingAlta}
+                  file={fileAlta}
+                  buttonLabel={
+                    fileAlta || documentoTrAlta?.storage_path ? "Cambiar alta de T-Registro" : "Subir alta de T-Registro"
+                  }
+                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  onFileChange={setFileAlta}
+                />
+                {documentoTrAlta?.storage_path ? (
+                  <EliminarDocumentoGuardado
+                    relacionId={relacionId}
+                    documentoId={documentoTrAlta.id}
+                    descripcion="¿Eliminar el alta de T-Registro? Dejará de verse en esta ficha."
+                    disabled={pendingAlta}
+                  />
+                ) : null}
+                <DateField
+                  label="Fecha de alta"
+                  name="fecha"
+                  defaultValue={items.find((item) => item.tipo === "ALTA")?.fecha ?? trabajador.fecha_ingreso}
+                  readOnly={pendingAlta}
+                />
+                <Button type="submit" disabled={pendingAlta}>
+                  {pendingAlta ? "Guardando…" : "Guardar alta de T-Registro"}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Solo consulta.</p>
+            )
           }
         />
-        {canWrite && documentoTrAlta?.storage_path ? (
-          <EliminarDocumentoGuardado
-            relacionId={relacionId}
-            documentoId={documentoTrAlta.id}
-            descripcion="¿Eliminar el alta de T-Registro? Dejará de verse en esta ficha."
-            disabled={pendingAlta}
-          />
-        ) : null}
-        {canWrite ? (
-          <div className={`${panelCardClass} space-y-4 p-5`}>
-            <DateField
-              label="Fecha de alta"
-              name="fecha"
-              defaultValue={items.find((item) => item.tipo === "ALTA")?.fecha ?? trabajador.fecha_ingreso}
-              readOnly={pendingAlta}
-            />
-            <Button type="submit" disabled={pendingAlta}>
-              {pendingAlta ? "Guardando…" : "Guardar alta de T-Registro"}
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Solo consulta.</p>
-        )}
       </form>
 
       <div className="space-y-4">
@@ -288,34 +290,34 @@ export function FichaTRegistro({
           vacio="Suba la baja de T-Registro cuando la tenga en SUNAT."
           extra={
             canWriteTrBaja ? (
-              <FileInput
-                accept={DOCUMENTO_ACCEPT}
-                disabled={pendingBaja}
-                file={fileBaja}
-                buttonLabel={
-                  fileBaja || documentoTrBaja?.storage_path
-                    ? "Cambiar baja de T-Registro"
-                    : "Subir baja de T-Registro"
-                }
-                emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
-                onFileChange={setFileBaja}
-              />
+              <div className="space-y-4">
+                <FileInput
+                  accept={DOCUMENTO_ACCEPT}
+                  disabled={pendingBaja}
+                  file={fileBaja}
+                  buttonLabel={
+                    fileBaja || documentoTrBaja?.storage_path
+                      ? "Cambiar baja de T-Registro"
+                      : "Subir baja de T-Registro"
+                  }
+                  emptyLabel="PDF, JPG, PNG o WEBP. Máximo 10 MB."
+                  onFileChange={setFileBaja}
+                />
+                {documentoTrBaja?.storage_path ? (
+                  <EliminarDocumentoGuardado
+                    relacionId={relacionId}
+                    documentoId={documentoTrBaja.id}
+                    descripcion="¿Eliminar la baja de T-Registro? Dejará de verse en esta ficha."
+                    disabled={pendingBaja}
+                  />
+                ) : null}
+                <Button type="button" disabled={pendingBaja} onClick={() => void guardarBaja()}>
+                  {pendingBaja ? "Guardando…" : "Guardar baja de T-Registro"}
+                </Button>
+              </div>
             ) : null
           }
         />
-        {canWriteTrBaja && documentoTrBaja?.storage_path ? (
-          <EliminarDocumentoGuardado
-            relacionId={relacionId}
-            documentoId={documentoTrBaja.id}
-            descripcion="¿Eliminar la baja de T-Registro? Dejará de verse en esta ficha."
-            disabled={pendingBaja}
-          />
-        ) : null}
-        {canWriteTrBaja ? (
-          <Button type="button" disabled={pendingBaja} onClick={() => void guardarBaja()}>
-            {pendingBaja ? "Guardando…" : "Guardar baja de T-Registro"}
-          </Button>
-        ) : null}
         {canWrite ? <DarDeBajaControl trabajador={trabajador} /> : null}
       </div>
 
