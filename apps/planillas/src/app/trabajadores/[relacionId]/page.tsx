@@ -26,7 +26,7 @@ import {
 } from "@/lib/actions/ficha";
 import { listVacaciones } from "@/lib/actions/vacaciones";
 import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
-import { mesActualLima } from "@/lib/horario-asistencia";
+import { esMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import {
   HORIZONTE_VENCIMIENTO_DIAS,
   contratoConfirmado,
@@ -56,7 +56,7 @@ export default async function FichaTrabajadorPage({
   searchParams,
 }: {
   params: { relacionId: string };
-  searchParams: { tab?: string; periodo?: string };
+  searchParams: { tab?: string; periodo?: string; mes?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const trabajador = await getTrabajador(params.relacionId);
@@ -113,7 +113,12 @@ export default async function FichaTrabajadorPage({
     tab === "vida-ley"
       ? { raiz: "Vida Ley", hrefRaiz: `/vida-ley?entidadId=${trabajador.entidad_id}` }
       : tab === "asistencia"
-        ? { raiz: "Asistencias", hrefRaiz: `/asistencias?entidadId=${trabajador.entidad_id}` }
+        ? {
+            raiz: "Asistencias",
+            hrefRaiz: `/asistencias?entidadId=${trabajador.entidad_id}${
+              searchParams.mes && esMesAsistencia(searchParams.mes) ? `&mes=${searchParams.mes}` : ""
+            }`,
+          }
         : tab === "vacaciones"
           ? {
               raiz: "Vacaciones",
@@ -295,10 +300,9 @@ export default async function FichaTrabajadorPage({
           <FichaAsistencia
             relacionId={params.relacionId}
             entidadId={trabajador.entidad_id}
-            fechaIngreso={trabajador.fecha_ingreso}
-            fechaCese={trabajador.fecha_cese}
             documentos={documentos}
             canWrite={canEditFicha}
+            mesInicial={searchParams.mes}
           />
         ) : null}
         {tab === "vacaciones" ? (

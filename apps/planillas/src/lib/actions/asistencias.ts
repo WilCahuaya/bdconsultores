@@ -206,6 +206,37 @@ export async function listDocumentosAsistenciaMes(
   }[];
 }
 
+export async function listDocumentosAsistenciaAnio(
+  entidadId: string,
+  anio: number,
+): Promise<{ relacion_id: string; mes: string; storage_path: string | null; nota: string | null }[]> {
+  await requirePlanillasProfile();
+  if (!Number.isInteger(anio) || anio < 1900 || anio > 9999) return [];
+  const trabajadores = await listTrabajadores(entidadId);
+  const ids = trabajadores.map((t) => t.id);
+  if (ids.length === 0) return [];
+  const db = await planillasDb();
+  const { data, error } = await db
+    .from("documentos")
+    .select("storage_path, relacion_id, nota, observaciones")
+    .eq("tipo", "ASISTENCIA")
+    .like("observaciones", `${anio}-%`)
+    .in("relacion_id", ids);
+  if (error) throw new Error(error.message);
+  return (data ?? []).flatMap((row) => {
+    const mes = String(row.observaciones ?? "");
+    if (!esMesAsistencia(mes)) return [];
+    return [
+      {
+        relacion_id: row.relacion_id as string,
+        mes,
+        storage_path: (row.storage_path as string | null) ?? null,
+        nota: (row.nota as string | null) ?? null,
+      },
+    ];
+  });
+}
+
 export async function asegurarDocumentoAsistenciaMes(
   relacionId: string,
   mes: string,
