@@ -33,8 +33,10 @@ import {
   VisitasCampoHistorialPanel,
 } from "@inventario/ui/panel";
 import type { AmbienteConVisita } from "@/lib/actions/visitas-campo";
+import { exportVisitaCampoReportePdf } from "@/lib/reportes/visita-campo-pdf";
 import {
   attachVisitaEstadoToAmbientes,
+  datosUsuarioReporte,
   getVisitaCampoDetalle,
   getVisitaCampoReporte,
 } from "@/lib/actions/visitas-campo";
@@ -428,6 +430,17 @@ export function AdminAmbientesPanel({
             setDetalleReporte(null);
           }}
           reporte={detalleReporte ?? undefined}
+          onExportarReporte={async (visita) => {
+            if (!detalleReporte) return;
+            const usuario = await datosUsuarioReporte();
+            await exportVisitaCampoReportePdf({
+              entidadNombre: entidad.nombre,
+              visita,
+              reporte: detalleReporte,
+              usuarioNombre: usuario.nombre,
+              usuarioEmail: usuario.email,
+            });
+          }}
         />
         </>
       ) : tab === "sucursales" ? (

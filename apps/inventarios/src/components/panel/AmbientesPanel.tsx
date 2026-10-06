@@ -35,6 +35,7 @@ import {
   AmbientesDatosMenu,
 } from "@inventario/ui/panel";
 import type { AmbienteConSede } from "@/lib/actions/ubicacion";
+import { exportVisitaCampoReportePdf } from "@/lib/reportes/visita-campo-pdf";
 import {
   createAmbiente,
   createEspacio,
@@ -54,6 +55,7 @@ import {
   abrirVisitaCampo,
   attachVisitaEstadoToAmbientes,
   cerrarVisitaCampo,
+  datosUsuarioReporte,
   getVisitaCampoDetalle,
   getVisitaCampoReporte,
   getVisitasCampoActivas,
@@ -688,6 +690,17 @@ export function AmbientesPanel({
           onTerminar={puedeGestionarVisita ? handleCerrarVisita : undefined}
           terminarPendingId={cerrarPendingId}
           reporte={detalleReporte ?? undefined}
+          onExportarReporte={async (visita) => {
+            if (!detalleReporte) return;
+            const usuario = await datosUsuarioReporte();
+            await exportVisitaCampoReportePdf({
+              entidadNombre: entidad.nombre,
+              visita,
+              reporte: detalleReporte,
+              usuarioNombre: usuario.nombre,
+              usuarioEmail: usuario.email,
+            });
+          }}
         />
         </>
       ) : !sedeFocus && tab === "responsables" ? (

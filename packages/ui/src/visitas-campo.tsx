@@ -85,59 +85,6 @@ function resumenNovedades(faltantes: number, bajas: number, cambios: number): st
   return partes.length > 0 ? partes.join(" · ") : "Sin novedades";
 }
 
-function csvCelda(value: string): string {
-  const text = value.replace(/"/g, '""');
-  return /[",\n\r]/.test(text) ? `"${text}"` : text;
-}
-
-function detalleReporteItem(item: VisitaCampoReporteItem, tono: "faltante" | "baja" | "estado"): string {
-  if (tono === "faltante") return "Pasó a faltante";
-  if (tono === "baja") return "De baja";
-  if (item.estado_anterior && item.estado_nuevo) {
-    return `${estadoBienLabel(item.estado_anterior)} → ${estadoBienLabel(item.estado_nuevo)}`;
-  }
-  return "";
-}
-
-function descargarReporteVisita(visita: VisitaCampoHistorial, reporte: VisitaCampoReporte) {
-  const filas: string[][] = [[
-    "Tipo",
-    "Ambiente",
-    "Sucursal",
-    "Bien",
-    "Código",
-    "Detalle",
-    "Motivo",
-    "Revisado por",
-    "Fecha",
-  ]];
-  const push = (tipo: string, item: VisitaCampoReporteItem, tono: "faltante" | "baja" | "estado") => {
-    filas.push([
-      tipo,
-      item.ambiente_nombre,
-      item.sede_nombre,
-      item.nombre,
-      item.codigo_barras ?? "",
-      detalleReporteItem(item, tono),
-      item.motivo ?? "",
-      item.revisado_por_nombre ?? "",
-      item.revisado_at ? formatFecha(item.revisado_at) : "",
-    ]);
-  };
-  for (const item of reporte.faltantes) push("Faltante", item, "faltante");
-  for (const item of reporte.bajas) push("Baja", item, "baja");
-  for (const item of reporte.cambios_estado) push("Cambio de estado", item, "estado");
-
-  const csv = filas.map((cols) => cols.map(csvCelda).join(",")).join("\r\n");
-  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `visita-${visita.numero}-reporte.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 export function visitaCampoSedeLabel(visita: {
   sede_id: string | null;
   sede_nombre: string | null;
@@ -487,6 +434,7 @@ export function VisitasCampoHistorialPanel({
   onTerminar,
   terminarPendingId,
   reporte,
+  onExportarReporte,
 }: {
   historial: VisitaCampoHistorial[];
   loadingDetalle?: boolean;
@@ -499,8 +447,10 @@ export function VisitasCampoHistorialPanel({
   terminarPendingId?: string | null;
   /** Si llega, cada ambiente se despliega con faltantes, bajas y cambios de estado. */
   reporte?: VisitaCampoReporte;
+  onExportarReporte?: (visita: VisitaCampoHistorial) => void | Promise<void>;
 }) {
   const [ambienteAbierto, setAmbienteAbierto] = React.useState<string | null>(null);
+  const [exportandoReporte, setExportandoReporte] = React.useState(false);
   React.useEffect(() => {
     setAmbienteAbierto(null);
   }, [detalleVisita?.id]);
@@ -614,14 +564,20 @@ export function VisitasCampoHistorialPanel({
                             ? `Cerrada el ${formatFecha(visita.cerrado_at)}`
                             : `Abierta el ${formatFecha(visita.abierto_at)}`}
                         </p>
-                        {reporte ? (
+                        {reporte && onExportarReporte ? (
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
-                            onClick={() => descargarReporteVisita(visita, reporte)}
+                            disabled={exportandoReporte}
+                            onClick={() => {
+                              setExportandoReporte(true);
+                              void Promise.resolve(onExportarReporte(visita)).finally(() => {
+                                setExportandoReporte(false);
+                              });
+                            }}
                           >
-                            Exportar reporte
+                            {exportandoReporte ? "Exportando…" : "Exportar PDF"}
                           </Button>
                         ) : null}
                       </div>

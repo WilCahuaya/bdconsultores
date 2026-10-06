@@ -699,3 +699,11 @@ export async function getVisitaCampoReporte(
     },
   };
 }
+
+export async function datosUsuarioReporte(): Promise<{ nombre: string; email: string }> {
+  const profile = await getProfile();
+  return {
+    nombre: profile?.nombre?.trim() || "Usuario",
+    email: profile?.email?.trim() || "",
+  };
+}
