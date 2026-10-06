@@ -1,10 +1,8 @@
-import type { ReporteId } from "./types";
+import { plantillaReporte, type ReporteId } from "./types";
 
 export function esReporteAdquiridosEjercicio(reporteId: ReporteId): boolean {
-  return (
-    reporteId === "reporte_adquiridos_ejercicio_actual" ||
-    reporteId === "reporte_adquiridos_ejercicio_anterior"
-  );
+  const plantilla = plantillaReporte(reporteId);
+  return plantilla === "ejercicio_actual" || plantilla === "ejercicio_anterior";
 }
 
 /** Año de referencia a partir de fecha de corte ISO (AAAA-MM-DD) o DD/MM/AAAA. */
@@ -23,8 +21,9 @@ export function anioEjercicioAdquisicion(
   fechaCorte?: string,
 ): number | null {
   const ref = anioReferenciaDesdeFechaCorte(fechaCorte);
-  if (reporteId === "reporte_adquiridos_ejercicio_actual") return ref;
-  if (reporteId === "reporte_adquiridos_ejercicio_anterior") return ref - 1;
+  const plantilla = plantillaReporte(reporteId);
+  if (plantilla === "ejercicio_actual") return ref;
+  if (plantilla === "ejercicio_anterior") return ref - 1;
   return null;
 }
 
@@ -37,6 +36,6 @@ export function tituloReporteAdquiridosEjercicio(
   fechaCorte?: string,
 ): string {
   const anio = anioEjercicioAdquisicion(reporteId, fechaCorte);
-  if (anio == null) return "REPORTE DE ACTIVOS ADQUIRIDOS";
-  return `REPORTE DE ACTIVOS ADQUIRIDOS EN EL EJERCICIO ${anio}`;
+  if (anio == null) return "BIENES ADQUIRIDOS";
+  return `BIENES ADQUIRIDOS EN EL EJERCICIO ${anio}`;
 }

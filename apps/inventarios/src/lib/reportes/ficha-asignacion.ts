@@ -1,22 +1,12 @@
 import { labelFechaCorte, labelFechaEmision } from "@inventario/types";
-import type { ReporteContexto, ReporteId } from "./types";
-
-export const FICHA_ASIGNACION_TITULO = "FICHA DE ASIGNACION DE BIENES AL USUARIO";
-export const INVENTARIO_ACTIVOS_FIJOS_AMBIENTE_TITULO =
-  "INVENTARIO DE ACTIVOS FIJOS POR AMBIENTE";
-export const INVENTARIO_ACTIVOS_VALORIZADOS_AMBIENTE_TITULO =
-  "INVENTARIO DE ACTIVOS VALORIZADOS POR AMBIENTE";
+import { definicionReporte, plantillaReporte, type ReporteContexto, type ReporteId } from "./types";
 
 export const FICHA_TABLE_HEAD_RGB: [number, number, number] = [29, 78, 137];
 export const FICHA_TABLE_ALT_ROW_RGB: [number, number, number] = [248, 248, 248];
 
 /** Informes por ambiente con diseño extendido (no membrete institucional). */
 export function esReporteAmbienteDiseno(reporteId: ReporteId): boolean {
-  return (
-    reporteId === "inventario_ambiente_sin_valores" ||
-    reporteId === "inventario_ambiente_activos_fijos" ||
-    reporteId === "inventario_ambiente_valorizado"
-  );
+  return definicionReporte(reporteId).scope === "ambiente";
 }
 
 /** @deprecated Use esReporteAmbienteDiseno */
@@ -25,17 +15,11 @@ export function esReporteAmbienteFicha(reporteId: ReporteId): boolean {
 }
 
 export function tituloReporteAmbienteDiseno(reporteId: ReporteId): string {
-  if (reporteId === "inventario_ambiente_activos_fijos") {
-    return INVENTARIO_ACTIVOS_FIJOS_AMBIENTE_TITULO;
-  }
-  if (reporteId === "inventario_ambiente_valorizado") {
-    return INVENTARIO_ACTIVOS_VALORIZADOS_AMBIENTE_TITULO;
-  }
-  return FICHA_ASIGNACION_TITULO;
+  return definicionReporte(reporteId).titulo;
 }
 
 export function reporteAmbienteIncluyeFirmas(reporteId: ReporteId): boolean {
-  return reporteId === "inventario_ambiente_sin_valores";
+  return plantillaReporte(reporteId) === "ficha_ambiente";
 }
 
 export function buildFichaActualizacionLabel(fechaCorte: string): string {
@@ -51,12 +35,7 @@ export function ambienteDisenoExportFilename(ctx: ReporteContexto): string {
     .toLowerCase()
     .slice(0, 48);
   const fecha = ctx.fechaGeneracion.toISOString().slice(0, 10);
-  const prefix =
-    ctx.reporteId === "inventario_ambiente_activos_fijos"
-      ? "inventario-activos-fijos"
-      : ctx.reporteId === "inventario_ambiente_valorizado"
-        ? "inventario-activos-valorizados"
-        : "ficha-asignacion";
+  const prefix = definicionReporte(ctx.reporteId).archivo;
   return `${prefix}-${slug}-${fecha}`;
 }
 

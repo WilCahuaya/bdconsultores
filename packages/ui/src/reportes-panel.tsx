@@ -91,7 +91,7 @@ function opcionesTipoReporte(reportes: ReporteDefinicionUI[]) {
   const etiquetas = {
     ambiente: "Por ambiente",
     entidad: "De toda la entidad",
-    situacion: "Situación y adquisiciones",
+    situacion: "Situación",
   } as const;
   const orden = ["ambiente", "entidad", "situacion"] as const;
   if (!reportes.some((reporte) => reporte.grupo)) {
