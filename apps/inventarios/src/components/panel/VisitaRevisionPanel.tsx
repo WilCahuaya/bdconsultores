@@ -323,15 +323,18 @@ export function FaltanteBienesPanel({
   ambienteId,
   activos,
   procedenciaPorActivo,
+  origenAmbientePorActivo,
 }: {
   entidadId: string;
   ambienteId: string;
   activos: Activo[];
   procedenciaPorActivo?: Record<string, string>;
+  origenAmbientePorActivo?: Record<string, string>;
 }) {
   const router = useRouter();
   const [destinos, setDestinos] = useState<{ id: string; nombre: string }[]>([]);
-  const [destino, setDestino] = useState("");
+  const [destinoPorActivo, setDestinoPorActivo] = useState<Record<string, string>>({});
+  const sugeridoRef = useRef(new Set<string>());
   const [motivo, setMotivo] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -343,12 +346,35 @@ export function FaltanteBienesPanel({
       setDestinos(
         lista
           .filter((ambiente) => !ambiente.es_preregistro && !ambiente.es_faltante)
-          .map((ambiente) => ({ id: ambiente.id, nombre: ambiente.nombre })),
+          .map((ambiente) => ({
+            id: ambiente.id,
+            nombre: ambiente.sede_nombre
+              ? `${ambiente.nombre} · ${ambiente.sede_nombre}`
+              : ambiente.nombre,
+          })),
       );
     });
   }, [entidadId]);
 
+  useEffect(() => {
+    if (destinos.length === 0 || !origenAmbientePorActivo) return;
+    setDestinoPorActivo((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [activoId, ambienteOrigen] of Object.entries(origenAmbientePorActivo)) {
+        if (sugeridoRef.current.has(activoId) || prev[activoId]) continue;
+        sugeridoRef.current.add(activoId);
+        if (destinos.some((ambiente) => ambiente.id === ambienteOrigen)) {
+          next[activoId] = ambienteOrigen;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [destinos, origenAmbientePorActivo]);
+
   async function resolver(activo: Activo, accion: "MOVER" | "BAJA") {
+    const destino = destinoPorActivo[activo.id] ?? "";
     setPendingId(activo.id);
     setError(null);
     const result = await resolverBienFaltante({
@@ -365,7 +391,7 @@ export function FaltanteBienesPanel({
       return;
     }
     setMotivo("");
-    if (accion === "MOVER" && destino) {
+    if (accion === "MOVER" && destinoPorActivo[activo.id]) {
       router.push(`/contador/entidades/${entidadId}/ambientes/${destino}`);
       return;
     }
@@ -388,6 +414,8 @@ export function FaltanteBienesPanel({
           {registrados.map((activo) => {
             const ocupado = pendingId === activo.id;
             const defectuoso = activo.estado_bien === "MALO";
+            const destino = destinoPorActivo[activo.id] ?? "";
+            const sugerido = origenAmbientePorActivo?.[activo.id] === destino && Boolean(destino);
             return (
               <li key={activo.id} className="flex flex-wrap items-center gap-2 py-2">
                 <span className="min-w-0 flex-1 text-sm">
@@ -400,7 +428,10 @@ export function FaltanteBienesPanel({
                 <select
                   className="h-8 max-w-[14rem] rounded-md border border-input bg-background px-2 text-sm"
                   value={destino}
-                  onChange={(event) => setDestino(event.target.value)}
+                  title={sugerido ? "Sugerido: el ambiente del que proviene" : undefined}
+                  onChange={(event) =>
+                    setDestinoPorActivo((prev) => ({ ...prev, [activo.id]: event.target.value }))
+                  }
                 >
                   <option value="">Ambiente destino</option>
                   {destinos.map((item) => (

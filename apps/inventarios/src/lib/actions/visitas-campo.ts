@@ -560,12 +560,17 @@ function etiquetaProcedencia(ambiente: string, sede: string): string {
   return sede ? `${ambiente} · ${sede}` : ambiente;
 }
 
-/** Ambiente del que salió cada bien al pasar a Faltante. */
-export async function listProcedenciaFaltante(activoIds: string[]): Promise<Record<string, string>> {
+export interface ProcedenciaFaltante {
+  ambienteId: string;
+  etiqueta: string;
+}
+
+async function origenIdPorActivoFaltante(activoIds: string[]): Promise<Map<string, string>> {
   const ids = [...new Set(activoIds.filter(Boolean))];
-  if (ids.length === 0) return {};
+  const origenIdPorActivo = new Map<string, string>();
+  if (ids.length === 0) return origenIdPorActivo;
   const profile = await getProfile();
-  if (!profile) return {};
+  if (!profile) return origenIdPorActivo;
 
   const supabase = await createClient();
   const { data: revisiones, error } = await supabase
@@ -575,9 +580,8 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
     .in("activo_id", ids)
     .order("updated_at", { ascending: false });
 
-  if (error) return {};
+  if (error) return origenIdPorActivo;
 
-  const origenIdPorActivo = new Map<string, string>();
   for (const row of revisiones ?? []) {
     const activoId = String(row.activo_id ?? "");
     const ambienteId = String(row.ambiente_id ?? "");
@@ -601,9 +605,18 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
     }
   }
 
+  return origenIdPorActivo;
+}
+
+/** Ambiente del que salió cada bien al pasar a Faltante, con su nombre. */
+export async function listProcedenciaFaltanteDetalle(
+  activoIds: string[],
+): Promise<Record<string, ProcedenciaFaltante>> {
+  const origenIdPorActivo = await origenIdPorActivoFaltante(activoIds);
   const origenIds = [...new Set(origenIdPorActivo.values())];
   if (origenIds.length === 0) return {};
 
+  const supabase = await createClient();
   const { data: ambientes } = await supabase
     .from("ambientes")
     .select("id, nombre, sedes(nombre)")
@@ -617,10 +630,20 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
     if (id && etiqueta) etiquetaPorAmbiente.set(id, etiqueta);
   }
 
-  const out: Record<string, string> = {};
+  const out: Record<string, ProcedenciaFaltante> = {};
   for (const [activoId, origenId] of origenIdPorActivo) {
     const etiqueta = etiquetaPorAmbiente.get(origenId);
-    if (etiqueta) out[activoId] = etiqueta;
+    if (etiqueta) out[activoId] = { ambienteId: origenId, etiqueta };
+  }
+  return out;
+}
+
+/** Ambiente del que salió cada bien al pasar a Faltante. */
+export async function listProcedenciaFaltante(activoIds: string[]): Promise<Record<string, string>> {
+  const detalle = await listProcedenciaFaltanteDetalle(activoIds);
+  const out: Record<string, string> = {};
+  for (const [activoId, item] of Object.entries(detalle)) {
+    out[activoId] = item.etiqueta;
   }
   return out;
 }

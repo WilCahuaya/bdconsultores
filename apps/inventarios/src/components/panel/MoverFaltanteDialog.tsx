@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ConfirmDialog, Label, Select } from "@inventario/ui";
 import { listAmbientesPorEntidad } from "@/lib/actions/ubicacion";
-import { resolverBienFaltante } from "@/lib/actions/visitas-campo";
+import { listProcedenciaFaltanteDetalle, resolverBienFaltante } from "@/lib/actions/visitas-campo";
 
 interface MoverFaltanteDialogProps {
   open: boolean;
@@ -26,34 +26,43 @@ export function MoverFaltanteDialog({
   const router = useRouter();
   const [destinos, setDestinos] = useState<{ id: string; label: string }[]>([]);
   const [destino, setDestino] = useState("");
+  const [sugeridoId, setSugeridoId] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) {
       setDestino("");
+      setSugeridoId("");
       setError(null);
       setPending(false);
       return;
     }
     let cancel = false;
-    void listAmbientesPorEntidad(entidadId).then((lista) => {
+    void Promise.all([
+      listAmbientesPorEntidad(entidadId),
+      listProcedenciaFaltanteDetalle([activoId]),
+    ]).then(([lista, procedencia]) => {
       if (cancel) return;
-      setDestinos(
-        lista
-          .filter((ambiente) => !ambiente.es_preregistro && !ambiente.es_faltante)
-          .map((ambiente) => ({
-            id: ambiente.id,
-            label: ambiente.sede_nombre
-              ? `${ambiente.nombre} · ${ambiente.sede_nombre}`
-              : ambiente.nombre,
-          })),
-      );
+      const opciones = lista
+        .filter((ambiente) => !ambiente.es_preregistro && !ambiente.es_faltante)
+        .map((ambiente) => ({
+          id: ambiente.id,
+          label: ambiente.sede_nombre
+            ? `${ambiente.nombre} · ${ambiente.sede_nombre}`
+            : ambiente.nombre,
+        }));
+      setDestinos(opciones);
+      const origenId = procedencia[activoId]?.ambienteId ?? "";
+      if (origenId && opciones.some((ambiente) => ambiente.id === origenId)) {
+        setDestino(origenId);
+        setSugeridoId(origenId);
+      }
     });
     return () => {
       cancel = true;
     };
-  }, [open, entidadId]);
+  }, [open, entidadId, activoId]);
 
   async function confirmar() {
     if (!destino) return;
@@ -102,6 +111,9 @@ export function MoverFaltanteDialog({
             ...destinos.map((item) => ({ value: item.id, label: item.label })),
           ]}
         />
+        {sugeridoId && destino === sugeridoId ? (
+          <p className="text-xs text-muted-foreground">Sugerido: el ambiente del que proviene.</p>
+        ) : null}
       </div>
     </ConfirmDialog>
   );
