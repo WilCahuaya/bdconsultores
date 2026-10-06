@@ -235,6 +235,24 @@ async function conteoRevisionPorAmbiente(
   return resultado;
 }
 
+/** Revisiones guardadas en la visita, por el ambiente donde se marcaron. */
+async function conteoRevisionesDeVisita(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  visitaId: string,
+): Promise<Map<string, number>> {
+  const { data } = await supabase
+    .from("visita_revisiones")
+    .select("ambiente_id")
+    .eq("visita_id", visitaId);
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const ambienteId = row.ambiente_id as string | null;
+    if (!ambienteId) continue;
+    counts.set(ambienteId, (counts.get(ambienteId) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export async function listVisitasCampoHistorial(
   entidadId: string,
 ): Promise<VisitaCampoHistorial[]> {
@@ -260,15 +278,18 @@ export async function listVisitasCampoHistorial(
       .eq("visita_id", v.id);
 
     const relevantes = (filas ?? []).filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
-    const visitaPorAmbiente = new Map(
-      relevantes.map((fila) => [fila.ambiente_id as string, v.id as string]),
-    );
-    const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
     const ambientes_total = relevantes.length;
-    const ambientes_culminados = relevantes.filter((fila) => {
-      const cifras = conteo.get(fila.ambiente_id as string);
-      return cifras != null && cifras.revisados === cifras.total;
-    }).length;
+    let ambientes_culminados = ambientes_total;
+    if (v.estado !== "CERRADO") {
+      const visitaPorAmbiente = new Map(
+        relevantes.map((fila) => [fila.ambiente_id as string, v.id as string]),
+      );
+      const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+      ambientes_culminados = relevantes.filter((fila) => {
+        const cifras = conteo.get(fila.ambiente_id as string);
+        return cifras != null && cifras.revisados === cifras.total;
+      }).length;
+    }
 
     result.push({
       id: v.id,
@@ -305,11 +326,19 @@ export async function getVisitaCampoDetalle(
 
   if (error || !filas) return [];
 
+  const { data: visita } = await supabase
+    .from("visitas_campo")
+    .select("estado, cerrado_at")
+    .eq("id", visitaId)
+    .maybeSingle();
+  const cerrada = visita?.estado === "CERRADO";
+
   const participantes = filas.filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
   const visitaPorAmbiente = new Map(
     participantes.map((fila) => [fila.ambiente_id as string, visitaId]),
   );
-  const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+  const conteo = cerrada ? null : await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+  const revisiones = cerrada ? await conteoRevisionesDeVisita(supabase, visitaId) : null;
 
   return participantes.flatMap((fila) => {
     const ambRaw = fila.ambientes as unknown;
@@ -321,8 +350,12 @@ export async function getVisitaCampoDetalle(
     } | null;
     const sede = amb?.sedes;
     const sedeNombreJoin = Array.isArray(sede) ? sede[0]?.nombre : sede?.nombre;
-    const cifras = conteo.get(fila.ambiente_id as string) ?? { revisados: 0, total: 0 };
-    const completo = cifras.revisados === cifras.total;
+    const revisadosEnVisita = revisiones?.get(fila.ambiente_id as string) ?? 0;
+    const cifras = conteo?.get(fila.ambiente_id as string) ?? {
+      revisados: revisadosEnVisita,
+      total: revisadosEnVisita,
+    };
+    const completo = cerrada || cifras.revisados === cifras.total;
 
     return [
       {
@@ -331,10 +364,10 @@ export async function getVisitaCampoDetalle(
         sede_nombre: sedeNombreJoin ?? "—",
         es_preregistro: amb?.es_preregistro ?? false,
         estado: (completo ? "CULMINADO" : "EN_PROCESO") as EstadoVisitaAmbiente,
-        culminado_at: completo ? fila.culminado_at : null,
+        culminado_at: completo ? (fila.culminado_at ?? visita?.cerrado_at ?? null) : null,
         culminado_por_nombre: completo ? profileNombre(fila.culminado as ProfileJoin) : null,
-        revisados: cifras.revisados,
-        total: cifras.total,
+        revisados: cerrada ? revisadosEnVisita : cifras.revisados,
+        total: cerrada ? revisadosEnVisita : cifras.total,
       },
     ];
   });

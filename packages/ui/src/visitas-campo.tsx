@@ -77,6 +77,67 @@ function formatFecha(iso: string) {
   });
 }
 
+function resumenNovedades(faltantes: number, bajas: number, cambios: number): string {
+  const partes: string[] = [];
+  if (faltantes > 0) partes.push(`${faltantes} faltante${faltantes === 1 ? "" : "s"}`);
+  if (bajas > 0) partes.push(`${bajas} baja${bajas === 1 ? "" : "s"}`);
+  if (cambios > 0) partes.push(`${cambios} cambio${cambios === 1 ? "" : "s"} de estado`);
+  return partes.length > 0 ? partes.join(" · ") : "Sin novedades";
+}
+
+function csvCelda(value: string): string {
+  const text = value.replace(/"/g, '""');
+  return /[",\n\r]/.test(text) ? `"${text}"` : text;
+}
+
+function detalleReporteItem(item: VisitaCampoReporteItem, tono: "faltante" | "baja" | "estado"): string {
+  if (tono === "faltante") return "Pasó a faltante";
+  if (tono === "baja") return "De baja";
+  if (item.estado_anterior && item.estado_nuevo) {
+    return `${estadoBienLabel(item.estado_anterior)} → ${estadoBienLabel(item.estado_nuevo)}`;
+  }
+  return "";
+}
+
+function descargarReporteVisita(visita: VisitaCampoHistorial, reporte: VisitaCampoReporte) {
+  const filas: string[][] = [[
+    "Tipo",
+    "Ambiente",
+    "Sucursal",
+    "Bien",
+    "Código",
+    "Detalle",
+    "Motivo",
+    "Revisado por",
+    "Fecha",
+  ]];
+  const push = (tipo: string, item: VisitaCampoReporteItem, tono: "faltante" | "baja" | "estado") => {
+    filas.push([
+      tipo,
+      item.ambiente_nombre,
+      item.sede_nombre,
+      item.nombre,
+      item.codigo_barras ?? "",
+      detalleReporteItem(item, tono),
+      item.motivo ?? "",
+      item.revisado_por_nombre ?? "",
+      item.revisado_at ? formatFecha(item.revisado_at) : "",
+    ]);
+  };
+  for (const item of reporte.faltantes) push("Faltante", item, "faltante");
+  for (const item of reporte.bajas) push("Baja", item, "baja");
+  for (const item of reporte.cambios_estado) push("Cambio de estado", item, "estado");
+
+  const csv = filas.map((cols) => cols.map(csvCelda).join(",")).join("\r\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `visita-${visita.numero}-reporte.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function visitaCampoSedeLabel(visita: {
   sede_id: string | null;
   sede_nombre: string | null;
@@ -546,12 +607,24 @@ export function VisitasCampoHistorialPanel({
                 {abierto ? (
                   <tr className="border-b border-border/40 bg-muted/20">
                     <td colSpan={VISITAS_HISTORIAL_TABLE_WIDTHS_PCT.length} className="px-3 py-3 sm:px-4">
-                      <p className="mb-2 text-xs text-muted-foreground">
-                        {visitaCampoSedeLabel(visita)} ·{" "}
-                        {visita.cerrado_at
-                          ? `Cerrada el ${formatFecha(visita.cerrado_at)}`
-                          : `Abierta el ${formatFecha(visita.abierto_at)}`}
-                      </p>
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {visitaCampoSedeLabel(visita)} ·{" "}
+                          {visita.cerrado_at
+                            ? `Cerrada el ${formatFecha(visita.cerrado_at)}`
+                            : `Abierta el ${formatFecha(visita.abierto_at)}`}
+                        </p>
+                        {reporte ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => descargarReporteVisita(visita, reporte)}
+                          >
+                            Exportar reporte
+                          </Button>
+                        ) : null}
+                      </div>
                       {loadingDetalle ? (
                         <p className="text-sm text-muted-foreground">Cargando detalle…</p>
                       ) : detalle && detalle.length > 0 ? (
@@ -575,6 +648,11 @@ export function VisitasCampoHistorialPanel({
                                       ? ` · ${fila.revisados ?? 0}/${fila.total} bienes`
                                       : ""}
                                   </p>
+                                  {reporte ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      {resumenNovedades(faltantes.length, bajas.length, cambios.length)}
+                                    </p>
+                                  ) : null}
                                 </div>
                                 <div className="text-right">
                                   <VisitaCampoEstadoBadge estado={fila.estado} />
@@ -681,6 +759,12 @@ function ReporteAmbienteLista({
               </p>
             ) : null}
             {item.motivo ? <p className="text-xs text-muted-foreground">{item.motivo}</p> : null}
+            {item.revisado_por_nombre || item.revisado_at ? (
+              <p className="text-xs text-muted-foreground">
+                {item.revisado_por_nombre ?? "Sin revisor"}
+                {item.revisado_at ? ` · ${formatFecha(item.revisado_at)}` : ""}
+              </p>
+            ) : null}
           </li>
         ))}
       </ul>
