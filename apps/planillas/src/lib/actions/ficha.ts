@@ -408,7 +408,7 @@ export async function confirmarContratoFirmado(
   const db = await planillasDb();
   const { data: contrato, error: loadError } = await db
     .from("contratos")
-    .select("id, estado, documento_id, solicitud_registro_id")
+    .select("id, version, estado, documento_id, solicitud_registro_id")
     .eq("id", contratoId)
     .eq("relacion_id", relacionId)
     .maybeSingle();
@@ -428,7 +428,25 @@ export async function confirmarContratoFirmado(
     return { error: "Suba el contrato firmado o enlace una solicitud de registro antes de guardar los datos." };
   }
 
-  await db.from("contratos").update({ es_vigente: false }).eq("relacion_id", relacionId);
+  const { data: hermanos, error: hermanosError } = await db
+    .from("contratos")
+    .select("id, version, datos_confirmados, estado")
+    .eq("relacion_id", relacionId);
+  if (hermanosError) return { error: hermanosError.message };
+  const versionActual = Number(contrato.version ?? 0);
+  const otrosFirmados = (hermanos ?? []).filter(
+    (otro) => otro.id !== contratoId && otro.datos_confirmados && otro.estado !== "BAJA",
+  );
+  const quedaVigente = !otrosFirmados.some((otro) => Number(otro.version ?? 0) > versionActual);
+  const esElPrimero = !otrosFirmados.some((otro) => Number(otro.version ?? 0) < versionActual);
+
+  if (quedaVigente) {
+    const { error: limpiarError } = await db
+      .from("contratos")
+      .update({ es_vigente: false })
+      .eq("relacion_id", relacionId);
+    if (limpiarError) return { error: limpiarError.message };
+  }
 
   const { error } = await db
     .from("contratos")
@@ -441,21 +459,28 @@ export async function confirmarContratoFirmado(
       remuneracion: snapshot.remuneracion,
       asignacion_familiar: montoAsignacionFamiliar(gate.trabajador.recibe_asignacion_familiar),
       datos_confirmados: true,
-      es_vigente: true,
+      es_vigente: quedaVigente,
     })
     .eq("id", contratoId)
     .eq("relacion_id", relacionId);
   if (error) return { error: error.message };
 
-  const { error: relError } = await db
-    .from("relaciones_laborales")
-    .update({
-      cargo: snapshot.cargo,
-      horario: snapshot.horario,
-      jornada: snapshot.jornada,
-    })
-    .eq("id", relacionId);
-  if (relError) return { error: relError.message };
+  const cambiosPuesto: {
+    cargo?: string;
+    horario?: string;
+    jornada?: JornadaLaboral;
+    fecha_ingreso?: string;
+  } = {};
+  if (quedaVigente) {
+    cambiosPuesto.cargo = snapshot.cargo;
+    cambiosPuesto.horario = snapshot.horario;
+    cambiosPuesto.jornada = snapshot.jornada;
+  }
+  if (esElPrimero) cambiosPuesto.fecha_ingreso = snapshot.fecha_inicio;
+  if (Object.keys(cambiosPuesto).length > 0) {
+    const { error: relError } = await db.from("relaciones_laborales").update(cambiosPuesto).eq("id", relacionId);
+    if (relError) return { error: relError.message };
+  }
 
   revalidatePath("/");
   revalidatePath("/pendientes");

@@ -260,7 +260,7 @@ export function FichaContratos({
         <form action={onGenerar}>
           <FormSection
             title="Generar contrato"
-            hint="Crea una versión nueva, aunque la anterior no tenga respaldo ni esté recogida. Estos datos van solo a este documento. Al confirmar el firmado se actualizan cargo, horario y jornada del puesto. No se toca la fecha de ingreso."
+            hint="Crea una versión nueva, aunque la anterior no tenga respaldo ni esté recogida. Estos datos van solo a este documento. Al confirmar, cargo, horario y jornada pasan al puesto solo si esta versión es la más reciente firmada. La fecha de inicio pasa a la fecha de ingreso solo si este es el primer contrato o solicitud firmado."
           >
             <DatosContratoFields
               key={`gen-${base?.id ?? "nuevo"}-${base?.horario ?? ""}`}
