@@ -535,6 +535,7 @@ export function ActivosAmbientePanel({
           puedeDarDeBaja={!isAdmin && !esAmbientePreregistro}
           puedeValidarPreregistro={!isAdmin && esAmbientePreregistro}
           puedeEliminarPreregistro={esAmbientePreregistro}
+          puedeMoverDesdeFaltante={!isAdmin && esAmbienteFaltante}
           gestionPreregistros={esAmbientePreregistro ? gestionPreregistrosConfig : undefined}
           onActivoEliminado={(id) => quitarActivos([id])}
           modoAdmin={isAdmin}

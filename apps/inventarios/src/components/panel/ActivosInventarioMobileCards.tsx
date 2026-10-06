@@ -27,6 +27,7 @@ interface ActivosInventarioMobileCardsProps {
   puedeDarDeBaja?: boolean;
   puedeValidarPreregistro?: boolean;
   puedeEliminarPreregistro?: boolean;
+  puedeMoverDesdeFaltante?: boolean;
   editarLabel?: string;
   mostrarEstadoRegistro?: boolean;
   mostrarUbicacion?: boolean;
@@ -89,6 +90,7 @@ export function ActivosInventarioMobileCards({
   puedeDarDeBaja = true,
   puedeValidarPreregistro = false,
   puedeEliminarPreregistro = false,
+  puedeMoverDesdeFaltante = false,
   editarLabel,
   mostrarEstadoRegistro = false,
   mostrarUbicacion = false,
@@ -258,6 +260,7 @@ export function ActivosInventarioMobileCards({
                 puedeDarDeBaja={puedeDarDeBaja}
                 puedeValidarPreregistro={puedeValidarPreregistro}
                 puedeEliminarPreregistro={puedeEliminarPreregistro}
+                puedeMoverDesdeFaltante={puedeMoverDesdeFaltante}
                 editarLabel={editarLabel}
                 modoAdmin={modoAdmin}
                 onActivoEliminado={onActivoEliminado}
