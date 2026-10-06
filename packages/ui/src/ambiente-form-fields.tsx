@@ -1,9 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Ambiente, Espacio, Responsable, SedeConConteo } from "@inventario/types";
-import { etiquetaNombreEspacio } from "@inventario/types";
+import type { Ambiente, Espacio, Responsable, SedeConConteo, TrabajadorPlanillaOpcion } from "@inventario/types";
+import { etiquetaNombreEspacio, normalizeResponsableDni, normalizeResponsableNombre } from "@inventario/types";
 import { Button, Input, Label, Select, Textarea } from "./components";
+
+const TRABAJADOR_RESPONSABLE_PREFIX = "trabajador:";
+
+function etiquetaResponsable(nombre: string, cargo?: string | null): string {
+  const cargoLimpio = cargo?.trim();
+  return cargoLimpio ? `${nombre} — ${cargoLimpio}` : nombre;
+}
+
+function clavesResponsable(responsable: Pick<Responsable, "nombre" | "dni">): string[] {
+  const claves = [`nombre:${normalizeResponsableNombre(responsable.nombre).toLowerCase()}`];
+  const dni = normalizeResponsableDni(responsable.dni ?? "");
+  if (dni) claves.push(`dni:${dni}`);
+  return claves;
+}
+
+function clavesTrabajador(trabajador: TrabajadorPlanillaOpcion): string[] {
+  const claves = [`nombre:${normalizeResponsableNombre(trabajador.nombre).toLowerCase()}`];
+  const dni = normalizeResponsableDni(trabajador.dni);
+  if (dni) claves.unshift(`dni:${dni}`);
+  return claves;
+}
 
 export type AmbienteFormAmbiente = Pick<
   Ambiente,
@@ -43,6 +64,8 @@ export function AmbienteFormFields({
   showSedeSelect,
   responsableId,
   onResponsableIdChange,
+  trabajadores,
+  onElegirTrabajador,
   onRequestCreateResponsable,
   espacioId,
   onEspacioIdChange,
@@ -58,6 +81,9 @@ export function AmbienteFormFields({
   showSedeSelect?: boolean;
   responsableId: string;
   onResponsableIdChange: (id: string) => void;
+  /** Personas que aún no están en responsables y se pueden elegir en el mismo selector. */
+  trabajadores?: TrabajadorPlanillaOpcion[] | null;
+  onElegirTrabajador?: (relacionId: string) => Promise<{ id?: string; error?: string }>;
   onRequestCreateResponsable?: () => void;
   espacioId: string;
   onEspacioIdChange: (id: string) => void;
@@ -90,6 +116,48 @@ export function AmbienteFormFields({
   );
 
   const puedeElegirResponsable = Boolean(ambiente) || nombre.trim().length > 0;
+  const [asignandoResponsable, setAsignandoResponsable] = useState(false);
+  const [errorResponsable, setErrorResponsable] = useState<string | null>(null);
+
+  const opcionesResponsable = useMemo(() => {
+    const personas = activos.map((responsable) => ({
+      value: responsable.id,
+      label: etiquetaResponsable(responsable.nombre, responsable.cargo),
+    }));
+    const yaRegistrados = new Set(activos.flatMap((responsable) => clavesResponsable(responsable)));
+    for (const trabajador of trabajadores ?? []) {
+      const claves = clavesTrabajador(trabajador);
+      if (claves.some((clave) => yaRegistrados.has(clave))) continue;
+      personas.push({
+        value: `${TRABAJADOR_RESPONSABLE_PREFIX}${trabajador.relacionId}`,
+        label: etiquetaResponsable(trabajador.nombre, trabajador.cargo),
+      });
+    }
+    personas.sort((a, b) => a.label.localeCompare(b.label, "es"));
+    return [{ value: "", label: "Sin responsable asignado" }, ...personas];
+  }, [activos, trabajadores]);
+
+  async function handleResponsableChange(value: string) {
+    if (!value.startsWith(TRABAJADOR_RESPONSABLE_PREFIX)) {
+      setErrorResponsable(null);
+      onResponsableIdChange(value);
+      return;
+    }
+    if (!onElegirTrabajador) return;
+    const relacionId = value.slice(TRABAJADOR_RESPONSABLE_PREFIX.length);
+    setAsignandoResponsable(true);
+    setErrorResponsable(null);
+    try {
+      const result = await onElegirTrabajador(relacionId);
+      if (result.error || !result.id) {
+        setErrorResponsable(result.error ?? "No se pudo asignar el responsable.");
+        return;
+      }
+      onResponsableIdChange(result.id);
+    } finally {
+      setAsignandoResponsable(false);
+    }
+  }
 
   return (
     <>
@@ -201,16 +269,11 @@ export function AmbienteFormFields({
           id="amb_responsable_id"
           name="responsable_id"
           value={responsableId}
-          onChange={onResponsableIdChange}
-          disabled={!puedeElegirResponsable}
-          options={[
-            { value: "", label: "Sin responsable asignado" },
-            ...activos.map((r) => ({
-              value: r.id,
-              label: `${r.nombre}${r.cargo ? ` — ${r.cargo}` : ""}`,
-            })),
-          ]}
+          onChange={(value) => void handleResponsableChange(value)}
+          disabled={!puedeElegirResponsable || asignandoResponsable}
+          options={opcionesResponsable}
         />
+        {errorResponsable && <p className="text-sm text-destructive">{errorResponsable}</p>}
         {!puedeElegirResponsable && (
           <p className="text-xs text-muted-foreground">
             Escriba primero el nombre del ambiente para asignar un responsable.
@@ -221,7 +284,10 @@ export function AmbienteFormFields({
             Registre responsables en la pestaña «Responsables» antes de asignarlos.
           </p>
         )}
-        {puedeElegirResponsable && activos.length === 0 && onRequestCreateResponsable && (
+        {puedeElegirResponsable &&
+          activos.length === 0 &&
+          (trabajadores?.length ?? 0) === 0 &&
+          onRequestCreateResponsable && (
           <p className="text-xs text-muted-foreground">
             No hay responsables registrados. Use «+ Nuevo responsable» para crear uno.
           </p>

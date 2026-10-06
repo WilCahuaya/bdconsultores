@@ -214,6 +214,52 @@ export function etiquetaNombreEspacio(nombre: string, descripcion?: string | nul
   return desc ? `${nombre} — ${desc}` : nombre;
 }
 
+/** Número de «Espacio 01», «Espacio 01 — local», etc. Null si no hay espacio numerado. */
+export function numeroEspacioDesdeEtiqueta(etiqueta: string | null | undefined): number | null {
+  if (!etiqueta) return null;
+  const match = etiqueta.trim().match(/^espacio\s*0*(\d+)/i);
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Preregistro y faltante primero; luego sucursal; dentro, espacio de menor a mayor. Sin espacio, al final. */
+export function compareAmbientesPorEspacio(
+  a: {
+    nombre: string;
+    es_preregistro?: boolean;
+    es_faltante?: boolean;
+    sede_es_principal?: boolean;
+    sede_nombre?: string;
+    espacio_nombre?: string | null;
+  },
+  b: {
+    nombre: string;
+    es_preregistro?: boolean;
+    es_faltante?: boolean;
+    sede_es_principal?: boolean;
+    sede_nombre?: string;
+    espacio_nombre?: string | null;
+  },
+): number {
+  if (Boolean(a.es_preregistro) !== Boolean(b.es_preregistro)) return a.es_preregistro ? -1 : 1;
+  if (Boolean(a.es_faltante) !== Boolean(b.es_faltante)) return a.es_faltante ? -1 : 1;
+  if (Boolean(a.sede_es_principal) !== Boolean(b.sede_es_principal)) {
+    return a.sede_es_principal ? -1 : 1;
+  }
+  const sedeA = a.sede_nombre ?? "";
+  const sedeB = b.sede_nombre ?? "";
+  if (sedeA !== sedeB) return sedeA.localeCompare(sedeB, "es");
+
+  const espacioA = numeroEspacioDesdeEtiqueta(a.espacio_nombre);
+  const espacioB = numeroEspacioDesdeEtiqueta(b.espacio_nombre);
+  if (espacioA == null && espacioB == null) return a.nombre.localeCompare(b.nombre, "es");
+  if (espacioA == null) return 1;
+  if (espacioB == null) return -1;
+  if (espacioA !== espacioB) return espacioA - espacioB;
+  return a.nombre.localeCompare(b.nombre, "es");
+}
+
 export function resumenOcupacionEspacio(
   ambientes: Array<{ id: string; nombre: string; activo?: boolean }> | null | undefined,
 ): Pick<EspacioConOcupacion, "ocupantes" | "ambiente_id" | "ambiente_nombre"> {

@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Activo, CreateResponsableInput, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
-import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
+import { compareAmbientesPorEspacio, entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
 import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
 import {
   DeleteIcon,
@@ -427,6 +427,23 @@ export function AmbientesPanel({
     return { error: result.error };
   }
 
+  async function elegirTrabajadorComoResponsable(relacionId: string) {
+    const trabajador = trabajadoresPlanilla?.find((item) => item.relacionId === relacionId);
+    if (!trabajador) return { error: "No se encontró el responsable." };
+    const result = await createResponsableDesdeAmbiente({
+      nombre: trabajador.nombre,
+      dni: trabajador.dni,
+      email: trabajador.email ?? "",
+      telefono: trabajador.telefono ?? "",
+      cargo: trabajador.cargo ?? undefined,
+      desdePlanilla: true,
+    });
+    if (result.error || !result.data) {
+      return { error: result.error ?? "No se pudo asignar el responsable." };
+    }
+    return { id: result.data.id };
+  }
+
   const ambientesBase = useMemo(() => {
     if (!sedeActivaId) return ambientes;
     return ambientes.filter((a) => a.sede_id === sedeActivaId);
@@ -499,13 +516,7 @@ export function AmbientesPanel({
         responsableNombreById(input.responsableId) ??
         null,
     };
-    setAmbientes((prev) =>
-      [...prev, nuevo].sort((a, b) => {
-        if (a.sede_es_principal !== b.sede_es_principal) return a.sede_es_principal ? -1 : 1;
-        if (a.sede_nombre !== b.sede_nombre) return a.sede_nombre.localeCompare(b.sede_nombre);
-        return a.nombre.localeCompare(b.nombre);
-      }),
-    );
+    setAmbientes((prev) => [...prev, nuevo].sort(compareAmbientesPorEspacio));
     setSedes((prev) =>
       prev.map((s) =>
         s.id === input.sedeId ? { ...s, ambiente_count: s.ambiente_count + 1 } : s,
@@ -1003,6 +1014,8 @@ export function AmbientesPanel({
             showSedeSelect={entidadMultiplesSedes}
             responsableId={createResponsableId}
             onResponsableIdChange={setCreateResponsableId}
+            trabajadores={trabajadoresPlanilla}
+            onElegirTrabajador={elegirTrabajadorComoResponsable}
             onRequestCreateResponsable={() => setCreateResponsableOpen(true)}
             espacioId={createEspacioId}
             onEspacioIdChange={setCreateEspacioId}
@@ -1027,8 +1040,6 @@ export function AmbientesPanel({
         open={createOpen && createResponsableOpen}
         onClose={() => setCreateResponsableOpen(false)}
         onCreate={createResponsableDesdeAmbiente}
-        trabajadoresPlanilla={trabajadoresPlanilla}
-        cargandoPlanilla={cargandoPlanilla}
         onCreated={(nuevo) => {
           setCreateResponsableId(nuevo.id);
           setCreateResponsableOpen(false);
@@ -1050,6 +1061,8 @@ export function AmbientesPanel({
               espacios={espacios}
               responsableId={editResponsableId}
               onResponsableIdChange={setEditResponsableId}
+              trabajadores={trabajadoresPlanilla}
+              onElegirTrabajador={elegirTrabajadorComoResponsable}
               onRequestCreateResponsable={() => setEditResponsableOpen(true)}
               espacioId={editEspacioId}
               onEspacioIdChange={setEditEspacioId}
@@ -1076,8 +1089,6 @@ export function AmbientesPanel({
         open={Boolean(editAmbiente) && editResponsableOpen}
         onClose={() => setEditResponsableOpen(false)}
         onCreate={createResponsableDesdeAmbiente}
-        trabajadoresPlanilla={trabajadoresPlanilla}
-        cargandoPlanilla={cargandoPlanilla}
         onCreated={(nuevo) => {
           setEditResponsableId(nuevo.id);
           setEditResponsableOpen(false);
