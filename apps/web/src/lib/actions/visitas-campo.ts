@@ -8,7 +8,7 @@ import type {
   VisitaCampoHistorial,
 } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, requireProfile } from "@/lib/auth/profile";
+import { getProfile, requirePersonalEstudio, requireProfile } from "@/lib/auth/profile";
 import type { AmbienteConSede } from "./ubicacion";
 
 function revalidateEntidadVisita(entidadId: string) {
@@ -485,9 +485,9 @@ export async function resolverBienFaltante(input: {
   motivo?: string | null;
 }) {
   try {
-    await requireProfile("CONTADOR");
+    await requirePersonalEstudio();
   } catch {
-    return { error: "No autorizado." };
+    return { error: "Solo el contador o el asistente puede mover un bien de Faltantes." };
   }
 
   const supabase = await createClient();

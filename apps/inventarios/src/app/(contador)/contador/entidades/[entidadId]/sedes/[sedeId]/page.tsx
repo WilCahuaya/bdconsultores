@@ -8,7 +8,7 @@ import {
   getVisitasCampoActivas,
   listVisitasCampoHistorial,
 } from "@/lib/actions/visitas-campo";
-import { requireProfile } from "@/lib/auth/profile";
+import { requirePersonalEstudio } from "@/lib/auth/profile";
 
 export default async function SedeAmbientesPage({
   params,
@@ -16,7 +16,7 @@ export default async function SedeAmbientesPage({
   params: Promise<{ entidadId: string; sedeId: string }>;
 }) {
   try {
-    await requireProfile("CONTADOR");
+    await requirePersonalEstudio();
   } catch {
     redirect("/login");
   }

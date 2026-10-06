@@ -10,7 +10,7 @@ import type {
   VisitaCampoReporteItem,
 } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, requireProfile } from "@/lib/auth/profile";
+import { getProfile, requirePersonalEstudio, requireProfile } from "@/lib/auth/profile";
 import type { AmbienteConSede } from "./ubicacion";
 
 function revalidateEntidadVisita(entidadId: string) {
@@ -487,9 +487,9 @@ export async function resolverBienFaltante(input: {
   motivo?: string | null;
 }) {
   try {
-    await requireProfile("CONTADOR");
+    await requirePersonalEstudio();
   } catch {
-    return { error: "No autorizado." };
+    return { error: "Solo el contador o el asistente puede mover un bien de Faltantes." };
   }
 
   const supabase = await createClient();
@@ -612,7 +612,7 @@ export async function getVisitaCampoReporte(
   const { data: filas, error } = await supabase
     .from("visita_revisiones")
     .select(
-      "id, activo_id, hallado, accion, codigo_barras, nombre, ambiente_nombre, sede_nombre, estado_bien_anterior, estado_bien_nuevo, motivo, revisado_por_nombre, created_at, activos(codigo_barras, nombre)",
+      "id, activo_id, ambiente_id, hallado, accion, codigo_barras, nombre, ambiente_nombre, sede_nombre, estado_bien_anterior, estado_bien_nuevo, motivo, revisado_por_nombre, created_at, activos(codigo_barras, nombre)",
     )
     .eq("visita_id", visitaId)
     .order("created_at");
@@ -629,6 +629,7 @@ export async function getVisitaCampoReporte(
     const estadoNuevo = (fila.estado_bien_nuevo as VisitaCampoReporteItem["estado_nuevo"]) ?? null;
     return {
       id: fila.id as string,
+      ambiente_id: fila.ambiente_id as string,
       codigo_barras: (fila.codigo_barras as string | null) ?? activo?.codigo_barras ?? null,
       nombre: (fila.nombre as string | null) ?? activo?.nombre ?? "Bien",
       ambiente_nombre: (fila.ambiente_nombre as string | null) ?? "—",
@@ -659,7 +660,9 @@ export async function getVisitaCampoReporte(
       hallados: items.filter((item) => item.hallado).sort(porNombre),
       faltantes: items.filter((item) => item.accion === "FALTANTE").sort(porNombre),
       bajas: items.filter((item) => item.accion === "BAJA").sort(porNombre),
-      cambios_estado: items.filter(cambioEstado).sort(porNombre),
+      cambios_estado: items
+        .filter((item) => item.accion == null && cambioEstado(item))
+        .sort(porNombre),
     },
   };
 }

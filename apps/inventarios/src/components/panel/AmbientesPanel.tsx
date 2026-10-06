@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Activo, CreateResponsableInput, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
+import type { Activo, CreateResponsableInput, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial, VisitaCampoReporte } from "@inventario/types";
 import { compareAmbientesPorEspacio, entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
 import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
 import {
@@ -54,8 +54,9 @@ import {
   abrirVisitaCampo,
   attachVisitaEstadoToAmbientes,
   cerrarVisitaCampo,
-  getVisitasCampoActivas,
   getVisitaCampoDetalle,
+  getVisitaCampoReporte,
+  getVisitasCampoActivas,
   listVisitasCampoHistorial,
 } from "@/lib/actions/visitas-campo";
 import {
@@ -67,7 +68,6 @@ import {
 } from "@/lib/actions/responsables";
 import { useTrabajadoresPlanilla } from "./use-trabajadores-planilla";
 import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
-import { VisitaCampoReporteDialog } from "./VisitaCampoReporteDialog";
 import { AmbientesImportDialog } from "./AmbientesImportDialog";
 import { InventarioImportDialog } from "./InventarioImportDialog";
 import {
@@ -264,7 +264,7 @@ export function AmbientesPanel({
   const [cerrarPendingId, setCerrarPendingId] = useState<string | null>(null);
   const [visitaError, setVisitaError] = useState<string | null>(null);
   const [detalleVisita, setDetalleVisita] = useState<VisitaCampoHistorial | null>(null);
-  const [reporteVisita, setReporteVisita] = useState<VisitaCampoHistorial | null>(null);
+  const [detalleReporte, setDetalleReporte] = useState<VisitaCampoReporte | null>(null);
   const [detalleAmbientes, setDetalleAmbientes] = useState<Awaited<ReturnType<typeof getVisitaCampoDetalle>> | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [abrirVisitaOpen, setAbrirVisitaOpen] = useState(false);
@@ -398,8 +398,15 @@ export function AmbientesPanel({
     setDetalleVisita(visita);
     setDetalleLoading(true);
     setDetalleAmbientes(null);
-    const detalle = await getVisitaCampoDetalle(visita.id);
+    setDetalleReporte(null);
+    const [detalle, reporte] = await Promise.all([
+      getVisitaCampoDetalle(visita.id),
+      getVisitaCampoReporte(visita.id),
+    ]);
     setDetalleAmbientes(detalle);
+    setDetalleReporte(
+      reporte.data ?? { hallados: [], faltantes: [], bajas: [], cambios_estado: [] },
+    );
     setDetalleLoading(false);
   }
 
@@ -675,13 +682,13 @@ export function AmbientesPanel({
           onCerrarDetalle={() => {
             setDetalleVisita(null);
             setDetalleAmbientes(null);
+            setDetalleReporte(null);
           }}
           visitasAbiertas={visitasActivas}
           onTerminar={puedeGestionarVisita ? handleCerrarVisita : undefined}
           terminarPendingId={cerrarPendingId}
-          onVerReporte={setReporteVisita}
+          reporte={detalleReporte ?? undefined}
         />
-        <VisitaCampoReporteDialog visita={reporteVisita} onClose={() => setReporteVisita(null)} />
         </>
       ) : !sedeFocus && tab === "responsables" ? (
         <ResponsablesPanel

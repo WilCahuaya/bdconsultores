@@ -10,7 +10,7 @@ import {
   listVisitasCampoHistorial,
 } from "@/lib/actions/visitas-campo";
 import { listResponsables } from "@/lib/actions/responsables";
-import { requireProfile } from "@/lib/auth/profile";
+import { requirePersonalEstudio } from "@/lib/auth/profile";
 
 export default async function EntidadAmbientesPage({
   params,
@@ -20,7 +20,7 @@ export default async function EntidadAmbientesPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   try {
-    await requireProfile("CONTADOR");
+    await requirePersonalEstudio();
   } catch {
     redirect("/login");
   }

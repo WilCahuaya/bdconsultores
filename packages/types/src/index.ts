@@ -115,6 +115,7 @@ export interface VisitaCampoAmbienteDetalle {
 /** Línea congelada de una revisión de visita de campo. */
 export interface VisitaCampoReporteItem {
   id: string;
+  ambiente_id: string;
   codigo_barras: string | null;
   nombre: string;
   ambiente_nombre: string;

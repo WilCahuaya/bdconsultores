@@ -4,7 +4,7 @@ import { listActivosPorAmbiente } from "@/lib/actions/activos";
 import { resolveFichaAsignacionExportMeta } from "@/lib/actions/ficha-asignacion-meta";
 import { getEntidad } from "@/lib/actions/entidades";
 import { getAmbiente } from "@/lib/actions/ubicacion";
-import { requireProfile } from "@/lib/auth/profile";
+import { requirePersonalEstudio } from "@/lib/auth/profile";
 
 export default async function AmbienteActivosPage({
   params,
@@ -13,7 +13,7 @@ export default async function AmbienteActivosPage({
 }) {
   let profile;
   try {
-    profile = await requireProfile("CONTADOR");
+    profile = await requirePersonalEstudio();
   } catch {
     redirect("/login");
   }
