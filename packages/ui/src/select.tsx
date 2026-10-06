@@ -178,7 +178,7 @@ export function Select({
           maxWidth: menuRect.maxWidth,
           maxHeight: menuRect.maxHeight,
           width: "max-content",
-          zIndex: 300,
+          zIndex: 400,
         }}
       >
         {options.map((option, index) => {

@@ -5,6 +5,7 @@ import type {
   CreateResponsableInput,
   Responsable,
   ResponsableConConteo,
+  TrabajadorPlanillaOpcion,
   UpdateResponsableInput,
 } from "@inventario/types";
 import {
@@ -12,6 +13,8 @@ import {
   normalizeResponsableNombre,
   RESPONSABLE_CARGO_DEFAULT,
   validarCreateResponsableInput,
+  validarResponsableEmail,
+  validarResponsableTelefono,
 } from "@inventario/types";
 import { syncAdminResponsableForEntidad } from "@/lib/responsables-admin-sync";
 import { createClient } from "@/lib/supabase/server";
@@ -101,40 +104,173 @@ export async function listResponsables(entidadId: string): Promise<ResponsableCo
   });
 }
 
+type PersonaPlanillaEmbed = {
+  dni: string;
+  nombres: string;
+  apellido_paterno: string | null;
+  apellido_materno: string | null;
+  celular: string | null;
+  correo: string | null;
+};
+
+function nombrePersonaPlanilla(persona: PersonaPlanillaEmbed): string {
+  return [persona.nombres, persona.apellido_paterno, persona.apellido_materno]
+    .map((parte) => parte?.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+function personaEmbed(
+  personas: PersonaPlanillaEmbed | PersonaPlanillaEmbed[] | null,
+): PersonaPlanillaEmbed | null {
+  if (!personas) return null;
+  return Array.isArray(personas) ? (personas[0] ?? null) : personas;
+}
+
+/** Trabajadores con relación activa, para elegirlos como responsable de inventario. */
+export async function listTrabajadoresActivosPlanilla(
+  entidadId: string,
+): Promise<TrabajadorPlanillaOpcion[]> {
+  const profile = await getProfile();
+  if (!profile) return [];
+  if (profile.rol === "ADMIN_ENTIDAD" && profile.entidad_id !== entidadId) return [];
+
+  const supabase = await createClient();
+  const { data: entidad } = await supabase
+    .from("entidades")
+    .select("usa_planillas")
+    .eq("id", entidadId)
+    .maybeSingle();
+  if (!entidad || entidad.usa_planillas === false) return [];
+
+  const { data, error } = await supabase
+    .schema("planillas")
+    .from("relaciones_laborales")
+    .select(
+      "id, cargo, personas!inner(dni, nombres, apellido_paterno, apellido_materno, celular, correo)",
+    )
+    .eq("entidad_id", entidadId)
+    .eq("estado", "ACTIVA")
+    .is("fecha_cese", null);
+
+  if (error || !data) return [];
+
+  const opciones: TrabajadorPlanillaOpcion[] = [];
+  for (const row of data) {
+    const persona = personaEmbed(
+      row.personas as PersonaPlanillaEmbed | PersonaPlanillaEmbed[] | null,
+    );
+    if (!persona) continue;
+    const nombre = normalizeResponsableNombre(nombrePersonaPlanilla(persona));
+    if (!nombre) continue;
+    opciones.push({
+      relacionId: row.id as string,
+      nombre,
+      dni: normalizeResponsableDni(persona.dni ?? ""),
+      email: persona.correo?.trim() || null,
+      telefono: persona.celular?.trim() || null,
+      cargo: typeof row.cargo === "string" && row.cargo.trim() ? row.cargo.trim() : null,
+    });
+  }
+
+  opciones.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  return opciones;
+}
+
 export async function createResponsable(
   entidadId: string,
   input: CreateResponsableInput,
-): Promise<{ data?: Responsable; error?: string }> {
+): Promise<{ data?: Responsable; error?: string; reused?: boolean }> {
   try {
     await assertCanManageEntidad(entidadId);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "No autorizado." };
   }
 
-  const validationError = validarCreateResponsableInput(input);
+  const desdePlanilla = Boolean(input.desdePlanilla);
+  const contacto: CreateResponsableInput = desdePlanilla
+    ? {
+        ...input,
+        email: validarResponsableEmail(input.email) ? "" : input.email,
+        telefono: validarResponsableTelefono(input.telefono) ? "" : input.telefono,
+      }
+    : input;
+
+  const validationError = validarCreateResponsableInput(contacto);
   if (validationError) return { error: validationError };
 
   const supabase = await createClient();
-  const nombre = normalizeResponsableNombre(input.nombre);
+  const nombre = normalizeResponsableNombre(contacto.nombre);
+  const dni = normalizeResponsableDni(contacto.dni) || null;
   const trimOrNull = (v?: string) => {
     const t = v?.trim();
     return t ? t : null;
   };
+
+  if (desdePlanilla && dni) {
+    const { data: existing } = await supabase
+      .from("responsables")
+      .select("*")
+      .eq("entidad_id", entidadId)
+      .eq("dni", dni)
+      .maybeSingle();
+
+    if (existing) {
+      if (existing.activo) {
+        return { data: existing as Responsable, reused: true };
+      }
+      const { data: reactivado, error: actError } = await supabase
+        .from("responsables")
+        .update({ activo: true })
+        .eq("id", existing.id)
+        .select()
+        .single();
+      if (actError) return { error: actError.message };
+      revalidateEntidadResponsables(entidadId);
+      return { data: reactivado as Responsable, reused: true };
+    }
+  }
+
+  const cargo = desdePlanilla
+    ? contacto.cargo?.trim() || RESPONSABLE_CARGO_DEFAULT
+    : RESPONSABLE_CARGO_DEFAULT;
 
   const { data, error } = await supabase
     .from("responsables")
     .insert({
       entidad_id: entidadId,
       nombre,
-      dni: normalizeResponsableDni(input.dni) || null,
-      email: trimOrNull(input.email),
-      telefono: trimOrNull(input.telefono),
-      cargo: RESPONSABLE_CARGO_DEFAULT,
+      dni,
+      email: trimOrNull(contacto.email),
+      telefono: trimOrNull(contacto.telefono),
+      cargo,
     })
     .select()
     .single();
 
   if (error) {
+    if (error.code === "23505" && desdePlanilla) {
+      const { data: mismoNombre } = await supabase
+        .from("responsables")
+        .select("*")
+        .eq("entidad_id", entidadId)
+        .ilike("nombre", nombre)
+        .maybeSingle();
+      if (mismoNombre) {
+        if (!mismoNombre.activo) {
+          const { data: reactivado, error: actError } = await supabase
+            .from("responsables")
+            .update({ activo: true })
+            .eq("id", mismoNombre.id)
+            .select()
+            .single();
+          if (actError) return { error: actError.message };
+          revalidateEntidadResponsables(entidadId);
+          return { data: reactivado as Responsable, reused: true };
+        }
+        return { data: mismoNombre as Responsable, reused: true };
+      }
+    }
     if (error.code === "23505") {
       if (error.message.includes("dni") || error.message.includes("idx_responsables_entidad_dni")) {
         return { error: "Ya existe un responsable con ese DNI en esta entidad." };

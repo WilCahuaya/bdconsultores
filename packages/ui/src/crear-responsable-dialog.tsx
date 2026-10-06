@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
-import type { CreateResponsableInput, Responsable } from "@inventario/types";
-import { Button, Dialog } from "./components";
-import { ResponsableFormFields, responsableFromForm } from "./responsable-form-fields";
+import { useEffect, useState } from "react";
+import type { CreateResponsableInput, Responsable, TrabajadorPlanillaOpcion } from "@inventario/types";
+import { Dialog } from "./components";
+import { ResponsableAltaForm } from "./responsable-alta-form";
 
 export interface CrearResponsableDialogProps {
   open: boolean;
@@ -13,6 +13,9 @@ export interface CrearResponsableDialogProps {
   ) => Promise<{ data?: Responsable; error?: string }>;
   onCreated?: (responsable: Responsable) => void;
   title?: string;
+  /** Si la empresa usa Planillas, trabajadores activos para copiarlos como responsable. */
+  trabajadoresPlanilla?: TrabajadorPlanillaOpcion[] | null;
+  cargandoPlanilla?: boolean;
 }
 
 export function CrearResponsableDialog({
@@ -21,10 +24,15 @@ export function CrearResponsableDialog({
   onCreate,
   onCreated,
   title = "Nuevo responsable",
+  trabajadoresPlanilla = null,
+  cargandoPlanilla = false,
 }: CrearResponsableDialogProps) {
-  const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) setError(null);
+  }, [open]);
 
   function handleClose() {
     if (pending) return;
@@ -32,12 +40,11 @@ export function CrearResponsableDialog({
     onClose();
   }
 
-  async function handleSave() {
-    if (!formRef.current) return;
+  async function handleSave(input: CreateResponsableInput) {
     setPending(true);
     setError(null);
     try {
-      const result = await onCreate(responsableFromForm(new FormData(formRef.current)));
+      const result = await onCreate(input);
       if (result.error) {
         setError(result.error);
         return;
@@ -52,29 +59,15 @@ export function CrearResponsableDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} title={title} className="max-w-lg">
-      <form
-        ref={formRef}
-        className="grid gap-3 sm:grid-cols-2"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void handleSave();
-        }}
-      >
-        <div className="sm:col-span-2">
-          <ResponsableFormFields idPrefix="crear_resp" />
-        </div>
-        {error && (
-          <p className="text-sm text-destructive sm:col-span-2">{error}</p>
-        )}
-        <div className="flex justify-end gap-2 sm:col-span-2">
-          <Button type="button" variant="outline" onClick={handleClose} disabled={pending}>
-            Cancelar
-          </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={pending}>
-            {pending ? "Guardando…" : "Guardar responsable"}
-          </Button>
-        </div>
-      </form>
+      <ResponsableAltaForm
+        idPrefix="crear_resp"
+        trabajadoresPlanilla={trabajadoresPlanilla}
+        cargandoPlanilla={cargandoPlanilla}
+        pending={pending}
+        error={error}
+        onCancel={handleClose}
+        onSubmit={(input) => void handleSave(input)}
+      />
     </Dialog>
   );
 }

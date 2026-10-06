@@ -65,6 +65,7 @@ import {
   setResponsableActivo,
   updateResponsable,
 } from "@/lib/actions/responsables";
+import { useTrabajadoresPlanilla } from "./use-trabajadores-planilla";
 import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
 import { AmbientesImportDialog } from "./AmbientesImportDialog";
 import { InventarioImportDialog } from "./InventarioImportDialog";
@@ -196,6 +197,8 @@ export function AmbientesPanel({
   panelMode = "contador",
 }: AmbientesPanelProps) {
   const isAdmin = panelMode === "admin";
+  const { trabajadores: trabajadoresPlanilla, cargando: cargandoPlanilla } =
+    useTrabajadoresPlanilla(entidad);
   const entidadHref = isAdmin ? "/admin/activos" : `/contador/entidades/${entidad.id}`;
   const sedeHref = (sedeId: string) =>
     isAdmin
@@ -407,7 +410,18 @@ export function AmbientesPanel({
     const result = await createResponsable(entidad.id, input);
     if (result.data) {
       const nuevo: ResponsableConConteo = { ...result.data, ambiente_count: 0 };
-      setResponsables((prev) => [...prev, nuevo]);
+      setResponsables((prev) => {
+        const idx = prev.findIndex((r) => r.id === nuevo.id);
+        if (idx < 0) return [...prev, nuevo];
+        const next = [...prev];
+        next[idx] = {
+          ...prev[idx],
+          ...nuevo,
+          ambiente_count: prev[idx].ambiente_count,
+          ambiente_nombres: prev[idx].ambiente_nombres,
+        };
+        return next;
+      });
       return { data: nuevo };
     }
     return { error: result.error };
@@ -661,10 +675,13 @@ export function AmbientesPanel({
               await syncAmbientesYResponsables();
               return {
                 data: { ...result.data, ambiente_count: 0 },
+                reused: result.reused,
               };
             }
             return { error: result.error };
           }}
+          trabajadoresPlanilla={trabajadoresPlanilla}
+          cargandoPlanilla={cargandoPlanilla}
           onUpdate={async (id, input) => {
             const result = await updateResponsable(id, input);
             if (!result.error) await syncAmbientesYResponsables();
@@ -1010,6 +1027,8 @@ export function AmbientesPanel({
         open={createOpen && createResponsableOpen}
         onClose={() => setCreateResponsableOpen(false)}
         onCreate={createResponsableDesdeAmbiente}
+        trabajadoresPlanilla={trabajadoresPlanilla}
+        cargandoPlanilla={cargandoPlanilla}
         onCreated={(nuevo) => {
           setCreateResponsableId(nuevo.id);
           setCreateResponsableOpen(false);
@@ -1057,6 +1076,8 @@ export function AmbientesPanel({
         open={Boolean(editAmbiente) && editResponsableOpen}
         onClose={() => setEditResponsableOpen(false)}
         onCreate={createResponsableDesdeAmbiente}
+        trabajadoresPlanilla={trabajadoresPlanilla}
+        cargandoPlanilla={cargandoPlanilla}
         onCreated={(nuevo) => {
           setEditResponsableId(nuevo.id);
           setEditResponsableOpen(false);

@@ -267,13 +267,28 @@ export interface ResponsableConConteo extends Responsable {
   es_administrador?: boolean;
 }
 
+/** Trabajador activo de Planillas, para copiarlo como responsable de inventario. */
+export interface TrabajadorPlanillaOpcion {
+  relacionId: string;
+  nombre: string;
+  dni: string;
+  email: string | null;
+  telefono: string | null;
+  cargo: string | null;
+}
+
 export interface CreateResponsableInput {
   nombre: string;
   dni: string;
   email?: string;
   telefono?: string;
-  /** @deprecated El cargo se asigna automáticamente al crear. */
+  /**
+   * Cargo del trabajador en Planillas. Solo se guarda si `desdePlanilla` es verdadero.
+   * En un alta manual el cargo queda en «Responsable».
+   */
   cargo?: string;
+  /** Copia los datos de un trabajador activo. Si el DNI ya existe, se reutiliza ese responsable. */
+  desdePlanilla?: boolean;
 }
 
 /** Cargo por defecto al registrar un responsable (no editable en el formulario). */

@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import type {
   CreateResponsableInput,
   ResponsableConConteo,
+  TrabajadorPlanillaOpcion,
   UpdateResponsableInput,
 } from "@inventario/types";
 import { Button, Dialog } from "./components";
 import { ConfirmDialog } from "./confirm-dialog";
+import { ResponsableAltaForm } from "./responsable-alta-form";
 import { ResponsableFormFields, responsableFromForm } from "./responsable-form-fields";
 import {
   ActivateIcon,
@@ -43,7 +45,7 @@ export interface ResponsablesPanelProps {
   responsables: ResponsableConConteo[];
   onCreate: (
     input: CreateResponsableInput,
-  ) => Promise<{ data?: ResponsableConConteo; error?: string }>;
+  ) => Promise<{ data?: ResponsableConConteo; error?: string; reused?: boolean }>;
   onUpdate: (
     id: string,
     input: UpdateResponsableInput,
@@ -51,6 +53,9 @@ export interface ResponsablesPanelProps {
   onSetActivo: (id: string, activo: boolean) => Promise<{ error?: string }>;
   onDelete?: (id: string) => Promise<{ error?: string }>;
   onReload?: () => void | Promise<void>;
+  /** Si la empresa usa Planillas, trabajadores activos para copiarlos como responsable. */
+  trabajadoresPlanilla?: TrabajadorPlanillaOpcion[] | null;
+  cargandoPlanilla?: boolean;
 }
 
 function formatOptional(value: string | null | undefined): string {
@@ -76,6 +81,8 @@ export function ResponsablesPanel({
   onSetActivo,
   onDelete,
   onReload,
+  trabajadoresPlanilla = null,
+  cargandoPlanilla = false,
 }: ResponsablesPanelProps) {
   const [busqueda, setBusqueda] = useState("");
   const [ocultarInactivos, setOcultarInactivos] = useState(true);
@@ -102,18 +109,22 @@ export function ResponsablesPanel({
     );
   }, [responsables, busqueda, ocultarInactivos]);
 
-  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function handleCreate(input: CreateResponsableInput) {
     setPending(true);
     setError(null);
     setMessage(null);
     try {
-      const result = await onCreate(responsableFromForm(new FormData(e.currentTarget)));
+      const result = await onCreate(input);
       if (result.error) {
         setError(result.error);
         return;
       }
-      setMessage(`Responsable «${result.data?.nombre}» registrado.`);
+      const nombre = result.data?.nombre ?? input.nombre;
+      setMessage(
+        result.reused
+          ? `«${nombre}» ya estaba como responsable. Se usará ese registro.`
+          : `Responsable «${nombre}» registrado.`,
+      );
       setCreateOpen(false);
       void onReload?.();
     } finally {
@@ -233,7 +244,14 @@ export function ResponsablesPanel({
             >
               {ocultarInactivos ? "Mostrar inactivos" : "Ocultar inactivos"}
             </Button>
-            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setCreateOpen(true);
+              }}
+            >
               + Agregar responsable
             </Button>
           </div>
@@ -241,7 +259,7 @@ export function ResponsablesPanel({
       />
 
       {message && <PanelFlashMessage variant="success">{message}</PanelFlashMessage>}
-      {error && <PanelFlashMessage variant="error">{error}</PanelFlashMessage>}
+      {error && !createOpen && <PanelFlashMessage variant="error">{error}</PanelFlashMessage>}
 
       {filtrados.length === 0 ? (
         <PanelEmptyState
@@ -252,7 +270,13 @@ export function ResponsablesPanel({
           }
           action={
             responsables.length === 0 ? (
-              <Button type="button" onClick={() => setCreateOpen(true)}>
+              <Button
+                type="button"
+                onClick={() => {
+                  setError(null);
+                  setCreateOpen(true);
+                }}
+              >
                 + Agregar primer responsable
               </Button>
             ) : undefined
@@ -367,19 +391,15 @@ export function ResponsablesPanel({
       )}
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Nuevo responsable">
-        <form className="grid gap-3 sm:grid-cols-2" onSubmit={(e) => void handleCreate(e)}>
-          <div className="sm:col-span-2">
-            <ResponsableFormFields idPrefix="new_resp" />
-          </div>
-          <div className="flex justify-end gap-2 sm:col-span-2">
-            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando…" : "Guardar"}
-            </Button>
-          </div>
-        </form>
+        <ResponsableAltaForm
+          idPrefix="new_resp"
+          trabajadoresPlanilla={trabajadoresPlanilla}
+          cargandoPlanilla={cargandoPlanilla}
+          pending={pending}
+          error={error}
+          onCancel={() => setCreateOpen(false)}
+          onSubmit={(input) => void handleCreate(input)}
+        />
       </Dialog>
 
       <Dialog
