@@ -13,6 +13,7 @@ export interface ReporteDefinicionUI {
   scope: "ambiente" | "entidad";
   formatos: ("pdf" | "excel")[];
   valorizado?: boolean;
+  grupo?: "ambiente" | "entidad" | "situacion";
 }
 
 export interface ReporteResumenGrupoUI {
@@ -84,6 +85,41 @@ function FechaCorteInput({
       onChange={onChange}
     />
   );
+}
+
+function opcionesTipoReporte(reportes: ReporteDefinicionUI[]) {
+  const etiquetas = {
+    ambiente: "Por ambiente",
+    entidad: "De toda la entidad",
+    situacion: "Situación y adquisiciones",
+  } as const;
+  const orden = ["ambiente", "entidad", "situacion"] as const;
+  if (!reportes.some((reporte) => reporte.grupo)) {
+    return reportes.map((reporte) => ({ value: reporte.id, label: reporte.label }));
+  }
+  const options: {
+    value: string;
+    label: string;
+    kind?: "section-header";
+    disabled?: boolean;
+  }[] = [];
+  for (const grupo of orden) {
+    const items = reportes.filter((reporte) => reporte.grupo === grupo);
+    if (items.length === 0) continue;
+    options.push({
+      value: `__grupo_${grupo}`,
+      label: etiquetas[grupo],
+      kind: "section-header",
+      disabled: true,
+    });
+    for (const reporte of items) {
+      options.push({ value: reporte.id, label: reporte.label });
+    }
+  }
+  for (const reporte of reportes.filter((item) => !item.grupo)) {
+    options.push({ value: reporte.id, label: reporte.label });
+  }
+  return options;
 }
 
 function FormatoBadge({ formato }: { formato: "pdf" | "excel" }) {
@@ -162,7 +198,7 @@ export function ReportesPanelContent({
             value={reporteId}
             disabled={disabled}
             onChange={onReporteIdChange}
-            options={reportes.map((r) => ({ value: r.id, label: r.label }))}
+            options={opcionesTipoReporte(reportes)}
           />
           <p className="text-xs text-muted-foreground">{definicion.descripcion}</p>
           <div className="flex flex-wrap gap-1.5">

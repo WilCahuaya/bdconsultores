@@ -9,12 +9,15 @@ export type ReporteId =
   | "inventario_entidad_valorizado"
   | "reporte_bajas"
   | "reporte_activos_estado_malo"
+  | "reporte_faltantes"
   | "reporte_adquiridos_ejercicio_actual"
   | "reporte_adquiridos_ejercicio_anterior";
 
 export type ReporteFormato = "pdf" | "excel";
 
 export type ReporteScope = "ambiente" | "entidad";
+
+export type ReporteGrupo = "ambiente" | "entidad" | "situacion";
 
 export interface ReporteDefinicion {
   id: ReporteId;
@@ -24,6 +27,7 @@ export interface ReporteDefinicion {
   valorizado: boolean;
   formatos: ReporteFormato[];
   soloContador?: boolean;
+  grupo: ReporteGrupo;
 }
 
 export const REPORTES: ReporteDefinicion[] = [
@@ -34,6 +38,7 @@ export const REPORTES: ReporteDefinicion[] = [
     scope: "ambiente",
     valorizado: false,
     formatos: ["pdf", "excel"],
+    grupo: "ambiente",
   },
   {
     id: "inventario_ambiente_activos_fijos",
@@ -42,6 +47,7 @@ export const REPORTES: ReporteDefinicion[] = [
     scope: "ambiente",
     valorizado: false,
     formatos: ["pdf", "excel"],
+    grupo: "ambiente",
   },
   {
     id: "inventario_entidad_sin_valores",
@@ -51,6 +57,7 @@ export const REPORTES: ReporteDefinicion[] = [
     valorizado: false,
     formatos: ["pdf", "excel"],
     soloContador: true,
+    grupo: "entidad",
   },
   {
     id: "inventario_entidad_activos_fijos",
@@ -59,6 +66,7 @@ export const REPORTES: ReporteDefinicion[] = [
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
+    grupo: "entidad",
   },
   {
     id: "inventario_ambiente_valorizado",
@@ -68,6 +76,7 @@ export const REPORTES: ReporteDefinicion[] = [
     valorizado: true,
     formatos: ["pdf", "excel"],
     soloContador: true,
+    grupo: "ambiente",
   },
   {
     id: "inventario_entidad_valorizado",
@@ -77,6 +86,7 @@ export const REPORTES: ReporteDefinicion[] = [
     valorizado: true,
     formatos: ["pdf", "excel"],
     soloContador: true,
+    grupo: "entidad",
   },
   {
     id: "reporte_bajas",
@@ -85,6 +95,7 @@ export const REPORTES: ReporteDefinicion[] = [
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
+    grupo: "situacion",
   },
   {
     id: "reporte_activos_estado_malo",
@@ -93,6 +104,16 @@ export const REPORTES: ReporteDefinicion[] = [
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
+    grupo: "situacion",
+  },
+  {
+    id: "reporte_faltantes",
+    label: "Reporte del ambiente Faltantes",
+    descripcion: "Bienes que están en Faltantes, con el ambiente del que salieron.",
+    scope: "entidad",
+    valorizado: false,
+    formatos: ["pdf", "excel"],
+    grupo: "situacion",
   },
   {
     id: "reporte_adquiridos_ejercicio_actual",
@@ -102,6 +123,7 @@ export const REPORTES: ReporteDefinicion[] = [
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
+    grupo: "situacion",
   },
   {
     id: "reporte_adquiridos_ejercicio_anterior",
@@ -111,6 +133,7 @@ export const REPORTES: ReporteDefinicion[] = [
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
+    grupo: "situacion",
   },
 ];
 
@@ -136,6 +159,8 @@ export interface ActivoReporte extends Activo {
   cuenta_contable?: string | null;
   contabilidad?: string | null;
   grupo_contable?: string | null;
+  /** Ambiente del que salió el bien al pasar a Faltantes. */
+  procedencia?: string | null;
 }
 
 export interface ReporteContexto {

@@ -23,12 +23,15 @@ export const REPORTE_BAJAS_TITULO = "REPORTE DE BAJAS DE ACTIVOS FIJOS";
 
 export const REPORTE_ACTIVOS_ESTADO_MALO_TITULO = "REPORTE DE ACTIVOS EN ESTADO MALO";
 
+export const REPORTE_FALTANTES_TITULO = "REPORTE DEL AMBIENTE FALTANTES";
+
 const REPORTES_ENTIDAD_DISENO: ReporteId[] = [
   "inventario_entidad_sin_valores",
   "inventario_entidad_activos_fijos",
   "inventario_entidad_valorizado",
   "reporte_bajas",
   "reporte_activos_estado_malo",
+  "reporte_faltantes",
   "reporte_adquiridos_ejercicio_actual",
   "reporte_adquiridos_ejercicio_anterior",
 ];
@@ -44,6 +47,7 @@ export function reporteEntidadIncluyeFirmas(reporteId: ReporteId): boolean {
 export function tituloReporteEntidadDiseno(reporteId: ReporteId, fechaCorte?: string): string {
   if (reporteId === "reporte_bajas") return REPORTE_BAJAS_TITULO;
   if (reporteId === "reporte_activos_estado_malo") return REPORTE_ACTIVOS_ESTADO_MALO_TITULO;
+  if (reporteId === "reporte_faltantes") return REPORTE_FALTANTES_TITULO;
   if (esReporteAdquiridosEjercicio(reporteId)) {
     return tituloReporteAdquiridosEjercicio(reporteId, fechaCorte);
   }
@@ -79,6 +83,7 @@ export function entidadDisenoExportFilename(ctx: ReporteContexto): string {
     inventario_entidad_valorizado: "inventario-activos-valorizados-general",
     reporte_bajas: "reporte-bajas",
     reporte_activos_estado_malo: "reporte-activos-estado-malo",
+    reporte_faltantes: "reporte-ambiente-faltantes",
     reporte_adquiridos_ejercicio_actual: "adquiridos-ejercicio-actual",
     reporte_adquiridos_ejercicio_anterior: "adquiridos-ejercicio-anterior",
   };

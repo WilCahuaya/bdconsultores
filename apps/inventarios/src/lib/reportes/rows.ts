@@ -24,6 +24,7 @@ import {
   INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO,
   REPORTE_BAJAS_TITULO,
   REPORTE_ACTIVOS_ESTADO_MALO_TITULO,
+  REPORTE_FALTANTES_TITULO,
   esReporteEntidadDiseno,
 } from "./inventario-entidad-diseno";
 import { tituloReporteAdquiridosEjercicio, esReporteAdquiridosEjercicio } from "./ejercicio";
@@ -199,6 +200,7 @@ function esReporteScopeEntidad(reporteId: ReporteId): boolean {
     reporteId === "inventario_entidad_valorizado" ||
     reporteId === "reporte_bajas" ||
     reporteId === "reporte_activos_estado_malo" ||
+    reporteId === "reporte_faltantes" ||
     reporteId === "reporte_adquiridos_ejercicio_actual" ||
     reporteId === "reporte_adquiridos_ejercicio_anterior"
   );
@@ -250,6 +252,15 @@ const HEADERS_BAJAS = [
   "Nombre del bien",
   "Motivo de baja",
   "Fecha de baja",
+] as const;
+
+const HEADERS_FALTANTES = [
+  "N°",
+  "Código",
+  "Corr.",
+  "Nombre del bien",
+  "Estado",
+  "Viene de",
 ] as const;
 
 function comprobanteExport(activo: ActivoReporte): string {
@@ -378,6 +389,9 @@ export function reporteTableHeaderDefs(
   if (reporteId === "reporte_bajas") {
     return headerDefFromStrings([...HEADERS_BAJAS, columnaUbicacionLabel(reporteId)]);
   }
+  if (reporteId === "reporte_faltantes") {
+    return headerDefFromStrings([...HEADERS_FALTANTES]);
+  }
   if (reporteId === "inventario_ambiente_valorizado") return HEADERS_AMBIENTE_VALORIZADO;
   if (reporteId === "inventario_entidad_valorizado") return HEADERS_ENTIDAD_VALORIZADO;
 
@@ -452,6 +466,9 @@ function pdfColumnStylesFromWeights(
 /** Pesos relativos (reporte de bajas por entidad). */
 const BAJAS_COL_WEIGHTS = [5, 10, 8, 22, 18, 10, 17] as const;
 
+/** Pesos relativos (reporte del ambiente Faltantes). */
+const FALTANTES_COL_WEIGHTS = [5, 14, 8, 28, 12, 28] as const;
+
 /** Pesos relativos (inventario general por entidad sin valores). */
 const ENTIDAD_SIN_VALOR_COL_WEIGHTS = [
   4, 4, 4, 5, 8, 6, 13, 17, 7, 6, 9, 12,
@@ -489,6 +506,9 @@ export function reporteDisenoPdfColumnStyles(
   if (reporteId === "reporte_bajas") {
     return pdfColumnStylesFromWeights(tableWidthMm, BAJAS_COL_WEIGHTS, [3]);
   }
+  if (reporteId === "reporte_faltantes") {
+    return pdfColumnStylesFromWeights(tableWidthMm, FALTANTES_COL_WEIGHTS, [3, 5]);
+  }
   return undefined;
 }
 
@@ -518,7 +538,9 @@ export function reporteDisenoExcelColWidths(reporteId: ReporteId): number[] | un
             ? ENTIDAD_VALORIZADO_COL_WEIGHTS
             : reporteId === "reporte_bajas"
               ? BAJAS_COL_WEIGHTS
-              : null;
+              : reporteId === "reporte_faltantes"
+                ? FALTANTES_COL_WEIGHTS
+                : null;
   if (!weights) return undefined;
 
   const total = weights.reduce((sum, w) => sum + w, 0);
@@ -554,6 +576,22 @@ export function buildReporteRows(
       activo.motivo_baja?.trim() || "—",
       formatFechaISOToDDMMYYYY(activo.updated_at.slice(0, 10)) || "—",
       ubicacionReporteLabel(activo, reporteId),
+    ]);
+  }
+
+  if (reporteId === "reporte_faltantes") {
+    const porOrigen = [...ordenados].sort((a, b) => {
+      const origen = (a.procedencia ?? "").localeCompare(b.procedencia ?? "", "es");
+      if (origen !== 0) return origen;
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
+    return porOrigen.map((activo, index) => [
+      String(index + 1),
+      activo.codigo_barras ?? activo.codigo_catalogo,
+      formatCorrelativoDisplay(activo.correlativo),
+      activo.nombre,
+      estadoBienLabel(activo.estado_bien),
+      activo.procedencia?.trim() || "—",
     ]);
   }
 
@@ -631,6 +669,7 @@ export function reporteTitulo(
     inventario_entidad_valorizado: INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO,
     reporte_bajas: REPORTE_BAJAS_TITULO,
     reporte_activos_estado_malo: REPORTE_ACTIVOS_ESTADO_MALO_TITULO,
+    reporte_faltantes: REPORTE_FALTANTES_TITULO,
     reporte_adquiridos_ejercicio_actual: tituloReporteAdquiridosEjercicio(
       "reporte_adquiridos_ejercicio_actual",
       fechaCorte,

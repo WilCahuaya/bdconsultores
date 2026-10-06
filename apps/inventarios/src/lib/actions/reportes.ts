@@ -4,8 +4,9 @@ import type { EstadoRegistro } from "@inventario/types";
 import { attachCatalogoNacionalPorCodigo, resolveCuentaContableActivo } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
-import type { ActivoReporte } from "@/lib/reportes/types";
-import { REPORTES, reportePermitidoParaRol, type ReporteId } from "@/lib/reportes/types";
+import type { ActivoReporte, ReporteId } from "@/lib/reportes/types";
+import { REPORTES, reportePermitidoParaRol } from "@/lib/reportes/types";
+import { listProcedenciaFaltante } from "@/lib/actions/visitas-campo";
 import {
   anioEjercicioAdquisicion,
   esReporteAdquiridosEjercicio,
@@ -93,6 +94,18 @@ export async function cargarActivosReporte(
     query = query
       .eq("estado_registro", "REGISTRADO" as EstadoRegistro)
       .eq("estado_bien", "MALO");
+  } else if (input.reporteId === "reporte_faltantes") {
+    const { data: ambienteFaltante } = await supabase
+      .from("ambientes")
+      .select("id, sedes!inner(entidad_id)")
+      .eq("es_faltante", true)
+      .eq("activo", true)
+      .eq("sedes.entidad_id", input.entidadId)
+      .maybeSingle();
+    if (!ambienteFaltante?.id) return { data: [] };
+    query = query
+      .eq("ambiente_id", ambienteFaltante.id)
+      .eq("estado_registro", "REGISTRADO" as EstadoRegistro);
   } else if (esReporteAdquiridosEjercicio(input.reporteId as ReporteId)) {
     const anio = anioEjercicioAdquisicion(
       input.reporteId as ReporteId,
@@ -129,6 +142,13 @@ export async function cargarActivosReporte(
     input.reporteId as ReporteId,
     input.fechaCorte,
   );
+  if (input.reporteId === "reporte_faltantes" && activos.length > 0) {
+    const procedencia = await listProcedenciaFaltante(activos.map((activo) => activo.id));
+    activos = activos.map((activo) => ({
+      ...activo,
+      procedencia: procedencia[activo.id] ?? null,
+    }));
+  }
 
   return { data: activos };
 }
