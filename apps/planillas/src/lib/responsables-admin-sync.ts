@@ -30,10 +30,7 @@ export async function syncAdminResponsableForEntidad(
     .ilike("email", emailNorm)
     .maybeSingle();
 
-  if (byEmail) {
-    await supabase.from("responsables").update(payload).eq("id", byEmail.id);
-    return;
-  }
+  if (byEmail) return;
 
   const { error } = await supabase.from("responsables").insert({
     entidad_id: entidadId,
@@ -47,6 +44,6 @@ export async function syncAdminResponsableForEntidad(
       .eq("entidad_id", entidadId)
       .ilike("nombre", nombre)
       .maybeSingle();
-    if (byName) await supabase.from("responsables").update(payload).eq("id", byName.id);
+    if (byName) return;
   }
 }

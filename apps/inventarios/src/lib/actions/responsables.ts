@@ -216,18 +216,35 @@ export async function createResponsable(
       .maybeSingle();
 
     if (existing) {
-      if (existing.activo) {
+      const cargoPlanilla = contacto.cargo?.trim() || RESPONSABLE_CARGO_DEFAULT;
+      const emailPlanilla = trimOrNull(contacto.email)?.toLowerCase() ?? null;
+      const telefonoPlanilla = trimOrNull(contacto.telefono);
+      const sinCambios =
+        existing.activo &&
+        normalizeResponsableNombre(existing.nombre) === nombre &&
+        (normalizeResponsableDni(existing.dni ?? "") || null) === dni &&
+        (existing.email?.trim().toLowerCase() ?? null) === emailPlanilla &&
+        (existing.telefono?.trim() || null) === telefonoPlanilla &&
+        (existing.cargo ?? null) === cargoPlanilla;
+      if (sinCambios) {
         return { data: existing as Responsable, reused: true };
       }
-      const { data: reactivado, error: actError } = await supabase
+      const { data: actualizado, error: actError } = await supabase
         .from("responsables")
-        .update({ activo: true })
+        .update({
+          activo: true,
+          nombre,
+          dni,
+          email: emailPlanilla,
+          telefono: telefonoPlanilla,
+          cargo: cargoPlanilla,
+        })
         .eq("id", existing.id)
         .select()
         .single();
       if (actError) return { error: actError.message };
       revalidateEntidadResponsables(entidadId);
-      return { data: reactivado as Responsable, reused: true };
+      return { data: actualizado as Responsable, reused: true };
     }
   }
 
