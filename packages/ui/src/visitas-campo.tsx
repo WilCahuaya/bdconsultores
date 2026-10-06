@@ -422,6 +422,7 @@ export function VisitasCampoHistorialPanel({
   visitasAbiertas = [],
   onTerminar,
   terminarPendingId,
+  onVerReporte,
 }: {
   historial: VisitaCampoHistorial[];
   loadingDetalle?: boolean;
@@ -432,6 +433,7 @@ export function VisitasCampoHistorialPanel({
   visitasAbiertas?: VisitaCampoActiva[];
   onTerminar?: (visitaId: string) => void;
   terminarPendingId?: string | null;
+  onVerReporte?: (visita: VisitaCampoHistorial) => void;
 }) {
   if (historial.length === 0) {
     return (
@@ -519,6 +521,16 @@ export function VisitasCampoHistorialPanel({
                           }}
                         >
                           {terminarPendingId === visita.id ? "Terminando…" : "Terminar visita"}
+                        </Button>
+                      ) : null}
+                      {onVerReporte ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onVerReporte(visita)}
+                        >
+                          Ver reporte
                         </Button>
                       ) : null}
                       <Button

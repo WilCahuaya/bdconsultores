@@ -2021,6 +2021,48 @@ export function ActivoForm({
         )}
       </fieldset>
 
+      {!isEdit && (
+        <fieldset className={`${fieldsetCompact} self-start`}>
+          <legend className={panelLegendClass}>Bienes similares</legend>
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={agregarSimilares}
+                disabled={pending}
+                onChange={(e) => {
+                  setAgregarSimilares(e.target.checked);
+                  if (message) setMessage(null);
+                }}
+              />
+              Agregar bienes similares
+            </label>
+            {agregarSimilares && (
+              <div className="space-y-2">
+                <Label htmlFor="cantidad_similares">Cantidad a registrar</Label>
+                <Input
+                  id="cantidad_similares"
+                  type="number"
+                  min={1}
+                  max={MAX_ACTIVOS_SIMILARES_CANTIDAD}
+                  value={cantidadSimilares}
+                  disabled={pending}
+                  onChange={(e) => {
+                    setCantidadSimilares(e.target.value);
+                    if (message) setMessage(null);
+                  }}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se crearán además de este bien, con los mismos datos y en la misma ubicación.
+                  Máximo {MAX_ACTIVOS_SIMILARES_CANTIDAD} por operación.
+                </p>
+              </div>
+            )}
+          </div>
+        </fieldset>
+      )}
+
       </>
       )}
 
@@ -2206,48 +2248,6 @@ export function ActivoForm({
             </div>
           </fieldset>
         </>
-      )}
-
-      {!isEdit && (
-        <fieldset className={fieldsetWide}>
-          <legend className={panelLegendClass}>Bienes similares</legend>
-          <div className="space-y-3">
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={agregarSimilares}
-                disabled={pending}
-                onChange={(e) => {
-                  setAgregarSimilares(e.target.checked);
-                  if (message) setMessage(null);
-                }}
-              />
-              Agregar bienes similares
-            </label>
-            {agregarSimilares && (
-              <div className="space-y-2">
-                <Label htmlFor="cantidad_similares">Cantidad a registrar</Label>
-                <Input
-                  id="cantidad_similares"
-                  type="number"
-                  min={1}
-                  max={MAX_ACTIVOS_SIMILARES_CANTIDAD}
-                  value={cantidadSimilares}
-                  disabled={pending}
-                  onChange={(e) => {
-                    setCantidadSimilares(e.target.value);
-                    if (message) setMessage(null);
-                  }}
-                  className="max-w-xs"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Se crearán además de este bien, con los mismos datos y en la misma ubicación.
-                  Máximo {MAX_ACTIVOS_SIMILARES_CANTIDAD} por operación.
-                </p>
-              </div>
-            )}
-          </div>
-        </fieldset>
       )}
 
       {message && !actionsBottomRight && (

@@ -112,6 +112,29 @@ export interface VisitaCampoAmbienteDetalle {
   total?: number;
 }
 
+/** Línea congelada de una revisión de visita de campo. */
+export interface VisitaCampoReporteItem {
+  id: string;
+  codigo_barras: string | null;
+  nombre: string;
+  ambiente_nombre: string;
+  sede_nombre: string;
+  hallado: boolean;
+  accion: "BAJA" | "FALTANTE" | null;
+  estado_anterior: EstadoBien | null;
+  estado_nuevo: EstadoBien | null;
+  motivo: string | null;
+  revisado_por_nombre: string | null;
+  revisado_at: string;
+}
+
+export interface VisitaCampoReporte {
+  hallados: VisitaCampoReporteItem[];
+  faltantes: VisitaCampoReporteItem[];
+  bajas: VisitaCampoReporteItem[];
+  cambios_estado: VisitaCampoReporteItem[];
+}
+
 /** Perfil de usuario (tabla profiles) */
 export interface Profile {
   id: string;

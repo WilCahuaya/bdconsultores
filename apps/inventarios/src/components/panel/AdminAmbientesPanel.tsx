@@ -57,6 +57,7 @@ import {
 } from "@/lib/actions/responsables";
 import { useTrabajadoresPlanilla } from "./use-trabajadores-planilla";
 import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
+import { VisitaCampoReporteDialog } from "./VisitaCampoReporteDialog";
 import { GestionarSucursales } from "./GestionarSucursales";
 import {
   PanelCountLabel,
@@ -157,6 +158,7 @@ export function AdminAmbientesPanel({
   }, [initialVisitasHistorial]);
 
   const [detalleVisita, setDetalleVisita] = useState<VisitaCampoHistorial | null>(null);
+  const [reporteVisita, setReporteVisita] = useState<VisitaCampoHistorial | null>(null);
   const [detalleAmbientes, setDetalleAmbientes] = useState<Awaited<ReturnType<typeof getVisitaCampoDetalle>> | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const visitaAbierta = initialVisitasActivas.length > 0;
@@ -406,6 +408,7 @@ export function AdminAmbientesPanel({
       <PanelTabs tabs={ADMIN_ENTITY_TABS} value={tab} onChange={handleTabChange} />
 
       {tab === "visitas" ? (
+        <>
         <VisitasCampoHistorialPanel
           historial={visitasHistorial}
           loadingDetalle={detalleLoading}
@@ -416,7 +419,10 @@ export function AdminAmbientesPanel({
             setDetalleVisita(null);
             setDetalleAmbientes(null);
           }}
+          onVerReporte={setReporteVisita}
         />
+        <VisitaCampoReporteDialog visita={reporteVisita} onClose={() => setReporteVisita(null)} />
+        </>
       ) : tab === "sucursales" ? (
         <GestionarSucursales
           entidadId={entidad.id}

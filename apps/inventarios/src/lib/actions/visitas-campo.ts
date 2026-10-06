@@ -6,6 +6,8 @@ import type {
   VisitaCampoActiva,
   VisitaCampoAmbienteDetalle,
   VisitaCampoHistorial,
+  VisitaCampoReporte,
+  VisitaCampoReporteItem,
 } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
@@ -588,4 +590,76 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
     if (etiqueta) out[activoId] = etiqueta;
   }
   return out;
+}
+
+export async function getVisitaCampoReporte(
+  visitaId: string,
+): Promise<{ data?: VisitaCampoReporte; error?: string }> {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+
+  const supabase = await createClient();
+  const { data: visita, error: visitaError } = await supabase
+    .from("visitas_campo")
+    .select("id, numero, estado, entidad_id")
+    .eq("id", visitaId)
+    .maybeSingle();
+
+  if (visitaError || !visita) {
+    return { error: visitaError?.message ?? "Visita no encontrada." };
+  }
+
+  const { data: filas, error } = await supabase
+    .from("visita_revisiones")
+    .select(
+      "id, activo_id, hallado, accion, codigo_barras, nombre, ambiente_nombre, sede_nombre, estado_bien_anterior, estado_bien_nuevo, motivo, revisado_por_nombre, created_at, activos(codigo_barras, nombre)",
+    )
+    .eq("visita_id", visitaId)
+    .order("created_at");
+
+  if (error) return { error: error.message };
+
+  const items: VisitaCampoReporteItem[] = (filas ?? []).map((fila) => {
+    const activoRaw = fila.activos as unknown;
+    const activo = (Array.isArray(activoRaw) ? activoRaw[0] : activoRaw) as {
+      codigo_barras?: string | null;
+      nombre?: string | null;
+    } | null;
+    const estadoAnterior = (fila.estado_bien_anterior as VisitaCampoReporteItem["estado_anterior"]) ?? null;
+    const estadoNuevo = (fila.estado_bien_nuevo as VisitaCampoReporteItem["estado_nuevo"]) ?? null;
+    return {
+      id: fila.id as string,
+      codigo_barras: (fila.codigo_barras as string | null) ?? activo?.codigo_barras ?? null,
+      nombre: (fila.nombre as string | null) ?? activo?.nombre ?? "Bien",
+      ambiente_nombre: (fila.ambiente_nombre as string | null) ?? "—",
+      sede_nombre: (fila.sede_nombre as string | null) ?? "",
+      hallado: Boolean(fila.hallado),
+      accion: (fila.accion as VisitaCampoReporteItem["accion"]) ?? null,
+      estado_anterior: estadoAnterior,
+      estado_nuevo: estadoNuevo,
+      motivo: (fila.motivo as string | null) ?? null,
+      revisado_por_nombre: (fila.revisado_por_nombre as string | null) ?? null,
+      revisado_at: fila.created_at as string,
+    };
+  });
+
+  const porNombre = (a: VisitaCampoReporteItem, b: VisitaCampoReporteItem) => {
+    const ambiente = a.ambiente_nombre.localeCompare(b.ambiente_nombre, "es");
+    if (ambiente !== 0) return ambiente;
+    return a.nombre.localeCompare(b.nombre, "es");
+  };
+
+  const cambioEstado = (item: VisitaCampoReporteItem) =>
+    item.estado_anterior != null &&
+    item.estado_nuevo != null &&
+    item.estado_anterior !== item.estado_nuevo;
+
+  return {
+    data: {
+      hallados: items.filter((item) => item.hallado).sort(porNombre),
+      faltantes: items.filter((item) => item.accion === "FALTANTE").sort(porNombre),
+      bajas: items.filter((item) => item.accion === "BAJA").sort(porNombre),
+      cambios_estado: items.filter(cambioEstado).sort(porNombre),
+    },
+  };
 }

@@ -67,6 +67,7 @@ import {
 } from "@/lib/actions/responsables";
 import { useTrabajadoresPlanilla } from "./use-trabajadores-planilla";
 import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
+import { VisitaCampoReporteDialog } from "./VisitaCampoReporteDialog";
 import { AmbientesImportDialog } from "./AmbientesImportDialog";
 import { InventarioImportDialog } from "./InventarioImportDialog";
 import {
@@ -263,6 +264,7 @@ export function AmbientesPanel({
   const [cerrarPendingId, setCerrarPendingId] = useState<string | null>(null);
   const [visitaError, setVisitaError] = useState<string | null>(null);
   const [detalleVisita, setDetalleVisita] = useState<VisitaCampoHistorial | null>(null);
+  const [reporteVisita, setReporteVisita] = useState<VisitaCampoHistorial | null>(null);
   const [detalleAmbientes, setDetalleAmbientes] = useState<Awaited<ReturnType<typeof getVisitaCampoDetalle>> | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [abrirVisitaOpen, setAbrirVisitaOpen] = useState(false);
@@ -663,6 +665,7 @@ export function AmbientesPanel({
           onOpenEliminarPorCodigos={!isAdmin ? () => setEliminarOpen(true) : undefined}
         />
       ) : !sedeFocus && tab === "visitas" ? (
+        <>
         <VisitasCampoHistorialPanel
           historial={visitasHistorial}
           loadingDetalle={detalleLoading}
@@ -676,7 +679,10 @@ export function AmbientesPanel({
           visitasAbiertas={visitasActivas}
           onTerminar={puedeGestionarVisita ? handleCerrarVisita : undefined}
           terminarPendingId={cerrarPendingId}
+          onVerReporte={setReporteVisita}
         />
+        <VisitaCampoReporteDialog visita={reporteVisita} onClose={() => setReporteVisita(null)} />
+        </>
       ) : !sedeFocus && tab === "responsables" ? (
         <ResponsablesPanel
           responsables={responsables}
