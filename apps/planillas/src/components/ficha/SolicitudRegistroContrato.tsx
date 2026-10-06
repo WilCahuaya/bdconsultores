@@ -37,6 +37,9 @@ export function SolicitudRegistroContrato({
   solicitud,
   solicitudes,
   enlazables,
+  numero = null,
+  nombres = "",
+  apellidoPaterno = null,
 }: {
   relacionId: string;
   entidadId: string;
@@ -46,6 +49,9 @@ export function SolicitudRegistroContrato({
   solicitud: SolicitudRegistroVista | null;
   solicitudes: SolicitudRegistroVista[];
   enlazables: ContratoEnlazable[];
+  numero?: number | null;
+  nombres?: string;
+  apellidoPaterno?: string | null;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -72,7 +78,11 @@ export function SolicitudRegistroContrato({
     if (!solicitud?.storage_path) return;
     setOpening(true);
     const result = await getSignedDocumentoUrl(solicitud.storage_path, {
-      download: nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path),
+      download: nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path, {
+        numero,
+        nombres,
+        apellidoPaterno,
+      }),
     });
     setOpening(false);
     if (result.error || !result.url) {
@@ -184,6 +194,7 @@ export function SolicitudRegistroContrato({
         </p>
       </div>
       <MarcoPrevisualizacion
+        sinBotonDescarga
         titulo="Solicitud de registro de contratos"
         storagePath={reemplazo || archivo ? null : solicitud?.storage_path}
         file={reemplazo ?? archivo}

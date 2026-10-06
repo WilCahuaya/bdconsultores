@@ -22,6 +22,7 @@ import { Field, DateField, SelectField, FormSection } from "@/components/fields"
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
 import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { nombreBaseContrato } from "@/lib/nombre-archivo";
 import { contratoConfirmado, type FlujoContrato, type FlujoDocumento } from "@/lib/flujo-ficha";
 
 function rutaFirmadoDeContrato(contrato: FlujoContrato | null, documentos: FlujoDocumento[]): string | null {
@@ -33,6 +34,22 @@ function rutaFirmadoDeContrato(contrato: FlujoContrato | null, documentos: Flujo
     if (propio?.storage_path) return propio.storage_path;
   }
   return contrato.solicitud_storage_path?.trim() || null;
+}
+
+function nombreContratoVigente(trabajador: TrabajadorListItem): string | null {
+  const jornada = trabajador.jornada;
+  const cargo = trabajador.cargo;
+  const contrato = contratoConfirmado(trabajador.contratos) ?? trabajador.contratos.find((item) => item.es_vigente) ?? null;
+  const fecha = contrato?.fecha_inicio ?? trabajador.fecha_ingreso;
+  if ((jornada !== "TIEMPO_COMPLETO" && jornada !== "TIEMPO_PARCIAL") || !cargo || !fecha) return null;
+  return nombreBaseContrato({
+    numero: trabajador.numero,
+    jornada,
+    cargo,
+    nombres: trabajador.persona.nombres,
+    apellidoPaterno: trabajador.persona.apellido_paterno,
+    fecha,
+  });
 }
 
 function rutaFirmadoVigente(trabajador: TrabajadorListItem): string | null {
@@ -138,7 +155,11 @@ export function FichaPuestoForm({
   }
 
   return (
-    <MarcoPrevisualizacion titulo="Contrato firmado vigente" storagePath={firmadoVigente}>
+    <MarcoPrevisualizacion
+      titulo="Contrato firmado vigente"
+      storagePath={firmadoVigente}
+      nombreDescarga={nombreContratoVigente(trabajador)}
+    >
     <div className="space-y-4">
       {cesada ? (
         <p className="text-sm text-muted-foreground">

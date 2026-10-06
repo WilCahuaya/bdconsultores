@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
+import { BotonDescargarDocumento } from "@/components/ficha/DescargaTrabajador";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 
 function archivoEsPdf(file: File | null, path: string | null): boolean {
@@ -123,18 +124,25 @@ export function MarcoPrevisualizacion({
   storagePath,
   file = null,
   children,
+  nombreDescarga,
+  sinBotonDescarga = false,
 }: {
   titulo: string;
   storagePath: string | null | undefined;
   file?: File | null;
   children: ReactNode;
+  nombreDescarga?: string | null;
+  sinBotonDescarga?: boolean;
 }) {
   const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(titulo, storagePath, file);
 
   return (
     <div className="space-y-3">
       {hayArchivo ? (
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {storagePath && !sinBotonDescarga ? (
+            <BotonDescargarDocumento titulo={titulo} storagePath={storagePath} nombreDescarga={nombreDescarga} />
+          ) : null}
           <BotonPrevisualizacion visible={visible} onClick={() => setVisible((valor) => !valor)} />
         </div>
       ) : null}
@@ -157,6 +165,8 @@ export function DocumentoPrevisualizacion({
   vacio = "Aún no hay escaneo en Documentos.",
   defaultVisible,
   extra,
+  nombreDescarga,
+  sinBotonDescarga = false,
 }: {
   titulo: string;
   storagePath: string | null | undefined;
@@ -164,6 +174,8 @@ export function DocumentoPrevisualizacion({
   vacio?: string;
   defaultVisible?: boolean;
   extra?: ReactNode;
+  nombreDescarga?: string | null;
+  sinBotonDescarga?: boolean;
 }) {
   const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(titulo, storagePath, file, defaultVisible);
 
@@ -172,7 +184,12 @@ export function DocumentoPrevisualizacion({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">{titulo}</p>
         {hayArchivo ? (
-          <BotonPrevisualizacion visible={visible} onClick={() => setVisible((valor) => !valor)} />
+          <div className="flex flex-wrap items-center gap-2">
+            {storagePath && !sinBotonDescarga ? (
+              <BotonDescargarDocumento titulo={titulo} storagePath={storagePath} nombreDescarga={nombreDescarga} />
+            ) : null}
+            <BotonPrevisualizacion visible={visible} onClick={() => setVisible((valor) => !valor)} />
+          </div>
         ) : null}
       </div>
       {!hayArchivo ? <p className="text-sm text-muted-foreground">{vacio}</p> : null}

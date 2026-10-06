@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { entidadEtiqueta } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
+import { DescargaTrabajadorProvider } from "@/components/ficha/DescargaTrabajador";
 import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
 import { AltaPasosNav } from "@/components/ficha/FichaTabs";
 import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
@@ -95,6 +96,13 @@ export default async function ContratoProcesoPage({
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
+      <DescargaTrabajadorProvider
+        value={{
+          numero: trabajador.numero,
+          nombres: trabajador.persona.nombres,
+          apellidoPaterno: trabajador.persona.apellido_paterno,
+        }}
+      >
       <div className="ficha-proceso-page">
         <div className="shrink-0 space-y-3 pb-4">
           <div className="flex items-center gap-2">
@@ -221,6 +229,7 @@ export default async function ContratoProcesoPage({
         ) : null}
         </div>
       </div>
+      </DescargaTrabajadorProvider>
     </PlanillasShell>
   );
 }

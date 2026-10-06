@@ -1,3 +1,5 @@
+import { personaNombreArchivo, prefijoNumeroArchivo, tokenNombreArchivo } from "@/lib/nombre-archivo";
+
 export const DOCUMENTOS_PLANILLAS_BUCKET = "documentos-planillas";
 
 export const DOCUMENTO_ACCEPT = [
@@ -141,15 +143,16 @@ export function pathPerteneceAlDocumento(
   return path.startsWith(`${entidadId}/${relacionId}/${documentoId}.`);
 }
 
-export function nombreDescargaDocumento(tipoLabel: string, path: string): string {
+export function nombreDescargaDocumento(
+  tipoLabel: string,
+  path: string,
+  opts?: { numero?: number | null; nombres?: string; apellidoPaterno?: string | null },
+): string {
   const ext = path.split(".").pop()?.toLowerCase() || "pdf";
-  const base = tipoLabel
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-  return `${base || "documento"}.${ext}`;
+  const tipo = tokenNombreArchivo(tipoLabel) || "DOCUMENTO";
+  const persona = opts?.nombres ? personaNombreArchivo(opts.nombres, opts.apellidoPaterno) : "";
+  const cuerpo = [tipo, persona].filter(Boolean).join(" - ");
+  return `${prefijoNumeroArchivo(opts?.numero)}${cuerpo}.${ext}`;
 }
 
 export function errorArchivoDocumento(file: File): string | null {

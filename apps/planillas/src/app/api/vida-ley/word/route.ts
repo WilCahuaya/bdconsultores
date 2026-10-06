@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 function filaDe(t: TrabajadorListItem): VidaLeyTrabajadorWord {
   return {
+    numero: t.numero,
     nombres: t.persona.nombres,
     apellidoPaterno: t.persona.apellido_paterno,
     apellidoMaterno: t.persona.apellido_materno,

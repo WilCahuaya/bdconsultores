@@ -85,6 +85,7 @@ export async function GET(
     fechaFin: contrato.fecha_fin,
     remuneracion,
     horario: contrato.horario ?? trabajador.horario,
+    numero: trabajador.numero,
   };
 
   const buffer = await bufferContratoWord(datos);

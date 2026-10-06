@@ -24,6 +24,7 @@ import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { Field, DateField, SelectField } from "@/components/fields";
 import { TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
+import { BotonDescargarDocumento } from "@/components/ficha/DescargaTrabajador";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
@@ -94,6 +95,7 @@ export function CapturaDesplegable({
   textoListo,
   datos,
   preview,
+  storagePath,
 }: {
   titulo: string;
   alerta: boolean;
@@ -103,6 +105,7 @@ export function CapturaDesplegable({
   textoListo?: string;
   datos: ReactNode;
   preview: ReactNode;
+  storagePath?: string | null;
 }) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const abiertoAlInicio = useRef(defaultOpen ?? alerta);
@@ -152,6 +155,16 @@ export function CapturaDesplegable({
             <p className="text-sm text-emerald-800">{textoListo ?? "Documento cargado"}</p>
           )}
         </div>
+        {storagePath ? (
+          <span
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+          >
+            <BotonDescargarDocumento titulo={titulo} storagePath={storagePath} />
+          </span>
+        ) : null}
       </summary>
       <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
         <div className="space-y-4">
@@ -296,6 +309,7 @@ function CapturaDni({
   return (
     <CapturaDesplegable
       titulo={TIPO_DOCUMENTO_LABEL.DNI}
+      storagePath={documento?.storage_path}
       alerta={alerta}
       alertaNombre="DNI"
       hint="Suba el escaneo y complete nombres y fecha. Con 8 dígitos se busca el DNI; con 9, el carné de extranjería. El número de la ficha no se cambia aquí."
@@ -427,6 +441,7 @@ function CapturaFicha({
   return (
     <CapturaDesplegable
       titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
+      storagePath={documento?.storage_path}
       alerta={alerta}
       alertaNombre="ficha de datos personales"
       hint="Suba el escaneo y complete la dirección: región, provincia, distrito, tipo de vía y número. Eso se copia en AFPNet y queda armado para la ficha, por ejemplo Av. Grau 123 - El Tambo - Huancayo - Junín."
@@ -550,6 +565,7 @@ function CapturaPension({
   return (
     <CapturaDesplegable
       titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
+      storagePath={documento?.storage_path}
       alerta={alerta}
       alertaNombre="sistema de pensiones firmado"
       hint="Suba el sistema de pensiones firmado e indique AFP u ONP. Si es AFP, el alta queda válida con el nombre de AFP y el CUSPP. El documento de alta AFP es opcional."
@@ -737,6 +753,7 @@ function CapturaAsignacion({
   return (
     <CapturaDesplegable
       titulo={TIPO_DOCUMENTO_LABEL.ASIGNACION_FAMILIAR}
+      storagePath={documento?.storage_path}
       alerta={pideArchivo && !tieneArchivo}
       alertaNombre="asignación familiar"
       textoListo={corresponde ? "Documento cargado" : "No corresponde asignación"}

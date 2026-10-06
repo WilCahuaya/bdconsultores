@@ -17,6 +17,7 @@ import {
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, formatRemuneracion, montoAsignacionFamiliar, opcionesCargo, remuneracionBruta } from "@/lib/planillas-labels";
 import { descargarContratoWord } from "@/lib/descargar-contrato-word";
+import { nombreBaseContrato } from "@/lib/nombre-archivo";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
@@ -50,6 +51,21 @@ function contratoTieneSolicitud(contrato: ContratoRow, solicitudes: SolicitudReg
   return Boolean(solicitudDeContrato(contrato, solicitudes)?.storage_path);
 }
 
+function nombrePdfContrato(trabajador: TrabajadorListItem, contrato: ContratoRow | null): string | null {
+  const jornada = contrato?.jornada ?? trabajador.jornada;
+  const cargo = contrato?.cargo ?? trabajador.cargo;
+  const fecha = contrato?.fecha_inicio ?? trabajador.fecha_ingreso;
+  if ((jornada !== "TIEMPO_COMPLETO" && jornada !== "TIEMPO_PARCIAL") || !cargo || !fecha) return null;
+  return nombreBaseContrato({
+    numero: trabajador.numero,
+    jornada,
+    cargo,
+    nombres: trabajador.persona.nombres,
+    apellidoPaterno: trabajador.persona.apellido_paterno,
+    fecha,
+  });
+}
+
 function textoRespaldo(pdf: boolean, solicitud: boolean): string {
   if (pdf && solicitud) return "Ambos";
   if (pdf) return "Contrato";
@@ -78,6 +94,16 @@ export function FichaContratos({
   canWrite: boolean;
   canMarcarRecogido: boolean;
 }) {
+  const descarga = {
+    numero: trabajador.numero,
+    nombres: trabajador.persona.nombres,
+    apellidoPaterno: trabajador.persona.apellido_paterno,
+    nombreBase: (documento: DocumentoRow) => {
+      if (documento.tipo !== "CONTRATO_FIRMADO") return null;
+      const ligado = contratos.find((c) => c.documento_id === documento.id) ?? null;
+      return nombrePdfContrato(trabajador, ligado);
+    },
+  };
   const router = useRouter();
   const { pushToast } = useToast();
   const abierto = contratos.find(
@@ -288,11 +314,15 @@ export function FichaContratos({
             tiposFiltro={["CONTRATO_FIRMADO"]}
             permitirAgregar={false}
             hint={`PDF firmado de la versión ${firmando.version}.`}
+            descarga={descarga}
           />
           <SolicitudRegistroContrato
             relacionId={relacionId}
             entidadId={entidadId}
             contratoId={firmando.id}
+            numero={trabajador.numero}
+            nombres={trabajador.persona.nombres}
+            apellidoPaterno={trabajador.persona.apellido_paterno}
             canWrite={canWrite}
             cerrado={firmando.estado === "BAJA"}
             solicitud={solicitudDeContrato(firmando, solicitudes)}
@@ -381,6 +411,7 @@ export function FichaContratos({
             tiposFiltro={["CONTRATO_FIRMADO"]}
             permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
             hint="PDF firmado. El ingreso a la empresa no cambia."
+            descarga={descarga}
           />
         </FormSection>
       ) : null}

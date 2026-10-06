@@ -15,7 +15,7 @@ import {
 import type { JornadaLaboral, TipoAdendaPlanilla } from "@inventario/types";
 import { cargoCanonico, funcionesDeCargo } from "@/lib/cargos-funciones";
 import { esFemeninoNombre } from "@/lib/contrato-word";
-import { MES_ABREV } from "@/lib/horario-asistencia";
+import { nombreBaseAdenda } from "@/lib/nombre-archivo";
 import { estructuraHorarioParcial, formatHorarioContrato, parseHorario } from "@/lib/horario-laboral";
 import { formatRemuneracion, nombreCompleto, rotuloDocumentoIdentidad } from "@/lib/planillas-labels";
 import { solesEnLetras } from "@/lib/soles-letras";
@@ -60,6 +60,7 @@ export type AdendaWordDatos = {
   remuneracionNueva: number | null;
   horarioNuevo: string | null;
   jornadaNueva: JornadaLaboral | null;
+  numero: number | null;
 };
 
 type Genero = {
@@ -327,25 +328,14 @@ function tablaFirmas(d: AdendaWordDatos, g: Genero, nombreTrab: string): Table {
   });
 }
 
-function tokenNombreArchivo(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^A-Za-z0-9 ]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .toUpperCase();
-}
-
 export function nombreArchivoAdenda(d: AdendaWordDatos): string {
-  const tipo = d.tipo === "REMUNERACION" ? "SUELDO" : d.tipo;
-  const persona = tokenNombreArchivo(
-    [d.personaNombres.trim().split(/\s+/)[0] ?? "", d.apellidoPaterno ?? ""].filter(Boolean).join(" "),
-  ).slice(0, 50);
-  const [year, month, day] = d.fechaVigencia.slice(0, 10).split("-");
-  const abrev = MES_ABREV[Number(month) - 1] ?? month ?? "";
-  const fecha = `${day ?? ""} ${abrev.toUpperCase()} ${year ?? ""}`.replace(/\s+/g, " ").trim();
-  return `ADENDA ${tipo} - ${persona} - ${fecha}.docx`;
+  return `${nombreBaseAdenda({
+    numero: d.numero,
+    tipo: d.tipo,
+    nombres: d.personaNombres,
+    apellidoPaterno: d.apellidoPaterno,
+    fecha: d.fechaVigencia,
+  })}.docx`;
 }
 
 export function construirDocumentoAdenda(d: AdendaWordDatos): Document {
