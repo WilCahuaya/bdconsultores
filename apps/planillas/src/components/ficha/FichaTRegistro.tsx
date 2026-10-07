@@ -28,6 +28,7 @@ import {
   remuneracionBruta,
 } from "@/lib/planillas-labels";
 import { DateField } from "@/components/fields";
+import { ApartadoDesplegable } from "@/components/ficha/ApartadoDesplegable";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
@@ -58,6 +59,7 @@ export function FichaTRegistro({
   documentoCartaRenuncia,
   canWrite,
   canWriteTrBaja = canWrite,
+  abrirAltaPorDefecto = false,
 }: {
   relacionId: string;
   items: TRegistroRow[];
@@ -70,6 +72,8 @@ export function FichaTRegistro({
   documentoCartaRenuncia?: DocumentoRow | null;
   canWrite: boolean;
   canWriteTrBaja?: boolean;
+  /** Si AFP ya está lista, abrir Alta T-Registro al entrar al paso. */
+  abrirAltaPorDefecto?: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -78,6 +82,9 @@ export function FichaTRegistro({
   const persona = trabajador.persona;
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
   const yaAlta = items.some((item) => item.tipo === "ALTA" && item.realizado);
+  const altaLista = yaAlta && Boolean(documentoTrAlta?.storage_path);
+  const fechaAlta = items.find((item) => item.tipo === "ALTA")?.fecha;
+  const yaBaja = items.some((item) => item.tipo === "BAJA" && item.realizado);
 
   async function guardarAlta(formData: FormData) {
     if (!yaAlta && !fileAlta && !documentoTrAlta?.storage_path) {
@@ -135,140 +142,171 @@ export function FichaTRegistro({
 
   return (
     <div id="t-registro" className="space-y-4">
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-      <section className={`${panelCardClass} space-y-4 p-5`}>
-        <div>
-          <p className="text-sm font-medium">Datos para pegar en T-Registro</p>
-          <p className="text-sm text-muted-foreground">
-            Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta. La remuneración bruta es la remuneración más S/ {ASIGNACION_FAMILIAR_SOLES} si tiene asignación familiar.
-          </p>
+      <ApartadoDesplegable
+        titulo="Alta T-Registro"
+        pendiente={!altaLista}
+        defaultOpen={!altaLista && abrirAltaPorDefecto}
+        resumen={
+          altaLista
+            ? `Listo${fechaAlta ? ` · ${formatFechaPlanilla(fechaAlta)}` : ""}.`
+            : "Pendiente: registre el alta en SUNAT y súbala aquí."
+        }
+      >
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <section className="space-y-4">
+            <div>
+              <p className="text-sm font-medium">Datos para pegar en T-Registro</p>
+              <p className="text-sm text-muted-foreground">
+                Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta. La remuneración bruta es la
+                remuneración más S/ {ASIGNACION_FAMILIAR_SOLES} si tiene asignación familiar.
+              </p>
+            </div>
+            <a
+              href={TREGISTRO_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Abrir T-Registro
+            </a>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <DatoAlta label="DNI" value={persona.dni} />
+              <DatoAlta
+                label="Fecha de nacimiento"
+                value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
+              />
+              <DatoAlta label="Número de teléfono" value={persona.celular ?? ""} />
+              <DatoAlta label="Correo" value={persona.correo ?? ""} />
+              <DatoAlta
+                label="Fecha de inicio del trabajador"
+                value={trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : ""}
+              />
+              <DatoAlta label={etiquetaCodigoOcupacion(trabajador.cargo)} value={codigoOcupacion} />
+              <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
+              <DatoAlta
+                label="Asignación familiar"
+                value={
+                  trabajador.recibe_asignacion_familiar === true
+                    ? remuneracionCopia(montoAsignacionFamiliar(true))
+                    : ""
+                }
+              />
+              <DatoAlta
+                label="Remuneración bruta"
+                value={remuneracionCopia(
+                  remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar),
+                )}
+              />
+              <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
+              <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
+            </p>
+          </section>
+          <div className="space-y-4">
+            <DocumentoPrevisualizacion
+              titulo={TIPO_DOCUMENTO_LABEL.DNI}
+              storagePath={documentoDni?.storage_path}
+              vacio="Suba el DNI en Documentos para verlo aquí."
+            />
+            <DocumentoPrevisualizacion
+              titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
+              storagePath={documentoFicha?.storage_path}
+              vacio="Suba la ficha en Documentos para verla aquí."
+            />
+          </div>
         </div>
-        <a
-          href={TREGISTRO_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          Abrir T-Registro
-        </a>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <DatoAlta label="DNI" value={persona.dni} />
-          <DatoAlta
-            label="Fecha de nacimiento"
-            value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
-          />
-          <DatoAlta label="Número de teléfono" value={persona.celular ?? ""} />
-          <DatoAlta label="Correo" value={persona.correo ?? ""} />
-          <DatoAlta
-            label="Fecha de inicio del trabajador"
-            value={trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : ""}
-          />
-          <DatoAlta label={etiquetaCodigoOcupacion(trabajador.cargo)} value={codigoOcupacion} />
-          <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
-          <DatoAlta
-            label="Asignación familiar"
-            value={trabajador.recibe_asignacion_familiar === true ? remuneracionCopia(montoAsignacionFamiliar(true)) : ""}
-          />
-          <DatoAlta
-            label="Remuneración bruta"
-            value={remuneracionCopia(remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar))}
-          />
-          <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
-          <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
-        </p>
-      </section>
-      <div className="space-y-4">
-        <DocumentoPrevisualizacion
-          titulo={TIPO_DOCUMENTO_LABEL.DNI}
-          storagePath={documentoDni?.storage_path}
-          vacio="Suba el DNI en Documentos para verlo aquí."
-        />
-        <DocumentoPrevisualizacion
-          titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
-          storagePath={documentoFicha?.storage_path}
-          vacio="Suba la ficha en Documentos para verla aquí."
-        />
-      </div>
-      </div>
 
-      <form action={guardarAlta} className="space-y-4">
-        <DocumentoPrevisualizacion
-          titulo={TIPO_DOCUMENTO_LABEL.TR_ALTA}
-          storagePath={fileAlta ? null : documentoTrAlta?.storage_path}
-          file={fileAlta}
-          vacio="Suba el alta de T-Registro cuando lo tenga en SUNAT."
-          extra={
-            canWrite ? (
-              <div className="space-y-4">
-                <DocumentoFileInput
-                  accept={DOCUMENTO_ACCEPT}
-                  disabled={pendingAlta}
-                  file={fileAlta}
-                  buttonLabel={
-                    fileAlta || documentoTrAlta?.storage_path ? "Cambiar alta de T-Registro" : "Subir alta de T-Registro"
-                  }
-                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
-                  onFileChange={setFileAlta}
-                />
-                {documentoTrAlta?.storage_path ? (
-                  <EliminarDocumentoGuardado
-                    relacionId={relacionId}
-                    documentoId={documentoTrAlta.id}
-                    descripcion="¿Eliminar el alta de T-Registro? Dejará de verse en esta ficha."
+        <form action={guardarAlta} className="space-y-4">
+          <DocumentoPrevisualizacion
+            titulo={TIPO_DOCUMENTO_LABEL.TR_ALTA}
+            storagePath={fileAlta ? null : documentoTrAlta?.storage_path}
+            file={fileAlta}
+            vacio="Suba el alta de T-Registro cuando lo tenga en SUNAT."
+            extra={
+              canWrite ? (
+                <div className="space-y-4">
+                  <DocumentoFileInput
+                    accept={DOCUMENTO_ACCEPT}
                     disabled={pendingAlta}
+                    file={fileAlta}
+                    buttonLabel={
+                      fileAlta || documentoTrAlta?.storage_path
+                        ? "Cambiar alta de T-Registro"
+                        : "Subir alta de T-Registro"
+                    }
+                    emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+                    onFileChange={setFileAlta}
                   />
-                ) : null}
-                <DateField
-                  label="Fecha de alta"
-                  name="fecha"
-                  defaultValue={items.find((item) => item.tipo === "ALTA")?.fecha ?? trabajador.fecha_ingreso}
-                  readOnly={pendingAlta}
-                  hint={yaAlta ? "Puede corregir la fecha y guardar de nuevo." : undefined}
-                />
-                <Button type="submit" disabled={pendingAlta}>
-                  {pendingAlta ? "Guardando…" : yaAlta ? "Guardar fecha de alta" : "Guardar alta de T-Registro"}
-                </Button>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Solo consulta.</p>
-            )
-          }
-        />
-      </form>
+                  {documentoTrAlta?.storage_path ? (
+                    <EliminarDocumentoGuardado
+                      relacionId={relacionId}
+                      documentoId={documentoTrAlta.id}
+                      descripcion="¿Eliminar el alta de T-Registro? Dejará de verse en esta ficha."
+                      disabled={pendingAlta}
+                    />
+                  ) : null}
+                  <DateField
+                    label="Fecha de alta"
+                    name="fecha"
+                    defaultValue={fechaAlta ?? trabajador.fecha_ingreso}
+                    readOnly={pendingAlta}
+                    hint={yaAlta ? "Puede corregir la fecha y guardar de nuevo." : undefined}
+                  />
+                  <Button type="submit" disabled={pendingAlta}>
+                    {pendingAlta ? "Guardando…" : yaAlta ? "Guardar fecha de alta" : "Guardar alta de T-Registro"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Solo consulta.</p>
+              )
+            }
+          />
+        </form>
+
+        <ul className={`${panelCardClass} divide-y p-0`}>
+          {items.length === 0 ? (
+            <li className="px-4 py-6 text-sm text-muted-foreground">Sin altas ni bajas registradas.</li>
+          ) : (
+            items.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <span>
+                  {TIPO_T_REGISTRO_LABEL[item.tipo]}
+                  {item.fecha ? ` · ${formatFechaPlanilla(item.fecha)}` : ""}
+                </span>
+                <span className="text-muted-foreground">{item.realizado ? "Realizado" : "Pendiente"}</span>
+              </li>
+            ))
+          )}
+        </ul>
+        {yaAlta ? (
+          <Link
+            href={`/trabajadores/${relacionId}`}
+            className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            Ver ficha
+          </Link>
+        ) : null}
+      </ApartadoDesplegable>
 
       {canWriteTrBaja || canWrite ? (
-        <DarDeBajaControl
-          trabajador={trabajador}
-          documentoCarta={documentoCartaRenuncia ?? null}
-          documentoTrBaja={documentoTrBaja}
-        />
-      ) : null}
-
-      <ul className={`${panelCardClass} divide-y p-0`}>
-        {items.length === 0 ? (
-          <li className="px-4 py-6 text-sm text-muted-foreground">Sin altas ni bajas registradas.</li>
-        ) : (
-          items.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-              <span>
-                {TIPO_T_REGISTRO_LABEL[item.tipo]}
-                {item.fecha ? ` · ${formatFechaPlanilla(item.fecha)}` : ""}
-              </span>
-              <span className="text-muted-foreground">{item.realizado ? "Realizado" : "Pendiente"}</span>
-            </li>
-          ))
-        )}
-      </ul>
-      {yaAlta ? (
-        <Link
-          href={`/trabajadores/${relacionId}`}
-          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+        <ApartadoDesplegable
+          titulo="Baja"
+          pendiente={!yaBaja}
+          defaultOpen={false}
+          resumen={
+            yaBaja
+              ? "Baja registrada en T-Registro."
+              : "Cese del trabajador: carta (si renuncia), baja T-Registro y AFP."
+          }
         >
-          Ver ficha
-        </Link>
+          <DarDeBajaControl
+            trabajador={trabajador}
+            documentoCarta={documentoCartaRenuncia ?? null}
+            documentoTrBaja={documentoTrBaja}
+          />
+        </ApartadoDesplegable>
       ) : null}
     </div>
   );

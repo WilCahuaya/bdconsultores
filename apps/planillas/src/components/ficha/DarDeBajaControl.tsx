@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, ConfirmDialog, useToast } from "@inventario/ui";
-import { panelCardClass } from "@inventario/ui/panel";
 import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
@@ -115,14 +114,11 @@ export function DarDeBajaControl({
   }
 
   return (
-    <section className={`${panelCardClass} space-y-5 p-5`}>
-      <div>
-        <h3 className="text-sm font-medium text-foreground">Dar de baja</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Complete el formulario con previsualización. El botón se habilita al marcar la baja de AFP. El modal solo confirma
-          el cese.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <p className="text-sm text-muted-foreground">
+        Complete el formulario con previsualización. El botón se habilita al marcar la baja de AFP. El modal solo confirma
+        el cese.
+      </p>
 
       <SelectField
         label="Motivo de baja"
@@ -274,6 +270,6 @@ export function DarDeBajaControl({
         pending={pending}
         onConfirm={() => void onBaja()}
       />
-    </section>
+    </div>
   );
 }

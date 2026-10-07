@@ -10,6 +10,7 @@ import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
 import { FichaAdendas } from "@/components/ficha/FichaAdendas";
+import { ApartadoDesplegable } from "@/components/ficha/ApartadoDesplegable";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
@@ -43,6 +44,7 @@ import {
   flujoDesdeTrabajador,
   parseContratoPaso,
   pasoAltaInicial,
+  pensionAltaLista,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador } from "@/lib/planillas-labels";
 
@@ -213,15 +215,30 @@ export default async function ContratoProcesoPage({
               El estudio da de alta AFP y T-Registro aquí, en Contratos. Si es ONP, no hay alta AFP. Después se
               registra el alta en T-Registro.
             </p>
-            <FichaPensiones
-              relacionId={params.relacionId}
-              pension={pension}
-              trabajador={trabajador}
-              entidad={entidad}
-              documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
-              documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
-              canWrite={esEstudio && !fichaCesada}
-            />
+            <ApartadoDesplegable
+              titulo="AFP"
+              pendiente={!pensionAltaLista({ pension })}
+              defaultOpen={!pensionAltaLista({ pension })}
+              resumen={
+                !pension?.tipo
+                  ? "Pendiente: aún no se marcó AFP u ONP en Documentos."
+                  : pension.tipo === "ONP"
+                    ? "ONP · no requiere alta AFP."
+                    : pensionAltaLista({ pension })
+                      ? `Listo · ${pension.afp_nombre?.trim() || "AFP"}${pension.cuspp?.trim() ? ` · ${pension.cuspp.trim()}` : ""}.`
+                      : "Pendiente: complete nombre de AFP y CUSPP."
+              }
+            >
+              <FichaPensiones
+                relacionId={params.relacionId}
+                pension={pension}
+                trabajador={trabajador}
+                entidad={entidad}
+                documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
+                documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
+                canWrite={esEstudio && !fichaCesada}
+              />
+            </ApartadoDesplegable>
             <FichaTRegistro
               relacionId={params.relacionId}
               items={tRegistro}
@@ -234,6 +251,7 @@ export default async function ContratoProcesoPage({
               documentoCartaRenuncia={documentos.find((d) => d.tipo === "CARTA_RENUNCIA") ?? null}
               canWrite={esEstudio && !fichaCesada}
               canWriteTrBaja={esEstudio && !fichaCesada}
+              abrirAltaPorDefecto={pensionAltaLista({ pension })}
             />
           </div>
         ) : null}

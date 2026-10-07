@@ -286,14 +286,6 @@ export function FichaPensiones({
         </>
       ) : null}
 
-      {esOnp || (esAfp && pension?.tramite_estado === "TRAMITADO") ? (
-        <a
-          href="#t-registro"
-          className="inline-flex h-9 items-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
-        >
-          Ir a T-Registro
-        </a>
-      ) : null}
     </div>
   );
 }
