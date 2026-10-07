@@ -7,8 +7,6 @@ export type VersionContratoLista = {
   version: number;
   fechas: string;
   estado: string;
-  pdf: boolean;
-  solicitud: boolean;
   tono: TonoEstadoContrato;
   vigente: boolean;
 };
@@ -93,9 +91,6 @@ export function VersionesContratoButton({ versiones }: { versiones: VersionContr
                     {item.estado}
                   </span>
                 </p>
-                <div className="mt-1">
-                  <MarcasDocumentoContrato pdf={item.pdf} solicitud={item.solicitud} />
-                </div>
               </li>
             ))}
           </ul>
