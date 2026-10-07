@@ -358,7 +358,7 @@ export function FichaContratos({
   return (
     <div className="space-y-4">
       {faltaFirmadoValidado ? (
-        <p className={`${panelCardClass} border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950`}>
+        <p className={`${panelCardClass} border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-50`}>
           {ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO}. Use «Subir firmado» en la versión validada.
         </p>
       ) : null}
@@ -441,7 +441,7 @@ export function FichaContratos({
               : "Suba el PDF firmado, la solicitud de registro, o ambos. Revise los datos del contrato y valídelo. El ingreso a la empresa no cambia."
           }
         >
-          <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4">
+          <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/40">
             <FichaDocumentos
               relacionId={relacionId}
               entidadId={entidadId}
@@ -453,7 +453,7 @@ export function FichaContratos({
               descarga={descarga}
             />
           </div>
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
             <SolicitudRegistroContrato
               relacionId={relacionId}
               entidadId={entidadId}
@@ -472,7 +472,7 @@ export function FichaContratos({
           firmando.estado !== "COMPLETO" ? (
             <form
               action={(formData) => pedirValidacion(formData)}
-              className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4"
+              className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-950/40"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>

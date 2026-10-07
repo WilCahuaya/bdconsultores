@@ -313,7 +313,7 @@ export function FichaVidaLey({
           </p>
         </div>
         {canWrite && enviosExistentes.length > 0 && !lote?.constancia_storage_path && !lote?.factura_storage_path ? (
-          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/50">
             <label className="block space-y-1.5">
               <span className="text-sm font-medium">Usar un grupo que ya tiene constancia o factura</span>
               <select
@@ -334,7 +334,7 @@ export function FichaVidaLey({
             </Button>
           </div>
         ) : null}
-        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4">
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-800 dark:bg-sky-950/40">
           <ArchivoCompartidoVidaLey
             relacionId={relacionId}
             entidadId={trabajador.entidad_id}
@@ -356,7 +356,7 @@ export function FichaVidaLey({
             }}
           />
         </div>
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/40">
           <DocumentoPrevisualizacion
             titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY}
             storagePath={fileCertificado ? null : documentoCertificado?.storage_path}
@@ -433,7 +433,7 @@ export function FichaVidaLey({
             }
           />
         </div>
-        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4">
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-800 dark:bg-violet-950/40">
           <ArchivoCompartidoVidaLey
             relacionId={relacionId}
             entidadId={trabajador.entidad_id}
@@ -460,7 +460,7 @@ export function FichaVidaLey({
           />
         </div>
       </section>
-      <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+      <section className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 dark:border-emerald-800 dark:bg-emerald-950/40">
         <div className="space-y-1">
           <p className="text-sm font-medium">Comprobante de envío de la empresa</p>
           <p className="text-sm text-muted-foreground">
