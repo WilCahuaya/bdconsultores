@@ -36,7 +36,9 @@ import {
 import { contextoSolicitudesRegistro } from "@/lib/actions/solicitudes-registro";
 import { listHijosAsignacion } from "@/lib/actions/hijos-asignacion";
 import {
+  ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO,
   estadoPasosAlta,
+  faltaContratoFirmadoUltimoValidado,
   faltasPorPaso,
   flujoDesdeTrabajador,
   parseContratoPaso,
@@ -62,6 +64,8 @@ export default async function ContratoProcesoPage({
   const fichaCesada = trabajador.estado === "CESADA";
   const canEditFicha = puedeEditarFichaLaboral(profile) && !fichaCesada;
   const porValidar = trabajador.validacion === "PENDIENTE" && !fichaCesada;
+  const faltaFirmadoValidado =
+    !fichaCesada && faltaContratoFirmadoUltimoValidado(flujo.contratos, flujo.documentos);
   const paso = searchParams.paso ? parseContratoPaso(searchParams.paso) : pasoAltaInicial(completados);
   if (paso === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
@@ -157,6 +161,11 @@ export default async function ContratoProcesoPage({
                 <p className="text-xs text-muted-foreground">El contador o el asistente deben aceptar este alta.</p>
               )}
             </div>
+          ) : null}
+          {faltaFirmadoValidado && paso !== "contratos" ? (
+            <p className={`${panelCardClass} border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-950`}>
+              {ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO}. Puede seguir con el alta; súbalo en Contratos cuando lo tenga.
+            </p>
           ) : null}
           <AltaPasosNav tab={paso} completados={completados} faltas={faltas} relacionId={params.relacionId} />
         </div>

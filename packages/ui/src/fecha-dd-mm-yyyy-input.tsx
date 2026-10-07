@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, type InputHTMLAttributes } from "react";
-import { formatFechaInputDDMMYYYY } from "@inventario/types";
+import { completarFechaInputDDMMYYYY, formatFechaInputDDMMYYYY } from "@inventario/types";
 import { Input } from "./components";
 
 /** Posición del cursor tras N dígitos en el texto formateado DD/MM/AAAA. */
@@ -33,6 +33,7 @@ export function FechaDdMmYyyyInput({
   disabled,
   id,
   placeholder = "DD/MM/AAAA",
+  onBlur,
   ...rest
 }: FechaDdMmYyyyInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +69,11 @@ export function FechaDdMmYyyyInput({
       disabled={disabled}
       className={className}
       onChange={handleChange}
+      onBlur={(event) => {
+        const completo = completarFechaInputDDMMYYYY(value);
+        if (completo !== value) onChange(completo);
+        onBlur?.(event);
+      }}
     />
   );
 }

@@ -29,22 +29,14 @@ import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib
 import { esMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import {
   HORIZONTE_VENCIMIENTO_DIAS,
-  contratoConfirmado,
-  contratoMasReciente,
-  contratoTienePdfPropio,
-  contratoVigente,
-  documentosAltaFaltantes,
-  enlaceProcesoOperativo,
-  enlaceProcesoPendiente,
-  hrefAltaTrabajador,
+  armarPendientesAlertaFicha,
   flujoDesdeTrabajador,
-  resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
 import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorButton";
 import { DescargaTrabajadorProvider } from "@/components/ficha/DescargaTrabajador";
 import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
-import { PendientesFichaButton, type PendienteFicha } from "@/components/ficha/PendientesFichaButton";
-import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import { PendientesFichaButton } from "@/components/ficha/PendientesFichaButton";
+import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -76,8 +68,6 @@ export default async function FichaTrabajadorPage({
   }
 
   const flujo = flujoDesdeTrabajador(trabajador);
-  const siguiente = resolverSiguientePaso(flujo, esEstudio);
-  const contratoVig = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
   const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const fichaCesada = trabajador.estado === "CESADA";
@@ -130,41 +120,15 @@ export default async function FichaTrabajadorPage({
   const mes = mesActualLima();
   const periodo = anioActualLima();
   const hoy = new Date().toISOString().slice(0, 10);
-  const pendientes: PendienteFicha[] = [];
-  const ultimoContrato = contratoMasReciente(flujo.contratos);
-  const faltaContratoFirmado = !contratoTienePdfPropio(ultimoContrato, flujo.documentos);
-  if (!fichaCesada) {
-    const docsHref = hrefAltaTrabajador(params.relacionId, "documentos");
-    for (const tipo of documentosAltaFaltantes(flujo)) {
-      pendientes.push({ id: tipo, etiqueta: TIPO_DOCUMENTO_LABEL[tipo], href: docsHref });
-    }
-    if (faltaContratoFirmado) {
-      pendientes.push({
-        id: "CONTRATO_FIRMADO",
-        etiqueta: "Falta contrato firmado",
-        href: hrefAltaTrabajador(params.relacionId),
-      });
-    }
-    if (siguiente.rol !== "alerta" && siguiente.paso !== "listo") {
-      const enlace = enlaceProcesoPendiente(params.relacionId, siguiente);
-      const yaAvisaFirmado =
-        faltaContratoFirmado && enlace?.etiqueta === "Subir contrato firmado o solicitud de registro";
-      if (enlace && !yaAvisaFirmado) {
-        pendientes.push({ id: `paso-${siguiente.paso}`, etiqueta: enlace.etiqueta, href: enlace.href });
-      }
-    } else if (siguiente.paso === "listo") {
-      const operativo = enlaceProcesoOperativo({
-        entidadId: trabajador.entidad_id,
+  const pendientes = fichaCesada
+    ? []
+    : armarPendientesAlertaFicha({
         relacionId: params.relacionId,
+        entidadId: trabajador.entidad_id,
+        flujo,
         esEstudio,
         estado: trabajador.estado,
-        validacion: trabajador.validacion,
-        fechaIngreso: trabajador.fecha_ingreso,
         fechaCese: trabajador.fecha_cese,
-        pension: trabajador.pension,
-        tRegistro: trabajador.tRegistro,
-        documentos: trabajador.documentos,
-        contratoCerrado: contratoVig?.estado === "RECOGIDO" || contratoVig?.estado === "COMPLETO",
         vidaLey,
         pdfAsistenciaMes: documentos.some(
           (d) => d.tipo === "ASISTENCIA" && d.observaciones === mes && Boolean(d.storage_path),
@@ -175,9 +139,6 @@ export default async function FichaTrabajadorPage({
         hoy,
         limite: plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS),
       });
-      if (operativo) pendientes.push({ id: "operativo", etiqueta: operativo.etiqueta, href: operativo.href });
-    }
-  }
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>

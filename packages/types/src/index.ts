@@ -722,21 +722,32 @@ export function valorExcelATextoDDMMYYYY(value: unknown): string {
   return String(value).replace(/\s+/g, " ").trim();
 }
 
-/** Formatea dígitos al escribir: 12122025 → 12/12/2025. Ignora barras sueltas (evita 12//12). */
+/**
+ * Formatea al escribir: 31122025 → 31/12/2025.
+ * No completa el año de 2 dígitos aquí (eso es al salir del campo), para no pelear con el teclado.
+ */
 export function formatFechaInputDDMMYYYY(value: string): string {
   const trimmed = value.trim();
   const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
-  const conSeparador = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
-  if (conSeparador) {
-    const year = yearDesdeTexto(conSeparador[3]);
-    const parsed = year ? parseFechaDDMMYYYY(`${conSeparador[1]}/${conSeparador[2]}/${year}`) : null;
+  // Solo normaliza pegados ya completos con año de 4 dígitos (1/12/1993 → 01/12/1993).
+  const completo = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if (completo) {
+    const parsed = parseFechaDDMMYYYY(`${completo[1]}/${completo[2]}/${completo[3]}`);
     if (parsed) return formatFechaISOToDDMMYYYY(parsed);
   }
   const digits = value.replace(/\D/g, "").slice(0, 8);
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+/** Al salir del campo: 31/12/20 → 31/12/2020; 1/12/1993 → 01/12/1993. */
+export function completarFechaInputDDMMYYYY(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const iso = parseFechaFlexible(trimmed);
+  return iso ? formatFechaISOToDDMMYYYY(iso) : formatFechaInputDDMMYYYY(trimmed);
 }
 
 /** ISO (YYYY-MM-DD) → DD/MM/AAAA para listados e informes. */

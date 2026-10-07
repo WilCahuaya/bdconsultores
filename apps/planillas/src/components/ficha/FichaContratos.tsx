@@ -27,7 +27,11 @@ import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
 import { VistaDocumentoGuardado } from "@/components/ficha/DocumentoPrevisualizacion";
 import { SolicitudRegistroContrato } from "@/components/ficha/SolicitudRegistroContrato";
 import type { ContratoEnlazable, SolicitudRegistroVista } from "@/lib/actions/solicitudes-registro";
-import { etiquetaDocumentosSubidos } from "@/lib/flujo-ficha";
+import {
+  ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO,
+  faltaContratoFirmadoUltimoValidado,
+  etiquetaDocumentosSubidos,
+} from "@/lib/flujo-ficha";
 
 function abrirVistaPrevia(relacionId: string, contratoId: string) {
   window.open(
@@ -335,8 +339,29 @@ export function FichaContratos({
     router.push(`/contratos/${relacionId}?paso=alta`);
   }
 
+  const faltaFirmadoValidado = faltaContratoFirmadoUltimoValidado(
+    contratos.map((c) => ({
+      estado: c.estado,
+      fecha_inicio: c.fecha_inicio,
+      fecha_fin: c.fecha_fin,
+      remuneracion: c.remuneracion,
+      es_vigente: c.es_vigente,
+      version: c.version,
+      datos_confirmados: c.datos_confirmados,
+      documento_id: c.documento_id,
+      solicitud_registro_id: c.solicitud_registro_id,
+      solicitud_storage_path: solicitudDeContrato(c, solicitudes)?.storage_path ?? null,
+    })),
+    documentos,
+  );
+
   return (
     <div className="space-y-4">
+      {faltaFirmadoValidado ? (
+        <p className={`${panelCardClass} border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950`}>
+          {ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO}. Use «Subir firmado» en la versión validada.
+        </p>
+      ) : null}
       {canWrite ? <p className="text-sm text-muted-foreground">Generar abre una versión nueva.</p> : null}
 
       {canWrite ? (
