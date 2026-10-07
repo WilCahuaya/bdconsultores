@@ -44,6 +44,8 @@ export type CompaneroEnvioVidaLey = {
   enEsteEnvio: boolean;
   otroEnvio: boolean;
   cesada: boolean;
+  /** Sin fecha fin o con seguro vencido → puede entrar a un grupo nuevo. */
+  libre: boolean;
 };
 
 export type EnvioVidaLeyExistente = {
@@ -258,7 +260,7 @@ export function FichaVidaLey({
     `${etiquetaTrabajador(trabajador.persona, trabajador.numero)}${trabajador.estado === "CESADA" ? " · Baja" : ""}`,
     ...companerosEnvio.filter((item) => item.enEsteEnvio).map((item) => item.etiqueta),
   ];
-  const paraAgregar = companerosEnvio.filter((item) => !item.enEsteEnvio);
+  const paraAgregar = companerosEnvio.filter((item) => !item.enEsteEnvio && item.libre);
 
   return (
     <div className="space-y-4">
@@ -746,7 +748,7 @@ function ArchivoCompartidoVidaLey({
           {permitirAgregar && paraAgregar.length > 0 ? (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">
-                Este trabajador queda incluido. Marque a quién más cubre el documento, incluidas las bajas.
+                Este trabajador queda incluido. Solo aparecen quienes están libres (sin seguro vigente o con fecha fin vencida).
               </p>
               <ListaCompaneros items={paraAgregar} marcados={marcados} disabled={ocupado} onToggle={toggle} />
             </div>

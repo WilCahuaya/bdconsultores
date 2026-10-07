@@ -23,7 +23,14 @@ import {
   pathPerteneceAVidaLeyLote,
   type ArchivoVidaLeyLote,
 } from "@/lib/documento-storage";
-import { parseFechaCampo, parseCargoCampo, armarDireccionPersona, montoAsignacionFamiliar, vidaLeyPendienteRecepcion } from "@/lib/planillas-labels";
+import {
+  parseFechaCampo,
+  parseCargoCampo,
+  armarDireccionPersona,
+  montoAsignacionFamiliar,
+  trabajadorLibreParaVidaLey,
+  vidaLeyPendienteRecepcion,
+} from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { fechaFinPeriodoVidaLey } from "@/lib/vida-ley-word";
 import { planillasDb } from "@/lib/supabase/planillas";
@@ -987,7 +994,7 @@ export async function getVidaLeyLote(relacionId: string): Promise<VidaLeyLoteRow
 }
 
 export async function contextoEnviosVidaLey(entidadId: string): Promise<{
-  porRelacion: { relacionId: string; loteId: string | null }[];
+  porRelacion: { relacionId: string; loteId: string | null; fechaFin: string | null }[];
   envios: EnvioVidaLeyOpcion[];
 }> {
   const vacio = { porRelacion: [], envios: [] };
@@ -995,7 +1002,7 @@ export async function contextoEnviosVidaLey(entidadId: string): Promise<{
   await requirePlanillasProfile();
   const db = await planillasDb();
   const [vidasRes, lotesRes] = await Promise.all([
-    db.from("vida_ley").select("relacion_id, lote_id").eq("entidad_id", entidadId),
+    db.from("vida_ley").select("relacion_id, lote_id, fecha_fin").eq("entidad_id", entidadId),
     db
       .from("vida_ley_lotes")
       .select("id, constancia_storage_path, factura_storage_path, created_at")
@@ -1007,6 +1014,7 @@ export async function contextoEnviosVidaLey(entidadId: string): Promise<{
   const porRelacion = (vidasRes.data ?? []).map((row) => ({
     relacionId: row.relacion_id as string,
     loteId: (row.lote_id as string | null) ?? null,
+    fechaFin: (row.fecha_fin as string | null) ?? null,
   }));
   const idsPorLote = new Map<string, string[]>();
   for (const row of porRelacion) {
@@ -1098,10 +1106,19 @@ export async function compartirEnvioVidaLey(
 
   const { data: existentes, error: existentesError } = await db
     .from("vida_ley")
-    .select("relacion_id, estado, numero_poliza, fecha_inicio, fecha_fin")
+    .select("relacion_id, estado, numero_poliza, fecha_inicio, fecha_fin, lote_id")
     .in("relacion_id", [relacionId, ...ids]);
   if (existentesError) return { error: existentesError.message };
   const porId = new Map((existentes ?? []).map((row) => [row.relacion_id as string, row]));
+  const ocupados = ids.filter((id) => {
+    const row = porId.get(id);
+    if (!row) return false;
+    if (row.lote_id && row.lote_id === loteId) return false;
+    return !trabajadorLibreParaVidaLey(row.fecha_fin as string | null);
+  });
+  if (ocupados.length > 0) {
+    return { error: "Hay trabajadores con seguro Vida Ley vigente. Solo puede agregar a quienes ya vencieron o no tienen fecha fin." };
+  }
   const payload = [relacionId, ...ids].map((id) => {
     const row = porId.get(id);
     return {

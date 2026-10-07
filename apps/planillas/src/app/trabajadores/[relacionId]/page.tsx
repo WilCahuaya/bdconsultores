@@ -36,7 +36,13 @@ import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorB
 import { DescargaTrabajadorProvider } from "@/components/ficha/DescargaTrabajador";
 import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
 import { PendientesFichaButton } from "@/components/ficha/PendientesFichaButton";
-import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto } from "@/lib/planillas-labels";
+import {
+  ESTADO_RELACION_LABEL,
+  ESTADO_VALIDACION_ALTA_LABEL,
+  etiquetaTrabajador,
+  nombreCompleto,
+  trabajadorLibreParaVidaLey,
+} from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -223,21 +229,21 @@ export default async function FichaTrabajadorPage({
             lote={lote}
             companerosEnvio={companeros
               .filter((item) => item.id !== params.relacionId)
-              .map((item) => ({
-                relacionId: item.id,
-                etiqueta: `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
-                enEsteEnvio: Boolean(
-                  lote && enviosCtx.porRelacion.some((row) => row.relacionId === item.id && row.loteId === lote.id),
-                ),
-                cesada: item.estado === "CESADA",
-                otroEnvio: enviosCtx.porRelacion.some(
-                  (row) =>
-                    row.relacionId === item.id &&
-                    Boolean(row.loteId) &&
-                    row.loteId !== lote?.id &&
-                    enviosCtx.envios.some((envio) => envio.loteId === row.loteId),
-                ),
-              }))
+              .map((item) => {
+                const vida = enviosCtx.porRelacion.find((row) => row.relacionId === item.id);
+                return {
+                  relacionId: item.id,
+                  etiqueta: `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
+                  enEsteEnvio: Boolean(lote && vida?.loteId === lote.id),
+                  cesada: item.estado === "CESADA",
+                  libre: trabajadorLibreParaVidaLey(vida?.fechaFin),
+                  otroEnvio: Boolean(
+                    vida?.loteId &&
+                      vida.loteId !== lote?.id &&
+                      enviosCtx.envios.some((envio) => envio.loteId === vida.loteId),
+                  ),
+                };
+              })
               .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"))}
             enviosExistentes={enviosCtx.envios
               .map((envio, index) => ({ ...envio, numero: index + 1 }))
