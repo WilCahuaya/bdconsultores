@@ -131,19 +131,21 @@ async function docxAPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
 }
 
 async function excelAPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
+  const { valorExcelATextoDDMMYYYY } = await import("@inventario/types");
   const XLSX = await import("xlsx-js-style");
-  const libro = XLSX.read(buffer, { type: "array" });
+  const libro = XLSX.read(buffer, { type: "array", cellDates: true });
   const bloques: Bloque[] = [];
   let filas = 0;
   for (const nombre of libro.SheetNames) {
     const hoja = libro.Sheets[nombre];
     if (!hoja) continue;
-    const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(hoja, {
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(hoja, {
       header: 1,
       raw: false,
+      dateNF: "dd/mm/yyyy",
       defval: "",
     });
-    const utiles = rows.filter((row) => row.some((celda) => String(celda ?? "").trim()));
+    const utiles = rows.filter((row) => row.some((celda) => valorExcelATextoDDMMYYYY(celda)));
     if (utiles.length === 0) continue;
     bloques.push({ tipo: "titulo", texto: nombre });
     for (const row of utiles) {
@@ -154,7 +156,7 @@ async function excelAPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
       filas += 1;
       bloques.push({
         tipo: "texto",
-        texto: row.map((celda) => String(celda ?? "").replace(/\s+/g, " ").trim()).filter(Boolean).join("  ·  "),
+        texto: row.map((celda) => valorExcelATextoDDMMYYYY(celda)).filter(Boolean).join("  ·  "),
       });
     }
   }

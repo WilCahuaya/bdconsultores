@@ -1,4 +1,4 @@
-import { parseFechaFlexible } from "@inventario/types";
+import { excelSerialToISO, parseFechaFlexible } from "@inventario/types";
 import type { ClasificacionTrabajador, JornadaLaboral } from "@inventario/types";
 import { cargoCanonico, type CargoTrabajador } from "@/lib/cargos-funciones";
 import {
@@ -236,24 +236,14 @@ function parseMonto(raw: string): number | null {
   return Math.round(value * 100) / 100;
 }
 
+/** Fechas de importación: siempre día/mes/año (también 1/12/1993). Sin reinterpretar mes/día. */
 function parseFechaImport(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
   if (/^\d{4,5}(\.0+)?$/.test(trimmed)) {
-    const serial = Math.floor(Number(trimmed));
-    const utc = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
-    const year = utc.getUTCFullYear();
-    const month = String(utc.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(utc.getUTCDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return excelSerialToISO(Math.floor(Number(trimmed)));
   }
-  const match = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
-  if (!match) return parseFechaFlexible(trimmed);
-  let year = match[3];
-  if (year.length === 2) year = Number(year) >= 50 ? `19${year}` : `20${year}`;
-  const directa = parseFechaFlexible(`${match[1].padStart(2, "0")}/${match[2].padStart(2, "0")}/${year}`);
-  if (directa) return directa;
-  return parseFechaFlexible(`${match[2].padStart(2, "0")}/${match[1].padStart(2, "0")}/${year}`);
+  return parseFechaFlexible(trimmed);
 }
 
 function dniDe(raw: string): string {

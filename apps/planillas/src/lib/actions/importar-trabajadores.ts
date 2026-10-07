@@ -209,10 +209,11 @@ async function matrizDesdeArchivo(formData: FormData): Promise<{ error?: string;
   if (file.size > 8 * 1024 * 1024) return { error: "El archivo supera 8 MB." };
 
   const buffer = Buffer.from(await file.arrayBuffer());
+  const { valorExcelATextoDDMMYYYY } = await import("@inventario/types");
   const XLSX = await import("xlsx-js-style");
   const libro = name.endsWith(".csv")
-    ? XLSX.read(buffer.toString("utf8"), { type: "string", FS: ";" })
-    : XLSX.read(buffer, { type: "buffer" });
+    ? XLSX.read(buffer.toString("utf8"), { type: "string", FS: ";", cellDates: true })
+    : XLSX.read(buffer, { type: "buffer", cellDates: true });
 
   const nombres = [...libro.SheetNames].sort((a, b) => {
     const an = a.toLowerCase().includes("planilla") ? 0 : 1;
@@ -222,12 +223,13 @@ async function matrizDesdeArchivo(formData: FormData): Promise<{ error?: string;
   for (const hoja of nombres) {
     const sheet = libro.Sheets[hoja];
     if (!sheet) continue;
-    const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(sheet, {
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
       header: 1,
       raw: false,
+      dateNF: "dd/mm/yyyy",
       defval: "",
     });
-    const texto = rows.map((row) => (row ?? []).map((celda) => (celda == null ? "" : String(celda).trim())));
+    const texto = rows.map((row) => (row ?? []).map((celda) => valorExcelATextoDDMMYYYY(celda)));
     const leido = leerTrabajadoresExcel(texto);
     if (!leido.error) return { rows: texto };
   }

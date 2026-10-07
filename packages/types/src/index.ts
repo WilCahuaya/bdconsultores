@@ -611,10 +611,10 @@ export const CATEGORIA_BIEN_LABELS: Record<
   },
 };
 
-/** Convierte DD/MM/AAAA a ISO (YYYY-MM-DD) o null si es inválida. */
+/** Convierte DD/MM/AAAA (día y mes de 1 o 2 dígitos) a ISO (YYYY-MM-DD) o null si es inválida. */
 export function parseFechaDDMMYYYY(text: string): string | null {
   const trimmed = text.trim();
-  const match = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!match) return null;
 
   const day = Number(match[1]);
@@ -630,21 +630,109 @@ export function parseFechaDDMMYYYY(text: string): string | null {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-/** Acepta DD/MM/AAAA, DD-MM-AAAA, DD.MM.AAAA o ISO YYYY-MM-DD. */
+function yearDesdeTexto(raw: string): string | null {
+  if (raw.length === 4) return raw;
+  if (raw.length !== 2) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  return n >= 50 ? `19${raw}` : `20${raw}`;
+}
+
+/** Acepta DD/MM/AAAA (también 1/12/1993), DD-MM-AAAA, DD.MM.AAAA o ISO YYYY-MM-DD. */
 export function parseFechaFlexible(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
   const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return parseFechaDDMMYYYY(`${iso[3]}/${iso[2]}/${iso[1]}`);
-  const other = trimmed.match(/^(\d{2})[./-](\d{2})[./-](\d{4})$/);
-  if (other) return parseFechaDDMMYYYY(`${other[1]}/${other[2]}/${other[3]}`);
+  const other = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (other) {
+    const year = yearDesdeTexto(other[3]);
+    if (!year) return null;
+    return parseFechaDDMMYYYY(`${other[1]}/${other[2]}/${year}`);
+  }
   return parseFechaDDMMYYYY(trimmed);
+}
+
+/** Serial de fecha Excel (días desde 1899-12-30) → ISO, o null si está fuera de rango. */
+export function excelSerialToISO(serial: number): string | null {
+  if (!Number.isFinite(serial)) return null;
+  const whole = Math.floor(serial);
+  if (whole < 1 || whole > 80000) return null;
+  const utc = new Date(Date.UTC(1899, 11, 30) + whole * 86400000);
+  const year = utc.getUTCFullYear();
+  const month = utc.getUTCMonth() + 1;
+  const day = utc.getUTCDate();
+  if (year < 1900 || year > 2100) return null;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Serial Excel → DD/MM/AAAA. */
+export function formatExcelSerialToDDMMYYYY(serial: number): string | null {
+  const iso = excelSerialToISO(serial);
+  return iso ? formatFechaISOToDDMMYYYY(iso) : null;
+}
+
+function fechaJsToDDMMYYYY(value: Date): string {
+  const utcMidnight =
+    value.getUTCHours() === 0 &&
+    value.getUTCMinutes() === 0 &&
+    value.getUTCSeconds() === 0 &&
+    value.getUTCMilliseconds() === 0;
+  const day = utcMidnight ? value.getUTCDate() : value.getDate();
+  const month = (utcMidnight ? value.getUTCMonth() : value.getMonth()) + 1;
+  const year = utcMidnight ? value.getUTCFullYear() : value.getFullYear();
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+}
+
+function pareceFormatoFechaExcel(numFmt: string | null | undefined, formatted: string | null | undefined): boolean {
+  const fmt = (numFmt ?? "").toLowerCase();
+  if (/[dy]/.test(fmt) && !/h|s|am\/pm|a\/p/.test(fmt.replace(/\[.*?\]/g, ""))) return true;
+  const texto = (formatted ?? "").trim();
+  return /^\d{1,2}[./-]\d{1,2}([./-]\d{2,4})?$/.test(texto);
+}
+
+/**
+ * Texto de celda Excel para PDF/importación: si es fecha, siempre DD/MM/AAAA
+ * (evita el m/d/yyyy de SheetJS).
+ */
+export function textoCeldaExcelDDMMYYYY(celda: {
+  v?: unknown;
+  w?: unknown;
+  t?: unknown;
+  z?: unknown;
+}): string {
+  const v = celda.v;
+  const w = celda.w != null ? String(celda.w) : null;
+  const z = celda.z != null ? String(celda.z) : null;
+  if (v instanceof Date && !Number.isNaN(v.getTime())) return fechaJsToDDMMYYYY(v);
+  if (typeof v === "number" && (celda.t === "d" || pareceFormatoFechaExcel(z, w))) {
+    return formatExcelSerialToDDMMYYYY(v) ?? (w ?? String(v));
+  }
+  if (typeof v === "number" && w && /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(w.trim())) {
+    return formatExcelSerialToDDMMYYYY(v) ?? w;
+  }
+  const crudo = w != null ? w : v != null ? String(v) : "";
+  return crudo.replace(/\s+/g, " ").trim();
+}
+
+/** Valor suelto de sheet_to_json → texto; objetos Date como DD/MM/AAAA. */
+export function valorExcelATextoDDMMYYYY(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return fechaJsToDDMMYYYY(value);
+  return String(value).replace(/\s+/g, " ").trim();
 }
 
 /** Formatea dígitos al escribir: 12122025 → 12/12/2025. Ignora barras sueltas (evita 12//12). */
 export function formatFechaInputDDMMYYYY(value: string): string {
-  const iso = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const trimmed = value.trim();
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const conSeparador = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  if (conSeparador) {
+    const year = yearDesdeTexto(conSeparador[3]);
+    const parsed = year ? parseFechaDDMMYYYY(`${conSeparador[1]}/${conSeparador[2]}/${year}`) : null;
+    if (parsed) return formatFechaISOToDDMMYYYY(parsed);
+  }
   const digits = value.replace(/\D/g, "").slice(0, 8);
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
@@ -1084,7 +1172,7 @@ export function categoriaBienCorto(categoria: CategoriaBien): string {
 export function validarFechaDDMMYYYY(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed) return null;
-  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+  if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(trimmed)) {
     return "Use el formato DD/MM/AAAA.";
   }
   if (!parseFechaDDMMYYYY(trimmed)) {

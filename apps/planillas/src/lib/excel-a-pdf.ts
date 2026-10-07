@@ -1,3 +1,4 @@
+import { textoCeldaExcelDDMMYYYY } from "@inventario/types";
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 
 const MAX_FILAS = 3000;
@@ -44,7 +45,7 @@ export async function excelComoPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
   const hojas = hojasDelLibro(libroXml, rels);
   const titulos = titulosDeImpresion(libroXml);
   const XLSX = await cargarXlsx();
-  const libro = XLSX.read(bytes, { type: "array" });
+  const libro = XLSX.read(bytes, { type: "array", cellDates: true });
   const pdf = await PDFDocument.create();
   const fuentes = {
     normal: await pdf.embedFont(StandardFonts.Helvetica),
@@ -69,8 +70,12 @@ export async function excelComoPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
   return pdf.save();
 }
 
+type CeldaXlsx = { w?: unknown; v?: unknown; t?: unknown; z?: unknown };
 type XlsxModule = {
-  read: (data: Uint8Array, opts: { type: "array" }) => { Sheets: Record<string, Record<string, { w?: unknown; v?: unknown }>> };
+  read: (
+    data: Uint8Array,
+    opts: { type: "array"; cellDates?: boolean },
+  ) => { Sheets: Record<string, Record<string, CeldaXlsx>> };
 };
 
 async function cargarXlsx(): Promise<XlsxModule> {
@@ -282,7 +287,7 @@ type HojaArmada = {
 
 function armarHoja(
   xml: string,
-  valores: Record<string, { w?: unknown; v?: unknown }>,
+  valores: Record<string, CeldaXlsx>,
   estilos: Estilo[],
   repetirFilas: number[],
 ): HojaArmada | null {
@@ -347,8 +352,7 @@ function armarHoja(
     if (direccion.startsWith("!")) continue;
     const pos = direccionCelda(direccion);
     if (!pos || pos.r > maxFila || pos.c > maxCol) continue;
-    const crudo = celda.w != null ? String(celda.w) : celda.v != null ? String(celda.v) : "";
-    const limpio = crudo.replace(/\s+/g, " ").trim();
+    const limpio = textoCeldaExcelDDMMYYYY(celda);
     if (limpio) textos.set(`${pos.r},${pos.c}`, limpio);
   }
   if (textos.size === 0 && estilosCelda.size === 0) return null;
