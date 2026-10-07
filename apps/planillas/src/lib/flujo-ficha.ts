@@ -416,20 +416,34 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
   if (!pasos.puesto) {
     return { paso: "puesto", tab: "puesto", etiqueta: "Completar puesto", rol: "empresa" };
   }
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PENDIENTE_DOCS") &&
+    !vigente.datos_confirmados &&
+    !firmado
+  ) {
+    return { paso: "contratos", tab: "contratos", etiqueta: "Presentar contrato al MTPE", rol: "empresa" };
+  }
+  if (borrador && vigente?.estado === "PRESENTADO_MTPE" && !firmado) {
+    return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado o solicitud de registro", rol: "empresa" };
+  }
   if (borrador && !firmado) {
     return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado o solicitud de registro", rol: "empresa" };
   }
   if (borrador && firmado) {
-    return { paso: "contratos", tab: "contratos", etiqueta: "Confirmar datos del respaldo", rol: "empresa" };
+    return { paso: "contratos", tab: "contratos", etiqueta: "Validar contrato", rol: "empresa" };
   }
   if (input.validacion === "PENDIENTE") {
     return esEstudio
       ? { paso: "contratos", tab: "contratos", etiqueta: "Validar alta", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
-  if (vigente?.estado === "ELABORADO" && firmado) {
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PRESENTADO_MTPE") &&
+    firmado &&
+    vigente.datos_confirmados
+  ) {
     return esEstudio
-      ? { paso: "contratos", tab: "contratos", etiqueta: "Marcar recogido", rol: "estudio" }
+      ? { paso: "contratos", tab: "contratos", etiqueta: "Cerrar contrato (marcar recogido)", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
   if (!pensionAltaLista(input)) {
@@ -557,6 +571,7 @@ export const HORIZONTE_VENCIMIENTO_DIAS = 30;
 export const ETAPAS_CONTRATO = [
   "alta",
   "generar",
+  "mtpe",
   "firmar",
   "confirmar",
   "validar",
@@ -582,10 +597,11 @@ export const ETAPA_CONTRATO_FILTRO_LABEL: Record<EtapaContratoId | "pendientes",
   pendientes: "Pendientes",
   alta: "Alta incompleta",
   generar: "Generar",
+  mtpe: "Presentar al MTPE",
   firmar: "Subir firmado",
-  confirmar: "Confirmar datos",
+  confirmar: "Validar contrato",
   validar: "Validar alta",
-  recoger: "Marcar recogido",
+  recoger: "Cerrar contrato",
   afp: "Dar de alta",
   "t-registro": "Alta T-Registro",
   vence: "Por vencer",
@@ -616,20 +632,34 @@ export function resolverEtapaContrato(
   if (!pasos.puesto) {
     return { id: "alta", etiqueta: "Falta completar puesto", tab: "puesto", rol: "empresa", pendiente: true };
   }
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PENDIENTE_DOCS") &&
+    !vigente.datos_confirmados &&
+    !firmado
+  ) {
+    return { id: "mtpe", etiqueta: "Falta presentar el contrato al MTPE", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+  if (borrador && vigente?.estado === "PRESENTADO_MTPE" && !firmado) {
+    return { id: "firmar", etiqueta: "Falta el contrato firmado o la solicitud de registro", tab: "contratos", rol: "empresa", pendiente: true };
+  }
   if (borrador && !firmado) {
     return { id: "firmar", etiqueta: "Falta el contrato firmado o la solicitud de registro", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (borrador && firmado) {
-    return { id: "confirmar", etiqueta: "Falta confirmar datos del respaldo", tab: "contratos", rol: "empresa", pendiente: true };
+    return { id: "confirmar", etiqueta: "Falta validar el contrato", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (flujo.validacion === "PENDIENTE") {
     return esEstudio
       ? { id: "validar", etiqueta: "Alta pendiente de validación", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "validar", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
-  if (vigente?.estado === "ELABORADO" && firmado) {
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PRESENTADO_MTPE") &&
+    firmado &&
+    vigente.datos_confirmados
+  ) {
     return esEstudio
-      ? { id: "recoger", etiqueta: "Contrato con respaldo: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
+      ? { id: "recoger", etiqueta: "Contrato validado: falta cerrar el proceso", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "recoger", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (!pensionAltaLista(flujo)) {

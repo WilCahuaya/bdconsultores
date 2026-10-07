@@ -10,6 +10,7 @@ import {
   confirmarContratoFirmado,
   eliminarContratoGenerado,
   generarContratoParaFirma,
+  marcarContratoPresentadoMtpe,
   marcarContratoRecogido,
   type ContratoRow,
   type DocumentoRow,
@@ -111,6 +112,15 @@ function IconRecogido({ className = "h-3.5 w-3.5" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function IconMtpe({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v12m0 0l-4-4m4 4 4-4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 19h14" />
     </svg>
   );
 }
@@ -252,7 +262,7 @@ export function FichaContratos({
     }
     setValidandoDatos(null);
     setFirmandoId(null);
-    pushToast("Contrato validado.");
+    pushToast("Contrato validado. El proceso del contrato terminó.");
     router.refresh();
   }
 
@@ -264,6 +274,10 @@ export function FichaContratos({
     }
     if (firmando.datos_confirmados) {
       pushToast("Este contrato ya está validado.", "error");
+      return;
+    }
+    if (firmando.estado !== "PRESENTADO_MTPE") {
+      pushToast("Presente el contrato al MTPE antes de validarlo.", "error");
       return;
     }
     if (!tieneRespaldoFirmando) {
@@ -290,6 +304,18 @@ export function FichaContratos({
     setFirmandoId(contrato.id);
   }
 
+  async function onPresentarMtpe(contratoId: string) {
+    setPending(`mtpe-${contratoId}`);
+    const result = await marcarContratoPresentadoMtpe(relacionId, contratoId);
+    setPending(null);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    pushToast("Contrato marcado como presentado al MTPE. Suba el documento firmado.");
+    router.refresh();
+  }
+
   async function onRecoger(contratoId: string) {
     setPending(contratoId);
     const result = await marcarContratoRecogido(relacionId, contratoId);
@@ -298,7 +324,7 @@ export function FichaContratos({
       pushToast(result.error, "error");
       return;
     }
-    pushToast("Contrato marcado como recogido. Siga con el alta AFP y T-Registro.");
+    pushToast("Contrato cerrado. Siga con el alta AFP y T-Registro.");
     router.push(`/contratos/${relacionId}?paso=alta`);
   }
 
@@ -444,7 +470,23 @@ export function FichaContratos({
                     trabajador={trabajador}
                     contrato={firmando}
                   />
-                  {tieneRespaldoFirmando ? (
+                  {firmando.estado !== "PRESENTADO_MTPE" ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Primero marque el contrato como presentado al MTPE. Después suba el firmado y valídelo.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setValidandoDatos(null);
+                          setFirmandoId(null);
+                        }}
+                      >
+                        Cerrar
+                      </Button>
+                    </>
+                  ) : tieneRespaldoFirmando ? (
                     <>
                       <div className="flex flex-wrap gap-2">
                         <Button type="submit" disabled={pending === "confirmar"}>
@@ -463,7 +505,7 @@ export function FichaContratos({
                         </Button>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Al validar se le pedirá confirmar. Revise los datos antes de continuar.
+                        Al validar se le pedirá confirmar. El proceso del contrato termina al validar.
                       </p>
                     </>
                   ) : (
@@ -567,10 +609,18 @@ export function FichaContratos({
               const conSolicitud = contratoTieneSolicitud(c, solicitudes);
               const conRespaldo = conPdf || conSolicitud;
               const cerrado = c.estado === "RECOGIDO" || c.estado === "COMPLETO" || c.estado === "BAJA";
-              const puedeSubirRespaldo = canWrite && c.estado !== "BAJA";
+              const elaborado = c.estado === "ELABORADO" || c.estado === "PENDIENTE_DOCS";
+              const presentado = c.estado === "PRESENTADO_MTPE";
               const puedeEditarEliminar = canWrite && !cerrado;
-              const puedeValidar = puedeEditarEliminar && !c.datos_confirmados && conRespaldo;
-              const puedeMarcar = canMarcarRecogido && c.estado === "ELABORADO" && c.datos_confirmados;
+              const puedePresentarMtpe = canWrite && elaborado && !c.datos_confirmados;
+              // Tras presentar al MTPE (o si ya hay archivo en elaborado): subir / validar.
+              const puedeSubirRespaldo =
+                canWrite && c.estado !== "BAJA" && (presentado || cerrado || (elaborado && conRespaldo) || c.datos_confirmados);
+              const puedeValidar = puedeEditarEliminar && !c.datos_confirmados && conRespaldo && presentado;
+              const puedeMarcar =
+                canMarcarRecogido &&
+                c.datos_confirmados &&
+                (c.estado === "ELABORADO" || c.estado === "PRESENTADO_MTPE" || c.estado === "PENDIENTE_DOCS");
               const etiquetaRespaldo = !conRespaldo
                 ? "Subir respaldo"
                 : puedeValidar
@@ -619,6 +669,15 @@ export function FichaContratos({
                       >
                         <IconWord />
                       </AccionIconButton>
+                      {puedePresentarMtpe ? (
+                        <AccionIconButton
+                          label={pending === `mtpe-${c.id}` ? "Guardando…" : "Presentar al MTPE"}
+                          disabled={pending === `mtpe-${c.id}`}
+                          onClick={() => void onPresentarMtpe(c.id)}
+                        >
+                          <IconMtpe />
+                        </AccionIconButton>
+                      ) : null}
                       {puedeSubirRespaldo || conRespaldo ? (
                         <AccionIconButton
                           label={pending === `firm-${c.id}` ? "Preparando…" : etiquetaRespaldo}
@@ -658,7 +717,7 @@ export function FichaContratos({
                       ) : null}
                       {puedeMarcar ? (
                         <AccionIconButton
-                          label={pending === c.id ? "Guardando…" : "Marcar recogido"}
+                          label={pending === c.id ? "Guardando…" : "Cerrar contrato"}
                           disabled={pending === c.id || !conRespaldo}
                           className="border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
                           onClick={() => void onRecoger(c.id)}
@@ -700,7 +759,7 @@ export function FichaContratos({
           setValidandoDatos(null);
         }}
         title="Validar contrato"
-        description="¿Está seguro de que desea validar? Revise los datos del formulario antes de validar. Se guardarán cargo, fechas, jornada, horario y remuneración de este contrato."
+        description="¿Está seguro de que desea validar? Revise los datos del formulario antes de validar. Se guardarán cargo, fechas, jornada, horario y remuneración, y el proceso del contrato terminará."
         confirmLabel="Sí, validar"
         pending={pending === "confirmar"}
         onConfirm={() => {

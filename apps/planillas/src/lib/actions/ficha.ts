@@ -460,6 +460,8 @@ export async function confirmarContratoFirmado(
       asignacion_familiar: montoAsignacionFamiliar(gate.trabajador.recibe_asignacion_familiar),
       datos_confirmados: true,
       es_vigente: quedaVigente,
+      // Validar cierra el proceso del contrato (Elaborado → MTPE → firmado → validar).
+      estado: "RECOGIDO" as EstadoContratoPlanilla,
     })
     .eq("id", contratoId)
     .eq("relacion_id", relacionId);
@@ -491,6 +493,49 @@ export async function confirmarContratoFirmado(
   return {};
 }
 
+export async function marcarContratoPresentadoMtpe(
+  relacionId: string,
+  contratoId: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+
+  const db = await planillasDb();
+  const { data: contrato, error: loadError } = await db
+    .from("contratos")
+    .select("id, estado, datos_confirmados")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!contrato) return { error: "Contrato no encontrado." };
+  if (contratoEstaCerrado(contrato.estado as EstadoContratoPlanilla)) {
+    return { error: "Este contrato ya está cerrado." };
+  }
+  if (contrato.datos_confirmados) {
+    return { error: "Este contrato ya está validado." };
+  }
+  if (contrato.estado === "PRESENTADO_MTPE") return {};
+  if (contrato.estado !== "ELABORADO" && contrato.estado !== "PENDIENTE_DOCS") {
+    return { error: "Solo se puede presentar al MTPE un contrato elaborado." };
+  }
+
+  const { error } = await db
+    .from("contratos")
+    .update({ estado: "PRESENTADO_MTPE" as EstadoContratoPlanilla })
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
+  revalidatePath("/");
+  return {};
+}
+
+/** Contratos ya validados que aún no cerraron el proceso (antes de unificar Validar = fin). */
 export async function marcarContratoRecogido(
   relacionId: string,
   contratoId: string,
@@ -508,11 +553,15 @@ export async function marcarContratoRecogido(
   if (loadError) return { error: loadError.message };
   if (!contrato) return { error: "Contrato no encontrado." };
   if (contrato.estado === "RECOGIDO") return {};
-  if (contrato.estado !== "ELABORADO") {
-    return { error: "Primero hay que generar el documento (estado Elaborado)." };
+  if (
+    contrato.estado !== "ELABORADO" &&
+    contrato.estado !== "PRESENTADO_MTPE" &&
+    contrato.estado !== "PENDIENTE_DOCS"
+  ) {
+    return { error: "Primero hay que elaborar o presentar el contrato al MTPE." };
   }
   if (!contrato.datos_confirmados) {
-    return { error: "Confirme los datos del respaldo antes de marcarlo Recogido." };
+    return { error: "Valide el contrato con el documento firmado antes de marcarlo Recogido." };
   }
 
   const respaldo = await hayRespaldoDeContrato(
