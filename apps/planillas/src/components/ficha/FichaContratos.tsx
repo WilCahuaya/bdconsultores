@@ -183,6 +183,7 @@ export function FichaContratos({
   const [validandoDatos, setValidandoDatos] = useState<FormData | null>(null);
   const [firmandoId, setFirmandoId] = useState<string | null>(null);
   const [vistaFirmandoId, setVistaFirmandoId] = useState<string | null>(null);
+  const [vistaRespaldo, setVistaRespaldo] = useState<"contrato" | "solicitud">("contrato");
   const firmando = contratos.find((c) => c.id === firmandoId) ?? null;
   const pdfFirmando = firmando ? documentoDeContrato(firmando, documentos) : null;
   const tienePdfFirmando = firmando ? contratoTienePdf(firmando, documentos) : false;
@@ -194,6 +195,10 @@ export function FichaContratos({
     firmando && vistaFirmandoId === firmando.id && (rutaContratoFirmado || rutaSolicitudFirmando),
   );
   const ambosRespaldos = Boolean(rutaContratoFirmado && rutaSolicitudFirmando);
+  const mostrarContratoVista =
+    verRespaldos && Boolean(rutaContratoFirmado) && (!ambosRespaldos || vistaRespaldo === "contrato");
+  const mostrarSolicitudVista =
+    verRespaldos && Boolean(rutaSolicitudFirmando) && (!ambosRespaldos || vistaRespaldo === "solicitud");
   const base = abierto ?? contratos.find((c) => c.datos_confirmados) ?? null;
 
   async function onGenerar(formData: FormData) {
@@ -453,14 +458,38 @@ export function FichaContratos({
                   </p>
                 </div>
                 {rutaContratoFirmado || rutaSolicitudFirmando ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setVistaFirmandoId(verRespaldos ? null : firmando.id)}
-                  >
-                    {verRespaldos ? "Ocultar previsualización" : ambosRespaldos ? "Ver contrato y solicitud" : "Ver previsualización"}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {verRespaldos && ambosRespaldos ? (
+                      <select
+                        className="flex h-8 rounded-md border border-input bg-background px-2 text-sm"
+                        value={vistaRespaldo}
+                        onChange={(event) => setVistaRespaldo(event.target.value as "contrato" | "solicitud")}
+                        aria-label="Documento a previsualizar"
+                      >
+                        <option value="contrato">Contrato firmado</option>
+                        <option value="solicitud">Solicitud</option>
+                      </select>
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (verRespaldos) {
+                          setVistaFirmandoId(null);
+                          return;
+                        }
+                        setVistaRespaldo(rutaContratoFirmado ? "contrato" : "solicitud");
+                        setVistaFirmandoId(firmando.id);
+                      }}
+                    >
+                      {verRespaldos
+                        ? "Ocultar previsualización"
+                        : ambosRespaldos
+                          ? "Ver documento"
+                          : "Ver previsualización"}
+                    </Button>
+                  </div>
                 ) : null}
               </div>
               <div className={verRespaldos ? "grid items-start gap-4 lg:grid-cols-2" : "space-y-4"}>
@@ -528,19 +557,11 @@ export function FichaContratos({
                 </div>
                 {verRespaldos ? (
                   <div className="space-y-4 lg:sticky lg:top-4">
-                    {rutaContratoFirmado ? (
-                      <VistaDocumentoGuardado
-                        titulo="Contrato firmado"
-                        storagePath={rutaContratoFirmado}
-                        compacto={ambosRespaldos}
-                      />
+                    {mostrarContratoVista && rutaContratoFirmado ? (
+                      <VistaDocumentoGuardado titulo="Contrato firmado" storagePath={rutaContratoFirmado} />
                     ) : null}
-                    {rutaSolicitudFirmando ? (
-                      <VistaDocumentoGuardado
-                        titulo="Solicitud de registro"
-                        storagePath={rutaSolicitudFirmando}
-                        compacto={ambosRespaldos}
-                      />
+                    {mostrarSolicitudVista && rutaSolicitudFirmando ? (
+                      <VistaDocumentoGuardado titulo="Solicitud de registro" storagePath={rutaSolicitudFirmando} />
                     ) : null}
                   </div>
                 ) : null}
