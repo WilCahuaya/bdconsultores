@@ -170,6 +170,7 @@ export function FichaContratos({
   const [mostrarGenerar, setMostrarGenerar] = useState(false);
   const [editando, setEditando] = useState<ContratoRow | null>(null);
   const [eliminando, setEliminando] = useState<ContratoRow | null>(null);
+  const [validandoDatos, setValidandoDatos] = useState<FormData | null>(null);
   const [firmandoId, setFirmandoId] = useState<string | null>(null);
   const [vistaFirmandoId, setVistaFirmandoId] = useState<string | null>(null);
   const firmando = contratos.find((c) => c.id === firmandoId) ?? null;
@@ -249,15 +250,34 @@ export function FichaContratos({
       pushToast(result.error, "error");
       return;
     }
+    setValidandoDatos(null);
     setFirmandoId(null);
-    pushToast("Contrato guardado.");
+    pushToast("Contrato validado.");
     router.refresh();
+  }
+
+  function pedirValidacion(formData: FormData) {
+    if (!firmando) return;
+    if (firmando.estado === "RECOGIDO" || firmando.estado === "COMPLETO" || firmando.estado === "BAJA") {
+      pushToast("Este contrato ya está cerrado. No se puede validar.", "error");
+      return;
+    }
+    if (firmando.datos_confirmados) {
+      pushToast("Este contrato ya está validado.", "error");
+      return;
+    }
+    if (!tieneRespaldoFirmando) {
+      pushToast("Suba el contrato firmado o una solicitud de registro para poder validar.", "error");
+      return;
+    }
+    setValidandoDatos(formData);
   }
 
   async function onSubirFirmado(contrato: ContratoRow) {
     setMostrarGenerar(false);
     setEditando(null);
-    if (!contrato.documento_id) {
+    setValidandoDatos(null);
+    if (!contrato.documento_id && contrato.estado !== "BAJA") {
       setPending(`firm-${contrato.id}`);
       const result = await asegurarFirmadoContrato(relacionId, contrato.id);
       setPending(null);
@@ -359,8 +379,8 @@ export function FichaContratos({
           title={`Respaldo del contrato · versión ${firmando.version}`}
           hint={
             firmando.datos_confirmados
-              ? "El contrato ya está guardado. Si después encuentra el PDF firmado o la solicitud, súbalo aquí. Los datos guardados no cambian."
-              : "Suba el PDF firmado, enlace una solicitud de registro, o ambos. Aquí confirma los datos de este contrato. El ingreso a la empresa no cambia."
+              ? "El contrato ya está validado. Si después encuentra el PDF firmado o la solicitud, súbalo aquí. Los datos guardados no cambian."
+              : "Suba el PDF firmado, la solicitud de registro, o ambos. Revise los datos del contrato y valídelo. El ingreso a la empresa no cambia."
           }
         >
           <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4">
@@ -390,10 +410,22 @@ export function FichaContratos({
               enlazables={enlazables}
             />
           </div>
-          {canWrite && !firmando.datos_confirmados && firmando.estado !== "BAJA" ? (
-            <form action={(formData) => void onConfirmar(firmando.id, formData)} className="space-y-4">
+          {canWrite &&
+          !firmando.datos_confirmados &&
+          firmando.estado !== "BAJA" &&
+          firmando.estado !== "RECOGIDO" &&
+          firmando.estado !== "COMPLETO" ? (
+            <form
+              action={(formData) => pedirValidacion(formData)}
+              className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4"
+            >
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">Datos a guardar (del generado; se pueden cambiar)</p>
+                <div>
+                  <p className="text-sm font-medium">Datos del contrato</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Revise o corrija estos datos. Con el respaldo subido podrá validar el contrato.
+                  </p>
+                </div>
                 {rutaContratoFirmado || rutaSolicitudFirmando ? (
                   <Button
                     type="button"
@@ -412,23 +444,44 @@ export function FichaContratos({
                     trabajador={trabajador}
                     contrato={firmando}
                   />
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="submit" disabled={pending === "confirmar" || !tieneRespaldoFirmando}>
-                      {pending === "confirmar" ? "Guardando…" : "Confirmar y guardar contrato"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={pending === "confirmar"}
-                      onClick={() => setFirmandoId(null)}
-                    >
-                      Cerrar
-                    </Button>
-                  </div>
-                  {tieneRespaldoFirmando ? null : (
-                    <p className="text-sm text-muted-foreground">
-                      Suba el contrato firmado o una solicitud de registro para poder confirmar.
-                    </p>
+                  {tieneRespaldoFirmando ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="submit" disabled={pending === "confirmar"}>
+                          {pending === "confirmar" ? "Validando…" : "Validar contrato"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={pending === "confirmar"}
+                          onClick={() => {
+                            setValidandoDatos(null);
+                            setFirmandoId(null);
+                          }}
+                        >
+                          Cerrar
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Al validar se le pedirá confirmar. Revise los datos antes de continuar.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Suba el contrato firmado o una solicitud de registro para poder validar.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setValidandoDatos(null);
+                          setFirmandoId(null);
+                        }}
+                      >
+                        Cerrar
+                      </Button>
+                    </>
                   )}
                 </div>
                 {verRespaldos ? (
@@ -452,7 +505,14 @@ export function FichaContratos({
               </div>
             </form>
           ) : (
-            <Button type="button" variant="outline" onClick={() => setFirmandoId(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setValidandoDatos(null);
+                setFirmandoId(null);
+              }}
+            >
               Cerrar
             </Button>
           )}
@@ -507,11 +567,25 @@ export function FichaContratos({
               const conSolicitud = contratoTieneSolicitud(c, solicitudes);
               const conRespaldo = conPdf || conSolicitud;
               const cerrado = c.estado === "RECOGIDO" || c.estado === "COMPLETO" || c.estado === "BAJA";
+              const puedeSubirRespaldo = canWrite && c.estado !== "BAJA";
+              const puedeEditarEliminar = canWrite && !cerrado;
+              const puedeValidar = puedeEditarEliminar && !c.datos_confirmados && conRespaldo;
+              const puedeMarcar = canMarcarRecogido && c.estado === "ELABORADO" && c.datos_confirmados;
               const etiquetaRespaldo = !conRespaldo
                 ? "Subir respaldo"
-                : c.datos_confirmados && (!conPdf || !conSolicitud)
-                  ? "Agregar respaldo"
-                  : "Ver respaldo";
+                : puedeValidar
+                  ? "Validar contrato"
+                  : c.datos_confirmados && (!conPdf || !conSolicitud)
+                    ? "Agregar respaldo"
+                    : "Ver respaldo";
+              const iconoRespaldo =
+                !conRespaldo || (c.datos_confirmados && (!conPdf || !conSolicitud)) ? (
+                  <IconRespaldo />
+                ) : puedeValidar ? (
+                  <IconRecogido />
+                ) : (
+                  <IconVer />
+                );
               return (
                 <tr key={c.id} className="border-b last:border-0">
                   <td className="px-3 py-2">{c.version}</td>
@@ -545,26 +619,28 @@ export function FichaContratos({
                       >
                         <IconWord />
                       </AccionIconButton>
-                      {canWrite || conRespaldo ? (
+                      {puedeSubirRespaldo || conRespaldo ? (
                         <AccionIconButton
                           label={pending === `firm-${c.id}` ? "Preparando…" : etiquetaRespaldo}
                           disabled={pending === `firm-${c.id}`}
+                          className={
+                            puedeValidar
+                              ? "border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-800"
+                              : undefined
+                          }
                           onClick={() => void onSubirFirmado(c)}
                         >
-                          {!conRespaldo || (c.datos_confirmados && (!conPdf || !conSolicitud)) ? (
-                            <IconRespaldo />
-                          ) : (
-                            <IconVer />
-                          )}
+                          {iconoRespaldo}
                         </AccionIconButton>
                       ) : null}
-                      {canWrite && !cerrado ? (
+                      {puedeEditarEliminar ? (
                         <>
                           <AccionIconButton
                             label="Editar"
                             onClick={() => {
                               setMostrarGenerar(false);
                               setFirmandoId(null);
+                              setValidandoDatos(null);
                               setEditando(c);
                             }}
                           >
@@ -580,7 +656,7 @@ export function FichaContratos({
                           </AccionIconButton>
                         </>
                       ) : null}
-                      {canMarcarRecogido && c.estado === "ELABORADO" && c.datos_confirmados ? (
+                      {puedeMarcar ? (
                         <AccionIconButton
                           label={pending === c.id ? "Guardando…" : "Marcar recogido"}
                           disabled={pending === c.id || !conRespaldo}
@@ -616,6 +692,21 @@ export function FichaContratos({
         confirmVariant="destructive"
         pending={Boolean(eliminando && pending === `del-${eliminando.id}`)}
         onConfirm={() => void onEliminar()}
+      />
+      <ConfirmDialog
+        open={Boolean(validandoDatos && firmando)}
+        onClose={() => {
+          if (pending === "confirmar") return;
+          setValidandoDatos(null);
+        }}
+        title="Validar contrato"
+        description="¿Está seguro de que desea validar? Revise los datos del formulario antes de validar. Se guardarán cargo, fechas, jornada, horario y remuneración de este contrato."
+        confirmLabel="Sí, validar"
+        pending={pending === "confirmar"}
+        onConfirm={() => {
+          if (!firmando || !validandoDatos) return;
+          void onConfirmar(firmando.id, validandoDatos);
+        }}
       />
     </div>
   );
