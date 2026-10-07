@@ -3,6 +3,7 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
+import { ContratosVistaBajas } from "@/components/ContratosVistaBajas";
 import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
 import { VersionesContratoButton, type VersionContratoLista } from "@/components/ficha/VersionesContratoButton";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
@@ -11,6 +12,7 @@ import { listTrabajadores } from "@/lib/actions/trabajadores";
 import {
   claseTonoEstadoContrato,
   contratoMasReciente,
+  contratoPrimeroFirmado,
   documentoCargado,
   estadoVisibleContrato,
   ETAPA_CONTRATO_FILTRO_LABEL,
@@ -42,16 +44,22 @@ function plusDays(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function hrefContratos(entidadId: string, etapa?: string) {
+function hrefContratos(entidadId: string, etapa?: string, bajas?: boolean) {
   const query = new URLSearchParams({ entidadId });
   if (etapa && etapa !== "todos") query.set("etapa", etapa);
+  if (bajas) query.set("bajas", "1");
   return `/contratos?${query.toString()}`;
+}
+
+function fechaAltaFila(trabajador: { fecha_ingreso: string | null }, flujo: ReturnType<typeof flujoDesdeTrabajador>) {
+  const primero = contratoPrimeroFirmado(flujo.contratos);
+  return trabajador.fecha_ingreso ?? primero?.fecha_inicio ?? null;
 }
 
 export default async function ContratosPage({
   searchParams,
 }: {
-  searchParams: { entidadId?: string; etapa?: string };
+  searchParams: { entidadId?: string; etapa?: string; bajas?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const canCreate = puedeCrearEntidad(profile);
@@ -62,6 +70,7 @@ export default async function ContratosPage({
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
   const filtro = parseEtapaContratoFiltro(searchParams.etapa);
+  const mostrarBajas = searchParams.bajas === "1";
   const hoy = new Date().toISOString().slice(0, 10);
   const limite = plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS);
   const trabajadores = selectedId ? await listTrabajadores(selectedId) : [];
@@ -90,16 +99,26 @@ export default async function ContratosPage({
         faltas,
         ultimo,
         versiones,
+        fechaAlta: fechaAltaFila(trabajador, flujo),
         etapa: resolverEtapaContrato(trabajador, esEstudio, { hoy, limite }),
       };
     })
     .sort((a, b) => compareTrabajadoresPorNumero(a.trabajador, b.trabajador));
+  const porEstado = filas.filter((fila) =>
+    mostrarBajas ? fila.trabajador.estado === "CESADA" : fila.trabajador.estado !== "CESADA",
+  );
+  const hayBajas = filas.some((fila) => fila.trabajador.estado === "CESADA");
   const visibles =
     filtro === "todos"
-      ? filas
+      ? porEstado
       : filtro === "pendientes"
-        ? filas.filter((fila) => fila.etapa.pendiente)
-        : filas.filter((fila) => fila.etapa.id === filtro);
+        ? porEstado.filter((fila) => fila.etapa.pendiente)
+        : porEstado.filter((fila) => fila.etapa.id === filtro);
+  const queryExtraParts = [
+    filtro !== "todos" ? `etapa=${filtro}` : null,
+    mostrarBajas ? "bajas=1" : null,
+  ].filter(Boolean);
+  const queryExtra = queryExtraParts.length > 0 ? queryExtraParts.join("&") : undefined;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -116,7 +135,7 @@ export default async function ContratosPage({
                 selectedId={selectedId}
                 locked={esUsuarioEntidad(profile.rol)}
                 hrefBase="/contratos"
-                queryExtra={filtro === "todos" ? undefined : `etapa=${filtro}`}
+                queryExtra={queryExtra}
                 inline
               />
             </>
@@ -129,14 +148,25 @@ export default async function ContratosPage({
           <>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-medium text-foreground">
-                {filtro === "todos" ? "Todos los contratos" : ETAPA_CONTRATO_FILTRO_LABEL[filtro]}
+                {mostrarBajas
+                  ? "Bajas"
+                  : filtro === "todos"
+                    ? "Todos los contratos"
+                    : ETAPA_CONTRATO_FILTRO_LABEL[filtro]}
               </h2>
               <div className="flex flex-wrap items-center gap-3 text-sm">
+                <ContratosVistaBajas entidadId={selectedId} checked={mostrarBajas} />
+                {hayBajas && !mostrarBajas ? (
+                  <span className="text-muted-foreground">Hay trabajadores de baja ocultos.</span>
+                ) : null}
                 <p className="text-muted-foreground">
-                  {visibles.length} de {filas.length}
+                  {visibles.length} de {porEstado.length}
                 </p>
                 {filtro !== "todos" ? (
-                  <Link href={hrefContratos(selectedId)} className="text-primary hover:underline">
+                  <Link
+                    href={hrefContratos(selectedId, undefined, mostrarBajas)}
+                    className="text-primary hover:underline"
+                  >
                     Ver todos
                   </Link>
                 ) : null}
@@ -144,7 +174,7 @@ export default async function ContratosPage({
             </div>
 
             <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[1180px] text-left text-sm">
+              <table className="w-full min-w-[1280px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-medium">Nº</th>
@@ -156,6 +186,7 @@ export default async function ContratosPage({
                     <th className="px-3 py-2 font-medium">Persona</th>
                     <th className="px-3 py-2 font-medium">Puesto</th>
                     <th className="px-3 py-2 font-medium">Contrato</th>
+                    <th className="px-3 py-2 font-medium">Fecha de alta</th>
                     <th className="px-3 py-2 font-medium">AFP</th>
                     <th className="px-3 py-2 font-medium">T-Registro</th>
                     <th className="px-3 py-2 font-medium">Estado</th>
@@ -164,14 +195,18 @@ export default async function ContratosPage({
                 <tbody>
                   {visibles.length === 0 ? (
                     <tr>
-                      <td className="px-3 py-8 text-muted-foreground" colSpan={12}>
+                      <td className="px-3 py-8 text-muted-foreground" colSpan={13}>
                         {filas.length === 0
                           ? "No hay trabajadores en esta empresa."
-                          : "No hay contratos en este paso."}
+                          : mostrarBajas
+                            ? "No hay bajas."
+                            : hayBajas
+                              ? "No hay contratos activos en este paso. Marque Mostrar bajas para ver a los cesados."
+                              : "No hay contratos en este paso."}
                       </td>
                     </tr>
                   ) : (
-                    visibles.map(({ trabajador, flujo, faltas, ultimo, versiones, etapa }) => (
+                    visibles.map(({ trabajador, flujo, faltas, ultimo, versiones, fechaAlta, etapa }) => (
                       <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-3 py-2 font-mono">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
                         <td className="px-3 py-2 font-mono">{trabajador.persona.dni}</td>
@@ -181,6 +216,7 @@ export default async function ContratosPage({
                             className="font-medium text-primary hover:underline"
                           >
                             {nombreCompleto(trabajador.persona)}
+                            {trabajador.estado === "CESADA" ? " · Baja" : ""}
                           </Link>
                         </td>
                         <td className="px-3 py-2">
@@ -208,6 +244,9 @@ export default async function ContratosPage({
                             <span className="text-amber-800">Falta</span>
                           )}
                         </td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {fechaAlta ? formatFechaPlanilla(fechaAlta) : <span className="text-muted-foreground">—</span>}
+                        </td>
                         <td className="px-3 py-2">
                           <Marca listo={pensionAltaLista(flujo)} />
                         </td>
@@ -215,7 +254,11 @@ export default async function ContratosPage({
                           <Marca listo={tRegistroAltaLista(flujo)} />
                         </td>
                         <td className="px-3 py-2">
-                          {versiones[0] ? (
+                          {trabajador.estado === "CESADA" ? (
+                            <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                              Baja
+                            </span>
+                          ) : versiones[0] ? (
                             <span
                               className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseTonoEstadoContrato(versiones[0].tono)}`}
                             >
