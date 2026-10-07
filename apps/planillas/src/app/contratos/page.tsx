@@ -4,7 +4,7 @@ import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
-import { VersionesContratoButton, type VersionContratoLista } from "@/components/ficha/VersionesContratoButton";
+import { MarcasDocumentoContrato, VersionesContratoButton, type VersionContratoLista } from "@/components/ficha/VersionesContratoButton";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
@@ -80,6 +80,8 @@ export default async function ContratosPage({
             version: contrato.version ?? 0,
             fechas: `${formatFechaPlanilla(contrato.fecha_inicio)} – ${formatFechaPlanilla(contrato.fecha_fin)}`,
             estado: visible.etiqueta,
+            pdf: visible.pdf,
+            solicitud: visible.solicitud,
             tono: visible.tono,
             vigente: contrato.es_vigente,
           };
@@ -216,11 +218,14 @@ export default async function ContratosPage({
                         </td>
                         <td className="px-3 py-2">
                           {versiones[0] ? (
-                            <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseTonoEstadoContrato(versiones[0].tono)}`}
-                            >
-                              {versiones[0].estado}
-                            </span>
+                            <div className="space-y-1">
+                              <span
+                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${claseTonoEstadoContrato(versiones[0].tono)}`}
+                              >
+                                {versiones[0].estado}
+                              </span>
+                              <MarcasDocumentoContrato pdf={versiones[0].pdf} solicitud={versiones[0].solicitud} />
+                            </div>
                           ) : (
                             "Falta"
                           )}

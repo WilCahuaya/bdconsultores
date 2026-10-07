@@ -176,7 +176,7 @@ export function SolicitudRegistroContrato({
   }
 
   return (
-    <div className="space-y-3 border-t pt-4">
+    <div className="space-y-3">
       <div>
         <h3 className="text-sm font-medium text-foreground">Solicitud de registro de contratos</h3>
         <p className="mt-1 text-sm text-muted-foreground">

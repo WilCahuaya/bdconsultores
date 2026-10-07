@@ -1,4 +1,5 @@
 import { errorArchivoDocumento, extensionDocumento, DOCUMENTO_MAX_BYTES } from "@/lib/documento-storage";
+import { excelComoPdf } from "@/lib/excel-a-pdf";
 
 const A4_ANCHO = 595.28;
 const A4_ALTO = 841.89;
@@ -36,8 +37,10 @@ async function convertirAPdf(file: File): Promise<File> {
       ? await imagenArchivoAPdf(file)
       : ext === "docx"
         ? await docxAPdf(await file.arrayBuffer())
-        : ext === "xls" || ext === "xlsx"
-          ? await excelAPdf(await file.arrayBuffer())
+        : ext === "xlsx"
+          ? await excelComoPdf(await file.arrayBuffer())
+          : ext === "xls"
+            ? await excelAPdf(await file.arrayBuffer())
           : null;
   if (!bytes) throw new Error("No se pudo convertir el archivo a PDF.");
   return archivoPdf(bytes, nombrePdf(file.name));

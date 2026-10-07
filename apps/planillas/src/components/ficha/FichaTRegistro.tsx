@@ -26,7 +26,7 @@ import {
   montoAsignacionFamiliar,
   remuneracionBruta,
 } from "@/lib/planillas-labels";
-import { Field, DateField, SelectField } from "@/components/fields";
+import { DateField } from "@/components/fields";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
@@ -72,10 +72,8 @@ export function FichaTRegistro({
   const { pushToast } = useToast();
   const [pendingAlta, setPendingAlta] = useState(false);
   const [pendingBaja, setPendingBaja] = useState(false);
-  const [pending, setPending] = useState(false);
   const [fileAlta, setFileAlta] = useState<File | null>(null);
   const [fileBaja, setFileBaja] = useState<File | null>(null);
-  const [mostrarForm, setMostrarForm] = useState(false);
   const persona = trabajador.persona;
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
   const yaAlta = items.some((item) => item.tipo === "ALTA" && item.realizado);
@@ -162,19 +160,6 @@ export function FichaTRegistro({
     }
     setFileBaja(null);
     pushToast("Baja de T-Registro guardada.");
-    router.refresh();
-  }
-
-  async function onSubmit(formData: FormData) {
-    setPending(true);
-    const result = await addTRegistro(relacionId, formData);
-    setPending(false);
-    if (result.error) {
-      pushToast(result.error, "error");
-      return;
-    }
-    setMostrarForm(false);
-    pushToast("Registro guardado.");
     router.refresh();
   }
 
@@ -344,37 +329,6 @@ export function FichaTRegistro({
         >
           Ver ficha
         </Link>
-      ) : null}
-      {canWrite && !mostrarForm ? (
-        <Button type="button" variant="outline" onClick={() => setMostrarForm(true)}>
-          Registrar baja u otro movimiento
-        </Button>
-      ) : null}
-      {canWrite && mostrarForm ? (
-        <form action={onSubmit} key={items.length} className={`${panelCardClass} space-y-4 p-5`}>
-          <p className="text-sm font-medium">Registrar alta o baja</p>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SelectField
-              label="Tipo"
-              name="tipo"
-              options={Object.entries(TIPO_T_REGISTRO_LABEL).map(([value, label]) => ({ value, label }))}
-            />
-            <DateField label="Fecha" name="fecha" />
-            <Field label="Observaciones" name="observaciones" />
-            <label className="flex items-end gap-2 pb-2 text-sm">
-              <input type="checkbox" name="realizado" />
-              Ya se realizó en T-Registro
-            </label>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando…" : "Agregar"}
-            </Button>
-            <Button type="button" variant="outline" disabled={pending} onClick={() => setMostrarForm(false)}>
-              Cancelar
-            </Button>
-          </div>
-        </form>
       ) : null}
     </div>
   );

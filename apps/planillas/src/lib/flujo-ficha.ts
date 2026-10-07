@@ -240,16 +240,46 @@ export function fechaFinUltimoContratoValidado(
 
 export type TonoEstadoContrato = "gris" | "verde" | "azul";
 export type EtiquetaEstadoContratoTabla = "Elaborado" | "Validado" | "Alta";
+export type EtiquetaDocumentosContrato = "Contrato firmado" | "Solicitud" | "Contrato y solicitud";
+
+/** Qué respaldo tiene esta versión: el PDF, la solicitud o los dos. */
+export function etiquetaDocumentosSubidos(pdf: boolean, solicitud: boolean): EtiquetaDocumentosContrato | null {
+  if (pdf && solicitud) return "Contrato y solicitud";
+  if (pdf) return "Contrato firmado";
+  if (solicitud) return "Solicitud";
+  return null;
+}
+
+export function documentosSubidosDeContrato(
+  contrato: Pick<FlujoContrato, "documento_id" | "solicitud_storage_path"> | null | undefined,
+  docs: FlujoDocumento[],
+): { pdf: boolean; solicitud: boolean; etiqueta: EtiquetaDocumentosContrato | null } {
+  if (!contrato) return { pdf: false, solicitud: false, etiqueta: null };
+  const pdf = contrato.documento_id
+    ? contratoTienePdfPropio(contrato, docs)
+    : documentoCargado(docs, "CONTRATO_FIRMADO");
+  const solicitud = Boolean(contrato.solicitud_storage_path?.trim());
+  return { pdf, solicitud, etiqueta: etiquetaDocumentosSubidos(pdf, solicitud) };
+}
 
 /** Elaborado sin respaldo, validado al subir PDF o solicitud, alta si el T-Registro ya se dio. */
 export function estadoVisibleContrato(
   contrato: Pick<FlujoContrato, "documento_id" | "solicitud_storage_path">,
   docs: FlujoDocumento[],
   alta: boolean,
-): { etiqueta: EtiquetaEstadoContratoTabla; tono: TonoEstadoContrato } {
-  if (alta) return { etiqueta: "Alta", tono: "azul" };
-  if (contratoTieneFirmado(contrato, docs)) return { etiqueta: "Validado", tono: "verde" };
-  return { etiqueta: "Elaborado", tono: "gris" };
+): {
+  etiqueta: EtiquetaEstadoContratoTabla;
+  tono: TonoEstadoContrato;
+  documentos: EtiquetaDocumentosContrato | null;
+  pdf: boolean;
+  solicitud: boolean;
+} {
+  const respaldo = documentosSubidosDeContrato(contrato, docs);
+  if (alta) return { etiqueta: "Alta", tono: "azul", documentos: respaldo.etiqueta, pdf: respaldo.pdf, solicitud: respaldo.solicitud };
+  if (contratoTieneFirmado(contrato, docs)) {
+    return { etiqueta: "Validado", tono: "verde", documentos: respaldo.etiqueta, pdf: respaldo.pdf, solicitud: respaldo.solicitud };
+  }
+  return { etiqueta: "Elaborado", tono: "gris", documentos: respaldo.etiqueta, pdf: respaldo.pdf, solicitud: respaldo.solicitud };
 }
 
 export function claseTonoEstadoContrato(tono: TonoEstadoContrato): string {

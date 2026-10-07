@@ -7,9 +7,25 @@ export type VersionContratoLista = {
   version: number;
   fechas: string;
   estado: string;
+  pdf: boolean;
+  solicitud: boolean;
   tono: TonoEstadoContrato;
   vigente: boolean;
 };
+
+export function MarcasDocumentoContrato({ pdf, solicitud }: { pdf: boolean; solicitud: boolean }) {
+  if (!pdf && !solicitud) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {pdf ? (
+        <span className="inline-flex rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-950">Contrato firmado</span>
+      ) : null}
+      {solicitud ? (
+        <span className="inline-flex rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-950">Solicitud</span>
+      ) : null}
+    </div>
+  );
+}
 
 export function VersionesContratoButton({ versiones }: { versiones: VersionContratoLista[] }) {
   const [open, setOpen] = useState(false);
@@ -77,6 +93,9 @@ export function VersionesContratoButton({ versiones }: { versiones: VersionContr
                     {item.estado}
                   </span>
                 </p>
+                <div className="mt-1">
+                  <MarcasDocumentoContrato pdf={item.pdf} solicitud={item.solicitud} />
+                </div>
               </li>
             ))}
           </ul>

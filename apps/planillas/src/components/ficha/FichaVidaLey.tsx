@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
 import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
@@ -27,6 +27,7 @@ import { Field, DateField } from "@/components/fields";
 import { etiquetaEstadoVidaLey, etiquetaTrabajador, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { descargarVidaLeyWord } from "@/lib/descargar-vida-ley-word";
 import { DocumentoPrevisualizacion, MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { SelectorPaginasPdf, type EstadoPaginasCertificado } from "@/components/ficha/SelectorPaginasPdf";
 import {
   EliminarArchivoVidaLey,
   EliminarComprobanteEmpresa,
@@ -34,6 +35,7 @@ import {
 } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
+import { recortarPaginasPdf } from "@/lib/recortar-pdf";
 import { uploadDocumentoFile, uploadVidaLeyComprobanteEmpresa, uploadVidaLeyLoteFile } from "@/lib/upload-documento";
 import type { ArchivoVidaLeyLote } from "@/lib/documento-storage";
 
@@ -85,6 +87,11 @@ export function FichaVidaLey({
   const [envioElegido, setEnvioElegido] = useState("");
   const [usandoEnvio, setUsandoEnvio] = useState(false);
   const [guardandoCertificado, setGuardandoCertificado] = useState(false);
+  const [archivoCertificadoId, setArchivoCertificadoId] = useState(0);
+  const [estadoPaginas, setEstadoPaginas] = useState<EstadoPaginasCertificado>({ tipo: "completo" });
+  const onEstadoPaginas = useCallback((estado: EstadoPaginasCertificado) => {
+    setEstadoPaginas(estado);
+  }, []);
 
   useEffect(() => {
     setCantidadTexto(cantidadComprobante != null ? String(cantidadComprobante) : "");
@@ -155,14 +162,30 @@ export function FichaVidaLey({
       pushToast("Elija el certificado de este trabajador.", "error");
       return;
     }
+    if (estadoPaginas.tipo === "leyendo") return;
+    if (estadoPaginas.tipo === "elegir" && estadoPaginas.elegidas.length === 0) {
+      pushToast("Marque las páginas de este trabajador.", "error");
+      return;
+    }
     setGuardandoCertificado(true);
-    const errorCertificado = await subirCertificado(fileCertificado);
+    let archivo = fileCertificado;
+    if (estadoPaginas.tipo === "elegir") {
+      const recorte = await recortarPaginasPdf(fileCertificado, estadoPaginas.elegidas);
+      if (recorte.error || !recorte.file) {
+        setGuardandoCertificado(false);
+        pushToast(recorte.error ?? "No se pudieron separar las páginas.", "error");
+        return;
+      }
+      archivo = recorte.file;
+    }
+    const errorCertificado = await subirCertificado(archivo);
     setGuardandoCertificado(false);
     if (errorCertificado) {
       pushToast(errorCertificado, "error");
       return;
     }
     setFileCertificado(null);
+    setEstadoPaginas({ tipo: "completo" });
     pushToast("Certificado de seguro guardado.");
     router.refresh();
   }
@@ -335,11 +358,19 @@ export function FichaVidaLey({
         <DocumentoPrevisualizacion
           titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY}
           storagePath={fileCertificado ? null : documentoCertificado?.storage_path}
-          file={fileCertificado}
+          file={
+            !fileCertificado
+              ? null
+              : estadoPaginas.tipo === "elegir" && estadoPaginas.mostrandoRecorte && estadoPaginas.recorte
+                ? estadoPaginas.recorte
+                : estadoPaginas.tipo === "elegir" && estadoPaginas.vistaPagina
+                  ? estadoPaginas.vistaPagina
+                  : fileCertificado
+          }
           vacio="Suba el certificado de seguro Vida Ley de este trabajador."
           extra={
             canWrite ? (
-              <div className="flex flex-wrap items-end gap-2">
+              <div className="space-y-3">
                 <DocumentoFileInput
                   accept={DOCUMENTO_ACCEPT}
                   disabled={ocupado}
@@ -349,20 +380,52 @@ export function FichaVidaLey({
                       ? "Cambiar certificado de seguro"
                       : "Subir certificado de seguro"
                   }
-                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
-                  onFileChange={setFileCertificado}
+                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB. Si trae varios certificados, marque las páginas de este trabajador."
+                  onFileChange={(file) => {
+                    setFileCertificado(file);
+                    setArchivoCertificadoId((actual) => actual + 1);
+                    setEstadoPaginas(
+                      file && (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"))
+                        ? { tipo: "leyendo" }
+                        : { tipo: "completo" },
+                    );
+                  }}
                 />
-                <Button type="button" size="sm" disabled={ocupado || !fileCertificado} onClick={() => void onGuardarCertificado()}>
-                  {guardandoCertificado ? "Guardando…" : "Guardar certificado"}
-                </Button>
-                {documentoCertificado?.storage_path ? (
-                  <EliminarDocumentoGuardado
-                    relacionId={relacionId}
-                    documentoId={documentoCertificado.id}
-                    descripcion="¿Eliminar el certificado de seguro de este trabajador?"
+                {fileCertificado ? (
+                  <SelectorPaginasPdf
+                    key={archivoCertificadoId}
+                    file={fileCertificado}
                     disabled={ocupado}
+                    onEstado={onEstadoPaginas}
                   />
                 ) : null}
+                <div className="flex flex-wrap items-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={
+                      ocupado ||
+                      !fileCertificado ||
+                      estadoPaginas.tipo === "leyendo" ||
+                      (estadoPaginas.tipo === "elegir" && estadoPaginas.elegidas.length === 0)
+                    }
+                    onClick={() => void onGuardarCertificado()}
+                  >
+                    {guardandoCertificado
+                      ? "Guardando…"
+                      : estadoPaginas.tipo === "elegir"
+                        ? "Guardar páginas elegidas"
+                        : "Guardar certificado"}
+                  </Button>
+                  {documentoCertificado?.storage_path ? (
+                    <EliminarDocumentoGuardado
+                      relacionId={relacionId}
+                      documentoId={documentoCertificado.id}
+                      descripcion="¿Eliminar el certificado de seguro de este trabajador?"
+                      disabled={ocupado}
+                    />
+                  ) : null}
+                </div>
               </div>
             ) : null
           }

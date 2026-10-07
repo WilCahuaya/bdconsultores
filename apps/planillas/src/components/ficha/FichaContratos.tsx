@@ -15,6 +15,7 @@ import {
   type DocumentoRow,
 } from "@/lib/actions/ficha";
 import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
+import { MarcasDocumentoContrato } from "@/components/ficha/VersionesContratoButton";
 import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, formatRemuneracion, montoAsignacionFamiliar, opcionesCargo, remuneracionBruta } from "@/lib/planillas-labels";
 import { descargarContratoWord } from "@/lib/descargar-contrato-word";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
@@ -48,13 +49,6 @@ function solicitudDeContrato(contrato: ContratoRow, solicitudes: SolicitudRegist
 
 function contratoTieneSolicitud(contrato: ContratoRow, solicitudes: SolicitudRegistroVista[]): boolean {
   return Boolean(solicitudDeContrato(contrato, solicitudes)?.storage_path);
-}
-
-function textoRespaldo(pdf: boolean, solicitud: boolean): string {
-  if (pdf && solicitud) return "Ambos";
-  if (pdf) return "Contrato";
-  if (solicitud) return "Solicitud";
-  return "No";
 }
 
 export function FichaContratos({
@@ -280,25 +274,29 @@ export function FichaContratos({
               : "Suba el PDF firmado, enlace una solicitud de registro, o ambos. Aquí confirma los datos de este contrato. El ingreso a la empresa no cambia."
           }
         >
-          <FichaDocumentos
-            relacionId={relacionId}
-            entidadId={entidadId}
-            documentos={pdfFirmando ? [pdfFirmando] : []}
-            canWrite={canWrite && firmando.estado !== "BAJA"}
-            tiposFiltro={["CONTRATO_FIRMADO"]}
-            permitirAgregar={false}
-            hint={`PDF firmado de la versión ${firmando.version}.`}
-          />
-          <SolicitudRegistroContrato
-            relacionId={relacionId}
-            entidadId={entidadId}
-            contratoId={firmando.id}
-            canWrite={canWrite}
-            cerrado={firmando.estado === "BAJA"}
-            solicitud={solicitudDeContrato(firmando, solicitudes)}
-            solicitudes={solicitudes}
-            enlazables={enlazables}
-          />
+          <div className="space-y-3 rounded-xl border border-sky-200 bg-sky-50 p-4">
+            <FichaDocumentos
+              relacionId={relacionId}
+              entidadId={entidadId}
+              documentos={pdfFirmando ? [pdfFirmando] : []}
+              canWrite={canWrite && firmando.estado !== "BAJA"}
+              tiposFiltro={["CONTRATO_FIRMADO"]}
+              permitirAgregar={false}
+              hint={`PDF firmado de la versión ${firmando.version}.`}
+            />
+          </div>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <SolicitudRegistroContrato
+              relacionId={relacionId}
+              entidadId={entidadId}
+              contratoId={firmando.id}
+              canWrite={canWrite}
+              cerrado={firmando.estado === "BAJA"}
+              solicitud={solicitudDeContrato(firmando, solicitudes)}
+              solicitudes={solicitudes}
+              enlazables={enlazables}
+            />
+          </div>
           {canWrite && !firmando.datos_confirmados && firmando.estado !== "BAJA" ? (
             <form action={(formData) => void onConfirmar(firmando.id, formData)} className="space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -395,7 +393,7 @@ export function FichaContratos({
               <th className="px-4 py-2 font-medium">Estado</th>
               <th className="px-4 py-2 font-medium">Remuneración</th>
               <th className="px-4 py-2 font-medium">Rem. bruta</th>
-              <th className="px-4 py-2 font-medium">Respaldo</th>
+              <th className="px-4 py-2 font-medium">Documento</th>
               <th className="px-4 py-2 font-medium">Guardado</th>
               <th className="px-4 py-2 font-medium">Acciones</th>
             </tr>
@@ -425,7 +423,9 @@ export function FichaContratos({
                   <td className="px-4 py-2">
                     {formatRemuneracion(remuneracionBruta(c.remuneracion, trabajador.recibe_asignacion_familiar))}
                   </td>
-                  <td className="px-4 py-2">{textoRespaldo(conPdf, conSolicitud)}</td>
+                  <td className="px-4 py-2">
+                    {conPdf || conSolicitud ? <MarcasDocumentoContrato pdf={conPdf} solicitud={conSolicitud} /> : "—"}
+                  </td>
                   <td className="px-4 py-2">{c.datos_confirmados ? "Sí" : "No"}</td>
                   <td className="px-4 py-2">
                     <div className="flex flex-wrap gap-2">
