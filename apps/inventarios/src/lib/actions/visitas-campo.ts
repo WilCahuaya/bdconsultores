@@ -6,9 +6,11 @@ import type {
   VisitaCampoActiva,
   VisitaCampoAmbienteDetalle,
   VisitaCampoHistorial,
+  VisitaCampoReporte,
+  VisitaCampoReporteItem,
 } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
-import { getProfile, requireProfile } from "@/lib/auth/profile";
+import { getProfile, requirePersonalEstudio, requireProfile } from "@/lib/auth/profile";
 import type { AmbienteConSede } from "./ubicacion";
 
 function revalidateEntidadVisita(entidadId: string) {
@@ -233,6 +235,24 @@ async function conteoRevisionPorAmbiente(
   return resultado;
 }
 
+/** Revisiones guardadas en la visita, por el ambiente donde se marcaron. */
+async function conteoRevisionesDeVisita(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  visitaId: string,
+): Promise<Map<string, number>> {
+  const { data } = await supabase
+    .from("visita_revisiones")
+    .select("ambiente_id")
+    .eq("visita_id", visitaId);
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    const ambienteId = row.ambiente_id as string | null;
+    if (!ambienteId) continue;
+    counts.set(ambienteId, (counts.get(ambienteId) ?? 0) + 1);
+  }
+  return counts;
+}
+
 export async function listVisitasCampoHistorial(
   entidadId: string,
 ): Promise<VisitaCampoHistorial[]> {
@@ -258,15 +278,18 @@ export async function listVisitasCampoHistorial(
       .eq("visita_id", v.id);
 
     const relevantes = (filas ?? []).filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
-    const visitaPorAmbiente = new Map(
-      relevantes.map((fila) => [fila.ambiente_id as string, v.id as string]),
-    );
-    const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
     const ambientes_total = relevantes.length;
-    const ambientes_culminados = relevantes.filter((fila) => {
-      const cifras = conteo.get(fila.ambiente_id as string);
-      return cifras != null && cifras.revisados === cifras.total;
-    }).length;
+    let ambientes_culminados = ambientes_total;
+    if (v.estado !== "CERRADO") {
+      const visitaPorAmbiente = new Map(
+        relevantes.map((fila) => [fila.ambiente_id as string, v.id as string]),
+      );
+      const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+      ambientes_culminados = relevantes.filter((fila) => {
+        const cifras = conteo.get(fila.ambiente_id as string);
+        return cifras != null && cifras.revisados === cifras.total;
+      }).length;
+    }
 
     result.push({
       id: v.id,
@@ -303,11 +326,19 @@ export async function getVisitaCampoDetalle(
 
   if (error || !filas) return [];
 
+  const { data: visita } = await supabase
+    .from("visitas_campo")
+    .select("estado, cerrado_at")
+    .eq("id", visitaId)
+    .maybeSingle();
+  const cerrada = visita?.estado === "CERRADO";
+
   const participantes = filas.filter((fila) => ambienteParticipaEnVisita(fila.ambientes));
   const visitaPorAmbiente = new Map(
     participantes.map((fila) => [fila.ambiente_id as string, visitaId]),
   );
-  const conteo = await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+  const conteo = cerrada ? null : await conteoRevisionPorAmbiente(supabase, visitaPorAmbiente);
+  const revisiones = cerrada ? await conteoRevisionesDeVisita(supabase, visitaId) : null;
 
   return participantes.flatMap((fila) => {
     const ambRaw = fila.ambientes as unknown;
@@ -319,8 +350,12 @@ export async function getVisitaCampoDetalle(
     } | null;
     const sede = amb?.sedes;
     const sedeNombreJoin = Array.isArray(sede) ? sede[0]?.nombre : sede?.nombre;
-    const cifras = conteo.get(fila.ambiente_id as string) ?? { revisados: 0, total: 0 };
-    const completo = cifras.revisados === cifras.total;
+    const revisadosEnVisita = revisiones?.get(fila.ambiente_id as string) ?? 0;
+    const cifras = conteo?.get(fila.ambiente_id as string) ?? {
+      revisados: revisadosEnVisita,
+      total: revisadosEnVisita,
+    };
+    const completo = cerrada || cifras.revisados === cifras.total;
 
     return [
       {
@@ -329,10 +364,10 @@ export async function getVisitaCampoDetalle(
         sede_nombre: sedeNombreJoin ?? "—",
         es_preregistro: amb?.es_preregistro ?? false,
         estado: (completo ? "CULMINADO" : "EN_PROCESO") as EstadoVisitaAmbiente,
-        culminado_at: completo ? fila.culminado_at : null,
+        culminado_at: completo ? (fila.culminado_at ?? visita?.cerrado_at ?? null) : null,
         culminado_por_nombre: completo ? profileNombre(fila.culminado as ProfileJoin) : null,
-        revisados: cifras.revisados,
-        total: cifras.total,
+        revisados: cerrada ? revisadosEnVisita : cifras.revisados,
+        total: cerrada ? revisadosEnVisita : cifras.total,
       },
     ];
   });
@@ -485,9 +520,9 @@ export async function resolverBienFaltante(input: {
   motivo?: string | null;
 }) {
   try {
-    await requireProfile("CONTADOR");
+    await requirePersonalEstudio();
   } catch {
-    return { error: "No autorizado." };
+    return { error: "Solo el contador o el asistente puede mover un bien de Faltantes." };
   }
 
   const supabase = await createClient();
@@ -525,12 +560,17 @@ function etiquetaProcedencia(ambiente: string, sede: string): string {
   return sede ? `${ambiente} · ${sede}` : ambiente;
 }
 
-/** Ambiente del que salió cada bien al pasar a Faltante. */
-export async function listProcedenciaFaltante(activoIds: string[]): Promise<Record<string, string>> {
+export interface ProcedenciaFaltante {
+  ambienteId: string;
+  etiqueta: string;
+}
+
+async function origenIdPorActivoFaltante(activoIds: string[]): Promise<Map<string, string>> {
   const ids = [...new Set(activoIds.filter(Boolean))];
-  if (ids.length === 0) return {};
+  const origenIdPorActivo = new Map<string, string>();
+  if (ids.length === 0) return origenIdPorActivo;
   const profile = await getProfile();
-  if (!profile) return {};
+  if (!profile) return origenIdPorActivo;
 
   const supabase = await createClient();
   const { data: revisiones, error } = await supabase
@@ -540,9 +580,8 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
     .in("activo_id", ids)
     .order("updated_at", { ascending: false });
 
-  if (error) return {};
+  if (error) return origenIdPorActivo;
 
-  const origenIdPorActivo = new Map<string, string>();
   for (const row of revisiones ?? []) {
     const activoId = String(row.activo_id ?? "");
     const ambienteId = String(row.ambiente_id ?? "");
@@ -566,9 +605,18 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
     }
   }
 
+  return origenIdPorActivo;
+}
+
+/** Ambiente del que salió cada bien al pasar a Faltante, con su nombre. */
+export async function listProcedenciaFaltanteDetalle(
+  activoIds: string[],
+): Promise<Record<string, ProcedenciaFaltante>> {
+  const origenIdPorActivo = await origenIdPorActivoFaltante(activoIds);
   const origenIds = [...new Set(origenIdPorActivo.values())];
   if (origenIds.length === 0) return {};
 
+  const supabase = await createClient();
   const { data: ambientes } = await supabase
     .from("ambientes")
     .select("id, nombre, sedes(nombre)")
@@ -582,10 +630,103 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
     if (id && etiqueta) etiquetaPorAmbiente.set(id, etiqueta);
   }
 
-  const out: Record<string, string> = {};
+  const out: Record<string, ProcedenciaFaltante> = {};
   for (const [activoId, origenId] of origenIdPorActivo) {
     const etiqueta = etiquetaPorAmbiente.get(origenId);
-    if (etiqueta) out[activoId] = etiqueta;
+    if (etiqueta) out[activoId] = { ambienteId: origenId, etiqueta };
   }
   return out;
+}
+
+/** Ambiente del que salió cada bien al pasar a Faltante. */
+export async function listProcedenciaFaltante(activoIds: string[]): Promise<Record<string, string>> {
+  const detalle = await listProcedenciaFaltanteDetalle(activoIds);
+  const out: Record<string, string> = {};
+  for (const [activoId, item] of Object.entries(detalle)) {
+    out[activoId] = item.etiqueta;
+  }
+  return out;
+}
+
+export async function getVisitaCampoReporte(
+  visitaId: string,
+): Promise<{ data?: VisitaCampoReporte; error?: string }> {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+
+  const supabase = await createClient();
+  const { data: visita, error: visitaError } = await supabase
+    .from("visitas_campo")
+    .select("id, numero, estado, entidad_id")
+    .eq("id", visitaId)
+    .maybeSingle();
+
+  if (visitaError || !visita) {
+    return { error: visitaError?.message ?? "Visita no encontrada." };
+  }
+
+  const { data: filas, error } = await supabase
+    .from("visita_revisiones")
+    .select(
+      "id, activo_id, ambiente_id, hallado, accion, codigo_barras, nombre, ambiente_nombre, sede_nombre, estado_bien_anterior, estado_bien_nuevo, motivo, revisado_por_nombre, created_at, activos(codigo_barras, nombre)",
+    )
+    .eq("visita_id", visitaId)
+    .order("created_at");
+
+  if (error) return { error: error.message };
+
+  const items: VisitaCampoReporteItem[] = (filas ?? []).map((fila) => {
+    const activoRaw = fila.activos as unknown;
+    const activo = (Array.isArray(activoRaw) ? activoRaw[0] : activoRaw) as {
+      codigo_barras?: string | null;
+      nombre?: string | null;
+    } | null;
+    const estadoAnterior = (fila.estado_bien_anterior as VisitaCampoReporteItem["estado_anterior"]) ?? null;
+    const estadoNuevo = (fila.estado_bien_nuevo as VisitaCampoReporteItem["estado_nuevo"]) ?? null;
+    return {
+      id: fila.id as string,
+      ambiente_id: fila.ambiente_id as string,
+      codigo_barras: (fila.codigo_barras as string | null) ?? activo?.codigo_barras ?? null,
+      nombre: (fila.nombre as string | null) ?? activo?.nombre ?? "Bien",
+      ambiente_nombre: (fila.ambiente_nombre as string | null) ?? "—",
+      sede_nombre: (fila.sede_nombre as string | null) ?? "",
+      hallado: Boolean(fila.hallado),
+      accion: (fila.accion as VisitaCampoReporteItem["accion"]) ?? null,
+      estado_anterior: estadoAnterior,
+      estado_nuevo: estadoNuevo,
+      motivo: (fila.motivo as string | null) ?? null,
+      revisado_por_nombre: (fila.revisado_por_nombre as string | null) ?? null,
+      revisado_at: fila.created_at as string,
+    };
+  });
+
+  const porNombre = (a: VisitaCampoReporteItem, b: VisitaCampoReporteItem) => {
+    const ambiente = a.ambiente_nombre.localeCompare(b.ambiente_nombre, "es");
+    if (ambiente !== 0) return ambiente;
+    return a.nombre.localeCompare(b.nombre, "es");
+  };
+
+  const cambioEstado = (item: VisitaCampoReporteItem) =>
+    item.estado_anterior != null &&
+    item.estado_nuevo != null &&
+    item.estado_anterior !== item.estado_nuevo;
+
+  return {
+    data: {
+      hallados: items.filter((item) => item.hallado).sort(porNombre),
+      faltantes: items.filter((item) => item.accion === "FALTANTE").sort(porNombre),
+      bajas: items.filter((item) => item.accion === "BAJA").sort(porNombre),
+      cambios_estado: items
+        .filter((item) => item.accion == null && cambioEstado(item))
+        .sort(porNombre),
+    },
+  };
+}
+
+export async function datosUsuarioReporte(): Promise<{ nombre: string; email: string }> {
+  const profile = await getProfile();
+  return {
+    nombre: profile?.nombre?.trim() || "Usuario",
+    email: profile?.email?.trim() || "",
+  };
 }

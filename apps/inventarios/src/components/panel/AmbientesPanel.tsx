@@ -3,8 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Activo, CreateResponsableInput, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
-import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
+import type { Activo, CreateResponsableInput, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial, VisitaCampoReporte } from "@inventario/types";
+import { compareAmbientesPorEspacio, entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
 import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
 import {
   DeleteIcon,
@@ -35,6 +35,7 @@ import {
   AmbientesDatosMenu,
 } from "@inventario/ui/panel";
 import type { AmbienteConSede } from "@/lib/actions/ubicacion";
+import { exportVisitaCampoReportePdf } from "@/lib/reportes/visita-campo-pdf";
 import {
   createAmbiente,
   createEspacio,
@@ -54,8 +55,10 @@ import {
   abrirVisitaCampo,
   attachVisitaEstadoToAmbientes,
   cerrarVisitaCampo,
-  getVisitasCampoActivas,
+  datosUsuarioReporte,
   getVisitaCampoDetalle,
+  getVisitaCampoReporte,
+  getVisitasCampoActivas,
   listVisitasCampoHistorial,
 } from "@/lib/actions/visitas-campo";
 import {
@@ -65,6 +68,7 @@ import {
   setResponsableActivo,
   updateResponsable,
 } from "@/lib/actions/responsables";
+import { useTrabajadoresPlanilla } from "./use-trabajadores-planilla";
 import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
 import { AmbientesImportDialog } from "./AmbientesImportDialog";
 import { InventarioImportDialog } from "./InventarioImportDialog";
@@ -196,6 +200,8 @@ export function AmbientesPanel({
   panelMode = "contador",
 }: AmbientesPanelProps) {
   const isAdmin = panelMode === "admin";
+  const { trabajadores: trabajadoresPlanilla, cargando: cargandoPlanilla } =
+    useTrabajadoresPlanilla(entidad);
   const entidadHref = isAdmin ? "/admin/activos" : `/contador/entidades/${entidad.id}`;
   const sedeHref = (sedeId: string) =>
     isAdmin
@@ -260,6 +266,7 @@ export function AmbientesPanel({
   const [cerrarPendingId, setCerrarPendingId] = useState<string | null>(null);
   const [visitaError, setVisitaError] = useState<string | null>(null);
   const [detalleVisita, setDetalleVisita] = useState<VisitaCampoHistorial | null>(null);
+  const [detalleReporte, setDetalleReporte] = useState<VisitaCampoReporte | null>(null);
   const [detalleAmbientes, setDetalleAmbientes] = useState<Awaited<ReturnType<typeof getVisitaCampoDetalle>> | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [abrirVisitaOpen, setAbrirVisitaOpen] = useState(false);
@@ -393,8 +400,15 @@ export function AmbientesPanel({
     setDetalleVisita(visita);
     setDetalleLoading(true);
     setDetalleAmbientes(null);
-    const detalle = await getVisitaCampoDetalle(visita.id);
+    setDetalleReporte(null);
+    const [detalle, reporte] = await Promise.all([
+      getVisitaCampoDetalle(visita.id),
+      getVisitaCampoReporte(visita.id),
+    ]);
     setDetalleAmbientes(detalle);
+    setDetalleReporte(
+      reporte.data ?? { hallados: [], faltantes: [], bajas: [], cambios_estado: [] },
+    );
     setDetalleLoading(false);
   }
 
@@ -407,10 +421,38 @@ export function AmbientesPanel({
     const result = await createResponsable(entidad.id, input);
     if (result.data) {
       const nuevo: ResponsableConConteo = { ...result.data, ambiente_count: 0 };
-      setResponsables((prev) => [...prev, nuevo]);
+      setResponsables((prev) => {
+        const idx = prev.findIndex((r) => r.id === nuevo.id);
+        if (idx < 0) return [...prev, nuevo];
+        const next = [...prev];
+        next[idx] = {
+          ...prev[idx],
+          ...nuevo,
+          ambiente_count: prev[idx].ambiente_count,
+          ambiente_nombres: prev[idx].ambiente_nombres,
+        };
+        return next;
+      });
       return { data: nuevo };
     }
     return { error: result.error };
+  }
+
+  async function elegirTrabajadorComoResponsable(relacionId: string) {
+    const trabajador = trabajadoresPlanilla?.find((item) => item.relacionId === relacionId);
+    if (!trabajador) return { error: "No se encontró el responsable." };
+    const result = await createResponsableDesdeAmbiente({
+      nombre: trabajador.nombre,
+      dni: trabajador.dni,
+      email: trabajador.email ?? "",
+      telefono: trabajador.telefono ?? "",
+      cargo: trabajador.cargo ?? undefined,
+      desdePlanilla: true,
+    });
+    if (result.error || !result.data) {
+      return { error: result.error ?? "No se pudo asignar el responsable." };
+    }
+    return { id: result.data.id };
   }
 
   const ambientesBase = useMemo(() => {
@@ -485,13 +527,7 @@ export function AmbientesPanel({
         responsableNombreById(input.responsableId) ??
         null,
     };
-    setAmbientes((prev) =>
-      [...prev, nuevo].sort((a, b) => {
-        if (a.sede_es_principal !== b.sede_es_principal) return a.sede_es_principal ? -1 : 1;
-        if (a.sede_nombre !== b.sede_nombre) return a.sede_nombre.localeCompare(b.sede_nombre);
-        return a.nombre.localeCompare(b.nombre);
-      }),
-    );
+    setAmbientes((prev) => [...prev, nuevo].sort(compareAmbientesPorEspacio));
     setSedes((prev) =>
       prev.map((s) =>
         s.id === input.sedeId ? { ...s, ambiente_count: s.ambiente_count + 1 } : s,
@@ -638,6 +674,7 @@ export function AmbientesPanel({
           onOpenEliminarPorCodigos={!isAdmin ? () => setEliminarOpen(true) : undefined}
         />
       ) : !sedeFocus && tab === "visitas" ? (
+        <>
         <VisitasCampoHistorialPanel
           historial={visitasHistorial}
           loadingDetalle={detalleLoading}
@@ -647,11 +684,25 @@ export function AmbientesPanel({
           onCerrarDetalle={() => {
             setDetalleVisita(null);
             setDetalleAmbientes(null);
+            setDetalleReporte(null);
           }}
           visitasAbiertas={visitasActivas}
           onTerminar={puedeGestionarVisita ? handleCerrarVisita : undefined}
           terminarPendingId={cerrarPendingId}
+          reporte={detalleReporte ?? undefined}
+          onExportarReporte={async (visita) => {
+            if (!detalleReporte) return;
+            const usuario = await datosUsuarioReporte();
+            await exportVisitaCampoReportePdf({
+              entidadNombre: entidad.nombre,
+              visita,
+              reporte: detalleReporte,
+              usuarioNombre: usuario.nombre,
+              usuarioEmail: usuario.email,
+            });
+          }}
         />
+        </>
       ) : !sedeFocus && tab === "responsables" ? (
         <ResponsablesPanel
           responsables={responsables}
@@ -661,10 +712,13 @@ export function AmbientesPanel({
               await syncAmbientesYResponsables();
               return {
                 data: { ...result.data, ambiente_count: 0 },
+                reused: result.reused,
               };
             }
             return { error: result.error };
           }}
+          trabajadoresPlanilla={trabajadoresPlanilla}
+          cargandoPlanilla={cargandoPlanilla}
           onUpdate={async (id, input) => {
             const result = await updateResponsable(id, input);
             if (!result.error) await syncAmbientesYResponsables();
@@ -986,6 +1040,8 @@ export function AmbientesPanel({
             showSedeSelect={entidadMultiplesSedes}
             responsableId={createResponsableId}
             onResponsableIdChange={setCreateResponsableId}
+            trabajadores={trabajadoresPlanilla}
+            onElegirTrabajador={elegirTrabajadorComoResponsable}
             onRequestCreateResponsable={() => setCreateResponsableOpen(true)}
             espacioId={createEspacioId}
             onEspacioIdChange={setCreateEspacioId}
@@ -1031,6 +1087,8 @@ export function AmbientesPanel({
               espacios={espacios}
               responsableId={editResponsableId}
               onResponsableIdChange={setEditResponsableId}
+              trabajadores={trabajadoresPlanilla}
+              onElegirTrabajador={elegirTrabajadorComoResponsable}
               onRequestCreateResponsable={() => setEditResponsableOpen(true)}
               espacioId={editEspacioId}
               onEspacioIdChange={setEditEspacioId}

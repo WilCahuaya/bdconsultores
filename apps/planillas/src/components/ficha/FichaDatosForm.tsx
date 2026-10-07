@@ -21,32 +21,49 @@ import {
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { DireccionAfpnetFields, direccionAfpnetDesdePersona } from "@/components/ficha/DireccionAfpnetFields";
-import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
-import { contratoConfirmado, type FlujoContrato, type FlujoDocumento } from "@/lib/flujo-ficha";
+import { DocumentoPrevisualizacion, MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
+import { nombreBaseContrato } from "@/lib/nombre-archivo";
+import { contratoConfirmado, contratoPrimeroFirmado, type FlujoContrato, type FlujoDocumento } from "@/lib/flujo-ficha";
 
-function rutaFirmadoDeContrato(contrato: FlujoContrato | null, documentos: FlujoDocumento[]): string | null {
+function respaldoFirmado(
+  contrato: FlujoContrato | null,
+  documentos: FlujoDocumento[],
+  titulos: { contrato: string; solicitud: string },
+): { path: string; titulo: string } | null {
   if (!contrato) return null;
   if (contrato.documento_id) {
     const propio = documentos.find(
       (documento) => documento.id === contrato.documento_id && documento.estado === "SI" && documento.storage_path,
     );
-    if (propio?.storage_path) return propio.storage_path;
+    if (propio?.storage_path) return { path: propio.storage_path, titulo: titulos.contrato };
   }
-  return contrato.solicitud_storage_path?.trim() || null;
+  const solicitud = contrato.solicitud_storage_path?.trim();
+  if (solicitud) return { path: solicitud, titulo: titulos.solicitud };
+  return null;
 }
 
-function rutaFirmadoVigente(trabajador: TrabajadorListItem): string | null {
-  const confirmado = rutaFirmadoDeContrato(contratoConfirmado(trabajador.contratos), trabajador.documentos);
-  if (confirmado) return confirmado;
-  const delVigente = rutaFirmadoDeContrato(
-    trabajador.contratos.find((contrato) => contrato.es_vigente) ?? null,
-    trabajador.documentos,
-  );
-  if (delVigente) return delVigente;
-  return (
-    trabajador.documentos.find((documento) => documento.tipo === "CONTRATO_FIRMADO" && documento.estado === "SI")
-      ?.storage_path ?? null
-  );
+function nombreContratoArchivo(trabajador: TrabajadorListItem, contrato: FlujoContrato | null): string | null {
+  const jornada = trabajador.jornada;
+  const cargo = trabajador.cargo;
+  const fecha = contrato?.fecha_inicio ?? trabajador.fecha_ingreso;
+  if ((jornada !== "TIEMPO_COMPLETO" && jornada !== "TIEMPO_PARCIAL") || !cargo || !fecha) return null;
+  return nombreBaseContrato({
+    numero: trabajador.numero,
+    jornada,
+    cargo,
+    nombres: trabajador.persona.nombres,
+    apellidoPaterno: trabajador.persona.apellido_paterno,
+    fecha,
+  });
+}
+
+function hintFechaIngreso(fechaIngreso: string | null, primero: FlujoContrato | null): string {
+  if (!primero) return "Todavía no hay contrato ni solicitud firmado. Escriba el primer día en la empresa.";
+  const fechaDoc = primero.fecha_inicio ? formatFechaPlanilla(primero.fecha_inicio) : null;
+  if (fechaDoc && fechaIngreso && fechaIngreso !== primero.fecha_inicio) {
+    return `En el primer documento figura ${fechaDoc}. Compárela con la previsualización y corríjala si no coincide.`;
+  }
+  return "Compárela con el primer contrato o solicitud firmado. Puede corregirla si no coincide.";
 }
 
 export function FichaPersonaForm({
@@ -123,7 +140,16 @@ export function FichaPuestoForm({
   const [pending, setPending] = useState(false);
   const [jornada, setJornada] = useState(trabajador.jornada ?? "");
   const cesada = trabajador.estado === "CESADA";
-  const firmadoVigente = rutaFirmadoVigente(trabajador);
+  const vigente = contratoConfirmado(trabajador.contratos);
+  const primero = contratoPrimeroFirmado(trabajador.contratos);
+  const firmadoVigente = respaldoFirmado(vigente, trabajador.documentos, {
+    contrato: "Contrato firmado vigente",
+    solicitud: "Solicitud de registro vigente",
+  });
+  const firmadoPrimero = respaldoFirmado(primero, trabajador.documentos, {
+    contrato: "Primer contrato firmado",
+    solicitud: "Primera solicitud firmada",
+  });
 
   async function onSubmit(formData: FormData) {
     setPending(true);
@@ -138,7 +164,11 @@ export function FichaPuestoForm({
   }
 
   return (
-    <MarcoPrevisualizacion titulo="Contrato firmado vigente" storagePath={firmadoVigente}>
+    <MarcoPrevisualizacion
+      titulo={firmadoVigente?.titulo ?? "Contrato o solicitud vigente"}
+      storagePath={firmadoVigente?.path ?? null}
+      nombreDescarga={firmadoVigente ? nombreContratoArchivo(trabajador, vigente) : null}
+    >
     <div className="space-y-4">
       {cesada ? (
         <p className="text-sm text-muted-foreground">
@@ -148,7 +178,7 @@ export function FichaPuestoForm({
       <form action={onSubmit} className="space-y-4">
         <FormSection
           title="Puesto en esta empresa"
-          hint="La fecha de ingreso es el primer día en la empresa. No tiene que coincidir con el contrato vigente: pueden faltar contratos viejos, haber solo el firmado actual, o no haber contrato elaborado."
+          hint="Cargo, horario y jornada salen del último contrato o solicitud firmado. La fecha de ingreso sale del primero; si todavía no hay uno, escríbala aquí."
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
@@ -189,14 +219,21 @@ export function FichaPuestoForm({
               onChange={(event) => setJornada(event.target.value)}
             />
             <HorarioLaboralField jornada={jornada} defaultValue={trabajador.horario} readOnly={!canWrite} />
-            <div className="sm:col-span-2">
+            <div className="space-y-3 sm:col-span-2">
               <DateField
                 label="Fecha de ingreso a la empresa"
                 name="fecha_ingreso"
-                defaultValue={trabajador.fecha_ingreso}
+                defaultValue={trabajador.fecha_ingreso || primero?.fecha_inicio || ""}
                 readOnly={!canWrite}
-                hint="De la empresa, no del PDF de contrato."
+                hint={hintFechaIngreso(trabajador.fecha_ingreso, primero)}
               />
+              {firmadoPrimero ? (
+                <DocumentoPrevisualizacion
+                  titulo={firmadoPrimero.titulo}
+                  storagePath={firmadoPrimero.path}
+                  nombreDescarga={nombreContratoArchivo(trabajador, primero)}
+                />
+              ) : null}
             </div>
             {cesada ? (
               <DateField

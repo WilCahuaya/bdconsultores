@@ -29,6 +29,8 @@ function aFilaExcel(t: TrabajadorListItem, horario: string | null): AsistenciaEx
   return {
     relacionId: t.id,
     numero: t.numero,
+    nombres: t.persona.nombres,
+    apellidoPaterno: t.persona.apellido_paterno,
     nombre: nombreCompleto(t.persona),
     dni: t.persona.dni,
     horario,

@@ -85,6 +85,7 @@ export async function GET(
     remuneracionNueva: adenda.remuneracion_nueva == null ? null : Number(adenda.remuneracion_nueva),
     horarioNuevo: adenda.horario_nuevo,
     jornadaNueva: adenda.jornada_nueva,
+    numero: trabajador.numero,
   };
 
   const buffer = await bufferAdendaWord(datos);

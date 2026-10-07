@@ -15,7 +15,8 @@ import {
   convertMillimetersToTwip,
 } from "docx";
 import { cargoCanonico } from "@/lib/cargos-funciones";
-import { nombreCompleto } from "@/lib/planillas-labels";
+import { fechaNombreArchivo, personaNombreArchivo, prefijoNumeroArchivo, prefijoNumerosArchivo, tokenNombreArchivo } from "@/lib/nombre-archivo";
+import { formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 const FONT = "Times New Roman";
 const SIZE = 22;
@@ -43,6 +44,7 @@ const BORDE = { style: BorderStyle.SINGLE, size: 4, color: "000000" };
 const BORDES = { top: BORDE, bottom: BORDE, left: BORDE, right: BORDE };
 
 export type VidaLeyTrabajadorWord = {
+  numero: number | null;
   nombres: string;
   apellidoPaterno: string | null;
   apellidoMaterno: string | null;
@@ -190,9 +192,10 @@ const COLS: { key: string; label: string; width: number; center: boolean }[] = [
 const FILAS_TRABAJADORES = 8;
 
 function filaTrabajador(t: VidaLeyTrabajadorWord | null, n: number): TableRow {
+  const numero = t ? formatNumeroTrabajador(t.numero) || String(n) : "";
   const vals = t
     ? [
-        String(n),
+        numero,
         nombreDoc(t),
         t.dni,
         fechaVidaLeyDoc(t.fechaIngreso),
@@ -221,12 +224,14 @@ function tablaTrabajadores(trabajadores: VidaLeyTrabajadorWord[]): Table {
 }
 
 export function nombreArchivoVidaLey(d: VidaLeyWordDatos): string {
-  const empresa = d.entidadNombre.replace(/[\\/:*?"<>|]/g, " ").slice(0, 40).trim();
+  const empresa = tokenNombreArchivo(d.entidadNombre).slice(0, 40) || "EMPRESA";
   if (d.trabajadores.length === 1) {
-    const persona = nombreDoc(d.trabajadores[0]).replace(/[\\/:*?"<>|]/g, " ").slice(0, 50).trim();
-    return `Tramite seguro Vida Ley - ${persona}.docx`;
+    const trabajador = d.trabajadores[0];
+    const persona = personaNombreArchivo(trabajador.nombres, trabajador.apellidoPaterno).slice(0, 50) || "TRABAJADOR";
+    const fecha = trabajador.fechaIngreso ? ` - ${fechaNombreArchivo(trabajador.fechaIngreso)}` : "";
+    return `${prefijoNumeroArchivo(trabajador.numero)}VIDA LEY - ${persona}${fecha}.docx`;
   }
-  return `Tramite seguro Vida Ley - ${empresa}.docx`;
+  return `${prefijoNumerosArchivo(d.trabajadores.map((trabajador) => trabajador.numero))}VIDA LEY - ${empresa}.docx`;
 }
 
 export function construirDocumentoVidaLey(d: VidaLeyWordDatos): Document {

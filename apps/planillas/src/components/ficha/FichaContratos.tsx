@@ -18,6 +18,7 @@ import type { TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { MarcasDocumentoContrato } from "@/components/ficha/VersionesContratoButton";
 import { ESTADO_CONTRATO_LABEL, JORNADA_LABEL, cargoCanonico, formatFechaPlanilla, formatRemuneracion, montoAsignacionFamiliar, opcionesCargo, remuneracionBruta } from "@/lib/planillas-labels";
 import { descargarContratoWord } from "@/lib/descargar-contrato-word";
+import { nombreBaseContrato } from "@/lib/nombre-archivo";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
 import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
@@ -51,6 +52,21 @@ function contratoTieneSolicitud(contrato: ContratoRow, solicitudes: SolicitudReg
   return Boolean(solicitudDeContrato(contrato, solicitudes)?.storage_path);
 }
 
+function nombrePdfContrato(trabajador: TrabajadorListItem, contrato: ContratoRow | null): string | null {
+  const jornada = contrato?.jornada ?? trabajador.jornada;
+  const cargo = contrato?.cargo ?? trabajador.cargo;
+  const fecha = contrato?.fecha_inicio ?? trabajador.fecha_ingreso;
+  if ((jornada !== "TIEMPO_COMPLETO" && jornada !== "TIEMPO_PARCIAL") || !cargo || !fecha) return null;
+  return nombreBaseContrato({
+    numero: trabajador.numero,
+    jornada,
+    cargo,
+    nombres: trabajador.persona.nombres,
+    apellidoPaterno: trabajador.persona.apellido_paterno,
+    fecha,
+  });
+}
+
 export function FichaContratos({
   relacionId,
   entidadId,
@@ -72,6 +88,16 @@ export function FichaContratos({
   canWrite: boolean;
   canMarcarRecogido: boolean;
 }) {
+  const descarga = {
+    numero: trabajador.numero,
+    nombres: trabajador.persona.nombres,
+    apellidoPaterno: trabajador.persona.apellido_paterno,
+    nombreBase: (documento: DocumentoRow) => {
+      if (documento.tipo !== "CONTRATO_FIRMADO") return null;
+      const ligado = contratos.find((c) => c.documento_id === documento.id) ?? null;
+      return nombrePdfContrato(trabajador, ligado);
+    },
+  };
   const router = useRouter();
   const { pushToast } = useToast();
   const abierto = contratos.find(
@@ -228,7 +254,7 @@ export function FichaContratos({
         <form action={onGenerar}>
           <FormSection
             title="Generar contrato"
-            hint="Crea una versión nueva, aunque la anterior no tenga respaldo ni esté recogida. Estos datos van solo a este documento. Al confirmar el firmado se actualizan cargo, horario y jornada del puesto. No se toca la fecha de ingreso."
+            hint="Crea una versión nueva, aunque la anterior no tenga respaldo ni esté recogida. Estos datos van solo a este documento. Al confirmar, cargo, horario y jornada pasan al puesto solo si esta versión es la más reciente firmada. La fecha de inicio pasa a la fecha de ingreso solo si este es el primer contrato o solicitud firmado."
           >
             <DatosContratoFields
               key={`gen-${base?.id ?? "nuevo"}-${base?.horario ?? ""}`}
@@ -283,6 +309,7 @@ export function FichaContratos({
               tiposFiltro={["CONTRATO_FIRMADO"]}
               permitirAgregar={false}
               hint={`PDF firmado de la versión ${firmando.version}.`}
+              descarga={descarga}
             />
           </div>
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
@@ -290,6 +317,9 @@ export function FichaContratos({
               relacionId={relacionId}
               entidadId={entidadId}
               contratoId={firmando.id}
+              numero={trabajador.numero}
+              nombres={trabajador.persona.nombres}
+              apellidoPaterno={trabajador.persona.apellido_paterno}
               canWrite={canWrite}
               cerrado={firmando.estado === "BAJA"}
               solicitud={solicitudDeContrato(firmando, solicitudes)}
@@ -379,6 +409,7 @@ export function FichaContratos({
             tiposFiltro={["CONTRATO_FIRMADO"]}
             permitirAgregar={!documentos.some((d) => d.tipo === "CONTRATO_FIRMADO")}
             hint="PDF firmado. El ingreso a la empresa no cambia."
+            descarga={descarga}
           />
         </FormSection>
       ) : null}

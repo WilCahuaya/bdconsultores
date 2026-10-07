@@ -5,7 +5,10 @@ import type {
   VisitaCampoActiva,
   VisitaCampoAmbienteDetalle,
   VisitaCampoHistorial,
+  VisitaCampoReporte,
+  VisitaCampoReporteItem,
 } from "@inventario/types";
+import { estadoBienLabel } from "@inventario/types";
 import { Button, Dialog, Select } from "./components";
 import {
   PanelDataTable,
@@ -72,6 +75,14 @@ function formatFecha(iso: string) {
     dateStyle: "short",
     timeStyle: "short",
   });
+}
+
+function resumenNovedades(faltantes: number, bajas: number, cambios: number): string {
+  const partes: string[] = [];
+  if (faltantes > 0) partes.push(`${faltantes} faltante${faltantes === 1 ? "" : "s"}`);
+  if (bajas > 0) partes.push(`${bajas} baja${bajas === 1 ? "" : "s"}`);
+  if (cambios > 0) partes.push(`${cambios} cambio${cambios === 1 ? "" : "s"} de estado`);
+  return partes.length > 0 ? partes.join(" · ") : "Sin novedades";
 }
 
 export function visitaCampoSedeLabel(visita: {
@@ -422,6 +433,8 @@ export function VisitasCampoHistorialPanel({
   visitasAbiertas = [],
   onTerminar,
   terminarPendingId,
+  reporte,
+  onExportarReporte,
 }: {
   historial: VisitaCampoHistorial[];
   loadingDetalle?: boolean;
@@ -432,7 +445,15 @@ export function VisitasCampoHistorialPanel({
   visitasAbiertas?: VisitaCampoActiva[];
   onTerminar?: (visitaId: string) => void;
   terminarPendingId?: string | null;
+  /** Si llega, cada ambiente se despliega con faltantes, bajas y cambios de estado. */
+  reporte?: VisitaCampoReporte;
+  onExportarReporte?: (visita: VisitaCampoHistorial) => void | Promise<void>;
 }) {
+  const [ambienteAbierto, setAmbienteAbierto] = React.useState<string | null>(null);
+  const [exportandoReporte, setExportandoReporte] = React.useState(false);
+  React.useEffect(() => {
+    setAmbienteAbierto(null);
+  }, [detalleVisita?.id]);
   if (historial.length === 0) {
     return (
       <PanelEmptyState message="Aún no hay visitas de campo registradas para esta entidad." />
@@ -536,41 +557,114 @@ export function VisitasCampoHistorialPanel({
                 {abierto ? (
                   <tr className="border-b border-border/40 bg-muted/20">
                     <td colSpan={VISITAS_HISTORIAL_TABLE_WIDTHS_PCT.length} className="px-3 py-3 sm:px-4">
-                      <p className="mb-2 text-xs text-muted-foreground">
-                        {visitaCampoSedeLabel(visita)} ·{" "}
-                        {visita.cerrado_at
-                          ? `Cerrada el ${formatFecha(visita.cerrado_at)}`
-                          : `Abierta el ${formatFecha(visita.abierto_at)}`}
-                      </p>
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {visitaCampoSedeLabel(visita)} ·{" "}
+                          {visita.cerrado_at
+                            ? `Cerrada el ${formatFecha(visita.cerrado_at)}`
+                            : `Abierta el ${formatFecha(visita.abierto_at)}`}
+                        </p>
+                        {reporte && onExportarReporte ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={exportandoReporte}
+                            onClick={() => {
+                              setExportandoReporte(true);
+                              void Promise.resolve(onExportarReporte(visita)).finally(() => {
+                                setExportandoReporte(false);
+                              });
+                            }}
+                          >
+                            {exportandoReporte ? "Exportando…" : "Exportar PDF"}
+                          </Button>
+                        ) : null}
+                      </div>
                       {loadingDetalle ? (
                         <p className="text-sm text-muted-foreground">Cargando detalle…</p>
                       ) : detalle && detalle.length > 0 ? (
                         <ul className="space-y-2 text-sm">
-                          {detalle.map((fila) => (
-                            <li
-                              key={fila.ambiente_id}
-                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-card px-3 py-2"
-                            >
-                              <div className="min-w-0">
-                                <p className="font-medium text-foreground">{fila.ambiente_nombre}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {fila.sede_nombre}
-                                  {fila.total != null
-                                    ? ` · ${fila.revisados ?? 0}/${fila.total} bienes`
-                                    : ""}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <VisitaCampoEstadoBadge estado={fila.estado} />
-                                {fila.estado === "CULMINADO" && fila.culminado_at ? (
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {formatFecha(fila.culminado_at)}
-                                    {fila.culminado_por_nombre ? ` · ${fila.culminado_por_nombre}` : ""}
+                          {detalle.map((fila) => {
+                            const abiertoAmbiente = ambienteAbierto === fila.ambiente_id;
+                            const delAmbiente = (items: VisitaCampoReporteItem[]) =>
+                              items.filter((item) => item.ambiente_id === fila.ambiente_id);
+                            const faltantes = delAmbiente(reporte?.faltantes ?? []);
+                            const bajas = delAmbiente(reporte?.bajas ?? []);
+                            const cambios = delAmbiente(reporte?.cambios_estado ?? []);
+                            const sinNovedades =
+                              faltantes.length === 0 && bajas.length === 0 && cambios.length === 0;
+                            const encabezado = (
+                              <>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-foreground">{fila.ambiente_nombre}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {fila.sede_nombre}
+                                    {fila.total != null
+                                      ? ` · ${fila.revisados ?? 0}/${fila.total} bienes`
+                                      : ""}
                                   </p>
+                                  {reporte ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      {resumenNovedades(faltantes.length, bajas.length, cambios.length)}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="text-right">
+                                  <VisitaCampoEstadoBadge estado={fila.estado} />
+                                  {fila.estado === "CULMINADO" && fila.culminado_at ? (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      {formatFecha(fila.culminado_at)}
+                                      {fila.culminado_por_nombre ? ` · ${fila.culminado_por_nombre}` : ""}
+                                    </p>
+                                  ) : null}
+                                  {reporte ? (
+                                    <p className="mt-1 text-xs text-primary">
+                                      {abiertoAmbiente ? "Ocultar novedades" : "Ver novedades"}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </>
+                            );
+                            return (
+                              <li
+                                key={fila.ambiente_id}
+                                className="rounded-lg border border-border/60 bg-card"
+                              >
+                                {reporte ? (
+                                  <button
+                                    type="button"
+                                    className="flex w-full flex-wrap items-center justify-between gap-2 px-3 py-2 text-left"
+                                    aria-expanded={abiertoAmbiente}
+                                    onClick={() =>
+                                      setAmbienteAbierto(abiertoAmbiente ? null : fila.ambiente_id)
+                                    }
+                                  >
+                                    {encabezado}
+                                  </button>
+                                ) : (
+                                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                                    {encabezado}
+                                  </div>
+                                )}
+                                {reporte && abiertoAmbiente ? (
+                                  <div className="space-y-3 border-t border-border/50 px-3 py-3">
+                                    {sinNovedades ? (
+                                      <p className="text-xs text-muted-foreground">
+                                        Sin faltantes, bajas ni cambios de estado.
+                                      </p>
+                                    ) : (
+                                      <>
+                                        <ReporteAmbienteLista titulo="Faltantes" items={faltantes} tono="faltante" />
+                                        <ReporteAmbienteLista titulo="Bajas" items={bajas} tono="baja" />
+                                        <ReporteAmbienteLista titulo="Cambiaron de estado" items={cambios} tono="estado" />
+                                      </>
+                                    )}
+                                  </div>
                                 ) : null}
-                              </div>
-                            </li>
-                          ))}
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : (
                         <p className="text-sm text-muted-foreground">Sin ambientes en esta visita.</p>
@@ -584,5 +678,52 @@ export function VisitasCampoHistorialPanel({
         </tbody>
       </PanelDataTable>
     </>
+  );
+}
+
+function ReporteAmbienteLista({
+  titulo,
+  items,
+  tono,
+}: {
+  titulo: string;
+  items: VisitaCampoReporteItem[];
+  tono: "faltante" | "baja" | "estado";
+}) {
+  if (items.length === 0) return null;
+  const tonoClass =
+    tono === "baja"
+      ? "text-destructive"
+      : "text-amber-700 dark:text-amber-300";
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs font-semibold text-foreground">
+        {titulo} <span className="font-normal text-muted-foreground">({items.length})</span>
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((item) => (
+          <li key={`${tono}-${item.id}`} className="rounded-md bg-muted/40 px-2.5 py-1.5">
+            <p className="font-medium text-foreground">{item.nombre}</p>
+            {item.codigo_barras ? (
+              <p className="font-mono text-xs text-muted-foreground">{item.codigo_barras}</p>
+            ) : null}
+            {tono === "faltante" ? <p className={`text-xs font-medium ${tonoClass}`}>Pasó a faltante</p> : null}
+            {tono === "baja" ? <p className={`text-xs font-medium ${tonoClass}`}>De baja</p> : null}
+            {tono === "estado" && item.estado_anterior && item.estado_nuevo ? (
+              <p className={`text-xs font-medium ${tonoClass}`}>
+                {estadoBienLabel(item.estado_anterior)} → {estadoBienLabel(item.estado_nuevo)}
+              </p>
+            ) : null}
+            {item.motivo ? <p className="text-xs text-muted-foreground">{item.motivo}</p> : null}
+            {item.revisado_por_nombre || item.revisado_at ? (
+              <p className="text-xs text-muted-foreground">
+                {item.revisado_por_nombre ?? "Sin revisor"}
+                {item.revisado_at ? ` · ${formatFecha(item.revisado_at)}` : ""}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

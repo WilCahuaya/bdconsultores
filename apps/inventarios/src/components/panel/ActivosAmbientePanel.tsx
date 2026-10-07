@@ -24,7 +24,7 @@ import {
   type PreregistroGestionToolbarState,
 } from "@inventario/ui/panel";
 import { ActivoForm } from "./ActivoForm";
-import { listProcedenciaFaltante } from "@/lib/actions/visitas-campo";
+import { listProcedenciaFaltanteDetalle } from "@/lib/actions/visitas-campo";
 import { FaltanteBienesPanel, useVisitaRevision } from "./VisitaRevisionPanel";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
@@ -141,6 +141,7 @@ export function ActivosAmbientePanel({
   const [preregistroHeaderToolbar, setPreregistroHeaderToolbar] =
     useState<PreregistroGestionToolbarState | null>(null);
   const [procedenciaPorActivo, setProcedenciaPorActivo] = useState<Record<string, string>>({});
+  const [origenAmbientePorActivo, setOrigenAmbientePorActivo] = useState<Record<string, string>>({});
   const procedenciaIds = useMemo(
     () => (esAmbienteFaltante ? activosList.map((activo) => activo.id).join(",") : ""),
     [activosList, esAmbienteFaltante],
@@ -148,12 +149,21 @@ export function ActivosAmbientePanel({
   useEffect(() => {
     if (isAdmin || !esAmbienteFaltante) {
       setProcedenciaPorActivo({});
+      setOrigenAmbientePorActivo({});
       return;
     }
     const ids = procedenciaIds ? procedenciaIds.split(",") : [];
     let cancel = false;
-    void listProcedenciaFaltante(ids).then((mapa) => {
-      if (!cancel) setProcedenciaPorActivo(mapa);
+    void listProcedenciaFaltanteDetalle(ids).then((detalle) => {
+      if (cancel) return;
+      const etiquetas: Record<string, string> = {};
+      const origenes: Record<string, string> = {};
+      for (const [activoId, item] of Object.entries(detalle)) {
+        etiquetas[activoId] = item.etiqueta;
+        origenes[activoId] = item.ambienteId;
+      }
+      setProcedenciaPorActivo(etiquetas);
+      setOrigenAmbientePorActivo(origenes);
     });
     return () => {
       cancel = true;
@@ -428,6 +438,7 @@ export function ActivosAmbientePanel({
           ambienteId={ambienteId}
           activos={activosList}
           procedenciaPorActivo={procedenciaPorActivo}
+          origenAmbientePorActivo={origenAmbientePorActivo}
         />
       ) : null}
 
@@ -535,6 +546,7 @@ export function ActivosAmbientePanel({
           puedeDarDeBaja={!isAdmin && !esAmbientePreregistro}
           puedeValidarPreregistro={!isAdmin && esAmbientePreregistro}
           puedeEliminarPreregistro={esAmbientePreregistro}
+          puedeMoverDesdeFaltante={!isAdmin && esAmbienteFaltante}
           gestionPreregistros={esAmbientePreregistro ? gestionPreregistrosConfig : undefined}
           onActivoEliminado={(id) => quitarActivos([id])}
           modoAdmin={isAdmin}

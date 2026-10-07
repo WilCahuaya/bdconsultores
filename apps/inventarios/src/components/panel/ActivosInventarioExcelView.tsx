@@ -41,6 +41,7 @@ interface ActivosInventarioExcelViewProps {
   puedeDarDeBaja?: boolean;
   puedeValidarPreregistro?: boolean;
   puedeEliminarPreregistro?: boolean;
+  puedeMoverDesdeFaltante?: boolean;
   gestionPreregistros?: GestionPreregistrosConfig;
   onActivoEliminado?: (activoId: string) => void;
   editarLabel?: string;
@@ -79,6 +80,7 @@ export function ActivosInventarioExcelView({
   puedeDarDeBaja = true,
   puedeValidarPreregistro = false,
   puedeEliminarPreregistro = false,
+  puedeMoverDesdeFaltante = false,
   gestionPreregistros,
   onActivoEliminado,
   editarLabel,
@@ -153,6 +155,7 @@ export function ActivosInventarioExcelView({
     puedeDarDeBaja,
     puedeValidarPreregistro,
     puedeEliminarPreregistro,
+    puedeMoverDesdeFaltante,
     editarLabel,
     modoAdmin,
   };

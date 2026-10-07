@@ -293,6 +293,14 @@ export async function confirmarAdenda(relacionId: string, adendaId: string): Pro
   if (row.datos_confirmados) return {};
   if (!row.storage_path) return { error: "Suba el PDF firmado antes de confirmar la adenda." };
 
+  const { data: contratoPadre, error: padreError } = await db
+    .from("contratos")
+    .select("es_vigente, datos_confirmados, estado")
+    .eq("id", row.contrato_id)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (padreError) return { error: padreError.message };
+
   const { error } = await db
     .from("adendas")
     .update({ datos_confirmados: true })
@@ -300,14 +308,18 @@ export async function confirmarAdenda(relacionId: string, adendaId: string): Pro
     .eq("relacion_id", relacionId);
   if (error) return { error: error.message };
 
-  if (row.tipo === "CARGO" && row.cargo_nuevo) {
+  const aplicaAlPuesto = Boolean(
+    contratoPadre?.es_vigente && contratoPadre.datos_confirmados && contratoPadre.estado !== "BAJA",
+  );
+
+  if (aplicaAlPuesto && row.tipo === "CARGO" && row.cargo_nuevo) {
     const { error: relError } = await db
       .from("relaciones_laborales")
       .update({ cargo: row.cargo_nuevo })
       .eq("id", relacionId);
     if (relError) return { error: relError.message };
   }
-  if (row.tipo === "HORARIO" && row.horario_nuevo && row.jornada_nueva) {
+  if (aplicaAlPuesto && row.tipo === "HORARIO" && row.horario_nuevo && row.jornada_nueva) {
     const { error: relError } = await db
       .from("relaciones_laborales")
       .update({ horario: row.horario_nuevo, jornada: row.jornada_nueva })

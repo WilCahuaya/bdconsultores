@@ -311,8 +311,21 @@ export function contratoBorrador(contratos: FlujoContrato[]): FlujoContrato | nu
   );
 }
 
+/** Último contrato confirmado (PDF firmado o solicitud). Sigue vigente hasta que se confirme uno de versión mayor. */
+function contratosFirmados(contratos: FlujoContrato[]): FlujoContrato[] {
+  return contratos.filter((c) => c.datos_confirmados && c.estado !== "BAJA");
+}
+
 export function contratoConfirmado(contratos: FlujoContrato[]): FlujoContrato | null {
-  return contratos.find((c) => c.datos_confirmados && c.es_vigente) ?? contratos.find((c) => c.datos_confirmados) ?? null;
+  const confirmados = contratosFirmados(contratos);
+  if (confirmados.length === 0) return null;
+  return [...confirmados].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
+}
+
+export function contratoPrimeroFirmado(contratos: FlujoContrato[]): FlujoContrato | null {
+  const confirmados = contratosFirmados(contratos);
+  if (confirmados.length === 0) return null;
+  return [...confirmados].sort((a, b) => (a.version ?? 0) - (b.version ?? 0))[0];
 }
 
 function campoVacio(value: string | null | undefined): boolean {

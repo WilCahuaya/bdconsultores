@@ -11,12 +11,14 @@ import {
 import { FotoPreviewDialog } from "./ActivoMediaDialogs";
 import { ActivoDetalleModal } from "./ActivoDetalleModal";
 import { AgregarBienesSimilaresDialog } from "./AgregarBienesSimilaresDialog";
+import { MoverFaltanteDialog } from "./MoverFaltanteDialog";
 import { ValidarPreregistroDialog } from "./ValidarPreregistroDialog";
 import {
   ActivoIconButton,
   IconAmbiente,
   IconEditar,
   IconFoto,
+  IconMover,
   IconSimilares,
   IconValidar,
   IconVer,
@@ -32,6 +34,7 @@ interface ActivoAccionesBarProps {
   puedeDarDeBaja?: boolean;
   puedeValidarPreregistro?: boolean;
   puedeEliminarPreregistro?: boolean;
+  puedeMoverDesdeFaltante?: boolean;
   editarLabel?: string;
   modoAdmin?: boolean;
   onActivoEliminado?: (activoId: string) => void;
@@ -47,6 +50,7 @@ export function ActivoAccionesBar({
   puedeDarDeBaja = true,
   puedeValidarPreregistro = false,
   puedeEliminarPreregistro = false,
+  puedeMoverDesdeFaltante = false,
   editarLabel = "Editar activo",
   modoAdmin = false,
   onActivoEliminado,
@@ -56,9 +60,11 @@ export function ActivoAccionesBar({
   const [detalleOpen, setDetalleOpen] = useState(false);
   const [similaresOpen, setSimilaresOpen] = useState(false);
   const [validarOpen, setValidarOpen] = useState(false);
+  const [moverOpen, setMoverOpen] = useState(false);
   const inactivo = activo.estado_registro === "DADO_DE_BAJA";
   const esPreregistrado = activo.estado_registro === "PREREGISTRADO";
   const mostrarValidar = puedeValidarPreregistro && esPreregistrado;
+  const mostrarMover = puedeMoverDesdeFaltante && activo.estado_registro === "REGISTRADO";
   const iconSize = compact ? "h-7 w-7" : "h-9 w-9";
   const overflowVariant = compact ? (variant === "auto" ? "icons" : variant) : variant;
 
@@ -78,6 +84,14 @@ export function ActivoAccionesBar({
         label: "Validar preregistro",
         icon: <IconValidar />,
         onClick: () => setValidarOpen(true),
+      });
+    }
+    if (mostrarMover && activo.ambiente_id) {
+      list.push({
+        id: "mover",
+        label: "Mover",
+        icon: <IconMover />,
+        onClick: () => setMoverOpen(true),
       });
     }
     if (!inactivo) {
@@ -117,6 +131,7 @@ export function ActivoAccionesBar({
     activo.foto_path,
     editarLabel,
     inactivo,
+    mostrarMover,
     mostrarValidar,
     onEdit,
     onIrAmbiente,
@@ -150,6 +165,16 @@ export function ActivoAccionesBar({
               className={iconSize}
             >
               <IconValidar />
+            </ActivoIconButton>
+          )}
+          {mostrarMover && activo.ambiente_id && (
+            <ActivoIconButton
+              label="Mover"
+              variant="primary"
+              onClick={() => setMoverOpen(true)}
+              className={iconSize}
+            >
+              <IconMover />
             </ActivoIconButton>
           )}
           {!inactivo && (
@@ -220,6 +245,17 @@ export function ActivoAccionesBar({
           titulo={nombreConsolidadoDesdeActivo(activo)}
         />
       )}
+
+      {mostrarMover && activo.ambiente_id ? (
+        <MoverFaltanteDialog
+          open={moverOpen}
+          onClose={() => setMoverOpen(false)}
+          entidadId={activo.entidad_id}
+          ambienteId={activo.ambiente_id}
+          activoId={activo.id}
+          nombre={activo.nombre}
+        />
+      ) : null}
 
       <AgregarBienesSimilaresDialog
         open={similaresOpen}

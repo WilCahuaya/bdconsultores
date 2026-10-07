@@ -25,6 +25,21 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
 
+const MENSAJE_MOVER_FALTANTE =
+  "Para sacar un bien de Faltantes use Mover en ese ambiente. Solo el contador o el asistente puede hacerlo.";
+
+async function esSalidaDeFaltante(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  ambienteId: string,
+) {
+  const { data } = await supabase
+    .from("ambientes")
+    .select("es_faltante")
+    .eq("id", ambienteId)
+    .maybeSingle();
+  return data?.es_faltante === true;
+}
+
 export interface CreateActivoInput {
   entidad_id: string;
   codigo_catalogo: string;
@@ -243,6 +258,12 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
   }
 
   const ambienteId = input.ambiente_id ?? existing.ambiente_id;
+  if (existing.ambiente_id && ambienteId !== existing.ambiente_id) {
+    const salidaFaltante = await esSalidaDeFaltante(supabase, existing.ambiente_id);
+    if (salidaFaltante) {
+      return { error: MENSAJE_MOVER_FALTANTE };
+    }
+  }
   let responsable: string | null = null;
 
   const responsableAmbienteId =
@@ -473,6 +494,13 @@ export async function cambiarUbicacionActivo(
 
   if (existing.estado_registro === "DADO_DE_BAJA") {
     return { error: "No se puede mover un activo dado de baja." };
+  }
+
+  if (existing.ambiente_id && ambienteId !== existing.ambiente_id) {
+    const salidaFaltante = await esSalidaDeFaltante(supabase, existing.ambiente_id);
+    if (salidaFaltante) {
+      return { error: MENSAJE_MOVER_FALTANTE };
+    }
   }
 
   if (profile.rol === "ADMIN_ENTIDAD") {

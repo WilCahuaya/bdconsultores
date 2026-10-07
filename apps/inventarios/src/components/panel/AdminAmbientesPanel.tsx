@@ -3,8 +3,8 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { CreateResponsableInput, Entidad, Espacio, EspacioConOcupacion, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
-import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
+import type { CreateResponsableInput, Entidad, Espacio, EspacioConOcupacion, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial, VisitaCampoReporte } from "@inventario/types";
+import { compareAmbientesPorEspacio, entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
 import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel } from "@inventario/ui";
 import {
   EditIcon,
@@ -33,9 +33,12 @@ import {
   VisitasCampoHistorialPanel,
 } from "@inventario/ui/panel";
 import type { AmbienteConVisita } from "@/lib/actions/visitas-campo";
+import { exportVisitaCampoReportePdf } from "@/lib/reportes/visita-campo-pdf";
 import {
   attachVisitaEstadoToAmbientes,
+  datosUsuarioReporte,
   getVisitaCampoDetalle,
+  getVisitaCampoReporte,
 } from "@/lib/actions/visitas-campo";
 import {
   createAmbiente,
@@ -55,6 +58,7 @@ import {
   setResponsableActivo,
   updateResponsable,
 } from "@/lib/actions/responsables";
+import { useTrabajadoresPlanilla } from "./use-trabajadores-planilla";
 import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
 import { GestionarSucursales } from "./GestionarSucursales";
 import {
@@ -99,6 +103,8 @@ export function AdminAmbientesPanel({
   visitasHistorial: initialVisitasHistorial = [],
   initialTab = "ambientes",
 }: AdminAmbientesPanelProps) {
+  const { trabajadores: trabajadoresPlanilla, cargando: cargandoPlanilla } =
+    useTrabajadoresPlanilla(entidad);
   const router = useRouter();
   const [tab, setTab] = useState<AdminEntityTab>(initialTab);
 
@@ -154,6 +160,7 @@ export function AdminAmbientesPanel({
   }, [initialVisitasHistorial]);
 
   const [detalleVisita, setDetalleVisita] = useState<VisitaCampoHistorial | null>(null);
+  const [detalleReporte, setDetalleReporte] = useState<VisitaCampoReporte | null>(null);
   const [detalleAmbientes, setDetalleAmbientes] = useState<Awaited<ReturnType<typeof getVisitaCampoDetalle>> | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const visitaAbierta = initialVisitasActivas.length > 0;
@@ -222,8 +229,15 @@ export function AdminAmbientesPanel({
     setDetalleVisita(visita);
     setDetalleLoading(true);
     setDetalleAmbientes(null);
-    const detalle = await getVisitaCampoDetalle(visita.id);
+    setDetalleReporte(null);
+    const [detalle, reporte] = await Promise.all([
+      getVisitaCampoDetalle(visita.id),
+      getVisitaCampoReporte(visita.id),
+    ]);
     setDetalleAmbientes(detalle);
+    setDetalleReporte(
+      reporte.data ?? { hallados: [], faltantes: [], bajas: [], cambios_estado: [] },
+    );
     setDetalleLoading(false);
   }
 
@@ -236,10 +250,38 @@ export function AdminAmbientesPanel({
     const result = await createResponsable(entidad.id, input);
     if (result.data) {
       const nuevo: ResponsableConConteo = { ...result.data, ambiente_count: 0 };
-      setResponsables((prev) => [...prev, nuevo]);
+      setResponsables((prev) => {
+        const idx = prev.findIndex((r) => r.id === nuevo.id);
+        if (idx < 0) return [...prev, nuevo];
+        const next = [...prev];
+        next[idx] = {
+          ...prev[idx],
+          ...nuevo,
+          ambiente_count: prev[idx].ambiente_count,
+          ambiente_nombres: prev[idx].ambiente_nombres,
+        };
+        return next;
+      });
       return { data: nuevo };
     }
     return { error: result.error };
+  }
+
+  async function elegirTrabajadorComoResponsable(relacionId: string) {
+    const trabajador = trabajadoresPlanilla?.find((item) => item.relacionId === relacionId);
+    if (!trabajador) return { error: "No se encontró el responsable." };
+    const result = await createResponsableDesdeAmbiente({
+      nombre: trabajador.nombre,
+      dni: trabajador.dni,
+      email: trabajador.email ?? "",
+      telefono: trabajador.telefono ?? "",
+      cargo: trabajador.cargo ?? undefined,
+      desdePlanilla: true,
+    });
+    if (result.error || !result.data) {
+      return { error: result.error ?? "No se pudo asignar el responsable." };
+    }
+    return { id: result.data.id };
   }
 
   const ambientesBase = useMemo(() => {
@@ -314,13 +356,7 @@ export function AdminAmbientesPanel({
         responsableNombreById(input.responsableId) ??
         null,
     };
-    setAmbientes((prev) =>
-      [...prev, nuevo].sort((a, b) => {
-        if (a.sede_es_principal !== b.sede_es_principal) return a.sede_es_principal ? -1 : 1;
-        if (a.sede_nombre !== b.sede_nombre) return a.sede_nombre.localeCompare(b.sede_nombre);
-        return a.nombre.localeCompare(b.nombre);
-      }),
-    );
+    setAmbientes((prev) => [...prev, nuevo].sort(compareAmbientesPorEspacio));
     setCreateOpen(false);
     form.reset();
     setCreateResponsableId("");
@@ -381,6 +417,7 @@ export function AdminAmbientesPanel({
       <PanelTabs tabs={ADMIN_ENTITY_TABS} value={tab} onChange={handleTabChange} />
 
       {tab === "visitas" ? (
+        <>
         <VisitasCampoHistorialPanel
           historial={visitasHistorial}
           loadingDetalle={detalleLoading}
@@ -390,8 +427,22 @@ export function AdminAmbientesPanel({
           onCerrarDetalle={() => {
             setDetalleVisita(null);
             setDetalleAmbientes(null);
+            setDetalleReporte(null);
+          }}
+          reporte={detalleReporte ?? undefined}
+          onExportarReporte={async (visita) => {
+            if (!detalleReporte) return;
+            const usuario = await datosUsuarioReporte();
+            await exportVisitaCampoReportePdf({
+              entidadNombre: entidad.nombre,
+              visita,
+              reporte: detalleReporte,
+              usuarioNombre: usuario.nombre,
+              usuarioEmail: usuario.email,
+            });
           }}
         />
+        </>
       ) : tab === "sucursales" ? (
         <GestionarSucursales
           entidadId={entidad.id}
@@ -444,10 +495,12 @@ export function AdminAmbientesPanel({
             const result = await createResponsable(entidad.id, input);
             if (result.data) {
               await syncAmbientesYResponsables();
-              return { data: { ...result.data, ambiente_count: 0 } };
+              return { data: { ...result.data, ambiente_count: 0 }, reused: result.reused };
             }
             return { error: result.error };
           }}
+          trabajadoresPlanilla={trabajadoresPlanilla}
+          cargandoPlanilla={cargandoPlanilla}
           onUpdate={async (id, input) => {
             const result = await updateResponsable(id, input);
             if (!result.error) await syncAmbientesYResponsables();
@@ -781,6 +834,8 @@ export function AdminAmbientesPanel({
             showSedeSelect={entidadMultiplesSedes}
             responsableId={createResponsableId}
             onResponsableIdChange={setCreateResponsableId}
+            trabajadores={trabajadoresPlanilla}
+            onElegirTrabajador={elegirTrabajadorComoResponsable}
             onRequestCreateResponsable={() => setCreateResponsableOpen(true)}
             espacioId={createEspacioId}
             onEspacioIdChange={setCreateEspacioId}
@@ -826,6 +881,8 @@ export function AdminAmbientesPanel({
               espacios={espacios}
               responsableId={editResponsableId}
               onResponsableIdChange={setEditResponsableId}
+              trabajadores={trabajadoresPlanilla}
+              onElegirTrabajador={elegirTrabajadorComoResponsable}
               onRequestCreateResponsable={() => setEditResponsableOpen(true)}
               espacioId={editEspacioId}
               onEspacioIdChange={setEditEspacioId}

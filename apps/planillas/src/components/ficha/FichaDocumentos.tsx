@@ -23,6 +23,7 @@ export function FichaDocumentos({
   tiposFiltro,
   permitirAgregar = true,
   hint,
+  descarga,
 }: {
   relacionId: string;
   entidadId: string;
@@ -31,6 +32,12 @@ export function FichaDocumentos({
   tiposFiltro?: TipoDocumentoPlanilla[];
   permitirAgregar?: boolean;
   hint?: string;
+  descarga?: {
+    numero: number | null;
+    nombres: string;
+    apellidoPaterno: string | null;
+    nombreBase?: (documento: DocumentoRow) => string | null;
+  };
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -95,6 +102,7 @@ export function FichaDocumentos({
               documento={d}
               canWrite={canWrite}
               disabled={pending}
+              descarga={descarga}
               onUpload={async (file) => {
                 setPending(true);
                 const uploadError = await adjuntarArchivo(d.id, file, d.storage_path);
@@ -176,12 +184,19 @@ function DocumentoItem({
   documento,
   canWrite,
   disabled,
+  descarga,
   onUpload,
 }: {
   relacionId: string;
   documento: DocumentoRow;
   canWrite: boolean;
   disabled: boolean;
+  descarga?: {
+    numero: number | null;
+    nombres: string;
+    apellidoPaterno: string | null;
+    nombreBase?: (documento: DocumentoRow) => string | null;
+  };
   onUpload: (file: File) => Promise<boolean>;
 }) {
   const [opening, setOpening] = useState(false);
@@ -193,7 +208,11 @@ function DocumentoItem({
     if (!documento.storage_path) return;
     setOpening(true);
     setLinkError(null);
-    const downloadName = nombreDescargaDocumento(TIPO_DOCUMENTO_LABEL[documento.tipo], documento.storage_path);
+    const base = descarga?.nombreBase?.(documento)?.trim();
+    const ext = documento.storage_path.split(".").pop()?.toLowerCase() || "pdf";
+    const downloadName = base
+      ? `${base}.${ext}`
+      : nombreDescargaDocumento(TIPO_DOCUMENTO_LABEL[documento.tipo], documento.storage_path, descarga);
     const result = await getSignedDocumentoUrl(documento.storage_path, {
       download: downloadName,
     });
@@ -224,6 +243,7 @@ function DocumentoItem({
         titulo={TIPO_DOCUMENTO_LABEL[documento.tipo]}
         storagePath={archivoPendiente ? null : documento.storage_path}
         file={archivoPendiente}
+        sinBotonDescarga
       >
       <div className="flex flex-wrap items-center gap-2">
         {tieneArchivo ? (

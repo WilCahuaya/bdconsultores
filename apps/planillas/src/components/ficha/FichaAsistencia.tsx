@@ -13,7 +13,9 @@ import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisual
 import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
 import { FeriadosMesPicker } from "@/components/ficha/FeriadosMesPicker";
+import { useDescargaTrabajador } from "@/components/ficha/DescargaTrabajador";
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
+import { nombreBaseAsistencia } from "@/lib/nombre-archivo";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
 
 export function FichaAsistencia({
@@ -36,6 +38,15 @@ export function FichaAsistencia({
   const [pending, setPending] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const documento = documentos.find((d) => d.tipo === "ASISTENCIA" && d.observaciones === mes) ?? null;
+  const ficha = useDescargaTrabajador();
+  const nombrePdf = ficha
+    ? nombreBaseAsistencia({
+        numero: ficha.numero,
+        nombres: ficha.nombres,
+        apellidoPaterno: ficha.apellidoPaterno,
+        mes,
+      })
+    : null;
 
   function elegirMes(siguiente: string) {
     setMes(siguiente);
@@ -132,6 +143,7 @@ export function FichaAsistencia({
       </section>
       <DocumentoPrevisualizacion
         titulo={`Horario firmado · ${etiquetaMesAsistencia(mes)}`}
+        nombreDescarga={nombrePdf}
         storagePath={file ? null : documento?.storage_path}
         file={file}
         vacio="Aún no suben el PDF de este mes."

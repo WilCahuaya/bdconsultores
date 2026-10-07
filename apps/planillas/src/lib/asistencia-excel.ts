@@ -1,4 +1,5 @@
 import type { Range, WorkSheet } from "xlsx-js-style";
+import { nombreBaseAsistencia, personaNombreArchivo, prefijoNumeroArchivo, prefijoNumerosArchivo } from "@/lib/nombre-archivo";
 import {
   MES_ABREV,
   MES_NOMBRE,
@@ -15,6 +16,8 @@ import {
 export type AsistenciaExcelTrabajador = {
   relacionId?: string;
   numero?: number | null;
+  nombres?: string;
+  apellidoPaterno?: string | null;
   nombre: string;
   dni: string;
   horario: string | null;
@@ -75,17 +78,29 @@ function slugNombre(text: string): string {
     .replace(/\s+/g, " ");
 }
 
-export function nombreArchivoAsistenciaEmpresa(mes: string, entidadNombre: string): string {
+export function nombreArchivoAsistenciaEmpresa(
+  mes: string,
+  entidadNombre: string,
+  numeros?: Array<number | null | undefined>,
+): string {
   const partes = partesMes(mes);
-  const mm = partes ? String(partes.month).padStart(2, "0") : mes;
   const abrev = partes ? MES_ABREV[partes.month - 1].toUpperCase() : "MES";
+  const year = partes ? String(partes.year) : "";
   const entidad = slugNombre(entidadNombre).toUpperCase() || "EMPRESA";
-  return `${mm} ${abrev} - ASISTENCIA - ${entidad}.xlsx`;
+  const fecha = `${abrev} ${year}`.trim();
+  return `${prefijoNumerosArchivo(numeros ?? [])}ASISTENCIA - ${fecha} - ${entidad}.xlsx`;
 }
 
-export function nombreArchivoAsistenciaTrabajador(nombre: string): string {
-  const persona = slugNombre(nombre).toUpperCase() || "TRABAJADOR";
-  return `HORARIO - ${persona}.xlsx`;
+export function nombreArchivoAsistenciaTrabajador(
+  trabajador: Pick<AsistenciaExcelTrabajador, "nombre" | "numero" | "nombres" | "apellidoPaterno">,
+  mes: string,
+): string {
+  return `${nombreBaseAsistencia({
+    numero: trabajador.numero,
+    nombres: trabajador.nombres?.trim() || trabajador.nombre,
+    apellidoPaterno: trabajador.apellidoPaterno,
+    mes,
+  })}.xlsx`;
 }
 
 function encodeCell(r: number, c: number): string {
@@ -145,10 +160,15 @@ function excelSerial(iso: string): number {
   return Math.round((Date.UTC(year, month - 1, day) - Date.UTC(1899, 11, 30)) / 86400000);
 }
 
-function sheetName(nombre: string, dni: string, numero: number | null | undefined, usados: Set<string>): string {
-  const primero = slugNombre(nombre).split(" ")[0] || dni.slice(-8) || "Hoja";
-  const nro =
-    numero != null && Number.isInteger(numero) && numero >= 1 ? String(numero).padStart(2, "0") : "";
+function sheetName(
+  trabajador: Pick<AsistenciaExcelTrabajador, "nombre" | "dni" | "numero" | "nombres" | "apellidoPaterno">,
+  usados: Set<string>,
+): string {
+  const corto = trabajador.nombres
+    ? personaNombreArchivo(trabajador.nombres, trabajador.apellidoPaterno)
+    : slugNombre(trabajador.nombre).split(" ")[0] || "";
+  const primero = corto || trabajador.dni.slice(-8) || "Hoja";
+  const nro = prefijoNumeroArchivo(trabajador.numero).trim();
   const base = (nro ? `${nro} ${primero}` : primero).slice(0, 31);
   let name = base;
   let n = 2;
@@ -224,7 +244,8 @@ function buildSheet(
   merge(merges, 1, 4, 2, 6);
   paint(ws, 1, 5, 6, greenName);
   paint(ws, 2, 4, 6, greenName);
-  setCell(ws, 1, 7, trabajador.nombre.toUpperCase(), greenName);
+  const nro = prefijoNumeroArchivo(trabajador.numero).trim();
+  setCell(ws, 1, 7, `${nro ? `${nro} ` : ""}${trabajador.nombre.toUpperCase()}`, greenName);
   merge(merges, 1, 7, 2, 10);
   paint(ws, 1, 8, 10, greenName);
   paint(ws, 2, 7, 10, greenName);
@@ -478,7 +499,7 @@ export async function bufferAsistenciaExcel(
   });
   ordenados.forEach((trabajador) => {
     const ws = buildSheet(empresa, trabajador, mes, marcas);
-    XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador.nombre, trabajador.dni, trabajador.numero, usados));
+    XLSX.utils.book_append_sheet(wb, ws, sheetName(trabajador, usados));
   });
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   return aplicarImpresionHerederos(buffer, empresa, mes);

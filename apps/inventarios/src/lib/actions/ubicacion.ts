@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { Ambiente, Espacio, EspacioConOcupacion, Sede, SedeConConteo } from "@inventario/types";
-import { etiquetaNombreEspacio, resumenOcupacionEspacio } from "@inventario/types";
+import { compareAmbientesPorEspacio, etiquetaNombreEspacio, resumenOcupacionEspacio } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { loadSedesForEntidad } from "@/lib/sede-principal-direccion";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
@@ -203,17 +203,7 @@ export async function listAmbientesPorEntidad(
     activo_count: activoCounts.get(ambiente.id) ?? 0,
   }));
 
-  return withCounts.sort((a, b) => {
-    if (a.es_preregistro !== b.es_preregistro) return a.es_preregistro ? -1 : 1;
-    if (Boolean(a.es_faltante) !== Boolean(b.es_faltante)) return a.es_faltante ? -1 : 1;
-    if (a.sede_es_principal !== b.sede_es_principal) {
-      return a.sede_es_principal ? -1 : 1;
-    }
-    if (a.sede_nombre !== b.sede_nombre) {
-      return a.sede_nombre.localeCompare(b.sede_nombre);
-    }
-    return a.nombre.localeCompare(b.nombre);
-  });
+  return withCounts.sort(compareAmbientesPorEspacio);
 }
 
 export async function listAmbientes(sedeId: string): Promise<Ambiente[]> {

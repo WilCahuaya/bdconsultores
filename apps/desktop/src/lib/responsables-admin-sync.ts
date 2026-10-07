@@ -11,27 +11,6 @@ type ResponsableSyncRow = {
   activo: boolean;
 };
 
-function sameAdminPayload(
-  row: Pick<ResponsableSyncRow, "nombre" | "email" | "dni" | "telefono" | "cargo" | "activo">,
-  payload: {
-    nombre: string;
-    email: string;
-    dni: string | null;
-    telefono: string | null;
-    cargo: string;
-    activo: boolean;
-  },
-): boolean {
-  return (
-    normalizeResponsableNombre(row.nombre) === payload.nombre &&
-    (row.email?.trim().toLowerCase() ?? "") === payload.email &&
-    (normalizeResponsableDni(row.dni ?? "") || null) === payload.dni &&
-    (row.telefono?.trim() || null) === payload.telefono &&
-    (row.cargo ?? null) === payload.cargo &&
-    row.activo === payload.activo
-  );
-}
-
 /** Mantiene un registro en responsables alineado con el administrador de la entidad. */
 export async function syncAdminResponsableForEntidad(
   supabase: SupabaseClient,
@@ -62,8 +41,8 @@ export async function syncAdminResponsableForEntidad(
     .maybeSingle();
 
   if (byEmail) {
-    if (sameAdminPayload(byEmail as ResponsableSyncRow, payload)) return;
-    await supabase.from("responsables").update(payload).eq("id", byEmail.id);
+    if ((byEmail as ResponsableSyncRow).activo) return;
+    await supabase.from("responsables").update({ activo: true }).eq("id", byEmail.id);
     return;
   }
 
@@ -80,8 +59,8 @@ export async function syncAdminResponsableForEntidad(
       .ilike("nombre", nombre)
       .maybeSingle();
     if (byName) {
-      if (sameAdminPayload(byName as ResponsableSyncRow, payload)) return;
-      await supabase.from("responsables").update(payload).eq("id", byName.id);
+      if ((byName as ResponsableSyncRow).activo) return;
+      await supabase.from("responsables").update({ activo: true }).eq("id", byName.id);
     }
   }
 }

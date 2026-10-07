@@ -41,6 +41,7 @@ import {
   resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
 import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorButton";
+import { DescargaTrabajadorProvider } from "@/components/ficha/DescargaTrabajador";
 import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
 import { PendientesFichaButton, type PendienteFicha } from "@/components/ficha/PendientesFichaButton";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
@@ -180,6 +181,13 @@ export default async function FichaTrabajadorPage({
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
+      <DescargaTrabajadorProvider
+        value={{
+          numero: trabajador.numero,
+          nombres: trabajador.persona.nombres,
+          apellidoPaterno: trabajador.persona.apellido_paterno,
+        }}
+      >
       <div className="space-y-6">
         <div>
           <div className="flex items-center justify-between gap-3">
@@ -336,6 +344,7 @@ export default async function FichaTrabajadorPage({
           </div>
         ) : null}
       </div>
+      </DescargaTrabajadorProvider>
     </PlanillasShell>
   );
 }

@@ -5,6 +5,7 @@ import type {
   VisitaCampoAmbienteDetalle,
   VisitaCampoHistorial,
 } from "@inventario/types";
+import { esPersonalEstudio } from "@inventario/types";
 import { fetchProfile } from "./profile";
 import { getSupabaseClient } from "./supabase";
 import type { AmbienteConSede } from "./ubicacion";
@@ -749,7 +750,9 @@ export async function resolverBienFaltante(input: {
 }) {
   if (!isOnline()) return { error: "Sin conexión. Resolver un bien de Faltante requiere internet." };
   const profile = await fetchProfile();
-  if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
+  if (!profile || !esPersonalEstudio(profile.rol)) {
+    return { error: "Solo el contador o el asistente puede mover un bien de Faltantes." };
+  }
 
   const supabase = getSupabaseClient();
   const { error } = await supabase.rpc("resolver_bien_faltante", {

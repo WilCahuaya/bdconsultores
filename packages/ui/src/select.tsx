@@ -178,7 +178,7 @@ export function Select({
           maxWidth: menuRect.maxWidth,
           maxHeight: menuRect.maxHeight,
           width: "max-content",
-          zIndex: 300,
+          zIndex: 400,
         }}
       >
         {options.map((option, index) => {
@@ -190,7 +190,7 @@ export function Select({
               <li key={optionKey} role="presentation" className="sticky top-0 z-[1] bg-card">
                 <div
                   className={cn(
-                    "border-t border-border/50 px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-wide text-muted-foreground first:border-t-0 first:pt-1.5",
+                    "border-t border-border/50 px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-wide text-primary first:border-t-0 first:pt-1.5",
                     size === "compact" && "px-2",
                     index === 0 && "border-t-0",
                   )}

@@ -7,53 +7,22 @@ import {
   addMerge,
   setCell,
 } from "./excel-styles";
-import type { ReporteContexto, ReporteId } from "./types";
+import { definicionReporte, plantillaReporte, type ReporteContexto, type ReporteId } from "./types";
 import { esReporteAdquiridosEjercicio, tituloReporteAdquiridosEjercicio } from "./ejercicio";
 
-export const ACTA_DE_INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO =
-  "ACTA DE INVENTARIO DE ACTIVOS FIJOS GENERAL";
-
-export const INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO =
-  "INVENTARIO DE ACTIVOS FIJOS GENERAL";
-
-export const INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO =
-  "INVENTARIO DE ACTIVOS VALORIZADOS GENERAL";
-
-export const REPORTE_BAJAS_TITULO = "REPORTE DE BAJAS DE ACTIVOS FIJOS";
-
-export const REPORTE_ACTIVOS_ESTADO_MALO_TITULO = "REPORTE DE ACTIVOS EN ESTADO MALO";
-
-const REPORTES_ENTIDAD_DISENO: ReporteId[] = [
-  "inventario_entidad_sin_valores",
-  "inventario_entidad_activos_fijos",
-  "inventario_entidad_valorizado",
-  "reporte_bajas",
-  "reporte_activos_estado_malo",
-  "reporte_adquiridos_ejercicio_actual",
-  "reporte_adquiridos_ejercicio_anterior",
-];
-
 export function esReporteEntidadDiseno(reporteId: ReporteId): boolean {
-  return REPORTES_ENTIDAD_DISENO.includes(reporteId);
+  return definicionReporte(reporteId).scope === "entidad";
 }
 
 export function reporteEntidadIncluyeFirmas(reporteId: ReporteId): boolean {
-  return reporteId === "inventario_entidad_sin_valores";
+  return plantillaReporte(reporteId) === "acta_entidad";
 }
 
 export function tituloReporteEntidadDiseno(reporteId: ReporteId, fechaCorte?: string): string {
-  if (reporteId === "reporte_bajas") return REPORTE_BAJAS_TITULO;
-  if (reporteId === "reporte_activos_estado_malo") return REPORTE_ACTIVOS_ESTADO_MALO_TITULO;
   if (esReporteAdquiridosEjercicio(reporteId)) {
     return tituloReporteAdquiridosEjercicio(reporteId, fechaCorte);
   }
-  if (reporteId === "inventario_entidad_sin_valores") {
-    return ACTA_DE_INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO;
-  }
-  if (reporteId === "inventario_entidad_valorizado") {
-    return INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO;
-  }
-  return INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO;
+  return definicionReporte(reporteId).titulo;
 }
 
 export function buildEntidadActualizacionLabel(fechaCorte: string): string {
@@ -73,16 +42,7 @@ export function entidadDisenoExportFilename(ctx: ReporteContexto): string {
     .toLowerCase()
     .slice(0, 48);
   const fecha = ctx.fechaGeneracion.toISOString().slice(0, 10);
-  const prefijos: Record<string, string> = {
-    inventario_entidad_sin_valores: "acta-inventario-activos-fijos-general",
-    inventario_entidad_activos_fijos: "inventario-activos-fijos-general",
-    inventario_entidad_valorizado: "inventario-activos-valorizados-general",
-    reporte_bajas: "reporte-bajas",
-    reporte_activos_estado_malo: "reporte-activos-estado-malo",
-    reporte_adquiridos_ejercicio_actual: "adquiridos-ejercicio-actual",
-    reporte_adquiridos_ejercicio_anterior: "adquiridos-ejercicio-anterior",
-  };
-  const prefijo = prefijos[ctx.reporteId] ?? "inventario-entidad";
+  const prefijo = definicionReporte(ctx.reporteId).archivo;
   return `${prefijo}-${slug}-${fecha}`;
 }
 

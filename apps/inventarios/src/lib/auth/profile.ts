@@ -1,5 +1,5 @@
 import type { Profile, RolUsuario } from "@inventario/types";
-import { homePathForRole, inventarioHomePathForRole } from "@inventario/types";
+import { esPersonalEstudio, homePathForRole, inventarioHomePathForRole } from "@inventario/types";
 import { portalOrigin } from "@bd/config";
 import { createClient } from "@/lib/supabase/server";
 
@@ -24,6 +24,14 @@ export async function getProfile(): Promise<Profile | null> {
 
   if (error || !data) return null;
   return data as Profile;
+}
+
+export async function requirePersonalEstudio(): Promise<Profile> {
+  const profile = await getProfile();
+  if (!profile || !esPersonalEstudio(profile.rol)) {
+    throw new Error("FORBIDDEN");
+  }
+  return profile;
 }
 
 export async function requireProfile(requiredRole?: RolUsuario): Promise<Profile> {

@@ -35,6 +35,7 @@ import {
   debePersistirCuentaContableEnActivo,
   entidadMuestraSelectorSede,
   isCatalogoPropio,
+  MAX_ACTIVOS_SIMILARES_CANTIDAD,
   sedeIdSinSelector,
   splitObservacionActivo,
   type ActivoAtributoCampo,
@@ -63,6 +64,7 @@ import {
 import { fechaAdquisicionToneClass } from "@inventario/ui/panel";
 import {
   createActivo,
+  createActivosSimilares,
   previewCodigoBarras,
   updateActivo,
   updateActivoPaths,
@@ -170,6 +172,8 @@ export function ActivoForm({
     (isEdit && activo?.estado_registro === "PREREGISTRADO");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [agregarSimilares, setAgregarSimilares] = useState(false);
+  const [cantidadSimilares, setCantidadSimilares] = useState("1");
   const [catalogo, setCatalogo] = useState<CatalogoNacional | null>(null);
   const [nombre, setNombre] = useState("");
   const [nombreEtiqueta, setNombreEtiqueta] = useState("");
@@ -655,6 +659,8 @@ export function ActivoForm({
     setComprobanteSerie("");
     setFotoFile(null);
     setCodigoBarrasPreview(null);
+    setAgregarSimilares(false);
+    setCantidadSimilares("1");
   }
 
   function handleComprobanteFileSelect(file: File | null) {
@@ -791,6 +797,16 @@ export function ActivoForm({
     if (!entidadEfectiva) {
       setMessage("Seleccione la entidad.");
       return;
+    }
+
+    if (!isEdit && agregarSimilares) {
+      const qty = Math.floor(Number(cantidadSimilares) || 0);
+      if (qty < 1 || qty > MAX_ACTIVOS_SIMILARES_CANTIDAD) {
+        setMessage(
+          `Indique una cantidad de similares entre 1 y ${MAX_ACTIVOS_SIMILARES_CANTIDAD}.`,
+        );
+        return;
+      }
     }
 
     const fechaError = validarFechaDDMMYYYY(fechaAdquisicion);
@@ -1059,6 +1075,31 @@ export function ActivoForm({
       }
     }
 
+    let similaresNota = "";
+    if (!isEdit && agregarSimilares && activoId) {
+      const qty = Math.floor(Number(cantidadSimilares) || 0);
+      const similares = await createActivosSimilares(activoId, qty);
+      if (similares.error) {
+        setPending(false);
+        setMessage(
+          `El bien se registró, pero no se pudieron agregar los similares: ${similares.error}`,
+        );
+        resetFormulario();
+        form.reset();
+        return;
+      }
+      const creados = similares.data?.creados ?? qty;
+      const primero = similares.data?.primer_codigo_barras;
+      const ultimo = similares.data?.ultimo_codigo_barras;
+      const rango =
+        primero && ultimo && primero !== ultimo
+          ? ` (${primero} a ${ultimo})`
+          : primero
+            ? ` (${primero})`
+            : "";
+      similaresNota = ` Se agregaron ${creados} similar${creados === 1 ? "" : "es"}${rango}.`;
+    }
+
     setPending(false);
     if (isEdit) {
       const actualizados =
@@ -1073,8 +1114,8 @@ export function ActivoForm({
     } else {
       setMessage(
         result.data?.estado_registro === "REGISTRADO"
-          ? `Activo registrado. Código: ${result.data.codigo_barras ?? codigoBarrasPreview ?? "—"}`
-          : "Activo preregistrado. Pendiente de validación del contador.",
+          ? `Activo registrado. Código: ${result.data.codigo_barras ?? codigoBarrasPreview ?? "—"}.${similaresNota}`
+          : `Activo preregistrado.${similaresNota} Pendiente de validación del contador.`,
       );
       resetFormulario();
       form.reset();
@@ -1108,6 +1149,7 @@ export function ActivoForm({
   const messageToneClass =
     message &&
     (message.includes("Error") ||
+      message.includes("no se pudieron") ||
       message.includes("obligator") ||
       message.includes("Seleccione"))
       ? "text-destructive"
@@ -1122,7 +1164,9 @@ export function ActivoForm({
           ? "Guardando…"
           : esEdicionMasiva
             ? `Guardar en ${ejemplaresTotal} ejemplares`
-            : submitLabel}
+            : !isEdit && agregarSimilares
+              ? `${esPreregistro ? "Preregistrar" : "Registrar"} y ${Math.max(0, Math.floor(Number(cantidadSimilares) || 0))} similares`
+              : submitLabel}
       </Button>
       {onCancel && (
         <Button type="button" variant="outline" onClick={onCancel}>
@@ -1976,6 +2020,48 @@ export function ActivoForm({
           </>
         )}
       </fieldset>
+
+      {!isEdit && (
+        <fieldset className={`${fieldsetCompact} self-start`}>
+          <legend className={panelLegendClass}>Bienes similares</legend>
+          <div className="space-y-3">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={agregarSimilares}
+                disabled={pending}
+                onChange={(e) => {
+                  setAgregarSimilares(e.target.checked);
+                  if (message) setMessage(null);
+                }}
+              />
+              Agregar bienes similares
+            </label>
+            {agregarSimilares && (
+              <div className="space-y-2">
+                <Label htmlFor="cantidad_similares">Cantidad a registrar</Label>
+                <Input
+                  id="cantidad_similares"
+                  type="number"
+                  min={1}
+                  max={MAX_ACTIVOS_SIMILARES_CANTIDAD}
+                  value={cantidadSimilares}
+                  disabled={pending}
+                  onChange={(e) => {
+                    setCantidadSimilares(e.target.value);
+                    if (message) setMessage(null);
+                  }}
+                  className="max-w-xs"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se crearán además de este bien, con los mismos datos y en la misma ubicación.
+                  Máximo {MAX_ACTIVOS_SIMILARES_CANTIDAD} por operación.
+                </p>
+              </div>
+            )}
+          </div>
+        </fieldset>
+      )}
 
       </>
       )}

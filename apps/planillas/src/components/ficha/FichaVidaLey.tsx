@@ -33,8 +33,7 @@ import {
   EliminarComprobanteEmpresa,
   EliminarDocumentoGuardado,
 } from "@/components/ficha/ConfirmarEliminarArchivo";
-import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
-import { getSignedDocumentoUrl } from "@/lib/storage-url";
+import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { recortarPaginasPdf } from "@/lib/recortar-pdf";
 import { uploadDocumentoFile, uploadVidaLeyComprobanteEmpresa, uploadVidaLeyLoteFile } from "@/lib/upload-documento";
 import type { ArchivoVidaLeyLote } from "@/lib/documento-storage";
@@ -566,26 +565,11 @@ function ArchivoCompartidoVidaLey({
   const [reemplazo, setReemplazo] = useState<File | null>(null);
   const [marcados, setMarcados] = useState<string[]>([]);
   const [pending, setPending] = useState<string | null>(null);
-  const [descargando, setDescargando] = useState(false);
   const [buscarArchivo, setBuscarArchivo] = useState(false);
   const ocupado = ocupadoExterno || pending !== null;
 
   function toggle(id: string) {
     setMarcados((actual) => (actual.includes(id) ? actual.filter((item) => item !== id) : [...actual, id]));
-  }
-
-  async function descargar() {
-    if (!storagePath) return;
-    setDescargando(true);
-    const result = await getSignedDocumentoUrl(storagePath, {
-      download: nombreDescargaDocumento(titulo, storagePath),
-    });
-    setDescargando(false);
-    if (result.error || !result.url) {
-      pushToast(result.error ?? "No se pudo abrir el archivo.", "error");
-      return;
-    }
-    window.open(result.url, "_blank", "noopener,noreferrer");
   }
 
   async function guardarArchivo(file: File, previousPath: string | null, ids: string[]) {
@@ -679,9 +663,6 @@ function ArchivoCompartidoVidaLey({
         <div className="space-y-3">
           <p className="text-sm text-foreground">La ven: {laVen.join(", ")}.</p>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={descargando} onClick={() => void descargar()}>
-              {descargando ? "Preparando…" : "Descargar"}
-            </Button>
             {canWrite && mostrarQuitar ? (
               <Button type="button" size="sm" variant="outline" disabled={ocupado} onClick={() => void onQuitar()}>
                 {pending === "quitar" ? "Quitando…" : "Quitar de este grupo"}

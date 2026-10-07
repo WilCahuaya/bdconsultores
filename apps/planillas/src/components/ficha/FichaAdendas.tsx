@@ -22,6 +22,7 @@ import { EliminarPdfAdenda } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { DocumentoPrevisualizacion, MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
 import { descargarAdendaWord } from "@/lib/descargar-adenda-word";
+import { nombreBaseAdenda } from "@/lib/nombre-archivo";
 import {
   ESTADO_CONTRATO_LABEL,
   JORNADA_LABEL,
@@ -200,6 +201,13 @@ export function FichaAdendas({
             titulo={`PDF firmado de la adenda ${abierto.numero}`}
             storagePath={archivoAdenda ? null : abierto.storage_path}
             file={archivoAdenda}
+            nombreDescarga={nombreBaseAdenda({
+              numero: trabajador.numero,
+              tipo: abierto.tipo,
+              nombres: trabajador.persona.nombres,
+              apellidoPaterno: trabajador.persona.apellido_paterno,
+              fecha: abierto.fecha_vigencia,
+            })}
           >
           <div className="flex flex-wrap items-center gap-2">
             {abierto.storage_path || archivoAdenda ? null : <span className="text-sm text-muted-foreground">Sin PDF</span>}
@@ -316,6 +324,13 @@ export function FichaAdendas({
           <DocumentoPrevisualizacion
             key={item.id}
             titulo={`PDF firmado · adenda ${item.numero}`}
+            nombreDescarga={nombreBaseAdenda({
+              numero: trabajador.numero,
+              tipo: item.tipo,
+              nombres: trabajador.persona.nombres,
+              apellidoPaterno: trabajador.persona.apellido_paterno,
+              fecha: item.fecha_vigencia,
+            })}
             storagePath={item.storage_path}
             defaultVisible
           />

@@ -22,6 +22,7 @@ export * from "./confirm-dialog";
 export * from "./incremento-mejora-field";
 export * from "./responsables-panel";
 export * from "./responsable-form-fields";
+export * from "./responsable-alta-form";
 export * from "./crear-responsable-dialog";
 export * from "./ambiente-form-fields";
 export * from "./espacios-sede-dialog";
