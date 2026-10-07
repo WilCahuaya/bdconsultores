@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { entidadAlcance, puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
 import { isUuid, pathPerteneceASolicitud } from "@/lib/documento-storage";
 import { nombreBaseSolicitudRegistro } from "@/lib/nombre-archivo";
-import { etiquetaTrabajador } from "@/lib/planillas-labels";
+import { contratoLibreParaSolicitudRegistro, etiquetaTrabajador } from "@/lib/planillas-labels";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 export type SolicitudTrabajador = {
@@ -28,6 +28,9 @@ export type ContratoEnlazable = {
   etiqueta: string;
   version: number;
   solicitudId: string | null;
+  fechaFin: string | null;
+  /** Sin solicitud o con contrato ya vencido → puede enlazarse a otra solicitud. */
+  libre: boolean;
 };
 
 const CERRADOS = new Set(["BAJA"]);
@@ -96,7 +99,7 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
       .order("created_at", { ascending: false }),
     db
       .from("contratos")
-      .select("id, version, estado, relacion_id, solicitud_registro_id")
+      .select("id, version, estado, relacion_id, solicitud_registro_id, fecha_fin")
       .eq("entidad_id", entidadId)
       .neq("estado", "BAJA"),
     db
@@ -124,6 +127,7 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
     estado: string;
     relacion_id: string;
     solicitud_registro_id: string | null;
+    fecha_fin: string | null;
   }[];
 
   function etiquetaContrato(relacionId: string, version: number): string {
@@ -174,6 +178,8 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
       etiqueta: etiquetaContrato(contrato.relacion_id, contrato.version),
       version: contrato.version,
       solicitudId: contrato.solicitud_registro_id,
+      fechaFin: contrato.fecha_fin,
+      libre: contratoLibreParaSolicitudRegistro(contrato.solicitud_registro_id, contrato.fecha_fin),
     }))
     .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
 
@@ -185,18 +191,21 @@ type FilaContratoEmpresa = {
   relacion_id: string;
   entidad_id: string;
   estado: string;
+  fecha_fin: string | null;
+  solicitud_registro_id: string | null;
 };
 
 async function contratosDeLaEmpresa(
   entidadId: string,
   contratoIds: string[],
+  opts?: { solicitudDestinoId?: string | null },
 ): Promise<{ error: string } | { rows: FilaContratoEmpresa[] }> {
   const ids = [...new Set(contratoIds.filter((id) => isUuid(id)))];
   if (ids.length === 0) return { error: "Elija al menos un contrato." };
   const db = await planillasDb();
   const { data, error } = await db
     .from("contratos")
-    .select("id, relacion_id, entidad_id, estado")
+    .select("id, relacion_id, entidad_id, estado, fecha_fin, solicitud_registro_id")
     .in("id", ids);
   if (error) return { error: error.message };
   const rows = (data ?? []) as FilaContratoEmpresa[];
@@ -204,6 +213,16 @@ async function contratosDeLaEmpresa(
   if (rows.some((row) => row.entidad_id !== entidadId)) return { error: "El contrato no es de esta empresa." };
   if (rows.some((row) => CERRADOS.has(row.estado))) {
     return { error: "Un contrato dado de baja no se puede enlazar a la solicitud." };
+  }
+  const ocupados = rows.filter((row) => {
+    if (opts?.solicitudDestinoId && row.solicitud_registro_id === opts.solicitudDestinoId) return false;
+    return !contratoLibreParaSolicitudRegistro(row.solicitud_registro_id, row.fecha_fin);
+  });
+  if (ocupados.length > 0) {
+    return {
+      error:
+        "Hay contratos con solicitud vigente. Solo puede agregar versiones libres (sin solicitud o con fecha fin vencida).",
+    };
   }
   const { data: relaciones, error: relError } = await db
     .from("relaciones_laborales")
@@ -410,7 +429,9 @@ export async function vincularContratosASolicitud(
   const gate = await assertEmpresa(relacionId);
   if ("error" in gate) return { error: gate.error };
   if (!isUuid(solicitudId)) return { error: "Solicitud no válida." };
-  const contratos = await contratosDeLaEmpresa(gate.entidadId, contratoIds);
+  const contratos = await contratosDeLaEmpresa(gate.entidadId, contratoIds, {
+    solicitudDestinoId: solicitudId,
+  });
   if ("error" in contratos) return { error: contratos.error };
 
   const db = await planillasDb();

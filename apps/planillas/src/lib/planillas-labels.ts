@@ -205,6 +205,18 @@ export const VIDA_LEY_ESTADO_LABEL: Record<VidaLeyEstado, string> = {
   Registrado: "Registrado",
 };
 
+function hoyIsoLimaLocal(hoyIso?: string): string {
+  return (
+    hoyIso ??
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Lima",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date())
+  );
+}
+
 /** Libre para un nuevo grupo: sin fecha fin o con seguro ya vencido (fecha fin anterior a hoy Lima). */
 export function trabajadorLibreParaVidaLey(
   fechaFin: string | null | undefined,
@@ -212,15 +224,22 @@ export function trabajadorLibreParaVidaLey(
 ): boolean {
   const fin = fechaFin?.trim().slice(0, 10);
   if (!fin) return true;
-  const hoy =
-    hoyIso ??
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Lima",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-  return fin < hoy;
+  return fin < hoyIsoLimaLocal(hoyIso);
+}
+
+/**
+ * Versión de contrato libre para una solicitud de registro:
+ * sin solicitud, o con solicitud pero fecha fin del contrato ya vencida.
+ */
+export function contratoLibreParaSolicitudRegistro(
+  solicitudId: string | null | undefined,
+  fechaFin: string | null | undefined,
+  hoyIso?: string,
+): boolean {
+  if (!solicitudId) return true;
+  const fin = fechaFin?.trim().slice(0, 10);
+  if (!fin) return false;
+  return fin < hoyIsoLimaLocal(hoyIso);
 }
 
 export function vidaLeyPendienteRecepcion(estado?: string | null): boolean {
