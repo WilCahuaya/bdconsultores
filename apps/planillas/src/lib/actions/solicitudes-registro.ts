@@ -14,6 +14,7 @@ export type SolicitudTrabajador = {
 export type SolicitudRegistroVista = {
   id: string;
   storage_path: string | null;
+  nombre_archivo: string | null;
   observaciones: string | null;
   created_at: string;
   trabajadores: SolicitudTrabajador[];
@@ -88,7 +89,7 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
   const [solicitudesRes, contratosRes, relacionesRes] = await Promise.all([
     db
       .from("solicitudes_registro")
-      .select("id, storage_path, observaciones, created_at")
+      .select("id, storage_path, nombre_archivo, observaciones, created_at")
       .eq("entidad_id", entidadId)
       .order("created_at", { ascending: false }),
     db
@@ -129,9 +130,12 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
     return `${base}${baja} · versión ${version}`;
   }
 
-  const solicitudes: SolicitudRegistroVista[] = ((solicitudesRes.data ?? []) as SolicitudRegistroVista[]).map((solicitud) => ({
+  const solicitudes: SolicitudRegistroVista[] = (
+    (solicitudesRes.data ?? []) as Omit<SolicitudRegistroVista, "trabajadores">[]
+  ).map((solicitud) => ({
     id: solicitud.id,
     storage_path: solicitud.storage_path,
+    nombre_archivo: solicitud.nombre_archivo ?? null,
     observaciones: solicitud.observaciones,
     created_at: solicitud.created_at,
     trabajadores: contratos
@@ -204,12 +208,18 @@ async function contratosDeLaEmpresa(
   return { rows };
 }
 
+function limpiarNombreArchivo(raw: string | null | undefined): string | null {
+  const nombre = raw?.trim().replace(/[/\\]/g, "").slice(0, 255) ?? "";
+  return nombre || null;
+}
+
 export async function registrarSolicitudRegistro(
   relacionId: string,
   solicitudId: string,
   storagePath: string,
   contratoIds: string[],
   observaciones: string,
+  nombreArchivo?: string | null,
 ): Promise<{ error?: string }> {
   const gate = await assertEmpresa(relacionId);
   if ("error" in gate) return { error: gate.error };
@@ -225,6 +235,7 @@ export async function registrarSolicitudRegistro(
     id: solicitudId,
     entidad_id: gate.entidadId,
     storage_path: storagePath,
+    nombre_archivo: limpiarNombreArchivo(nombreArchivo),
     observaciones: nota,
   });
   if (insertError) return { error: insertError.message };
@@ -247,6 +258,7 @@ export async function guardarArchivoSolicitud(
   relacionId: string,
   solicitudId: string,
   storagePath: string,
+  nombreArchivo?: string | null,
 ): Promise<{ error?: string }> {
   const gate = await assertEmpresa(relacionId);
   if ("error" in gate) return { error: gate.error };
@@ -265,7 +277,10 @@ export async function guardarArchivoSolicitud(
 
   const { error } = await db
     .from("solicitudes_registro")
-    .update({ storage_path: storagePath })
+    .update({
+      storage_path: storagePath,
+      nombre_archivo: limpiarNombreArchivo(nombreArchivo),
+    })
     .eq("id", solicitudId)
     .eq("entidad_id", gate.entidadId);
   if (error) return { error: error.message };
@@ -300,7 +315,7 @@ export async function quitarArchivoSolicitudRegistro(
   if (!path) return { error: "Esta solicitud no tiene archivo." };
   const { error } = await db
     .from("solicitudes_registro")
-    .update({ storage_path: null })
+    .update({ storage_path: null, nombre_archivo: null })
     .eq("id", solicitudId)
     .eq("entidad_id", gate.entidadId);
   if (error) return { error: error.message };

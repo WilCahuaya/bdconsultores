@@ -11,6 +11,7 @@ import {
 import {
   CLASIFICACION_LABEL,
   JORNADA_LABEL,
+  TIPO_DOCUMENTO_LABEL,
   cargoCanonico,
   formatFechaPlanilla,
   formatNumeroTrabajador,
@@ -171,9 +172,19 @@ export function FichaPuestoForm({
     >
     <div className="space-y-4">
       {cesada ? (
-        <p className="text-sm text-muted-foreground">
-          Dado de baja el {formatFechaPlanilla(trabajador.fecha_cese)}. El cese es de la empresa, no de un contrato.
-        </p>
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p>
+            Dado de baja el {formatFechaPlanilla(trabajador.fecha_cese)}. El cese es de la empresa, no de un
+            contrato.
+          </p>
+          {trabajador.tipo_baja ? (
+            <p>Motivo: {TIPO_DOCUMENTO_LABEL[trabajador.tipo_baja]}</p>
+          ) : null}
+          <p>Baja AFP: {trabajador.baja_afp ? "Sí" : "No"}</p>
+          {trabajador.observacion_baja?.trim() ? (
+            <p>Observación: {trabajador.observacion_baja.trim()}</p>
+          ) : null}
+        </div>
       ) : null}
       <form action={onSubmit} className="space-y-4">
         <FormSection

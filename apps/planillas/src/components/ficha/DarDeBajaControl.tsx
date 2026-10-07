@@ -28,13 +28,14 @@ export function DarDeBajaControl({
   const [pending, setPending] = useState(false);
   const [fechaCese, setFechaCese] = useState("");
   const [motivo, setMotivo] = useState<MotivoBaja>("CARTA_RENUNCIA");
-  const [archivo, setArchivo] = useState<File | null>(null);
+  const [observacion, setObservacion] = useState("");
+  const [bajaAfp, setBajaAfp] = useState(false);
+  const [archivoCarta, setArchivoCarta] = useState<File | null>(null);
+  const [archivoTrBaja, setArchivoTrBaja] = useState<File | null>(null);
   const yaHayCarta = documentoCargado(trabajador.documentos, "CARTA_RENUNCIA");
   const yaHayTrBaja = documentoCargado(trabajador.documentos, "TR_BAJA");
   const esCarta = motivo === "CARTA_RENUNCIA";
-  const tipoArchivo: TipoDocumentoPlanilla = esCarta ? "CARTA_RENUNCIA" : "TR_BAJA";
-  const yaHayArchivo = esCarta ? yaHayCarta : yaHayTrBaja;
-  const listoArchivo = yaHayArchivo || Boolean(archivo);
+  const listoTrBaja = yaHayTrBaja || Boolean(archivoTrBaja);
 
   async function subirDocumento(tipo: TipoDocumentoPlanilla, file: File): Promise<string | null> {
     const data = new FormData();
@@ -52,27 +53,41 @@ export function DarDeBajaControl({
     return savedFile.error ?? null;
   }
 
+  function resetDialog() {
+    setArchivoCarta(null);
+    setArchivoTrBaja(null);
+    setObservacion("");
+    setBajaAfp(false);
+  }
+
   async function onBaja() {
     if (!fechaCese.trim()) return;
-    if (!listoArchivo) {
-      pushToast(
-        esCarta ? "Suba la carta de renuncia." : "Suba el documento de T-Registro baja.",
-        "error",
-      );
+    if (!listoTrBaja) {
+      pushToast("Suba el documento de T-Registro baja.", "error");
       return;
     }
     setPending(true);
-    if (archivo) {
-      const errorArchivo = await subirDocumento(tipoArchivo, archivo);
-      if (errorArchivo) {
+    if (esCarta && archivoCarta) {
+      const errorCarta = await subirDocumento("CARTA_RENUNCIA", archivoCarta);
+      if (errorCarta) {
         setPending(false);
-        pushToast(errorArchivo, "error");
+        pushToast(errorCarta, "error");
+        return;
+      }
+    }
+    if (archivoTrBaja) {
+      const errorTr = await subirDocumento("TR_BAJA", archivoTrBaja);
+      if (errorTr) {
+        setPending(false);
+        pushToast(errorTr, "error");
         return;
       }
     }
     const form = new FormData();
     form.set("fecha_cese", fechaCese);
     form.set("tipo_baja", motivo);
+    form.set("observacion_baja", observacion.trim());
+    if (bajaAfp) form.set("baja_afp", "true");
     const result = await darDeBajaTrabajador(trabajador.id, form);
     setPending(false);
     if (result.error) {
@@ -80,7 +95,7 @@ export function DarDeBajaControl({
       return;
     }
     setOpen(false);
-    setArchivo(null);
+    resetDialog();
     pushToast("Trabajador dado de baja.");
     router.refresh();
   }
@@ -102,18 +117,14 @@ export function DarDeBajaControl({
           setOpen(false);
         }}
         title="Dar de baja"
-        description={
-          esCarta
-            ? "La ficha pasa a cesada y suelta el número. Con carta de renuncia solo se sube ese documento."
-            : "La ficha pasa a cesada y suelta el número. En término de contrato solo se sube la baja de T-Registro."
-        }
+        description="La ficha pasa a cesada y suelta el número. La baja de T-Registro es obligatoria."
         confirmLabel="Dar de baja"
         confirmVariant="destructive"
         pending={pending}
-        confirmDisabled={!fechaCese.trim() || !listoArchivo}
+        confirmDisabled={!fechaCese.trim() || !listoTrBaja}
         onConfirm={() => void onBaja()}
       >
-        <DateField label="Fecha de cese en la empresa" name="fecha_cese" value={fechaCese} onChange={setFechaCese} />
+        <DateField label="Fecha de baja" name="fecha_cese" value={fechaCese} onChange={setFechaCese} />
         <SelectField
           label="Motivo de baja"
           name="tipo_baja"
@@ -124,31 +135,59 @@ export function DarDeBajaControl({
           ]}
           onChange={(event) => {
             setMotivo(event.target.value as MotivoBaja);
-            setArchivo(null);
+            setArchivoCarta(null);
           }}
         />
+        {esCarta ? (
+          <DocumentoFileInput
+            accept={DOCUMENTO_ACCEPT}
+            disabled={pending}
+            file={archivoCarta}
+            buttonLabel={archivoCarta ? "Cambiar carta de renuncia" : "Subir carta de renuncia"}
+            emptyLabel={
+              yaHayCarta
+                ? "Ya hay carta de renuncia. Puede subir otra o dejar la que está. Opcional."
+                : "Opcional. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+            }
+            onFileChange={setArchivoCarta}
+          />
+        ) : null}
         <DocumentoFileInput
           accept={DOCUMENTO_ACCEPT}
           disabled={pending}
-          file={archivo}
-          buttonLabel={
-            archivo
-              ? "Cambiar archivo"
-              : esCarta
-                ? "Subir carta de renuncia"
-                : "Subir T-Registro baja"
-          }
+          file={archivoTrBaja}
+          buttonLabel={archivoTrBaja ? "Cambiar T-Registro baja" : "Subir T-Registro baja"}
           emptyLabel={
-            yaHayArchivo
-              ? esCarta
-                ? "Ya hay carta de renuncia. Puede subir otra o usar la que está."
-                : "Ya hay T-Registro baja. Puede subir otro o usar el que está."
-              : esCarta
-                ? "Solo este archivo. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
-                : "Solo la constancia de baja en T-Registro. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+            yaHayTrBaja
+              ? "Ya hay T-Registro baja. Puede subir otro o usar el que está. Obligatorio."
+              : "Obligatorio. Constancia de baja en T-Registro. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
           }
-          onFileChange={setArchivo}
+          onFileChange={setArchivoTrBaja}
         />
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-foreground">Observación</span>
+          <textarea
+            name="observacion_baja"
+            value={observacion}
+            onChange={(event) => setObservacion(event.target.value)}
+            disabled={pending}
+            rows={3}
+            maxLength={1000}
+            placeholder="Nota sobre el cese (opcional)"
+            className="flex min-h-[2.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </label>
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="baja_afp"
+            className="h-4 w-4 rounded border-input"
+            checked={bajaAfp}
+            disabled={pending}
+            onChange={(event) => setBajaAfp(event.target.checked)}
+          />
+          Se dio de baja de AFP
+        </label>
       </ConfirmDialog>
     </div>
   );

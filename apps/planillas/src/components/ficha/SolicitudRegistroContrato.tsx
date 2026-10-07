@@ -21,11 +21,22 @@ import { EliminarArchivoSolicitud } from "@/components/ficha/ConfirmarEliminarAr
 import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 
 function etiquetaSolicitud(solicitud: SolicitudRegistroVista): string {
+  const nombre = solicitud.nombre_archivo?.trim();
   const fecha = formatFechaPlanilla(solicitud.created_at);
   const cantidad = solicitud.trabajadores.length;
   const quienes = cantidad === 1 ? "1 trabajador" : `${cantidad} trabajadores`;
   const nota = solicitud.observaciones?.trim();
-  return nota ? `${fecha} · ${quienes} · ${nota}` : `${fecha} · ${quienes}`;
+  const detalle = nota ? `${fecha} · ${quienes} · ${nota}` : `${fecha} · ${quienes}`;
+  return nombre ? `${nombre} · ${detalle}` : detalle;
+}
+
+function nombreDescargaSolicitud(solicitud: SolicitudRegistroVista): string {
+  const original = solicitud.nombre_archivo?.trim();
+  if (original) {
+    // El archivo en storage es PDF; conservar el nombre subido y forzar .pdf si hace falta.
+    return /\.pdf$/i.test(original) ? original : `${original.replace(/\.[^.]+$/, "") || original}.pdf`;
+  }
+  return nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path ?? "solicitud.pdf");
 }
 
 export function SolicitudRegistroContrato({
@@ -78,11 +89,7 @@ export function SolicitudRegistroContrato({
     if (!solicitud?.storage_path) return;
     setOpening(true);
     const result = await getSignedDocumentoUrl(solicitud.storage_path, {
-      download: nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path, {
-        numero,
-        nombres,
-        apellidoPaterno,
-      }),
+      download: nombreDescargaSolicitud(solicitud),
     });
     setOpening(false);
     if (result.error || !result.url) {
@@ -124,6 +131,7 @@ export function SolicitudRegistroContrato({
       upload.path,
       [contratoId, ...marcados],
       nota,
+      archivo.name,
     );
     if (result.error) {
       await quitarArchivoSolicitud(upload.path);
@@ -148,7 +156,7 @@ export function SolicitudRegistroContrato({
       pushToast(upload.error ?? "No se pudo subir el archivo.", "error");
       return;
     }
-    const result = await guardarArchivoSolicitud(relacionId, solicitud.id, upload.path);
+    const result = await guardarArchivoSolicitud(relacionId, solicitud.id, upload.path, reemplazo.name);
     setPending(null);
     if (result.error) {
       pushToast(result.error, "error");
@@ -202,7 +210,12 @@ export function SolicitudRegistroContrato({
       {solicitud?.storage_path ? (
         <div className="space-y-3">
           <p className="text-sm text-foreground">
-            {solicitud.observaciones?.trim() || "Solicitud compartida"}
+            {solicitud.nombre_archivo?.trim()
+              ? `Archivo: ${solicitud.nombre_archivo.trim()}`
+              : solicitud.observaciones?.trim() || "Solicitud compartida"}
+            {solicitud.nombre_archivo?.trim() && solicitud.observaciones?.trim()
+              ? ` · ${solicitud.observaciones.trim()}`
+              : ""}
             {solicitud.trabajadores.length > 0
               ? `. La ven: ${solicitud.trabajadores.map((item) => item.etiqueta).join(", ")}.`
               : "."}

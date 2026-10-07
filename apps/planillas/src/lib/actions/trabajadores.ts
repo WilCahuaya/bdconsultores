@@ -52,6 +52,8 @@ export type PersonaRow = {
   region: string | null;
 };
 
+export type TipoBajaRelacion = "CARTA_RENUNCIA" | "TERMINO_CONTRATO";
+
 export type RelacionRow = {
   id: string;
   persona_id: string;
@@ -63,6 +65,9 @@ export type RelacionRow = {
   horario: string | null;
   fecha_ingreso: string | null;
   fecha_cese: string | null;
+  tipo_baja: TipoBajaRelacion | null;
+  observacion_baja: string | null;
+  baja_afp: boolean;
   recibe_asignacion_familiar: boolean | null;
   estado: EstadoRelacionLaboral;
   validacion: EstadoValidacionAltaPlanilla;
@@ -98,7 +103,7 @@ type DocumentoEmbed = {
 };
 
 const TRABAJADOR_SELECT =
-  "id, persona_id, entidad_id, numero, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados, documento_id, solicitud_registro_id, solicitudes_registro (storage_path)), documentos (id, tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
+  "id, persona_id, entidad_id, numero, cargo, clasificacion, jornada, horario, fecha_ingreso, fecha_cese, tipo_baja, observacion_baja, baja_afp, recibe_asignacion_familiar, estado, validacion, personas!persona_id (id, dni, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, celular, correo, direccion, tipo_via, via_nombre, via_numero, referencia, distrito, provincia, region), contratos (remuneracion, es_vigente, version, estado, fecha_inicio, fecha_fin, datos_confirmados, documento_id, solicitud_registro_id, solicitudes_registro (storage_path)), documentos (id, tipo, estado, storage_path), pensiones (tipo, afp_nombre, cuspp, tramite_estado, fecha_tramite), t_registro (tipo, realizado)";
 
 function asList<T>(value: T | T[] | null | undefined): T[] {
   if (!value) return [];
@@ -236,8 +241,15 @@ function mapTrabajadorRow(row: {
     } as FlujoContrato;
   });
   const documentosList = asList(documentos) as FlujoDocumento[];
+  const tipoBaja = relacion.tipo_baja;
   return {
     ...(relacion as RelacionRow),
+    tipo_baja:
+      tipoBaja === "CARTA_RENUNCIA" || tipoBaja === "TERMINO_CONTRATO"
+        ? tipoBaja
+        : null,
+    observacion_baja: (relacion.observacion_baja as string | null | undefined) ?? null,
+    baja_afp: Boolean(relacion.baja_afp),
     persona: persona as PersonaRow,
     remuneracion: remuneracionDeContratos(contratos),
     contratos: contratosList,
@@ -476,23 +488,26 @@ export async function darDeBajaTrabajador(
     return { error: "El cese no puede ser anterior al ingreso a la empresa." };
   }
   const motivo = String(formData.get("tipo_baja") ?? "").trim();
-  if (motivo === "CARTA_RENUNCIA") {
-    if (!documentoCargado(actual.documentos, "CARTA_RENUNCIA")) {
-      return { error: "Suba la carta de renuncia." };
-    }
-  } else if (motivo === "TERMINO_CONTRATO") {
-    if (!documentoCargado(actual.documentos, "TR_BAJA")) {
-      return { error: "Suba el documento de T-Registro baja." };
-    }
-  } else {
+  if (motivo !== "CARTA_RENUNCIA" && motivo !== "TERMINO_CONTRATO") {
     return { error: "Indique si la baja es por carta de renuncia o término de contrato." };
   }
+  if (!documentoCargado(actual.documentos, "TR_BAJA")) {
+    return { error: "Suba el documento de T-Registro baja." };
+  }
+  const observacion = String(formData.get("observacion_baja") ?? "").trim() || null;
+  const bajaAfp =
+    formData.get("baja_afp") === "on" ||
+    formData.get("baja_afp") === "true" ||
+    formData.get("baja_afp") === "1";
 
   const db = await planillasDb();
   const { error } = await db
     .from("relaciones_laborales")
     .update({
       fecha_cese: cese.value,
+      tipo_baja: motivo,
+      observacion_baja: observacion,
+      baja_afp: bajaAfp,
       estado: "CESADA",
       numero: null,
     })
