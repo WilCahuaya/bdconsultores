@@ -640,11 +640,12 @@ function yearDesdeTexto(raw: string): string | null {
 
 /** Acepta DD/MM/AAAA (también 1/12/1993), DD-MM-AAAA, DD.MM.AAAA o ISO YYYY-MM-DD. */
 export function parseFechaFlexible(text: string): string | null {
-  const trimmed = text.trim();
+  const trimmed = text.trim().replace(/\s+/g, " ");
   if (!trimmed) return null;
   const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return parseFechaDDMMYYYY(`${iso[3]}/${iso[2]}/${iso[1]}`);
-  const other = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})$/);
+  // Tolera hora al final (p. ej. "15/03/2026 0:00:00" desde Excel).
+  const other = trimmed.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})(?:\s|$)/);
   if (other) {
     const year = yearDesdeTexto(other[3]);
     if (!year) return null;
@@ -704,12 +705,22 @@ export function textoCeldaExcelDDMMYYYY(celda: {
   const v = celda.v;
   const w = celda.w != null ? String(celda.w) : null;
   const z = celda.z != null ? String(celda.z) : null;
+  // Prioridad: valor calendario real (Date/serial), nunca el texto EE. UU. de .w
   if (v instanceof Date && !Number.isNaN(v.getTime())) return fechaJsToDDMMYYYY(v);
-  if (typeof v === "number" && (celda.t === "d" || pareceFormatoFechaExcel(z, w))) {
-    return formatExcelSerialToDDMMYYYY(v) ?? (w ?? String(v));
+  if (typeof v === "number" && Number.isFinite(v)) {
+    if (celda.t === "d" || pareceFormatoFechaExcel(z, w)) {
+      return formatExcelSerialToDDMMYYYY(v) ?? (w ?? String(v));
+    }
+    // SheetJS a veces deja serial numérico con .w tipo fecha aunque t !== "d"
+    if (w && /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}/.test(w.trim()) && v > 20000 && v < 80000) {
+      return formatExcelSerialToDDMMYYYY(v) ?? w;
+    }
   }
-  if (typeof v === "number" && w && /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(w.trim())) {
-    return formatExcelSerialToDDMMYYYY(v) ?? w;
+  if (typeof v === "string") {
+    const texto = v.replace(/\s+/g, " ").trim();
+    const iso = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    return texto;
   }
   const crudo = w != null ? w : v != null ? String(v) : "";
   return crudo.replace(/\s+/g, " ").trim();

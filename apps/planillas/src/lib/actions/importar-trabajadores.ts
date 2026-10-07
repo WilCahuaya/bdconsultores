@@ -199,6 +199,41 @@ function planDeCompletado(
   return plan;
 }
 
+type CeldaHoja = { v?: unknown; w?: unknown; t?: unknown; z?: unknown };
+type LibroXlsx = {
+  SheetNames: string[];
+  Sheets: Record<string, Record<string, CeldaHoja | string | undefined> & { "!ref"?: string }>;
+};
+type XlsxUtils = {
+  decode_range: (ref: string) => { s: { r: number; c: number }; e: { r: number; c: number } };
+  encode_cell: (addr: { r: number; c: number }) => string;
+};
+
+/** Lee la hoja celda a celda: fechas desde Date/serial → DD/MM/AAAA (no el m/d/yyyy de SheetJS). */
+function matrizDesdeHoja(
+  sheet: LibroXlsx["Sheets"][string],
+  utils: XlsxUtils,
+  textoCelda: (celda: CeldaHoja) => string,
+): string[][] {
+  const ref = sheet["!ref"];
+  if (!ref || typeof ref !== "string") return [];
+  const rango = utils.decode_range(ref);
+  const filas: string[][] = [];
+  for (let r = rango.s.r; r <= rango.e.r; r += 1) {
+    const fila: string[] = [];
+    for (let c = rango.s.c; c <= rango.e.c; c += 1) {
+      const celda = sheet[utils.encode_cell({ r, c })];
+      if (!celda || typeof celda === "string") {
+        fila.push(typeof celda === "string" ? celda.trim() : "");
+        continue;
+      }
+      fila.push(textoCelda(celda));
+    }
+    filas.push(fila);
+  }
+  return filas;
+}
+
 async function matrizDesdeArchivo(formData: FormData): Promise<{ error?: string; rows?: string[][] }> {
   const file = formData.get("archivo");
   if (!(file instanceof File) || file.size === 0) return { error: "Elija el Excel de la plantilla." };
@@ -209,11 +244,13 @@ async function matrizDesdeArchivo(formData: FormData): Promise<{ error?: string;
   if (file.size > 8 * 1024 * 1024) return { error: "El archivo supera 8 MB." };
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { valorExcelATextoDDMMYYYY } = await import("@inventario/types");
+  const { textoCeldaExcelDDMMYYYY } = await import("@inventario/types");
   const XLSX = await import("xlsx-js-style");
-  const libro = name.endsWith(".csv")
-    ? XLSX.read(buffer.toString("utf8"), { type: "string", FS: ";", cellDates: true })
-    : XLSX.read(buffer, { type: "buffer", cellDates: true });
+  const libro = (
+    name.endsWith(".csv")
+      ? XLSX.read(buffer.toString("utf8"), { type: "string", FS: ";", cellDates: true })
+      : XLSX.read(buffer, { type: "buffer", cellDates: true })
+  ) as LibroXlsx;
 
   const nombres = [...libro.SheetNames].sort((a, b) => {
     const an = a.toLowerCase().includes("planilla") ? 0 : 1;
@@ -223,13 +260,7 @@ async function matrizDesdeArchivo(formData: FormData): Promise<{ error?: string;
   for (const hoja of nombres) {
     const sheet = libro.Sheets[hoja];
     if (!sheet) continue;
-    const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
-      header: 1,
-      raw: false,
-      dateNF: "dd/mm/yyyy",
-      defval: "",
-    });
-    const texto = rows.map((row) => (row ?? []).map((celda) => valorExcelATextoDDMMYYYY(celda)));
+    const texto = matrizDesdeHoja(sheet, XLSX.utils as XlsxUtils, textoCeldaExcelDDMMYYYY);
     const leido = leerTrabajadoresExcel(texto);
     if (!leido.error) return { rows: texto };
   }
