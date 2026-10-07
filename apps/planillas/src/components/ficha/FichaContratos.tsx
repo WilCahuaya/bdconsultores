@@ -458,9 +458,6 @@ export function FichaContratos({
               relacionId={relacionId}
               entidadId={entidadId}
               contratoId={firmando.id}
-              numero={trabajador.numero}
-              nombres={trabajador.persona.nombres}
-              apellidoPaterno={trabajador.persona.apellido_paterno}
               canWrite={canWrite}
               cerrado={firmando.estado === "BAJA"}
               solicitud={solicitudDeContrato(firmando, solicitudes)}

@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { entidadAlcance, puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
 import { isUuid, pathPerteneceASolicitud } from "@/lib/documento-storage";
+import { nombreBaseSolicitudRegistro } from "@/lib/nombre-archivo";
 import { etiquetaTrabajador } from "@/lib/planillas-labels";
 import { planillasDb } from "@/lib/supabase/planillas";
 
 export type SolicitudTrabajador = {
   contratoId: string;
   etiqueta: string;
+  nombres: string;
 };
 
 export type SolicitudRegistroVista = {
@@ -106,12 +108,13 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
   if (contratosRes.error) throw new Error(contratosRes.error.message);
   if (relacionesRes.error) throw new Error(relacionesRes.error.message);
 
-  const relaciones = new Map<string, { etiqueta: string; estado: string }>();
+  const relaciones = new Map<string, { etiqueta: string; estado: string; nombres: string }>();
   for (const row of (relacionesRes.data ?? []) as RelacionEmbed[]) {
     const persona = personaDe(row.personas);
     relaciones.set(row.id, {
       etiqueta: persona ? etiquetaTrabajador(persona, row.numero) : "Trabajador",
       estado: row.estado,
+      nombres: persona?.nombres?.trim() || "",
     });
   }
 
@@ -132,20 +135,28 @@ export async function contextoSolicitudesRegistro(entidadId: string): Promise<{
 
   const solicitudes: SolicitudRegistroVista[] = (
     (solicitudesRes.data ?? []) as Omit<SolicitudRegistroVista, "trabajadores">[]
-  ).map((solicitud) => ({
-    id: solicitud.id,
-    storage_path: solicitud.storage_path,
-    nombre_archivo: solicitud.nombre_archivo ?? null,
-    observaciones: solicitud.observaciones,
-    created_at: solicitud.created_at,
-    trabajadores: contratos
+  ).map((solicitud) => {
+    const trabajadores = contratos
       .filter((contrato) => contrato.solicitud_registro_id === solicitud.id)
-      .map((contrato) => ({
-        contratoId: contrato.id,
-        etiqueta: etiquetaContrato(contrato.relacion_id, contrato.version),
-      }))
-      .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es")),
-  }));
+      .map((contrato) => {
+        const relacion = relaciones.get(contrato.relacion_id);
+        return {
+          contratoId: contrato.id,
+          etiqueta: etiquetaContrato(contrato.relacion_id, contrato.version),
+          nombres: relacion?.nombres ?? "",
+        };
+      })
+      .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"));
+    const nombreGenerado = trabajadores.length > 0 ? `${nombreBaseSolicitudRegistro(trabajadores)}.pdf` : null;
+    return {
+      id: solicitud.id,
+      storage_path: solicitud.storage_path,
+      nombre_archivo: nombreGenerado ?? solicitud.nombre_archivo ?? null,
+      observaciones: solicitud.observaciones,
+      created_at: solicitud.created_at,
+      trabajadores,
+    };
+  });
 
   const abiertos = new Map<string, (typeof contratos)[number]>();
   for (const contrato of contratos) {
@@ -213,13 +224,66 @@ function limpiarNombreArchivo(raw: string | null | undefined): string | null {
   return nombre || null;
 }
 
+async function nombreArchivoDesdeContratos(
+  entidadId: string,
+  contratoIds: string[],
+): Promise<string | null> {
+  const ids = [...new Set(contratoIds.filter((id) => isUuid(id)))];
+  if (ids.length === 0) return null;
+  const db = await planillasDb();
+  const { data: contratos, error } = await db
+    .from("contratos")
+    .select("id, relacion_id")
+    .eq("entidad_id", entidadId)
+    .in("id", ids);
+  if (error || !contratos?.length) return null;
+
+  const relacionIds = [...new Set(contratos.map((row) => row.relacion_id as string))];
+  const { data: relaciones, error: relError } = await db
+    .from("relaciones_laborales")
+    .select("id, personas!persona_id (nombres)")
+    .in("id", relacionIds);
+  if (relError) return null;
+
+  const porRelacion = new Map<string, string>();
+  for (const row of (relaciones ?? []) as RelacionEmbed[]) {
+    const persona = personaDe(row.personas);
+    porRelacion.set(row.id, persona?.nombres?.trim() || "");
+  }
+
+  const trabajadores = contratos.map((row) => ({
+    nombres: porRelacion.get(row.relacion_id as string) ?? "",
+  }));
+  const base = nombreBaseSolicitudRegistro(trabajadores);
+  return limpiarNombreArchivo(`${base}.pdf`);
+}
+
+async function actualizarNombreArchivoSolicitud(
+  entidadId: string,
+  solicitudId: string,
+): Promise<void> {
+  const db = await planillasDb();
+  const { data: ligados } = await db
+    .from("contratos")
+    .select("id")
+    .eq("solicitud_registro_id", solicitudId)
+    .eq("entidad_id", entidadId);
+  const ids = (ligados ?? []).map((row) => row.id as string);
+  const nombre = await nombreArchivoDesdeContratos(entidadId, ids);
+  await db
+    .from("solicitudes_registro")
+    .update({ nombre_archivo: nombre })
+    .eq("id", solicitudId)
+    .eq("entidad_id", entidadId);
+}
+
 export async function registrarSolicitudRegistro(
   relacionId: string,
   solicitudId: string,
   storagePath: string,
   contratoIds: string[],
   observaciones: string,
-  nombreArchivo?: string | null,
+  _nombreArchivo?: string | null,
 ): Promise<{ error?: string }> {
   const gate = await assertEmpresa(relacionId);
   if ("error" in gate) return { error: gate.error };
@@ -230,12 +294,16 @@ export async function registrarSolicitudRegistro(
   if ("error" in contratos) return { error: contratos.error };
 
   const nota = observaciones.trim().slice(0, 200) || null;
+  const nombreArchivo = await nombreArchivoDesdeContratos(
+    gate.entidadId,
+    contratos.rows.map((row) => row.id),
+  );
   const db = await planillasDb();
   const { error: insertError } = await db.from("solicitudes_registro").insert({
     id: solicitudId,
     entidad_id: gate.entidadId,
     storage_path: storagePath,
-    nombre_archivo: limpiarNombreArchivo(nombreArchivo),
+    nombre_archivo: nombreArchivo,
     observaciones: nota,
   });
   if (insertError) return { error: insertError.message };
@@ -258,7 +326,7 @@ export async function guardarArchivoSolicitud(
   relacionId: string,
   solicitudId: string,
   storagePath: string,
-  nombreArchivo?: string | null,
+  _nombreArchivo?: string | null,
 ): Promise<{ error?: string }> {
   const gate = await assertEmpresa(relacionId);
   if ("error" in gate) return { error: gate.error };
@@ -275,21 +343,26 @@ export async function guardarArchivoSolicitud(
   if (loadError) return { error: loadError.message };
   if (!data) return { error: "Solicitud no encontrada." };
 
+  const { data: ligados } = await db
+    .from("contratos")
+    .select("id, relacion_id")
+    .eq("solicitud_registro_id", solicitudId)
+    .eq("entidad_id", gate.entidadId);
+  const contratoIds = (ligados ?? []).map((row) => row.id as string);
+  const nombreArchivo =
+    (await nombreArchivoDesdeContratos(gate.entidadId, contratoIds)) ??
+    limpiarNombreArchivo("solicitud.pdf");
+
   const { error } = await db
     .from("solicitudes_registro")
     .update({
       storage_path: storagePath,
-      nombre_archivo: limpiarNombreArchivo(nombreArchivo),
+      nombre_archivo: nombreArchivo,
     })
     .eq("id", solicitudId)
     .eq("entidad_id", gate.entidadId);
   if (error) return { error: error.message };
 
-  const { data: ligados } = await db
-    .from("contratos")
-    .select("relacion_id")
-    .eq("solicitud_registro_id", solicitudId)
-    .eq("entidad_id", gate.entidadId);
   const relaciones = [...new Set((ligados ?? []).map((row) => row.relacion_id as string))];
   revalidarRelaciones(relaciones.length > 0 ? relaciones : [relacionId]);
   return {};
@@ -359,6 +432,7 @@ export async function vincularContratosASolicitud(
     )
     .eq("entidad_id", gate.entidadId);
   if (error) return { error: error.message };
+  await actualizarNombreArchivoSolicitud(gate.entidadId, solicitudId);
   revalidarRelaciones(contratos.rows.map((row) => row.relacion_id));
   return {};
 }
@@ -371,6 +445,14 @@ export async function desvincularSolicitudContrato(
   if ("error" in gate) return { error: gate.error };
   if (!isUuid(contratoId)) return { error: "Contrato no válido." };
   const db = await planillasDb();
+  const { data: actual } = await db
+    .from("contratos")
+    .select("solicitud_registro_id")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .eq("entidad_id", gate.entidadId)
+    .maybeSingle();
+  const solicitudId = (actual?.solicitud_registro_id as string | null) ?? null;
   const { error } = await db
     .from("contratos")
     .update({ solicitud_registro_id: null })
@@ -378,6 +460,7 @@ export async function desvincularSolicitudContrato(
     .eq("relacion_id", relacionId)
     .eq("entidad_id", gate.entidadId);
   if (error) return { error: error.message };
+  if (solicitudId) await actualizarNombreArchivoSolicitud(gate.entidadId, solicitudId);
   revalidarRelaciones([relacionId]);
   return {};
 }

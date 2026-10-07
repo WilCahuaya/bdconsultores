@@ -13,6 +13,7 @@ import {
   type SolicitudRegistroVista,
 } from "@/lib/actions/solicitudes-registro";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
+import { nombreBaseSolicitudRegistro } from "@/lib/nombre-archivo";
 import { formatFechaPlanilla } from "@/lib/planillas-labels";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { quitarArchivoSolicitud, uploadSolicitudFile } from "@/lib/upload-documento";
@@ -20,23 +21,25 @@ import { Field } from "@/components/fields";
 import { EliminarArchivoSolicitud } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 
+function nombreSolicitud(solicitud: SolicitudRegistroVista): string {
+  if (solicitud.trabajadores.length > 0) {
+    return `${nombreBaseSolicitudRegistro(solicitud.trabajadores)}.pdf`;
+  }
+  const guardado = solicitud.nombre_archivo?.trim();
+  if (guardado) {
+    return /\.pdf$/i.test(guardado) ? guardado : `${guardado.replace(/\.[^.]+$/, "") || guardado}.pdf`;
+  }
+  return nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path ?? "solicitud.pdf");
+}
+
 function etiquetaSolicitud(solicitud: SolicitudRegistroVista): string {
-  const nombre = solicitud.nombre_archivo?.trim();
+  const nombre = nombreSolicitud(solicitud);
   const fecha = formatFechaPlanilla(solicitud.created_at);
   const cantidad = solicitud.trabajadores.length;
   const quienes = cantidad === 1 ? "1 trabajador" : `${cantidad} trabajadores`;
   const nota = solicitud.observaciones?.trim();
   const detalle = nota ? `${fecha} · ${quienes} · ${nota}` : `${fecha} · ${quienes}`;
-  return nombre ? `${nombre} · ${detalle}` : detalle;
-}
-
-function nombreDescargaSolicitud(solicitud: SolicitudRegistroVista): string {
-  const original = solicitud.nombre_archivo?.trim();
-  if (original) {
-    // El archivo en storage es PDF; conservar el nombre subido y forzar .pdf si hace falta.
-    return /\.pdf$/i.test(original) ? original : `${original.replace(/\.[^.]+$/, "") || original}.pdf`;
-  }
-  return nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path ?? "solicitud.pdf");
+  return `${nombre} · ${detalle}`;
 }
 
 export function SolicitudRegistroContrato({
@@ -48,9 +51,6 @@ export function SolicitudRegistroContrato({
   solicitud,
   solicitudes,
   enlazables,
-  numero = null,
-  nombres = "",
-  apellidoPaterno = null,
 }: {
   relacionId: string;
   entidadId: string;
@@ -60,9 +60,6 @@ export function SolicitudRegistroContrato({
   solicitud: SolicitudRegistroVista | null;
   solicitudes: SolicitudRegistroVista[];
   enlazables: ContratoEnlazable[];
-  numero?: number | null;
-  nombres?: string;
-  apellidoPaterno?: string | null;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -89,7 +86,7 @@ export function SolicitudRegistroContrato({
     if (!solicitud?.storage_path) return;
     setOpening(true);
     const result = await getSignedDocumentoUrl(solicitud.storage_path, {
-      download: nombreDescargaSolicitud(solicitud),
+      download: nombreSolicitud(solicitud),
     });
     setOpening(false);
     if (result.error || !result.url) {
@@ -131,7 +128,6 @@ export function SolicitudRegistroContrato({
       upload.path,
       [contratoId, ...marcados],
       nota,
-      archivo.name,
     );
     if (result.error) {
       await quitarArchivoSolicitud(upload.path);
@@ -156,7 +152,7 @@ export function SolicitudRegistroContrato({
       pushToast(upload.error ?? "No se pudo subir el archivo.", "error");
       return;
     }
-    const result = await guardarArchivoSolicitud(relacionId, solicitud.id, upload.path, reemplazo.name);
+    const result = await guardarArchivoSolicitud(relacionId, solicitud.id, upload.path);
     setPending(null);
     if (result.error) {
       pushToast(result.error, "error");
@@ -210,12 +206,8 @@ export function SolicitudRegistroContrato({
       {solicitud?.storage_path ? (
         <div className="space-y-3">
           <p className="text-sm text-foreground">
-            {solicitud.nombre_archivo?.trim()
-              ? `Archivo: ${solicitud.nombre_archivo.trim()}`
-              : solicitud.observaciones?.trim() || "Solicitud compartida"}
-            {solicitud.nombre_archivo?.trim() && solicitud.observaciones?.trim()
-              ? ` · ${solicitud.observaciones.trim()}`
-              : ""}
+            Archivo: {nombreSolicitud(solicitud)}
+            {solicitud.observaciones?.trim() ? ` · ${solicitud.observaciones.trim()}` : ""}
             {solicitud.trabajadores.length > 0
               ? `. La ven: ${solicitud.trabajadores.map((item) => item.etiqueta).join(", ")}.`
               : "."}
