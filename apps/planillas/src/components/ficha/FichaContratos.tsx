@@ -22,10 +22,12 @@ import { descargarContratoWord } from "@/lib/descargar-contrato-word";
 import { nombreBaseContrato } from "@/lib/nombre-archivo";
 import { Field, DateField, FormSection, SelectField } from "@/components/fields";
 import { HorarioLaboralField } from "@/components/ficha/HorarioLaboralField";
+import { HorarioContratoVista } from "@/components/ficha/HorarioContratoVista";
 import { FichaDocumentos } from "@/components/ficha/FichaDocumentos";
 import { VistaDocumentoGuardado } from "@/components/ficha/DocumentoPrevisualizacion";
 import { SolicitudRegistroContrato } from "@/components/ficha/SolicitudRegistroContrato";
 import type { ContratoEnlazable, SolicitudRegistroVista } from "@/lib/actions/solicitudes-registro";
+import { etiquetaDocumentosSubidos } from "@/lib/flujo-ficha";
 
 function abrirVistaPrevia(relacionId: string, contratoId: string) {
   window.open(
@@ -780,15 +782,86 @@ export function FichaContratos({
           setValidandoDatos(null);
         }}
         title="Validar contrato"
-        description="¿Está seguro de que desea validar? Revise los datos del formulario antes de validar. Se guardarán cargo, fechas, jornada, horario y remuneración, y el proceso del contrato terminará."
+        description="¿Está seguro de que desea validar? Revise el resumen antes de continuar. El proceso del contrato terminará."
         confirmLabel="Sí, validar"
         pending={pending === "confirmar"}
         onConfirm={() => {
           if (!firmando || !validandoDatos) return;
           void onConfirmar(firmando.id, validandoDatos);
         }}
-      />
+      >
+        {validandoDatos && firmando ? (
+          <ResumenValidacionContrato
+            formData={validandoDatos}
+            version={firmando.version}
+            tienePdf={tienePdfFirmando}
+            tieneSolicitud={tieneSolicitudFirmando}
+            recibeAsignacion={trabajador.recibe_asignacion_familiar}
+          />
+        ) : null}
+      </ConfirmDialog>
     </div>
+  );
+}
+
+function ResumenValidacionContrato({
+  formData,
+  version,
+  tienePdf,
+  tieneSolicitud,
+  recibeAsignacion,
+}: {
+  formData: FormData;
+  version: number;
+  tienePdf: boolean;
+  tieneSolicitud: boolean;
+  recibeAsignacion: boolean | null;
+}) {
+  const cargo = String(formData.get("cargo") ?? "").trim();
+  const jornada = String(formData.get("jornada") ?? "").trim();
+  const fechaInicio = String(formData.get("fecha_inicio") ?? "").trim();
+  const fechaFin = String(formData.get("fecha_fin") ?? "").trim();
+  const remuneracionRaw = String(formData.get("remuneracion") ?? "").trim();
+  const horario = String(formData.get("horario") ?? "").trim();
+  const remNum = Number(remuneracionRaw);
+  const remValida = remuneracionRaw !== "" && Number.isFinite(remNum);
+  const asignacion = montoAsignacionFamiliar(recibeAsignacion);
+  const bruta = remValida ? remuneracionBruta(remNum, recibeAsignacion) : null;
+  const documentos = etiquetaDocumentosSubidos(tienePdf, tieneSolicitud);
+  const filas: { label: string; value: ReactNode }[] = [
+    { label: "Versión", value: String(version) },
+    { label: "Cargo", value: cargo || "—" },
+    {
+      label: "Tipo de contrato",
+      value:
+        jornada === "TIEMPO_COMPLETO" || jornada === "TIEMPO_PARCIAL" ? JORNADA_LABEL[jornada] : jornada || "—",
+    },
+    { label: "Inicio", value: formatFechaPlanilla(fechaInicio || null) },
+    { label: "Fin", value: formatFechaPlanilla(fechaFin || null) },
+    { label: "Remuneración", value: remValida ? formatRemuneracion(remNum) : remuneracionRaw || "—" },
+    {
+      label: "Asignación familiar",
+      value:
+        recibeAsignacion === true
+          ? formatRemuneracion(asignacion)
+          : recibeAsignacion === false
+            ? "No corresponde"
+            : "—",
+    },
+    { label: "Remuneración bruta", value: bruta == null ? "—" : formatRemuneracion(bruta) },
+    { label: "Horario", value: <HorarioContratoVista value={horario || null} className="text-sm text-foreground" /> },
+    { label: "Documento", value: documentos ?? "—" },
+  ];
+
+  return (
+    <dl className="max-h-64 space-y-2 overflow-y-auto rounded-md border border-border/70 bg-muted/30 p-3 text-sm">
+      {filas.map((fila) => (
+        <div key={fila.label} className="grid gap-0.5 sm:grid-cols-[8.5rem_1fr] sm:gap-2">
+          <dt className="text-muted-foreground">{fila.label}</dt>
+          <dd className="min-w-0 font-medium text-foreground">{fila.value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 

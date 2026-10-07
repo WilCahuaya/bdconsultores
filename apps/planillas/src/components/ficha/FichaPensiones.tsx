@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
 import { DocumentoFileInput } from "@/components/ficha/DocumentoFileInput";
@@ -70,6 +70,9 @@ export function FichaPensiones({
   const { pushToast } = useToast();
   const [pending, setPending] = useState(false);
   const [fileAlta, setFileAlta] = useState<File | null>(null);
+  const [afpNombre, setAfpNombre] = useState(pension?.afp_nombre ?? "");
+  const [cuspp, setCuspp] = useState(pension?.cuspp ?? "");
+  const [fechaTramite, setFechaTramite] = useState(pension?.fecha_tramite ?? "");
   const tipo = pension?.tipo ?? "";
   const esAfp = tipo === "AFP";
   const esOnp = tipo === "ONP";
@@ -77,10 +80,16 @@ export function FichaPensiones({
   const nombre = nombreCompleto(persona);
   const fechaInicioLabor = trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : "";
 
+  useEffect(() => {
+    setAfpNombre(pension?.afp_nombre ?? "");
+    setCuspp(pension?.cuspp ?? "");
+    setFechaTramite(pension?.fecha_tramite ?? "");
+  }, [pension?.afp_nombre, pension?.cuspp, pension?.fecha_tramite]);
+
   async function onSubmit(formData: FormData) {
-    const afpNombre = String(formData.get("afp_nombre") ?? "").trim();
-    const cuspp = String(formData.get("cuspp") ?? "").trim();
-    const afiliacionCompleta = Boolean(afpNombre && cuspp);
+    const afpNombreGuardar = String(formData.get("afp_nombre") ?? "").trim();
+    const cusppGuardar = String(formData.get("cuspp") ?? "").trim();
+    const afiliacionCompleta = Boolean(afpNombreGuardar && cusppGuardar);
     if (!afiliacionCompleta) {
       pushToast("Indique el nombre de AFP y el CUSPP.", "error");
       return;
@@ -119,6 +128,9 @@ export function FichaPensiones({
       pushToast(result.error, "error");
       return;
     }
+    setAfpNombre(afpNombreGuardar);
+    setCuspp(cusppGuardar);
+    setFechaTramite(String(formData.get("fecha_tramite") ?? "").trim());
     setFileAlta(null);
     pushToast("Sistema de pensión guardado. Siga con T-Registro.");
     router.refresh();
@@ -233,22 +245,30 @@ export function FichaPensiones({
                 <SelectField
                   label="Nombre de AFP"
                   name="afp_nombre"
-                  defaultValue={pension?.afp_nombre}
+                  value={afpNombre}
                   allowEmpty
                   disabled={!canWrite}
                   options={[
-                    ...(pension?.afp_nombre && !(AFP_NOMBRES as readonly string[]).includes(pension.afp_nombre)
-                      ? [{ value: pension.afp_nombre, label: pension.afp_nombre }]
+                    ...(afpNombre && !(AFP_NOMBRES as readonly string[]).includes(afpNombre)
+                      ? [{ value: afpNombre, label: afpNombre }]
                       : []),
                     ...AFP_NOMBRES.map((nombreAfp) => ({ value: nombreAfp, label: nombreAfp })),
                   ]}
+                  onChange={(event) => setAfpNombre(event.target.value)}
                 />
-                <Field label="CUSPP" name="cuspp" defaultValue={pension?.cuspp} readOnly={!canWrite} />
+                <Field
+                  label="CUSPP"
+                  name="cuspp"
+                  value={cuspp}
+                  readOnly={!canWrite}
+                  onChange={(event) => setCuspp(event.target.value)}
+                />
                 <DateField
                   label="Fecha de afiliación"
                   name="fecha_tramite"
-                  defaultValue={pension?.fecha_tramite}
+                  value={fechaTramite}
                   readOnly={!canWrite}
+                  onChange={setFechaTramite}
                 />
               </div>
               {canWrite ? (
