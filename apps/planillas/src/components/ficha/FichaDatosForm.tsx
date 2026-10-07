@@ -189,7 +189,7 @@ export function FichaPuestoForm({
       <form action={onSubmit} className="space-y-4">
         <FormSection
           title="Puesto en esta empresa"
-          hint="Cargo, horario y jornada salen del último contrato o solicitud firmado. La fecha de ingreso sale del primero; si todavía no hay uno, escríbala aquí."
+          hint="Cargo, horario y jornada salen del último contrato o solicitud firmado. La fecha de ingreso sale del primero (y es la misma del alta T-Registro); si todavía no hay uno, escríbala aquí."
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <Field

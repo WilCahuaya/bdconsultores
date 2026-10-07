@@ -490,6 +490,10 @@ export async function confirmarContratoFirmado(
     const { error: relError } = await db.from("relaciones_laborales").update(cambiosPuesto).eq("id", relacionId);
     if (relError) return { error: relError.message };
   }
+  if (esElPrimero && snapshot.fecha_inicio) {
+    const sync = await sincronizarFechaAltaTRegistroConIngreso(relacionId, snapshot.fecha_inicio);
+    if (sync.error) return { error: sync.error };
+  }
 
   revalidatePath("/");
   revalidatePath("/pendientes");
@@ -1666,56 +1670,57 @@ export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]>
   return (data ?? []) as TRegistroRow[];
 }
 
-export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
-  const gate = await assertEscrituraTramite(relacionId);
-  if ("error" in gate) return { error: gate.error };
-  const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
-  if (fecha.error) return { error: fecha.error };
+/** La fecha de alta T-Registro es la misma que ingreso / inicio del primer contrato validado. */
+export async function sincronizarFechaAltaTRegistroConIngreso(
+  relacionId: string,
+  fechaIngreso: string | null | undefined,
+): Promise<{ error?: string }> {
+  if (!fechaIngreso) return {};
   const db = await planillasDb();
-  const { error } = await db.from("t_registro").insert({
-    relacion_id: relacionId,
-    tipo: String(formData.get("tipo")) as TipoTRegistro,
-    realizado: formData.get("realizado") === "on",
-    fecha: fecha.value,
-    observaciones: String(formData.get("observaciones") ?? "").trim() || null,
-  });
+  const { error } = await db
+    .from("t_registro")
+    .update({ fecha: fechaIngreso })
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "ALTA");
   if (error) return { error: error.message };
-  revalidatePath(`/trabajadores/${relacionId}`);
-  revalidatePath("/");
-  revalidatePath("/contratos");
-  revalidatePath("/pendientes");
   return {};
 }
 
-export async function updateFechaTRegistroAlta(
-  relacionId: string,
-  formData: FormData,
-): Promise<{ error?: string }> {
+export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
-  const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha de alta");
-  if (fecha.error) return { error: fecha.error };
-  if (!fecha.value) return { error: "Indique la fecha de alta." };
-
+  const tipo = String(formData.get("tipo")) as TipoTRegistro;
   const db = await planillasDb();
-  const { data: existente, error: loadError } = await db
-    .from("t_registro")
-    .select("id")
-    .eq("relacion_id", relacionId)
-    .eq("tipo", "ALTA")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (loadError) return { error: loadError.message };
-  if (!existente) return { error: "No hay alta de T-Registro para actualizar." };
 
-  const { error } = await db
-    .from("t_registro")
-    .update({ fecha: fecha.value })
-    .eq("id", existente.id)
-    .eq("relacion_id", relacionId);
+  let fechaValue: string | null = null;
+  if (tipo === "ALTA") {
+    const { data: rel, error: relError } = await db
+      .from("relaciones_laborales")
+      .select("fecha_ingreso")
+      .eq("id", relacionId)
+      .maybeSingle();
+    if (relError) return { error: relError.message };
+    if (!rel?.fecha_ingreso) {
+      return {
+        error:
+          "Falta la fecha de ingreso a la empresa (igual al inicio del primer contrato validado). Complétela en Puesto.",
+      };
+    }
+    fechaValue = rel.fecha_ingreso as string;
+  } else {
+    const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
+    if (fecha.error) return { error: fecha.error };
+    fechaValue = fecha.value;
+  }
+
+  const { error } = await db.from("t_registro").insert({
+    relacion_id: relacionId,
+    tipo,
+    realizado: formData.get("realizado") === "on",
+    fecha: fechaValue,
+    observaciones: String(formData.get("observaciones") ?? "").trim() || null,
+  });
   if (error) return { error: error.message };
-
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/");
   revalidatePath("/contratos");

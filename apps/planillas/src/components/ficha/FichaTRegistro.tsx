@@ -9,7 +9,6 @@ import { panelCardClass } from "@inventario/ui/panel";
 import {
   addTRegistro,
   setDocumentoArchivo,
-  updateFechaTRegistroAlta,
   type DocumentoRow,
   type PensionRow,
   type TRegistroRow,
@@ -27,7 +26,6 @@ import {
   montoAsignacionFamiliar,
   remuneracionBruta,
 } from "@/lib/planillas-labels";
-import { DateField } from "@/components/fields";
 import { ApartadoDesplegable } from "@/components/ficha/ApartadoDesplegable";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
@@ -83,12 +81,23 @@ export function FichaTRegistro({
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
   const yaAlta = items.some((item) => item.tipo === "ALTA" && item.realizado);
   const altaLista = yaAlta && Boolean(documentoTrAlta?.storage_path);
-  const fechaAlta = items.find((item) => item.tipo === "ALTA")?.fecha;
+  const fechaIngreso = trabajador.fecha_ingreso;
   const yaBaja = items.some((item) => item.tipo === "BAJA" && item.realizado);
 
   async function guardarAlta(formData: FormData) {
+    if (!fechaIngreso) {
+      pushToast(
+        "Falta la fecha de ingreso (igual al inicio del primer contrato validado). Complétela en Puesto.",
+        "error",
+      );
+      return;
+    }
     if (!yaAlta && !fileAlta && !documentoTrAlta?.storage_path) {
       pushToast("Suba el alta de T-Registro.", "error");
+      return;
+    }
+    if (yaAlta && !fileAlta) {
+      pushToast("No hay cambios que guardar. La fecha de alta es la de ingreso a la empresa.", "error");
       return;
     }
     setPendingAlta(true);
@@ -126,13 +135,6 @@ export function FichaTRegistro({
         pushToast(result.error, "error");
         return;
       }
-    } else {
-      const result = await updateFechaTRegistroAlta(relacionId, formData);
-      if (result.error) {
-        setPendingAlta(false);
-        pushToast(result.error, "error");
-        return;
-      }
     }
     setFileAlta(null);
     setPendingAlta(false);
@@ -148,7 +150,7 @@ export function FichaTRegistro({
         defaultOpen={!altaLista && abrirAltaPorDefecto}
         resumen={
           altaLista
-            ? `Listo${fechaAlta ? ` · ${formatFechaPlanilla(fechaAlta)}` : ""}.`
+            ? `Listo${fechaIngreso ? ` · ${formatFechaPlanilla(fechaIngreso)}` : ""}.`
             : "Pendiente: registre el alta en SUNAT y súbala aquí."
         }
       >
@@ -178,8 +180,8 @@ export function FichaTRegistro({
               <DatoAlta label="Número de teléfono" value={persona.celular ?? ""} />
               <DatoAlta label="Correo" value={persona.correo ?? ""} />
               <DatoAlta
-                label="Fecha de inicio del trabajador"
-                value={trabajador.fecha_ingreso ? formatFechaPlanilla(trabajador.fecha_ingreso) : ""}
+                label="Fecha de inicio / ingreso / alta T-Registro"
+                value={fechaIngreso ? formatFechaPlanilla(fechaIngreso) : ""}
               />
               <DatoAlta label={etiquetaCodigoOcupacion(trabajador.cargo)} value={codigoOcupacion} />
               <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
@@ -247,15 +249,16 @@ export function FichaTRegistro({
                       disabled={pendingAlta}
                     />
                   ) : null}
-                  <DateField
-                    label="Fecha de alta"
-                    name="fecha"
-                    defaultValue={fechaAlta ?? trabajador.fecha_ingreso}
-                    readOnly={pendingAlta}
-                    hint={yaAlta ? "Puede corregir la fecha y guardar de nuevo." : undefined}
-                  />
-                  <Button type="submit" disabled={pendingAlta}>
-                    {pendingAlta ? "Guardando…" : yaAlta ? "Guardar fecha de alta" : "Guardar alta de T-Registro"}
+                  <p className="text-sm text-muted-foreground">
+                    La fecha de alta es la de ingreso a la empresa (inicio del primer contrato validado)
+                    {fechaIngreso ? `: ${formatFechaPlanilla(fechaIngreso)}` : ". Complétela en Puesto."}.
+                  </p>
+                  <Button type="submit" disabled={pendingAlta || (yaAlta && !fileAlta) || !fechaIngreso}>
+                    {pendingAlta
+                      ? "Guardando…"
+                      : yaAlta
+                        ? "Guardar documento de alta"
+                        : "Guardar alta de T-Registro"}
                   </Button>
                 </div>
               ) : (

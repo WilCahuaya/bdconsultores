@@ -462,6 +462,16 @@ export async function updatePuestoTrabajador(
     .eq("id", relacionId);
   if (error) return { error: mensajeErrorNumero(error) ?? error.message };
 
+  // Misma fecha que el alta T-Registro e inicio del primer contrato validado.
+  if (ingreso.value) {
+    const { error: syncError } = await db
+      .from("t_registro")
+      .update({ fecha: ingreso.value })
+      .eq("relacion_id", relacionId)
+      .eq("tipo", "ALTA");
+    if (syncError) return { error: syncError.message };
+  }
+
   revalidatePath("/");
   revalidatePath("/pendientes");
   revalidatePath("/contratos");
