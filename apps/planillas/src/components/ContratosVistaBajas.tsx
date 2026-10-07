@@ -16,11 +16,13 @@ export function ContratosVistaBajas({
       entidadId={entidadId}
       checked={checked}
       onCheckedChange={(next) => {
-        const url = new URL(window.location.href);
-        if (entidadId) url.searchParams.set("entidadId", entidadId);
-        if (next) url.searchParams.set("bajas", "1");
-        else url.searchParams.delete("bajas");
-        router.replace(`${url.pathname}?${url.searchParams.toString()}`);
+        const params = new URLSearchParams(window.location.search);
+        if (entidadId) params.set("entidadId", entidadId);
+        if (next) params.set("bajas", "1");
+        else params.delete("bajas");
+        // Sin basePath: el router de Next ya lo antepone (p. ej. /planillas).
+        const query = params.toString();
+        router.replace(query ? `/contratos?${query}` : "/contratos");
       }}
     />
   );
