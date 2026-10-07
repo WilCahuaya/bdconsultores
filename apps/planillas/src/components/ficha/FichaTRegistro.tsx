@@ -9,6 +9,7 @@ import { panelCardClass } from "@inventario/ui/panel";
 import {
   addTRegistro,
   setDocumentoArchivo,
+  updateObservacionesTRegistroAlta,
   type DocumentoRow,
   type PensionRow,
   type TRegistroRow,
@@ -26,6 +27,7 @@ import {
   montoAsignacionFamiliar,
   remuneracionBruta,
 } from "@/lib/planillas-labels";
+import { Field } from "@/components/fields";
 import { ApartadoDesplegable } from "@/components/ficha/ApartadoDesplegable";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DarDeBajaControl } from "@/components/ficha/DarDeBajaControl";
@@ -79,7 +81,8 @@ export function FichaTRegistro({
   const [fileAlta, setFileAlta] = useState<File | null>(null);
   const persona = trabajador.persona;
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
-  const yaAlta = items.some((item) => item.tipo === "ALTA" && item.realizado);
+  const registroAlta = items.find((item) => item.tipo === "ALTA");
+  const yaAlta = Boolean(registroAlta?.realizado);
   const altaLista = yaAlta && Boolean(documentoTrAlta?.storage_path);
   const fechaIngreso = trabajador.fecha_ingreso;
   const yaBaja = items.some((item) => item.tipo === "BAJA" && item.realizado);
@@ -94,10 +97,6 @@ export function FichaTRegistro({
     }
     if (!yaAlta && !fileAlta && !documentoTrAlta?.storage_path) {
       pushToast("Suba el alta de T-Registro.", "error");
-      return;
-    }
-    if (yaAlta && !fileAlta) {
-      pushToast("No hay cambios que guardar. La fecha de alta es la de ingreso a la empresa.", "error");
       return;
     }
     setPendingAlta(true);
@@ -130,6 +129,13 @@ export function FichaTRegistro({
       formData.set("tipo", "ALTA");
       formData.set("realizado", "on");
       const result = await addTRegistro(relacionId, formData);
+      if (result.error) {
+        setPendingAlta(false);
+        pushToast(result.error, "error");
+        return;
+      }
+    } else {
+      const result = await updateObservacionesTRegistroAlta(relacionId, formData);
       if (result.error) {
         setPendingAlta(false);
         pushToast(result.error, "error");
@@ -253,11 +259,18 @@ export function FichaTRegistro({
                     La fecha de alta es la de ingreso a la empresa (inicio del primer contrato validado)
                     {fechaIngreso ? `: ${formatFechaPlanilla(fechaIngreso)}` : ". Complétela en Puesto."}.
                   </p>
-                  <Button type="submit" disabled={pendingAlta || (yaAlta && !fileAlta) || !fechaIngreso}>
+                  <Field
+                    label="Observaciones (opcional)"
+                    name="observaciones"
+                    defaultValue={registroAlta?.observaciones ?? ""}
+                    readOnly={pendingAlta}
+                    placeholder="Nota interna sobre el alta"
+                  />
+                  <Button type="submit" disabled={pendingAlta || !fechaIngreso}>
                     {pendingAlta
                       ? "Guardando…"
                       : yaAlta
-                        ? "Guardar documento de alta"
+                        ? "Guardar cambios del alta"
                         : "Guardar alta de T-Registro"}
                   </Button>
                 </div>
@@ -277,6 +290,7 @@ export function FichaTRegistro({
                 <span>
                   {TIPO_T_REGISTRO_LABEL[item.tipo]}
                   {item.fecha ? ` · ${formatFechaPlanilla(item.fecha)}` : ""}
+                  {item.observaciones?.trim() ? ` · ${item.observaciones.trim()}` : ""}
                 </span>
                 <span className="text-muted-foreground">{item.realizado ? "Realizado" : "Pendiente"}</span>
               </li>
