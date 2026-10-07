@@ -1686,3 +1686,39 @@ export async function addTRegistro(relacionId: string, formData: FormData): Prom
   revalidatePath("/pendientes");
   return {};
 }
+
+export async function updateFechaTRegistroAlta(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha de alta");
+  if (fecha.error) return { error: fecha.error };
+  if (!fecha.value) return { error: "Indique la fecha de alta." };
+
+  const db = await planillasDb();
+  const { data: existente, error: loadError } = await db
+    .from("t_registro")
+    .select("id")
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "ALTA")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!existente) return { error: "No hay alta de T-Registro para actualizar." };
+
+  const { error } = await db
+    .from("t_registro")
+    .update({ fecha: fecha.value })
+    .eq("id", existente.id)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/");
+  revalidatePath("/contratos");
+  revalidatePath("/pendientes");
+  return {};
+}

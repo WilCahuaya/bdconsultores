@@ -9,6 +9,7 @@ import { panelCardClass } from "@inventario/ui/panel";
 import {
   addTRegistro,
   setDocumentoArchivo,
+  updateFechaTRegistroAlta,
   type DocumentoRow,
   type PensionRow,
   type TRegistroRow,
@@ -54,6 +55,7 @@ export function FichaTRegistro({
   documentoFicha,
   documentoTrAlta,
   documentoTrBaja,
+  documentoCartaRenuncia,
   canWrite,
   canWriteTrBaja = canWrite,
 }: {
@@ -65,21 +67,20 @@ export function FichaTRegistro({
   documentoFicha: DocumentoRow | null;
   documentoTrAlta: DocumentoRow | null;
   documentoTrBaja: DocumentoRow | null;
+  documentoCartaRenuncia?: DocumentoRow | null;
   canWrite: boolean;
   canWriteTrBaja?: boolean;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [pendingAlta, setPendingAlta] = useState(false);
-  const [pendingBaja, setPendingBaja] = useState(false);
   const [fileAlta, setFileAlta] = useState<File | null>(null);
-  const [fileBaja, setFileBaja] = useState<File | null>(null);
   const persona = trabajador.persona;
   const codigoOcupacion = codigoOcupacionTRegistro(trabajador.cargo);
   const yaAlta = items.some((item) => item.tipo === "ALTA" && item.realizado);
 
   async function guardarAlta(formData: FormData) {
-    if (!fileAlta && !documentoTrAlta?.storage_path) {
+    if (!yaAlta && !fileAlta && !documentoTrAlta?.storage_path) {
       pushToast("Suba el alta de T-Registro.", "error");
       return;
     }
@@ -118,48 +119,17 @@ export function FichaTRegistro({
         pushToast(result.error, "error");
         return;
       }
+    } else {
+      const result = await updateFechaTRegistroAlta(relacionId, formData);
+      if (result.error) {
+        setPendingAlta(false);
+        pushToast(result.error, "error");
+        return;
+      }
     }
     setFileAlta(null);
     setPendingAlta(false);
     pushToast("Alta de T-Registro guardada.");
-    router.refresh();
-  }
-
-  async function guardarBaja() {
-    if (!fileBaja && !documentoTrBaja?.storage_path) {
-      pushToast("Suba la baja de T-Registro.", "error");
-      return;
-    }
-    if (!fileBaja) {
-      pushToast("La baja de T-Registro ya está guardada.");
-      return;
-    }
-    setPendingBaja(true);
-    if (!documentoTrBaja) {
-      setPendingBaja(false);
-      pushToast("No se pudo registrar la baja. Recargue la página.", "error");
-      return;
-    }
-    const upload = await uploadDocumentoFile(
-      trabajador.entidad_id,
-      relacionId,
-      documentoTrBaja.id,
-      fileBaja,
-      documentoTrBaja.storage_path,
-    );
-    if (upload.error || !upload.path) {
-      setPendingBaja(false);
-      pushToast(upload.error ?? "No se pudo subir la baja de T-Registro.", "error");
-      return;
-    }
-    const savedFile = await setDocumentoArchivo(relacionId, documentoTrBaja.id, upload.path);
-    setPendingBaja(false);
-    if (savedFile.error) {
-      pushToast(savedFile.error, "error");
-      return;
-    }
-    setFileBaja(null);
-    pushToast("Baja de T-Registro guardada.");
     router.refresh();
   }
 
@@ -256,9 +226,10 @@ export function FichaTRegistro({
                   name="fecha"
                   defaultValue={items.find((item) => item.tipo === "ALTA")?.fecha ?? trabajador.fecha_ingreso}
                   readOnly={pendingAlta}
+                  hint={yaAlta ? "Puede corregir la fecha y guardar de nuevo." : undefined}
                 />
                 <Button type="submit" disabled={pendingAlta}>
-                  {pendingAlta ? "Guardando…" : "Guardar alta de T-Registro"}
+                  {pendingAlta ? "Guardando…" : yaAlta ? "Guardar fecha de alta" : "Guardar alta de T-Registro"}
                 </Button>
               </div>
             ) : (
@@ -268,44 +239,13 @@ export function FichaTRegistro({
         />
       </form>
 
-      <div className="space-y-4">
-        <DocumentoPrevisualizacion
-          titulo={TIPO_DOCUMENTO_LABEL.TR_BAJA}
-          storagePath={fileBaja ? null : documentoTrBaja?.storage_path}
-          file={fileBaja}
-          vacio="Suba la baja de T-Registro cuando la tenga en SUNAT."
-          extra={
-            canWriteTrBaja ? (
-              <div className="space-y-4">
-                <DocumentoFileInput
-                  accept={DOCUMENTO_ACCEPT}
-                  disabled={pendingBaja}
-                  file={fileBaja}
-                  buttonLabel={
-                    fileBaja || documentoTrBaja?.storage_path
-                      ? "Cambiar baja de T-Registro"
-                      : "Subir baja de T-Registro"
-                  }
-                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
-                  onFileChange={setFileBaja}
-                />
-                {documentoTrBaja?.storage_path ? (
-                  <EliminarDocumentoGuardado
-                    relacionId={relacionId}
-                    documentoId={documentoTrBaja.id}
-                    descripcion="¿Eliminar la baja de T-Registro? Dejará de verse en esta ficha."
-                    disabled={pendingBaja}
-                  />
-                ) : null}
-                <Button type="button" disabled={pendingBaja} onClick={() => void guardarBaja()}>
-                  {pendingBaja ? "Guardando…" : "Guardar baja de T-Registro"}
-                </Button>
-              </div>
-            ) : null
-          }
+      {canWriteTrBaja || canWrite ? (
+        <DarDeBajaControl
+          trabajador={trabajador}
+          documentoCarta={documentoCartaRenuncia ?? null}
+          documentoTrBaja={documentoTrBaja}
         />
-        {canWrite ? <DarDeBajaControl trabajador={trabajador} /> : null}
-      </div>
+      ) : null}
 
       <ul className={`${panelCardClass} divide-y p-0`}>
         {items.length === 0 ? (

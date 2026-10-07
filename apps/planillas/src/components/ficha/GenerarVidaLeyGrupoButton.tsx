@@ -41,11 +41,7 @@ export function GenerarVidaLeyGrupoButton({
 
   return (
     <Button type="button" disabled={pending || cantidad === 0} onClick={() => void onGenerar()}>
-      {pending
-        ? "Generando…"
-        : cantidad === 0
-          ? "Sin pendientes de recepción"
-          : `Elaborar Vida Ley de la empresa (${cantidad})`}
+      {pending ? "Generando…" : `Elaborar Vida Ley de la empresa (${cantidad})`}
     </Button>
   );
 }

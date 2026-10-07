@@ -121,13 +121,7 @@ export default async function VidaLeyPage({
             ) : null}
           </div>
           {esEstudio && selectedId ? (
-            <div className="flex max-w-xl flex-col items-end gap-2">
-              <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
-              <p className="text-right text-sm text-muted-foreground">
-                Cada grupo comparte su constancia y, si llega, su factura. El comprobante de envío es uno para toda la
-                empresa y se sustituye cuando hay un alta nueva. El certificado se sube en cada ficha.
-              </p>
-            </div>
+            <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
           ) : null}
         </div>
 

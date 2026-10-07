@@ -231,6 +231,7 @@ export default async function ContratoProcesoPage({
               documentoFicha={documentos.find((d) => d.tipo === "FICHA_DATOS") ?? null}
               documentoTrAlta={documentos.find((d) => d.tipo === "TR_ALTA") ?? null}
               documentoTrBaja={documentos.find((d) => d.tipo === "TR_BAJA") ?? null}
+              documentoCartaRenuncia={documentos.find((d) => d.tipo === "CARTA_RENUNCIA") ?? null}
               canWrite={esEstudio && !fichaCesada}
               canWriteTrBaja={esEstudio && !fichaCesada}
             />

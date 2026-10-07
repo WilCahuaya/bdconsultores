@@ -491,6 +491,9 @@ export async function darDeBajaTrabajador(
   if (motivo !== "CARTA_RENUNCIA" && motivo !== "TERMINO_CONTRATO") {
     return { error: "Indique si la baja es por carta de renuncia o término de contrato." };
   }
+  if (motivo === "CARTA_RENUNCIA" && !documentoCargado(actual.documentos, "CARTA_RENUNCIA")) {
+    return { error: "Suba la carta de renuncia." };
+  }
   if (!documentoCargado(actual.documentos, "TR_BAJA")) {
     return { error: "Suba el documento de T-Registro baja." };
   }
@@ -499,6 +502,9 @@ export async function darDeBajaTrabajador(
     formData.get("baja_afp") === "on" ||
     formData.get("baja_afp") === "true" ||
     formData.get("baja_afp") === "1";
+  if (!bajaAfp) {
+    return { error: "Marque que se dio de baja de AFP antes de confirmar el cese." };
+  }
 
   const db = await planillasDb();
   const { error } = await db
