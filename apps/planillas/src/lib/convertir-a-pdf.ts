@@ -61,6 +61,17 @@ function archivoPdf(bytes: Uint8Array, nombre: string): File {
   return new File([copiaBytes(bytes)], nombre, { type: "application/pdf" });
 }
 
+export async function girarPaginasPdf(bytes: ArrayBuffer, grados: number): Promise<Uint8Array> {
+  const { PDFDocument, degrees } = await import("pdf-lib");
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const delta = ((grados % 360) + 360) % 360;
+  for (const page of doc.getPages()) {
+    const actual = page.getRotation().angle;
+    page.setRotation(degrees((actual + delta) % 360));
+  }
+  return doc.save();
+}
+
 export async function contarPaginasPdf(file: File): Promise<number> {
   const { PDFDocument } = await import("pdf-lib");
   const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });

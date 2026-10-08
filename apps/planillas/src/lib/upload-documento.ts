@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { archivoParaGuardar } from "@/lib/convertir-a-pdf";
+import { archivoParaGuardar, girarPaginasPdf } from "@/lib/convertir-a-pdf";
 import {
   DOCUMENTOS_PLANILLAS_BUCKET,
   pathDocumento,
@@ -26,6 +26,25 @@ async function subirPdf(
     await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).remove([previousPath]);
   }
   return { path };
+}
+
+export async function girarPdfGuardado(path: string, grados: 90 | -90): Promise<{ error?: string }> {
+  const supabase = createClient();
+  const { data, error } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).download(path);
+  if (error || !data) return { error: error?.message ?? "No se pudo abrir el PDF." };
+  let bytes: Uint8Array;
+  try {
+    bytes = await girarPaginasPdf(await data.arrayBuffer(), grados);
+  } catch {
+    return { error: "No se pudo girar el PDF." };
+  }
+  const archivo = new Blob([bytes], { type: "application/pdf" });
+  const { error: uploadError } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).upload(path, archivo, {
+    upsert: true,
+    contentType: "application/pdf",
+  });
+  if (uploadError) return { error: uploadError.message };
+  return {};
 }
 
 export async function uploadDocumentoFile(

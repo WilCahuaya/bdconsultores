@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Button } from "@inventario/ui";
+import { useRouter } from "next/navigation";
+import { Button, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { BotonDescargarDocumento } from "@/components/ficha/DescargaTrabajador";
+import { girarPdfGuardado } from "@/lib/upload-documento";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 
 function archivoEsPdf(file: File | null, path: string | null): boolean {
@@ -18,6 +20,41 @@ function archivoEsImagen(file: File | null, path: string | null): boolean {
   return Boolean(path && /\.(jpe?g|png|webp)$/i.test(path));
 }
 
+function BotonesGirarPdf({
+  storagePath,
+  onGuardado,
+}: {
+  storagePath: string;
+  onGuardado: () => void;
+}) {
+  const { pushToast } = useToast();
+  const router = useRouter();
+  const [pending, setPending] = useState<"izq" | "der" | null>(null);
+
+  async function girar(grados: 90 | -90) {
+    setPending(grados === -90 ? "izq" : "der");
+    const result = await girarPdfGuardado(storagePath, grados);
+    setPending(null);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    onGuardado();
+    router.refresh();
+    pushToast("PDF girado y guardado.");
+  }
+
+  return (
+    <>
+      <Button type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => void girar(-90)}>
+        {pending === "izq" ? "Girando…" : "Girar a la izquierda"}
+      </Button>
+      <Button type="button" size="sm" variant="outline" disabled={pending !== null} onClick={() => void girar(90)}>
+        {pending === "der" ? "Girando…" : "Girar a la derecha"}
+      </Button>
+    </>
+  );
+}
 function BotonPrevisualizacion({ visible, onClick }: { visible: boolean; onClick: () => void }) {
   return (
     <Button type="button" size="sm" variant="outline" onClick={onClick}>
@@ -32,6 +69,7 @@ function useVistaDocumento(
   file: File | null,
   defaultVisible?: boolean,
   alto = "h-[min(72vh,44rem)]",
+  marca = 0,
 ) {
   const hayArchivo = Boolean(file || storagePath);
   const [visible, setVisible] = useState(Boolean(defaultVisible));
@@ -60,7 +98,7 @@ function useVistaDocumento(
   useEffect(() => {
     setRemoteUrl(null);
     setError(null);
-  }, [storagePath]);
+  }, [storagePath, marca]);
 
   useEffect(() => {
     if (!visible || file || !storagePath || remoteUrl) return;
@@ -110,10 +148,15 @@ export function VistaDocumentoGuardado({
   compacto?: boolean;
 }) {
   const alto = compacto ? "h-[min(38vh,24rem)]" : "h-[min(72vh,44rem)]";
-  const { vista } = useVistaDocumento(titulo, storagePath, null, true, alto);
+  const [marca, setMarca] = useState(0);
+  const { vista } = useVistaDocumento(titulo, storagePath, null, true, alto, marca);
+  const esPdf = archivoEsPdf(null, storagePath);
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium">{titulo}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">{titulo}</p>
+        {esPdf ? <BotonesGirarPdf storagePath={storagePath} onGuardado={() => setMarca((valor) => valor + 1)} /> : null}
+      </div>
       {vista}
     </div>
   );
@@ -134,7 +177,9 @@ export function MarcoPrevisualizacion({
   nombreDescarga?: string | null;
   sinBotonDescarga?: boolean;
 }) {
-  const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(titulo, storagePath, file);
+  const [marca, setMarca] = useState(0);
+  const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(titulo, storagePath, file, undefined, undefined, marca);
+  const puedeGirar = Boolean(storagePath) && !file && archivoEsPdf(null, storagePath ?? null);
 
   return (
     <div className="space-y-3">
@@ -142,6 +187,9 @@ export function MarcoPrevisualizacion({
         <div className="flex flex-wrap items-center justify-end gap-2">
           {storagePath && !sinBotonDescarga ? (
             <BotonDescargarDocumento titulo={titulo} storagePath={storagePath} nombreDescarga={nombreDescarga} />
+          ) : null}
+          {puedeGirar && storagePath ? (
+            <BotonesGirarPdf storagePath={storagePath} onGuardado={() => setMarca((valor) => valor + 1)} />
           ) : null}
           <BotonPrevisualizacion visible={visible} onClick={() => setVisible((valor) => !valor)} />
         </div>
@@ -177,7 +225,16 @@ export function DocumentoPrevisualizacion({
   nombreDescarga?: string | null;
   sinBotonDescarga?: boolean;
 }) {
-  const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(titulo, storagePath, file, defaultVisible);
+  const [marca, setMarca] = useState(0);
+  const { hayArchivo, visible, setVisible, vista } = useVistaDocumento(
+    titulo,
+    storagePath,
+    file,
+    defaultVisible,
+    undefined,
+    marca,
+  );
+  const puedeGirar = Boolean(storagePath) && !file && archivoEsPdf(null, storagePath ?? null);
 
   return (
     <section className={`${panelCardClass} space-y-3 p-5`}>
@@ -187,6 +244,9 @@ export function DocumentoPrevisualizacion({
           <div className="flex flex-wrap items-center gap-2">
             {storagePath && !sinBotonDescarga ? (
               <BotonDescargarDocumento titulo={titulo} storagePath={storagePath} nombreDescarga={nombreDescarga} />
+            ) : null}
+            {puedeGirar && storagePath ? (
+              <BotonesGirarPdf storagePath={storagePath} onGuardado={() => setMarca((valor) => valor + 1)} />
             ) : null}
             <BotonPrevisualizacion visible={visible} onClick={() => setVisible((valor) => !valor)} />
           </div>

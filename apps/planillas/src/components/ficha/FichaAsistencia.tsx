@@ -24,6 +24,7 @@ import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisual
 import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
 import { FeriadosMesPicker } from "@/components/ficha/FeriadosMesPicker";
+import { HorarioContratoVista } from "@/components/ficha/HorarioContratoVista";
 import { useDescargaTrabajador } from "@/components/ficha/DescargaTrabajador";
 import { contarPaginasPdf, pdfSoloPaginas } from "@/lib/convertir-a-pdf";
 import { nombreBaseAsistencia } from "@/lib/nombre-archivo";
@@ -60,6 +61,7 @@ export function FichaAsistencia({
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [paginas, setPaginas] = useState<number[]>([]);
   const [feriados, setFeriados] = useState<string[]>([]);
+  const [verHorario, setVerHorario] = useState(false);
 
   useEffect(() => {
     setFeriados([]);
@@ -279,7 +281,20 @@ export function FichaAsistencia({
         </div>
         <div className="space-y-1 text-sm">
           <p className="font-medium">Horario</p>
-          <p className="text-muted-foreground">{horario?.trim() || "Sin horario en el puesto."}</p>
+          {horario?.trim() ? (
+            <>
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => setVerHorario((valor) => !valor)}
+              >
+                {verHorario ? "Ocultar" : "Mostrar"}
+              </button>
+              {verHorario ? <HorarioContratoVista value={horario} className="text-muted-foreground" /> : null}
+            </>
+          ) : (
+            <p className="text-muted-foreground">Sin horario en el puesto.</p>
+          )}
           <p>
             Horas del mes:{" "}
             <span className="font-medium">
