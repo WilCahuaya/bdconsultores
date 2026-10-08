@@ -160,71 +160,75 @@ export function FichaTRegistro({
             : "Pendiente: registre el alta en SUNAT y súbala aquí."
         }
       >
-        <div className="grid items-start gap-4 lg:grid-cols-2">
-          <section className="space-y-4">
-            <div>
-              <p className="text-sm font-medium">Datos para pegar en T-Registro</p>
-              <p className="text-sm text-muted-foreground">
-                Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta. La remuneración bruta es la
-                remuneración más S/ {ASIGNACION_FAMILIAR_SOLES} si tiene asignación familiar.
+        <ApartadoDesplegable
+          variante="interno"
+          titulo="Datos para tramitar T-Registro"
+          resumen="Abrir al copiar en SUNAT. Enlace, datos, DNI y ficha."
+          defaultOpen={false}
+        >
+          <p className="text-sm text-muted-foreground">
+            Planillas no entra sola. Abra SUNAT, copie estos datos y péguelos en el alta. La remuneración bruta es la
+            remuneración más S/ {ASIGNACION_FAMILIAR_SOLES} si tiene asignación familiar.
+          </p>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            <section className="space-y-4">
+              <a
+                href={TREGISTRO_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+              >
+                Abrir T-Registro
+              </a>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DatoAlta label="DNI" value={persona.dni} />
+                <DatoAlta
+                  label="Fecha de nacimiento"
+                  value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
+                />
+                <DatoAlta label="Número de teléfono" value={persona.celular ?? ""} />
+                <DatoAlta label="Correo" value={persona.correo ?? ""} />
+                <DatoAlta
+                  label="Fecha de inicio / ingreso / alta T-Registro"
+                  value={fechaIngreso ? formatFechaPlanilla(fechaIngreso) : ""}
+                />
+                <DatoAlta label={etiquetaCodigoOcupacion(trabajador.cargo)} value={codigoOcupacion} />
+                <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
+                <DatoAlta
+                  label="Asignación familiar"
+                  value={
+                    trabajador.recibe_asignacion_familiar === true
+                      ? remuneracionCopia(montoAsignacionFamiliar(true))
+                      : ""
+                  }
+                />
+                <DatoAlta
+                  label="Remuneración bruta"
+                  value={remuneracionCopia(
+                    remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar),
+                  )}
+                />
+                <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
+                <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
               </p>
+            </section>
+            <div className="space-y-4">
+              <DocumentoPrevisualizacion
+                titulo={TIPO_DOCUMENTO_LABEL.DNI}
+                storagePath={documentoDni?.storage_path}
+                vacio="Suba el DNI en Documentos para verlo aquí."
+              />
+              <DocumentoPrevisualizacion
+                titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
+                storagePath={documentoFicha?.storage_path}
+                vacio="Suba la ficha en Documentos para verla aquí."
+              />
             </div>
-            <a
-              href={TREGISTRO_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-            >
-              Abrir T-Registro
-            </a>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <DatoAlta label="DNI" value={persona.dni} />
-              <DatoAlta
-                label="Fecha de nacimiento"
-                value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
-              />
-              <DatoAlta label="Número de teléfono" value={persona.celular ?? ""} />
-              <DatoAlta label="Correo" value={persona.correo ?? ""} />
-              <DatoAlta
-                label="Fecha de inicio / ingreso / alta T-Registro"
-                value={fechaIngreso ? formatFechaPlanilla(fechaIngreso) : ""}
-              />
-              <DatoAlta label={etiquetaCodigoOcupacion(trabajador.cargo)} value={codigoOcupacion} />
-              <DatoAlta label="Remuneración" value={remuneracionCopia(trabajador.remuneracion)} />
-              <DatoAlta
-                label="Asignación familiar"
-                value={
-                  trabajador.recibe_asignacion_familiar === true
-                    ? remuneracionCopia(montoAsignacionFamiliar(true))
-                    : ""
-                }
-              />
-              <DatoAlta
-                label="Remuneración bruta"
-                value={remuneracionCopia(
-                  remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar),
-                )}
-              />
-              <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
-              <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
-            </p>
-          </section>
-          <div className="space-y-4">
-            <DocumentoPrevisualizacion
-              titulo={TIPO_DOCUMENTO_LABEL.DNI}
-              storagePath={documentoDni?.storage_path}
-              vacio="Suba el DNI en Documentos para verlo aquí."
-            />
-            <DocumentoPrevisualizacion
-              titulo={TIPO_DOCUMENTO_LABEL.FICHA_DATOS}
-              storagePath={documentoFicha?.storage_path}
-              vacio="Suba la ficha en Documentos para verla aquí."
-            />
           </div>
-        </div>
+        </ApartadoDesplegable>
 
         <form action={guardarAlta} className="space-y-4">
           <DocumentoPrevisualizacion

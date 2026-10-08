@@ -16,6 +16,7 @@ import {
   urlPortalAfp,
 } from "@/lib/planillas-labels";
 import { Field, DateField, SelectField, FormSection } from "@/components/fields";
+import { ApartadoDesplegable } from "@/components/ficha/ApartadoDesplegable";
 import { DatoAlta } from "@/components/ficha/DatoAlta";
 import { DocumentoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarArchivo";
@@ -168,46 +169,50 @@ export function FichaPensiones({
 
       {esAfp ? (
         <>
-          <div className="grid items-start gap-4 lg:grid-cols-2">
-          <section className={`${panelCardClass} space-y-3 p-5`}>
-            <div>
-              <p className="text-sm font-medium">Iniciar el trámite AFP</p>
-              <p className="text-sm text-muted-foreground">
-                Abra AFPNet, copie el DNI y los datos de abajo y péguelos en el alta. El documento de alta es opcional:
-                con el nombre de AFP y el CUSPP ya queda registrado.
-              </p>
-            </div>
-            <EnlaceAfpnet afpNombre={pension?.afp_nombre} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <DatoAlta label="Empresa" value={entidad?.nombre ?? ""} />
-              <DatoAlta label="RUC" value={entidad?.ruc ?? ""} />
-              <DatoAlta label="DNI" value={persona.dni} />
-              <DatoAlta label="Nombres y apellidos" value={nombre} />
-              <DatoAlta
-                label="Fecha de nacimiento"
-                value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
+          <ApartadoDesplegable
+            variante="interno"
+            titulo="Datos para tramitar AFP"
+            resumen="Abrir al copiar en AFPNet. Enlaces, datos y documento de pensiones firmado."
+            defaultOpen={false}
+          >
+            <p className="text-sm text-muted-foreground">
+              Abra AFPNet, copie el DNI y los datos de abajo y péguelos en el alta. El documento de alta es opcional: con
+              el nombre de AFP y el CUSPP ya queda registrado.
+            </p>
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <section className="space-y-3">
+                <EnlaceAfpnet afpNombre={pension?.afp_nombre} />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <DatoAlta label="Empresa" value={entidad?.nombre ?? ""} />
+                  <DatoAlta label="RUC" value={entidad?.ruc ?? ""} />
+                  <DatoAlta label="DNI" value={persona.dni} />
+                  <DatoAlta label="Nombres y apellidos" value={nombre} />
+                  <DatoAlta
+                    label="Fecha de nacimiento"
+                    value={persona.fecha_nacimiento ? formatFechaPlanilla(persona.fecha_nacimiento) : ""}
+                  />
+                  <DatoAlta label="Tipo de vía" value={persona.tipo_via ?? ""} />
+                  <DatoAlta label="Nombre de avenida, calle o jirón" value={persona.via_nombre ?? ""} />
+                  <DatoAlta label="Número de casa" value={persona.via_numero ?? ""} />
+                  <DatoAlta label="Referencia" value={persona.referencia ?? ""} />
+                  <DatoAlta label="Distrito" value={persona.distrito ?? ""} />
+                  <DatoAlta label="Provincia" value={persona.provincia ?? ""} />
+                  <DatoAlta label="Región" value={persona.region ?? ""} />
+                  {!persona.tipo_via && !persona.via_nombre && persona.direccion ? (
+                    <DatoAlta label="Dirección (aún no partida)" value={persona.direccion} />
+                  ) : null}
+                  <DatoAlta label="Teléfono" value={persona.celular ?? ""} />
+                  <DatoAlta label="Correo" value={persona.correo ?? ""} />
+                  <DatoAlta label="Fecha de inicio de labor" value={fechaInicioLabor} />
+                </div>
+              </section>
+              <DocumentoPrevisualizacion
+                titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
+                storagePath={documentoPension?.storage_path}
+                vacio="Súbalo en Documentos para verlo aquí."
               />
-              <DatoAlta label="Tipo de vía" value={persona.tipo_via ?? ""} />
-              <DatoAlta label="Nombre de avenida, calle o jirón" value={persona.via_nombre ?? ""} />
-              <DatoAlta label="Número de casa" value={persona.via_numero ?? ""} />
-              <DatoAlta label="Referencia" value={persona.referencia ?? ""} />
-              <DatoAlta label="Distrito" value={persona.distrito ?? ""} />
-              <DatoAlta label="Provincia" value={persona.provincia ?? ""} />
-              <DatoAlta label="Región" value={persona.region ?? ""} />
-              {!persona.tipo_via && !persona.via_nombre && persona.direccion ? (
-                <DatoAlta label="Dirección (aún no partida)" value={persona.direccion} />
-              ) : null}
-              <DatoAlta label="Teléfono" value={persona.celular ?? ""} />
-              <DatoAlta label="Correo" value={persona.correo ?? ""} />
-              <DatoAlta label="Fecha de inicio de labor" value={fechaInicioLabor} />
             </div>
-          </section>
-          <DocumentoPrevisualizacion
-            titulo={TIPO_DOCUMENTO_LABEL.PENSIONES_FIRMADO}
-            storagePath={documentoPension?.storage_path}
-            vacio="Súbalo en Documentos para verlo aquí."
-          />
-          </div>
+          </ApartadoDesplegable>
 
           <form action={onSubmit} className="space-y-4">
             <DocumentoPrevisualizacion

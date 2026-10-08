@@ -8,12 +8,15 @@ export function ApartadoDesplegable({
   resumen,
   pendiente = false,
   defaultOpen = false,
+  variante = "panel",
   children,
 }: {
   titulo: string;
   resumen: string;
   pendiente?: boolean;
   defaultOpen?: boolean;
+  /** `interno`: sin tarjeta, para anidar (p. ej. datos a copiar). */
+  variante?: "panel" | "interno";
   children: ReactNode;
 }) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
@@ -40,8 +43,16 @@ export function ApartadoDesplegable({
     });
   }
 
+  const interno = variante === "interno";
   return (
-    <details ref={asignarDetails} className={`group ${panelCardClass} !overflow-visible p-5`}>
+    <details
+      ref={asignarDetails}
+      className={
+        interno
+          ? "group rounded-md border border-border/70 bg-muted/20 p-4"
+          : `group ${panelCardClass} !overflow-visible p-5`
+      }
+    >
       <summary
         onClick={alternar}
         className="flex cursor-pointer list-none items-start gap-3 [&::-webkit-details-marker]:hidden [&::marker]:hidden"
@@ -58,7 +69,17 @@ export function ApartadoDesplegable({
         </svg>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">{titulo}</p>
-          <p className={`text-sm ${pendiente ? "text-amber-900" : "text-emerald-800"}`}>{resumen}</p>
+          <p
+            className={`text-sm ${
+              interno
+                ? "text-muted-foreground"
+                : pendiente
+                  ? "text-amber-900"
+                  : "text-emerald-800"
+            }`}
+          >
+            {resumen}
+          </p>
         </div>
       </summary>
       <div className="mt-4 space-y-4 border-t border-border/60 pt-4">{children}</div>
