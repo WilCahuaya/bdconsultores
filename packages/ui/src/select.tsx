@@ -24,7 +24,7 @@ export type SelectOption = {
 };
 
 const selectMenuClass = cn(
-  "max-h-60 overflow-auto rounded-md border border-border bg-card py-1 text-card-foreground",
+  "max-h-60 touch-pan-y overflow-auto overscroll-contain rounded-md border border-border bg-card py-1 text-card-foreground",
   "shadow-xl ring-1 ring-border/60",
 );
 
@@ -90,6 +90,7 @@ export function Select({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const keyboardMoveRef = useRef(false);
   const listId = useId();
 
   const isControlled = value !== undefined;
@@ -113,6 +114,7 @@ export function Select({
 
   function moveActive(direction: 1 | -1) {
     if (selectableIndexes.length === 0) return;
+    keyboardMoveRef.current = true;
     setOpen(true);
     setActiveIndex((current) => {
       const start = selectableIndexes.includes(current)
@@ -161,16 +163,31 @@ export function Select({
       setMenuRect(computeFloatingMenuLayout(rect, menuHeight));
     }
 
+    function onScroll(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && (target === listRef.current || listRef.current?.contains(target))) {
+        return;
+      }
+      updatePosition();
+    }
+
     updatePosition();
     const frameId = requestAnimationFrame(() => updatePosition());
     window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open, options.length]);
+
+  useEffect(() => {
+    if (!open || !keyboardMoveRef.current || activeIndex < 0) return;
+    keyboardMoveRef.current = false;
+    const button = document.getElementById(`${listId}-opt-${activeIndex}`);
+    if (button instanceof HTMLButtonElement) scrollOptionIntoView(button);
+  }, [activeIndex, open, listId]);
 
   useEffect(() => {
     if (!open) return;
@@ -281,12 +298,9 @@ export function Select({
                   role="option"
                   aria-selected={isSelected || isActive}
                   disabled={option.disabled}
-                  ref={(node) => {
-                    if (node && isActive) scrollOptionIntoView(node);
-                  }}
                   onMouseEnter={() => setActiveIndex(index)}
                   className={cn(
-                    "min-w-0 flex-1 px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    "min-w-0 flex-1 touch-pan-y px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                     size === "compact" && "px-2 py-1.5 text-xs",
                     isSelected
                       ? "font-medium text-primary"

@@ -208,7 +208,7 @@ export function formatAnioAdquisicion(fecha: string | null | undefined): string 
 /**
  * Línea de años en la etiqueta.
  * Con fecha: a la derecha de Control Patrimonial.
- * Sin fecha: «inventario {año de impresión}», centrado en los 50 mm.
+ * Sin fecha: «Inventario {año de impresión}», centrado en los 50 mm.
  */
 export function formatLineaInventarioEtiqueta(
   fechaAdquisicion: string | null | undefined,
@@ -217,11 +217,11 @@ export function formatLineaInventarioEtiqueta(
   const anio = formatAnioAdquisicion(fechaAdquisicion);
   if (anio) {
     return {
-      text: `Adquisición ${anio} - inventario ${anioImpresion}`,
+      text: `Adquisición ${anio} - Inventario ${anioImpresion}`,
       centered: false,
     };
   }
-  return { text: `inventario ${anioImpresion}`, centered: true };
+  return { text: `Inventario ${anioImpresion}`, centered: true };
 }
 
 function sanitizeZplField(value: string): string {
