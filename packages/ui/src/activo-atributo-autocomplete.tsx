@@ -40,6 +40,8 @@ export function ActivoAtributoAutocomplete({
   const onSearchRef = useRef(onSearch);
   onSearchRef.current = onSearch;
   const requestIdRef = useRef(0);
+  const focusedRef = useRef(false);
+  focusedRef.current = focused;
 
   const showList = open && (loading || results.length > 0);
 
@@ -57,7 +59,7 @@ export function ActivoAtributoAutocomplete({
           if (requestId !== requestIdRef.current) return;
           const next = items.filter((item) => item.trim().toLowerCase() !== trimmed.toLowerCase());
           setResults(next);
-          setOpen(next.length > 0);
+          setOpen(focusedRef.current && next.length > 0);
         })
         .finally(() => {
           if (requestId === requestIdRef.current) setLoading(false);
@@ -161,11 +163,23 @@ export function ActivoAtributoAutocomplete({
             setFocused(true);
             if (results.length > 0) setOpen(true);
           }}
-          onBlur={() => {
+          onBlur={(event) => {
+            const input = event.currentTarget;
             // Retraso para permitir click en una sugerencia (mousedown + blur).
-            window.setTimeout(() => setFocused(false), 150);
+            window.setTimeout(() => {
+              if (document.activeElement === input) return;
+              requestIdRef.current += 1;
+              setFocused(false);
+              setOpen(false);
+            }, 150);
           }}
           onKeyDown={(e) => {
+            if (e.key === "Tab") {
+              requestIdRef.current += 1;
+              setFocused(false);
+              setOpen(false);
+              return;
+            }
             if (e.key === "Escape") {
               setOpen(false);
               return;
