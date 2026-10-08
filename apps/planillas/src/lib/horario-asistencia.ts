@@ -204,6 +204,44 @@ export function etiquetaDia(dia: DiaSemana): string {
   return DIA_LABEL[dia];
 }
 
+export type RangoFecha = { inicio: string; fin: string };
+
+/** Días del mes que caen dentro de algún rango de vacaciones. */
+export function diasVacacionesEnMes(mes: string, rangos: readonly RangoFecha[]): string[] {
+  const out: string[] = [];
+  for (const iso of diasIsoDelMes(mes)) {
+    const enVacaciones = rangos.some((rango) => {
+      const inicio = rango.inicio.slice(0, 10);
+      const fin = rango.fin.slice(0, 10);
+      return iso >= inicio && iso <= fin;
+    });
+    if (enVacaciones) out.push(iso);
+  }
+  return out;
+}
+
+/** Horas del horario del mes. Feriados y vacaciones no suman. */
+export function minutosHorarioMes(input: {
+  mes: string;
+  horario: string | null | undefined;
+  fechaIngreso?: string | null;
+  fechaCese?: string | null;
+  feriados: readonly string[];
+  vacaciones: readonly RangoFecha[];
+}): number {
+  const feriados = new Set(input.feriados.map((dia) => dia.slice(0, 10)));
+  const vacaciones = new Set(diasVacacionesEnMes(input.mes, input.vacaciones));
+  let minutos = 0;
+  for (const iso of diasIsoDelMes(input.mes)) {
+    if (!trabajadorActivoEnFecha(iso, input.fechaIngreso, input.fechaCese)) continue;
+    if (feriados.has(iso) || vacaciones.has(iso)) continue;
+    const tramos = tramosDelDia(input.horario, diaSemanaDeIso(iso));
+    if (!tramos) continue;
+    for (const tramo of tramos) minutos += tramo.minutos;
+  }
+  return minutos;
+}
+
 export function trabajadorActivoEnFecha(
   iso: string,
   fechaIngreso: string | null | undefined,

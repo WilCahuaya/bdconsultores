@@ -61,6 +61,26 @@ function archivoPdf(bytes: Uint8Array, nombre: string): File {
   return new File([copiaBytes(bytes)], nombre, { type: "application/pdf" });
 }
 
+export async function contarPaginasPdf(file: File): Promise<number> {
+  const { PDFDocument } = await import("pdf-lib");
+  const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+  return doc.getPageCount();
+}
+
+/** Índices desde 0, en el orden elegido. Si son todas, devuelve el mismo archivo. */
+export async function pdfSoloPaginas(file: File, indices: number[]): Promise<File> {
+  const { PDFDocument } = await import("pdf-lib");
+  const origen = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+  const total = origen.getPageCount();
+  const validos = [...new Set(indices)].filter((indice) => indice >= 0 && indice < total).sort((a, b) => a - b);
+  if (validos.length === 0) throw new Error("Elija al menos una página.");
+  if (validos.length === total) return file;
+  const destino = await PDFDocument.create();
+  const copiadas = await destino.copyPages(origen, validos);
+  for (const pagina of copiadas) destino.addPage(pagina);
+  return archivoPdf(await destino.save(), nombrePdf(file.name));
+}
+
 async function imagenArchivoAPdf(file: File): Promise<Uint8Array> {
   const dibujo = await archivoAJpeg(file);
   const pdf = await import("pdf-lib").then((mod) => mod.PDFDocument.create());

@@ -150,20 +150,32 @@ export default async function VidaLeyPage({
               </div>
             </div>
 
-            <div className={`${panelCardClass} overflow-x-auto p-0`}>
-              <table className="w-full min-w-[1040px] text-left text-sm">
-                <thead className="border-b bg-muted/40 text-muted-foreground">
+            <div className={panelCardClass}>
+              <div className="max-h-[calc(100dvh-16rem)] overflow-auto">
+              <table className="w-full min-w-[1040px] border-separate border-spacing-0 text-left text-sm">
+                <thead>
                   <tr>
-                    <th className="px-4 py-2 font-medium">Nº</th>
-                    <th className="px-4 py-2 font-medium">DNI</th>
-                    <th className="px-4 py-2 font-medium">Nombre</th>
-                    <th className="px-4 py-2 font-medium">Paso</th>
-                    <th className="px-4 py-2 font-medium">Estado</th>
-                    <th className="px-4 py-2 font-medium">Certificado</th>
-                    <th className="px-4 py-2 font-medium">Alta</th>
-                    <th className="px-4 py-2 font-medium">Póliza</th>
-                    <th className="px-4 py-2 font-medium">Inicio</th>
-                    <th className="px-4 py-2 font-medium">Fin</th>
+                    {(
+                      [
+                        "Nº",
+                        "DNI",
+                        "Nombre",
+                        "Paso",
+                        "Estado",
+                        "Certificado",
+                        "Alta",
+                        "Póliza",
+                        "Inicio",
+                        "Fin",
+                      ] as const
+                    ).map((col) => (
+                      <th
+                        key={col}
+                        className="sticky top-0 z-20 whitespace-nowrap border-b bg-muted px-4 py-2 font-medium text-muted-foreground"
+                      >
+                        {col}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -214,6 +226,7 @@ export default async function VidaLeyPage({
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </>
         )}

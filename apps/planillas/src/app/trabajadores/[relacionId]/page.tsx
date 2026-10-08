@@ -94,7 +94,9 @@ export default async function FichaTrabajadorPage({
     esEstudio && tab === "vida-ley"
       ? getComprobanteVidaLeyEmpresa(trabajador.entidad_id)
       : Promise.resolve(null),
-    !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
+    !tab || tab === "vacaciones" || tab === "asistencia"
+      ? listVacaciones(params.relacionId)
+      : Promise.resolve([]),
     !tab ? listContratos(params.relacionId) : Promise.resolve([]),
     getEntidadPlanillas(trabajador.entidad_id),
     listTrabajadores(trabajador.entidad_id),
@@ -278,6 +280,13 @@ export default async function FichaTrabajadorPage({
             documentos={documentos}
             canWrite={canEditFicha}
             mesInicial={searchParams.mes}
+            horario={trabajador.horario}
+            fechaIngreso={trabajador.fecha_ingreso}
+            fechaCese={trabajador.fecha_cese}
+            vacaciones={vacaciones.map((item) => ({
+              inicio: item.fecha_inicio,
+              fin: item.fecha_fin,
+            }))}
           />
         ) : null}
         {tab === "vacaciones" ? (
