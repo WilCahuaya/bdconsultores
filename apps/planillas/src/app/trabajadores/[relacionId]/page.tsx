@@ -97,7 +97,7 @@ export default async function FichaTrabajadorPage({
     !tab || tab === "vacaciones" || tab === "asistencia"
       ? listVacaciones(params.relacionId)
       : Promise.resolve([]),
-    !tab ? listContratos(params.relacionId) : Promise.resolve([]),
+    !tab || tab === "asistencia" ? listContratos(params.relacionId) : Promise.resolve([]),
     getEntidadPlanillas(trabajador.entidad_id),
     listTrabajadores(trabajador.entidad_id),
   ]);
@@ -280,7 +280,13 @@ export default async function FichaTrabajadorPage({
             documentos={documentos}
             canWrite={canEditFicha}
             mesInicial={searchParams.mes}
-            horario={trabajador.horario}
+            contratos={contratos.map((item) => ({
+              horario: item.horario,
+              inicio: item.fecha_inicio,
+              fin: item.fecha_fin,
+              version: item.version,
+              confirmado: item.datos_confirmados,
+            }))}
             fechaIngreso={trabajador.fecha_ingreso}
             fechaCese={trabajador.fecha_cese}
             vacaciones={vacaciones.map((item) => ({

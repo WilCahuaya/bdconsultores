@@ -32,7 +32,7 @@ export async function girarPdfGuardado(path: string, grados: 90 | -90): Promise<
   const supabase = createClient();
   const { data, error } = await supabase.storage.from(DOCUMENTOS_PLANILLAS_BUCKET).download(path);
   if (error || !data) return { error: error?.message ?? "No se pudo abrir el PDF." };
-  let bytes: Uint8Array;
+  let bytes: Uint8Array<ArrayBuffer>;
   try {
     bytes = await girarPaginasPdf(await data.arrayBuffer(), grados);
   } catch {

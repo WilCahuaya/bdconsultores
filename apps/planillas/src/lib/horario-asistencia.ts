@@ -228,6 +228,7 @@ export function minutosHorarioMes(input: {
   fechaCese?: string | null;
   feriados: readonly string[];
   vacaciones: readonly RangoFecha[];
+  horarioEnFecha?: (iso: string) => string | null | undefined;
 }): number {
   const feriados = new Set(input.feriados.map((dia) => dia.slice(0, 10)));
   const vacaciones = new Set(diasVacacionesEnMes(input.mes, input.vacaciones));
@@ -235,11 +236,53 @@ export function minutosHorarioMes(input: {
   for (const iso of diasIsoDelMes(input.mes)) {
     if (!trabajadorActivoEnFecha(iso, input.fechaIngreso, input.fechaCese)) continue;
     if (feriados.has(iso) || vacaciones.has(iso)) continue;
-    const tramos = tramosDelDia(input.horario, diaSemanaDeIso(iso));
+    const horario = input.horarioEnFecha ? input.horarioEnFecha(iso) : input.horario;
+    const tramos = tramosDelDia(horario, diaSemanaDeIso(iso));
     if (!tramos) continue;
     for (const tramo of tramos) minutos += tramo.minutos;
   }
   return minutos;
+}
+
+export type ContratoHorarioMes = {
+  horario: string | null;
+  inicio: string | null;
+  fin: string | null;
+  version: number;
+  confirmado: boolean;
+};
+
+function contratoCubreFecha(contrato: ContratoHorarioMes, iso: string): boolean {
+  if (!contrato.confirmado || !contrato.horario?.trim() || !contrato.inicio) return false;
+  const inicio = contrato.inicio.slice(0, 10);
+  const fin = contrato.fin?.slice(0, 10);
+  return iso >= inicio && (!fin || iso <= fin);
+}
+
+/** Contrato confirmado vigente ese día. Si hay varios, el de inicio más reciente. */
+export function horarioContratoEnFecha(iso: string, contratos: readonly ContratoHorarioMes[]): string | null {
+  const candidatos = contratos.filter((contrato) => contratoCubreFecha(contrato, iso));
+  candidatos.sort(
+    (a, b) => (b.inicio ?? "").localeCompare(a.inicio ?? "") || b.version - a.version,
+  );
+  return candidatos[0]?.horario?.trim() || null;
+}
+
+/** Contratos confirmados que cubren al menos un día del mes, del más antiguo al más nuevo. */
+export function contratosHorarioDelMes(mes: string, contratos: readonly ContratoHorarioMes[]): ContratoHorarioMes[] {
+  const dias = diasIsoDelMes(mes);
+  const vistos = new Set<number>();
+  const out: ContratoHorarioMes[] = [];
+  for (const iso of dias) {
+    const horario = horarioContratoEnFecha(iso, contratos);
+    const contrato = contratos
+      .filter((item) => contratoCubreFecha(item, iso) && item.horario?.trim() === horario)
+      .sort((a, b) => (b.inicio ?? "").localeCompare(a.inicio ?? "") || b.version - a.version)[0];
+    if (!contrato || vistos.has(contrato.version)) continue;
+    vistos.add(contrato.version);
+    out.push(contrato);
+  }
+  return out;
 }
 
 export function trabajadorActivoEnFecha(

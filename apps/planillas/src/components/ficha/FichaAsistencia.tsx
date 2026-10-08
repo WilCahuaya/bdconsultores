@@ -9,14 +9,17 @@ import { asegurarDocumentoAsistenciaMes } from "@/lib/actions/asistencias";
 import { setDocumentoArchivo, type DocumentoRow } from "@/lib/actions/ficha";
 import { descargarAsistenciaExcel } from "@/lib/descargar-asistencia-excel";
 import {
+  contratosHorarioDelMes,
   diasVacacionesEnMes,
   esMesAsistencia,
   etiquetaMesAsistencia,
   formatoHorasTotales,
+  horarioContratoEnFecha,
   MES_ABREV,
   mesActualLima,
   minutosHorarioMes,
   tramosDelDia,
+  type ContratoHorarioMes,
   type RangoFecha,
 } from "@/lib/horario-asistencia";
 import { formatFechaPlanilla } from "@/lib/planillas-labels";
@@ -36,7 +39,7 @@ export function FichaAsistencia({
   documentos,
   canWrite,
   mesInicial,
-  horario,
+  contratos,
   fechaIngreso,
   fechaCese,
   vacaciones = [],
@@ -46,7 +49,7 @@ export function FichaAsistencia({
   documentos: DocumentoRow[];
   canWrite: boolean;
   mesInicial?: string;
-  horario: string | null;
+  contratos: ContratoHorarioMes[];
   fechaIngreso: string | null;
   fechaCese: string | null;
   vacaciones?: RangoFecha[];
@@ -61,7 +64,7 @@ export function FichaAsistencia({
   const [totalPaginas, setTotalPaginas] = useState(0);
   const [paginas, setPaginas] = useState<number[]>([]);
   const [feriados, setFeriados] = useState<string[]>([]);
-  const [verHorario, setVerHorario] = useState(false);
+  const [horarioAbierto, setHorarioAbierto] = useState<number | null>(null);
 
   useEffect(() => {
     setFeriados([]);
@@ -209,9 +212,20 @@ export function FichaAsistencia({
     router.refresh();
   }
 
-  const horarioSumable = !horario?.trim() || tramosDelDia(horario, "LUNES") !== null;
+  const contratosMes = contratosHorarioDelMes(mes, contratos);
+  const horarioSumable = contratosMes.every(
+    (contrato) => !contrato.horario?.trim() || tramosDelDia(contrato.horario, "LUNES") !== null,
+  );
   const minutosMes = horarioSumable
-    ? minutosHorarioMes({ mes, horario, fechaIngreso, fechaCese, feriados, vacaciones })
+    ? minutosHorarioMes({
+        mes,
+        horario: null,
+        fechaIngreso,
+        fechaCese,
+        feriados,
+        vacaciones,
+        horarioEnFecha: (iso) => horarioContratoEnFecha(iso, contratos),
+      })
     : null;
   const diasVacaciones = diasVacacionesEnMes(mes, vacaciones);
 
@@ -280,20 +294,35 @@ export function FichaAsistencia({
           </p>
         </div>
         <div className="space-y-1 text-sm">
-          <p className="font-medium">Horario</p>
-          {horario?.trim() ? (
-            <>
-              <button
-                type="button"
-                className="text-primary hover:underline"
-                onClick={() => setVerHorario((valor) => !valor)}
-              >
-                {verHorario ? "Ocultar" : "Mostrar"}
-              </button>
-              {verHorario ? <HorarioContratoVista value={horario} className="text-muted-foreground" /> : null}
-            </>
+          <p className="font-medium">Horario del contrato en este mes</p>
+          {contratosMes.length === 0 ? (
+            <p className="text-muted-foreground">Sin contrato confirmado en este mes.</p>
           ) : (
-            <p className="text-muted-foreground">Sin horario en el puesto.</p>
+            contratosMes.map((contrato) => {
+              const abierto = horarioAbierto === contrato.version;
+              const desde = contrato.inicio ? formatFechaPlanilla(contrato.inicio) : "";
+              const hasta = contrato.fin ? formatFechaPlanilla(contrato.fin) : "";
+              const vigencia = [desde, hasta].filter(Boolean).join(" – ");
+              const detalle =
+                contratosMes.length > 1
+                  ? ` · versión ${contrato.version}${vigencia ? ` · ${vigencia}` : ""}`
+                  : "";
+              return (
+                <div key={contrato.version} className="space-y-1">
+                  <button
+                    type="button"
+                    className="text-primary hover:underline"
+                    onClick={() => setHorarioAbierto(abierto ? null : contrato.version)}
+                  >
+                    {abierto ? "Ocultar" : "Mostrar"}
+                    {detalle}
+                  </button>
+                  {abierto && contrato.horario ? (
+                    <HorarioContratoVista value={contrato.horario} className="text-muted-foreground" />
+                  ) : null}
+                </div>
+              );
+            })
           )}
           <p>
             Horas del mes:{" "}
