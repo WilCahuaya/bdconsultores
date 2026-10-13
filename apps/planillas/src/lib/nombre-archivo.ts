@@ -76,6 +76,37 @@ export function nombreBaseAsistencia(d: {
   return `${prefijoNumeroArchivo(d.numero)}ASISTENCIA - ${persona} - ${fecha}`;
 }
 
+/** Primer nombre tal cual en ficha, seguro para archivo: `Sheyla`. */
+export function primerNombreArchivo(nombres: string | null | undefined): string {
+  const primero = (nombres ?? "").trim().split(/\s+/)[0] ?? "";
+  return primero
+    .normalize("NFC")
+    .replace(/[\\/:*?"<>|]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Solicitud de registro compartida: `Cargo MT - Sheyla - Maria`.
+ * Prefijo fijo + primer nombre de cada trabajador.
+ */
+export function nombreBaseSolicitudRegistro(
+  trabajadores: Array<{ nombres?: string | null }>,
+): string {
+  const nombres: string[] = [];
+  const vistosNombre = new Set<string>();
+  for (const item of trabajadores) {
+    const nombre = primerNombreArchivo(item.nombres);
+    const clave = nombre.toLocaleLowerCase("es");
+    if (nombre && !vistosNombre.has(clave)) {
+      vistosNombre.add(clave);
+      nombres.push(nombre);
+    }
+  }
+  const personas = nombres.join(" - ") || "TRABAJADOR";
+  return `Cargo MT - ${personas}`;
+}
+
 /** Números de ficha, sin repetir, en el orden recibido: `02 05 08`. */
 export function numerosArchivo(numeros: Array<number | null | undefined>): string {
   const vistos = new Set<string>();

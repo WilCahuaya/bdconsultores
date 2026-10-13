@@ -29,22 +29,20 @@ import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib
 import { esMesAsistencia, mesActualLima } from "@/lib/horario-asistencia";
 import {
   HORIZONTE_VENCIMIENTO_DIAS,
-  contratoConfirmado,
-  contratoMasReciente,
-  contratoTienePdfPropio,
-  contratoVigente,
-  documentosAltaFaltantes,
-  enlaceProcesoOperativo,
-  enlaceProcesoPendiente,
-  hrefAltaTrabajador,
+  armarPendientesAlertaFicha,
   flujoDesdeTrabajador,
-  resolverSiguientePaso,
 } from "@/lib/flujo-ficha";
 import { EliminarTrabajadorButton } from "@/components/ficha/EliminarTrabajadorButton";
 import { DescargaTrabajadorProvider } from "@/components/ficha/DescargaTrabajador";
 import { FichaRutaTrabajador } from "@/components/ficha/FichaRutaTrabajador";
-import { PendientesFichaButton, type PendienteFicha } from "@/components/ficha/PendientesFichaButton";
-import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador, nombreCompleto, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
+import { PendientesFichaButton } from "@/components/ficha/PendientesFichaButton";
+import {
+  ESTADO_RELACION_LABEL,
+  ESTADO_VALIDACION_ALTA_LABEL,
+  etiquetaTrabajador,
+  nombreCompleto,
+  trabajadorLibreParaVidaLey,
+} from "@/lib/planillas-labels";
 
 function plusDays(iso: string, days: number): string {
   const date = new Date(`${iso}T12:00:00.000Z`);
@@ -76,8 +74,6 @@ export default async function FichaTrabajadorPage({
   }
 
   const flujo = flujoDesdeTrabajador(trabajador);
-  const siguiente = resolverSiguientePaso(flujo, esEstudio);
-  const contratoVig = contratoConfirmado(flujo.contratos) ?? contratoVigente(flujo.contratos);
   const tab = parseFichaTab(tabRaw, esEstudio);
   const periodoVacacion = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
   const fichaCesada = trabajador.estado === "CESADA";
@@ -98,8 +94,10 @@ export default async function FichaTrabajadorPage({
     esEstudio && tab === "vida-ley"
       ? getComprobanteVidaLeyEmpresa(trabajador.entidad_id)
       : Promise.resolve(null),
-    !tab || tab === "vacaciones" ? listVacaciones(params.relacionId) : Promise.resolve([]),
-    !tab ? listContratos(params.relacionId) : Promise.resolve([]),
+    !tab || tab === "vacaciones" || tab === "asistencia"
+      ? listVacaciones(params.relacionId)
+      : Promise.resolve([]),
+    !tab || tab === "asistencia" ? listContratos(params.relacionId) : Promise.resolve([]),
     getEntidadPlanillas(trabajador.entidad_id),
     listTrabajadores(trabajador.entidad_id),
   ]);
@@ -130,41 +128,15 @@ export default async function FichaTrabajadorPage({
   const mes = mesActualLima();
   const periodo = anioActualLima();
   const hoy = new Date().toISOString().slice(0, 10);
-  const pendientes: PendienteFicha[] = [];
-  const ultimoContrato = contratoMasReciente(flujo.contratos);
-  const faltaContratoFirmado = !contratoTienePdfPropio(ultimoContrato, flujo.documentos);
-  if (!fichaCesada) {
-    const docsHref = hrefAltaTrabajador(params.relacionId, "documentos");
-    for (const tipo of documentosAltaFaltantes(flujo)) {
-      pendientes.push({ id: tipo, etiqueta: TIPO_DOCUMENTO_LABEL[tipo], href: docsHref });
-    }
-    if (faltaContratoFirmado) {
-      pendientes.push({
-        id: "CONTRATO_FIRMADO",
-        etiqueta: "Falta contrato firmado",
-        href: hrefAltaTrabajador(params.relacionId),
-      });
-    }
-    if (siguiente.rol !== "alerta" && siguiente.paso !== "listo") {
-      const enlace = enlaceProcesoPendiente(params.relacionId, siguiente);
-      const yaAvisaFirmado =
-        faltaContratoFirmado && enlace?.etiqueta === "Subir contrato firmado o solicitud de registro";
-      if (enlace && !yaAvisaFirmado) {
-        pendientes.push({ id: `paso-${siguiente.paso}`, etiqueta: enlace.etiqueta, href: enlace.href });
-      }
-    } else if (siguiente.paso === "listo") {
-      const operativo = enlaceProcesoOperativo({
-        entidadId: trabajador.entidad_id,
+  const pendientes = fichaCesada
+    ? []
+    : armarPendientesAlertaFicha({
         relacionId: params.relacionId,
+        entidadId: trabajador.entidad_id,
+        flujo,
         esEstudio,
         estado: trabajador.estado,
-        validacion: trabajador.validacion,
-        fechaIngreso: trabajador.fecha_ingreso,
         fechaCese: trabajador.fecha_cese,
-        pension: trabajador.pension,
-        tRegistro: trabajador.tRegistro,
-        documentos: trabajador.documentos,
-        contratoCerrado: contratoVig?.estado === "RECOGIDO" || contratoVig?.estado === "COMPLETO",
         vidaLey,
         pdfAsistenciaMes: documentos.some(
           (d) => d.tipo === "ASISTENCIA" && d.observaciones === mes && Boolean(d.storage_path),
@@ -175,9 +147,6 @@ export default async function FichaTrabajadorPage({
         hoy,
         limite: plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS),
       });
-      if (operativo) pendientes.push({ id: "operativo", etiqueta: operativo.etiqueta, href: operativo.href });
-    }
-  }
 
   return (
     <PlanillasShell profile={profile} entidadId={trabajador.entidad_id}>
@@ -262,21 +231,21 @@ export default async function FichaTrabajadorPage({
             lote={lote}
             companerosEnvio={companeros
               .filter((item) => item.id !== params.relacionId)
-              .map((item) => ({
-                relacionId: item.id,
-                etiqueta: `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
-                enEsteEnvio: Boolean(
-                  lote && enviosCtx.porRelacion.some((row) => row.relacionId === item.id && row.loteId === lote.id),
-                ),
-                cesada: item.estado === "CESADA",
-                otroEnvio: enviosCtx.porRelacion.some(
-                  (row) =>
-                    row.relacionId === item.id &&
-                    Boolean(row.loteId) &&
-                    row.loteId !== lote?.id &&
-                    enviosCtx.envios.some((envio) => envio.loteId === row.loteId),
-                ),
-              }))
+              .map((item) => {
+                const vida = enviosCtx.porRelacion.find((row) => row.relacionId === item.id);
+                return {
+                  relacionId: item.id,
+                  etiqueta: `${etiquetaTrabajador(item.persona, item.numero)}${item.estado === "CESADA" ? " · Baja" : ""}`,
+                  enEsteEnvio: Boolean(lote && vida?.loteId === lote.id),
+                  cesada: item.estado === "CESADA",
+                  libre: trabajadorLibreParaVidaLey(vida?.fechaFin),
+                  otroEnvio: Boolean(
+                    vida?.loteId &&
+                      vida.loteId !== lote?.id &&
+                      enviosCtx.envios.some((envio) => envio.loteId === vida.loteId),
+                  ),
+                };
+              })
               .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, "es"))}
             enviosExistentes={enviosCtx.envios
               .map((envio, index) => ({ ...envio, numero: index + 1 }))
@@ -311,6 +280,19 @@ export default async function FichaTrabajadorPage({
             documentos={documentos}
             canWrite={canEditFicha}
             mesInicial={searchParams.mes}
+            contratos={contratos.map((item) => ({
+              horario: item.horario,
+              inicio: item.fecha_inicio,
+              fin: item.fecha_fin,
+              version: item.version,
+              confirmado: item.datos_confirmados,
+            }))}
+            fechaIngreso={trabajador.fecha_ingreso}
+            fechaCese={trabajador.fecha_cese}
+            vacaciones={vacaciones.map((item) => ({
+              inicio: item.fecha_inicio,
+              fin: item.fecha_fin,
+            }))}
           />
         ) : null}
         {tab === "vacaciones" ? (

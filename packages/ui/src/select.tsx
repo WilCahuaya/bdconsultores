@@ -24,7 +24,7 @@ export type SelectOption = {
 };
 
 const selectMenuClass = cn(
-  "max-h-60 overflow-auto rounded-md border border-border bg-card py-1 text-card-foreground",
+  "max-h-60 touch-pan-y overflow-auto overscroll-contain rounded-md border border-border bg-card py-1 text-card-foreground",
   "shadow-xl ring-1 ring-border/60",
 );
 
@@ -86,9 +86,11 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState(defaultValue);
   const [menuRect, setMenuRect] = useState<FloatingMenuLayout | null>(null);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const keyboardMoveRef = useRef(false);
   const listId = useId();
 
   const isControlled = value !== undefined;
@@ -97,7 +99,50 @@ export function Select({
   function setCurrentValue(next: string) {
     if (!isControlled) setInternalValue(next);
     onChange?.(next);
+    setActiveIndex(-1);
     setOpen(false);
+  }
+
+  const selectableIndexes = useMemo(
+    () =>
+      options
+        .map((option, index) => ({ option, index }))
+        .filter(({ option }) => option.kind !== "section-header" && !option.disabled)
+        .map(({ index }) => index),
+    [options],
+  );
+
+  function moveActive(direction: 1 | -1) {
+    if (selectableIndexes.length === 0) return;
+    keyboardMoveRef.current = true;
+    setOpen(true);
+    setActiveIndex((current) => {
+      const start = selectableIndexes.includes(current)
+        ? current
+        : (selectableIndexes.find((index) => options[index]?.value === currentValue) ?? -1);
+      const pos = selectableIndexes.indexOf(start);
+      if (pos < 0) {
+        return direction === 1
+          ? selectableIndexes[0]!
+          : selectableIndexes[selectableIndexes.length - 1]!;
+      }
+      const next = pos + direction;
+      if (next < 0) return selectableIndexes[selectableIndexes.length - 1]!;
+      if (next >= selectableIndexes.length) return selectableIndexes[0]!;
+      return selectableIndexes[next]!;
+    });
+  }
+
+  function scrollOptionIntoView(button: HTMLButtonElement) {
+    const list = button.closest("ul");
+    if (!list) return;
+    const itemTop = button.offsetTop;
+    const itemBottom = itemTop + button.offsetHeight;
+    if (itemTop < list.scrollTop) {
+      list.scrollTop = itemTop;
+    } else if (itemBottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = itemBottom - list.clientHeight;
+    }
   }
 
   const selectedOption = options.find(
@@ -118,16 +163,31 @@ export function Select({
       setMenuRect(computeFloatingMenuLayout(rect, menuHeight));
     }
 
+    function onScroll(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && (target === listRef.current || listRef.current?.contains(target))) {
+        return;
+      }
+      updatePosition();
+    }
+
     updatePosition();
     const frameId = requestAnimationFrame(() => updatePosition());
     window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open, options.length]);
+
+  useEffect(() => {
+    if (!open || !keyboardMoveRef.current || activeIndex < 0) return;
+    keyboardMoveRef.current = false;
+    const button = document.getElementById(`${listId}-opt-${activeIndex}`);
+    if (button instanceof HTMLButtonElement) scrollOptionIntoView(button);
+  }, [activeIndex, open, listId]);
 
   useEffect(() => {
     if (!open) return;
@@ -138,7 +198,10 @@ export function Select({
       setOpen(false);
     }
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") {
+        setActiveIndex(-1);
+        setOpen(false);
+      }
     }
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -202,6 +265,7 @@ export function Select({
           }
 
           const isSelected = option.value === currentValue;
+          const isActive = index === activeIndex;
           const isPersonalizado = kind === "personalizado";
           const isDeletable =
             isPersonalizado &&
@@ -216,22 +280,27 @@ export function Select({
               <div
                 className={cn(
                   "flex items-stretch",
+                  isActive && "ring-2 ring-inset ring-ring",
                   isSelected
                     ? "bg-primary/20"
-                    : isPersonalizado
-                      ? "bg-muted/35 hover:bg-muted/50"
-                      : isAction
-                        ? "border-t border-border/50 bg-card hover:bg-accent"
-                        : "bg-card hover:bg-accent",
+                    : isActive
+                      ? "bg-accent"
+                      : isPersonalizado
+                        ? "bg-muted/35 hover:bg-muted/50"
+                        : isAction
+                          ? "border-t border-border/50 bg-card hover:bg-accent"
+                          : "bg-card hover:bg-accent",
                 )}
               >
                 <button
+                  id={`${listId}-opt-${index}`}
                   type="button"
                   role="option"
-                  aria-selected={isSelected}
+                  aria-selected={isSelected || isActive}
                   disabled={option.disabled}
+                  onMouseEnter={() => setActiveIndex(index)}
                   className={cn(
-                    "min-w-0 flex-1 px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                    "min-w-0 flex-1 touch-pan-y px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                     size === "compact" && "px-2 py-1.5 text-xs",
                     isSelected
                       ? "font-medium text-primary"
@@ -303,8 +372,43 @@ export function Select({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={listId}
+        aria-activedescendant={
+          open && activeIndex >= 0 ? `${listId}-opt-${activeIndex}` : undefined
+        }
         className={triggerClass}
-        onClick={() => !disabled && setOpen((prev) => !prev)}
+        onClick={() => {
+          if (disabled) return;
+          if (!open) {
+            const selected = selectableIndexes.find((index) => options[index]?.value === currentValue);
+            setActiveIndex(selected ?? selectableIndexes[0] ?? -1);
+          }
+          setOpen((prev) => !prev);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            moveActive(1);
+            return;
+          }
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            moveActive(-1);
+            return;
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            setActiveIndex(-1);
+            setOpen(false);
+            return;
+          }
+          if (event.key === "Enter" && open) {
+            event.preventDefault();
+            const option = options[activeIndex];
+            if (option && option.kind !== "section-header" && !option.disabled) {
+              setCurrentValue(option.value);
+            }
+          }
+        }}
       >
         <span className="min-w-0 flex-1 truncate text-left">{displayLabel}</span>
         <SelectChevron className={chevronClass} />

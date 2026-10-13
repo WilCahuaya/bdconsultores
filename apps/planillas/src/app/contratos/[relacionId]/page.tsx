@@ -10,6 +10,7 @@ import { FichaAltaDocumentos } from "@/components/ficha/FichaAltaDocumentos";
 import { FichaPersonaForm, FichaPuestoForm } from "@/components/ficha/FichaDatosForm";
 import { FichaContratos } from "@/components/ficha/FichaContratos";
 import { FichaAdendas } from "@/components/ficha/FichaAdendas";
+import { ApartadoDesplegable } from "@/components/ficha/ApartadoDesplegable";
 import { FichaPensiones } from "@/components/ficha/FichaPensiones";
 import { FichaTRegistro } from "@/components/ficha/FichaTRegistro";
 import { AceptarAltaButton } from "@/components/ficha/AceptarAltaButton";
@@ -36,11 +37,14 @@ import {
 import { contextoSolicitudesRegistro } from "@/lib/actions/solicitudes-registro";
 import { listHijosAsignacion } from "@/lib/actions/hijos-asignacion";
 import {
+  ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO,
   estadoPasosAlta,
+  faltaContratoFirmadoUltimoValidado,
   faltasPorPaso,
   flujoDesdeTrabajador,
   parseContratoPaso,
   pasoAltaInicial,
+  pensionAltaLista,
 } from "@/lib/flujo-ficha";
 import { ESTADO_RELACION_LABEL, ESTADO_VALIDACION_ALTA_LABEL, etiquetaTrabajador } from "@/lib/planillas-labels";
 
@@ -62,6 +66,8 @@ export default async function ContratoProcesoPage({
   const fichaCesada = trabajador.estado === "CESADA";
   const canEditFicha = puedeEditarFichaLaboral(profile) && !fichaCesada;
   const porValidar = trabajador.validacion === "PENDIENTE" && !fichaCesada;
+  const faltaFirmadoValidado =
+    !fichaCesada && faltaContratoFirmadoUltimoValidado(flujo.contratos, flujo.documentos);
   const paso = searchParams.paso ? parseContratoPaso(searchParams.paso) : pasoAltaInicial(completados);
   if (paso === "documentos" && canEditFicha) {
     await asegurarDocumentosAlta(params.relacionId);
@@ -158,6 +164,11 @@ export default async function ContratoProcesoPage({
               )}
             </div>
           ) : null}
+          {faltaFirmadoValidado && paso !== "contratos" ? (
+            <p className={`${panelCardClass} border-amber-300 bg-amber-50 px-3 py-1.5 text-xs text-amber-950`}>
+              {ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO}. Puede seguir con el alta; súbalo en Contratos cuando lo tenga.
+            </p>
+          ) : null}
           <AltaPasosNav tab={paso} completados={completados} faltas={faltas} relacionId={params.relacionId} />
         </div>
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain pb-2">
@@ -204,15 +215,30 @@ export default async function ContratoProcesoPage({
               El estudio da de alta AFP y T-Registro aquí, en Contratos. Si es ONP, no hay alta AFP. Después se
               registra el alta en T-Registro.
             </p>
-            <FichaPensiones
-              relacionId={params.relacionId}
-              pension={pension}
-              trabajador={trabajador}
-              entidad={entidad}
-              documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
-              documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
-              canWrite={esEstudio && !fichaCesada}
-            />
+            <ApartadoDesplegable
+              titulo="AFP"
+              pendiente={!pensionAltaLista({ pension })}
+              defaultOpen={!pensionAltaLista({ pension })}
+              resumen={
+                !pension?.tipo
+                  ? "Pendiente: aún no se marcó AFP u ONP en Documentos."
+                  : pension.tipo === "ONP"
+                    ? "ONP · no requiere alta AFP."
+                    : pensionAltaLista({ pension })
+                      ? `Listo · ${pension.afp_nombre?.trim() || "AFP"}${pension.cuspp?.trim() ? ` · ${pension.cuspp.trim()}` : ""}.`
+                      : "Pendiente: complete nombre de AFP y CUSPP."
+              }
+            >
+              <FichaPensiones
+                relacionId={params.relacionId}
+                pension={pension}
+                trabajador={trabajador}
+                entidad={entidad}
+                documentoPension={documentos.find((d) => d.tipo === "PENSIONES_FIRMADO") ?? null}
+                documentoTramiteAfp={documentos.find((d) => d.tipo === "TRAMITE_AFP") ?? null}
+                canWrite={esEstudio && !fichaCesada}
+              />
+            </ApartadoDesplegable>
             <FichaTRegistro
               relacionId={params.relacionId}
               items={tRegistro}
@@ -222,8 +248,10 @@ export default async function ContratoProcesoPage({
               documentoFicha={documentos.find((d) => d.tipo === "FICHA_DATOS") ?? null}
               documentoTrAlta={documentos.find((d) => d.tipo === "TR_ALTA") ?? null}
               documentoTrBaja={documentos.find((d) => d.tipo === "TR_BAJA") ?? null}
+              documentoCartaRenuncia={documentos.find((d) => d.tipo === "CARTA_RENUNCIA") ?? null}
               canWrite={esEstudio && !fichaCesada}
               canWriteTrBaja={esEstudio && !fichaCesada}
+              abrirAltaPorDefecto={pensionAltaLista({ pension })}
             />
           </div>
         ) : null}

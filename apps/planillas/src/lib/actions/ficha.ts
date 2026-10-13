@@ -23,7 +23,14 @@ import {
   pathPerteneceAVidaLeyLote,
   type ArchivoVidaLeyLote,
 } from "@/lib/documento-storage";
-import { parseFechaCampo, parseCargoCampo, armarDireccionPersona, montoAsignacionFamiliar, vidaLeyPendienteRecepcion } from "@/lib/planillas-labels";
+import {
+  parseFechaCampo,
+  parseCargoCampo,
+  armarDireccionPersona,
+  montoAsignacionFamiliar,
+  trabajadorLibreParaVidaLey,
+  vidaLeyPendienteRecepcion,
+} from "@/lib/planillas-labels";
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { fechaFinPeriodoVidaLey } from "@/lib/vida-ley-word";
 import { planillasDb } from "@/lib/supabase/planillas";
@@ -460,6 +467,8 @@ export async function confirmarContratoFirmado(
       asignacion_familiar: montoAsignacionFamiliar(gate.trabajador.recibe_asignacion_familiar),
       datos_confirmados: true,
       es_vigente: quedaVigente,
+      // Validar cierra el proceso del contrato (Elaborado → MTPE → firmado → validar).
+      estado: "RECOGIDO" as EstadoContratoPlanilla,
     })
     .eq("id", contratoId)
     .eq("relacion_id", relacionId);
@@ -481,6 +490,10 @@ export async function confirmarContratoFirmado(
     const { error: relError } = await db.from("relaciones_laborales").update(cambiosPuesto).eq("id", relacionId);
     if (relError) return { error: relError.message };
   }
+  if (esElPrimero && snapshot.fecha_inicio) {
+    const sync = await sincronizarFechaAltaTRegistroConIngreso(relacionId, snapshot.fecha_inicio);
+    if (sync.error) return { error: sync.error };
+  }
 
   revalidatePath("/");
   revalidatePath("/pendientes");
@@ -491,6 +504,49 @@ export async function confirmarContratoFirmado(
   return {};
 }
 
+export async function marcarContratoPresentadoMtpe(
+  relacionId: string,
+  contratoId: string,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraFicha(relacionId);
+  if ("error" in gate) return { error: gate.error };
+
+  const db = await planillasDb();
+  const { data: contrato, error: loadError } = await db
+    .from("contratos")
+    .select("id, estado, datos_confirmados")
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!contrato) return { error: "Contrato no encontrado." };
+  if (contratoEstaCerrado(contrato.estado as EstadoContratoPlanilla)) {
+    return { error: "Este contrato ya está cerrado." };
+  }
+  if (contrato.datos_confirmados) {
+    return { error: "Este contrato ya está validado." };
+  }
+  if (contrato.estado === "PRESENTADO_MTPE") return {};
+  if (contrato.estado !== "ELABORADO" && contrato.estado !== "PENDIENTE_DOCS") {
+    return { error: "Solo se puede presentar al MTPE un contrato elaborado." };
+  }
+
+  const { error } = await db
+    .from("contratos")
+    .update({ estado: "PRESENTADO_MTPE" as EstadoContratoPlanilla })
+    .eq("id", contratoId)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/pendientes");
+  revalidatePath("/contratos");
+  revalidatePath(`/contratos/${relacionId}`);
+  revalidatePath("/");
+  return {};
+}
+
+/** Contratos ya validados que aún no cerraron el proceso (antes de unificar Validar = fin). */
 export async function marcarContratoRecogido(
   relacionId: string,
   contratoId: string,
@@ -508,11 +564,15 @@ export async function marcarContratoRecogido(
   if (loadError) return { error: loadError.message };
   if (!contrato) return { error: "Contrato no encontrado." };
   if (contrato.estado === "RECOGIDO") return {};
-  if (contrato.estado !== "ELABORADO") {
-    return { error: "Primero hay que generar el documento (estado Elaborado)." };
+  if (
+    contrato.estado !== "ELABORADO" &&
+    contrato.estado !== "PRESENTADO_MTPE" &&
+    contrato.estado !== "PENDIENTE_DOCS"
+  ) {
+    return { error: "Primero hay que elaborar o presentar el contrato al MTPE." };
   }
   if (!contrato.datos_confirmados) {
-    return { error: "Confirme los datos del respaldo antes de marcarlo Recogido." };
+    return { error: "Valide el contrato con el documento firmado antes de marcarlo Recogido." };
   }
 
   const respaldo = await hayRespaldoDeContrato(
@@ -938,7 +998,7 @@ export async function getVidaLeyLote(relacionId: string): Promise<VidaLeyLoteRow
 }
 
 export async function contextoEnviosVidaLey(entidadId: string): Promise<{
-  porRelacion: { relacionId: string; loteId: string | null }[];
+  porRelacion: { relacionId: string; loteId: string | null; fechaFin: string | null }[];
   envios: EnvioVidaLeyOpcion[];
 }> {
   const vacio = { porRelacion: [], envios: [] };
@@ -946,7 +1006,7 @@ export async function contextoEnviosVidaLey(entidadId: string): Promise<{
   await requirePlanillasProfile();
   const db = await planillasDb();
   const [vidasRes, lotesRes] = await Promise.all([
-    db.from("vida_ley").select("relacion_id, lote_id").eq("entidad_id", entidadId),
+    db.from("vida_ley").select("relacion_id, lote_id, fecha_fin").eq("entidad_id", entidadId),
     db
       .from("vida_ley_lotes")
       .select("id, constancia_storage_path, factura_storage_path, created_at")
@@ -958,6 +1018,7 @@ export async function contextoEnviosVidaLey(entidadId: string): Promise<{
   const porRelacion = (vidasRes.data ?? []).map((row) => ({
     relacionId: row.relacion_id as string,
     loteId: (row.lote_id as string | null) ?? null,
+    fechaFin: (row.fecha_fin as string | null) ?? null,
   }));
   const idsPorLote = new Map<string, string[]>();
   for (const row of porRelacion) {
@@ -1049,10 +1110,19 @@ export async function compartirEnvioVidaLey(
 
   const { data: existentes, error: existentesError } = await db
     .from("vida_ley")
-    .select("relacion_id, estado, numero_poliza, fecha_inicio, fecha_fin")
+    .select("relacion_id, estado, numero_poliza, fecha_inicio, fecha_fin, lote_id")
     .in("relacion_id", [relacionId, ...ids]);
   if (existentesError) return { error: existentesError.message };
   const porId = new Map((existentes ?? []).map((row) => [row.relacion_id as string, row]));
+  const ocupados = ids.filter((id) => {
+    const row = porId.get(id);
+    if (!row) return false;
+    if (row.lote_id && row.lote_id === loteId) return false;
+    return !trabajadorLibreParaVidaLey(row.fecha_fin as string | null);
+  });
+  if (ocupados.length > 0) {
+    return { error: "Hay trabajadores con seguro Vida Ley vigente. Solo puede agregar a quienes ya vencieron o no tienen fecha fin." };
+  }
   const payload = [relacionId, ...ids].map((id) => {
     const row = porId.get(id);
     return {
@@ -1600,20 +1670,91 @@ export async function listTRegistro(relacionId: string): Promise<TRegistroRow[]>
   return (data ?? []) as TRegistroRow[];
 }
 
+/** La fecha de alta T-Registro es la misma que ingreso / inicio del primer contrato validado. */
+export async function sincronizarFechaAltaTRegistroConIngreso(
+  relacionId: string,
+  fechaIngreso: string | null | undefined,
+): Promise<{ error?: string }> {
+  if (!fechaIngreso) return {};
+  const db = await planillasDb();
+  const { error } = await db
+    .from("t_registro")
+    .update({ fecha: fechaIngreso })
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "ALTA");
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function addTRegistro(relacionId: string, formData: FormData): Promise<{ error?: string }> {
   const gate = await assertEscrituraTramite(relacionId);
   if ("error" in gate) return { error: gate.error };
-  const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
-  if (fecha.error) return { error: fecha.error };
+  const tipo = String(formData.get("tipo")) as TipoTRegistro;
   const db = await planillasDb();
+
+  let fechaValue: string | null = null;
+  if (tipo === "ALTA") {
+    const { data: rel, error: relError } = await db
+      .from("relaciones_laborales")
+      .select("fecha_ingreso")
+      .eq("id", relacionId)
+      .maybeSingle();
+    if (relError) return { error: relError.message };
+    if (!rel?.fecha_ingreso) {
+      return {
+        error:
+          "Falta la fecha de ingreso a la empresa (igual al inicio del primer contrato validado). Complétela en Puesto.",
+      };
+    }
+    fechaValue = rel.fecha_ingreso as string;
+  } else {
+    const fecha = parseFechaCampo(String(formData.get("fecha") ?? ""), "Fecha");
+    if (fecha.error) return { error: fecha.error };
+    fechaValue = fecha.value;
+  }
+
   const { error } = await db.from("t_registro").insert({
     relacion_id: relacionId,
-    tipo: String(formData.get("tipo")) as TipoTRegistro,
+    tipo,
     realizado: formData.get("realizado") === "on",
-    fecha: fecha.value,
+    fecha: fechaValue,
     observaciones: String(formData.get("observaciones") ?? "").trim() || null,
   });
   if (error) return { error: error.message };
+  revalidatePath(`/trabajadores/${relacionId}`);
+  revalidatePath("/");
+  revalidatePath("/contratos");
+  revalidatePath("/pendientes");
+  return {};
+}
+
+export async function updateObservacionesTRegistroAlta(
+  relacionId: string,
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const gate = await assertEscrituraTramite(relacionId);
+  if ("error" in gate) return { error: gate.error };
+  const observaciones = String(formData.get("observaciones") ?? "").trim() || null;
+
+  const db = await planillasDb();
+  const { data: existente, error: loadError } = await db
+    .from("t_registro")
+    .select("id")
+    .eq("relacion_id", relacionId)
+    .eq("tipo", "ALTA")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (loadError) return { error: loadError.message };
+  if (!existente) return { error: "No hay alta de T-Registro para actualizar." };
+
+  const { error } = await db
+    .from("t_registro")
+    .update({ observaciones })
+    .eq("id", existente.id)
+    .eq("relacion_id", relacionId);
+  if (error) return { error: error.message };
+
   revalidatePath(`/trabajadores/${relacionId}`);
   revalidatePath("/");
   revalidatePath("/contratos");

@@ -1311,7 +1311,7 @@ export function ActivoForm({
               />
               <ActivoAtributoAutocomplete
                 id="detalle_bulk"
-                label="Detalle"
+                label="Características"
                 campo="detalle"
                 value={detalle}
                 onChange={setDetalle}
@@ -1785,7 +1785,7 @@ export function ActivoForm({
           <div className="col-span-2 min-w-0">
             <ActivoAtributoAutocomplete
               id="detalle"
-              label="Detalle"
+              label="Características"
               campo="detalle"
               value={detalle}
               onChange={setDetalle}

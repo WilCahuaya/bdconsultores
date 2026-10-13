@@ -13,6 +13,7 @@ import {
   type SolicitudRegistroVista,
 } from "@/lib/actions/solicitudes-registro";
 import { DOCUMENTO_ACCEPT, nombreDescargaDocumento } from "@/lib/documento-storage";
+import { nombreBaseSolicitudRegistro } from "@/lib/nombre-archivo";
 import { formatFechaPlanilla } from "@/lib/planillas-labels";
 import { getSignedDocumentoUrl } from "@/lib/storage-url";
 import { quitarArchivoSolicitud, uploadSolicitudFile } from "@/lib/upload-documento";
@@ -20,12 +21,25 @@ import { Field } from "@/components/fields";
 import { EliminarArchivoSolicitud } from "@/components/ficha/ConfirmarEliminarArchivo";
 import { MarcoPrevisualizacion } from "@/components/ficha/DocumentoPrevisualizacion";
 
+function nombreSolicitud(solicitud: SolicitudRegistroVista): string {
+  if (solicitud.trabajadores.length > 0) {
+    return `${nombreBaseSolicitudRegistro(solicitud.trabajadores)}.pdf`;
+  }
+  const guardado = solicitud.nombre_archivo?.trim();
+  if (guardado) {
+    return /\.pdf$/i.test(guardado) ? guardado : `${guardado.replace(/\.[^.]+$/, "") || guardado}.pdf`;
+  }
+  return nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path ?? "solicitud.pdf");
+}
+
 function etiquetaSolicitud(solicitud: SolicitudRegistroVista): string {
+  const nombre = nombreSolicitud(solicitud);
   const fecha = formatFechaPlanilla(solicitud.created_at);
   const cantidad = solicitud.trabajadores.length;
   const quienes = cantidad === 1 ? "1 trabajador" : `${cantidad} trabajadores`;
   const nota = solicitud.observaciones?.trim();
-  return nota ? `${fecha} · ${quienes} · ${nota}` : `${fecha} · ${quienes}`;
+  const detalle = nota ? `${fecha} · ${quienes} · ${nota}` : `${fecha} · ${quienes}`;
+  return `${nombre} · ${detalle}`;
 }
 
 export function SolicitudRegistroContrato({
@@ -37,9 +51,6 @@ export function SolicitudRegistroContrato({
   solicitud,
   solicitudes,
   enlazables,
-  numero = null,
-  nombres = "",
-  apellidoPaterno = null,
 }: {
   relacionId: string;
   entidadId: string;
@@ -49,9 +60,6 @@ export function SolicitudRegistroContrato({
   solicitud: SolicitudRegistroVista | null;
   solicitudes: SolicitudRegistroVista[];
   enlazables: ContratoEnlazable[];
-  numero?: number | null;
-  nombres?: string;
-  apellidoPaterno?: string | null;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -64,7 +72,9 @@ export function SolicitudRegistroContrato({
   const [opening, setOpening] = useState(false);
 
   const otras = enlazables.filter((item) => item.contratoId !== contratoId);
-  const paraAgregar = otras.filter((item) => item.solicitudId !== solicitud?.id);
+  const paraAgregar = otras.filter(
+    (item) => item.libre && item.solicitudId !== solicitud?.id,
+  );
   const elegida = solicitudes.find((item) => item.id === elegidaId) ?? null;
   const puedeEditar = canWrite && !cerrado;
 
@@ -78,11 +88,7 @@ export function SolicitudRegistroContrato({
     if (!solicitud?.storage_path) return;
     setOpening(true);
     const result = await getSignedDocumentoUrl(solicitud.storage_path, {
-      download: nombreDescargaDocumento("Solicitud de registro", solicitud.storage_path, {
-        numero,
-        nombres,
-        apellidoPaterno,
-      }),
+      download: nombreSolicitud(solicitud),
     });
     setOpening(false);
     if (result.error || !result.url) {
@@ -186,7 +192,7 @@ export function SolicitudRegistroContrato({
   }
 
   return (
-    <div className="space-y-3 border-t pt-4">
+    <div className="space-y-3">
       <div>
         <h3 className="text-sm font-medium text-foreground">Solicitud de registro de contratos</h3>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -202,7 +208,8 @@ export function SolicitudRegistroContrato({
       {solicitud?.storage_path ? (
         <div className="space-y-3">
           <p className="text-sm text-foreground">
-            {solicitud.observaciones?.trim() || "Solicitud compartida"}
+            Archivo: {nombreSolicitud(solicitud)}
+            {solicitud.observaciones?.trim() ? ` · ${solicitud.observaciones.trim()}` : ""}
             {solicitud.trabajadores.length > 0
               ? `. La ven: ${solicitud.trabajadores.map((item) => item.etiqueta).join(", ")}.`
               : "."}
@@ -296,10 +303,12 @@ export function SolicitudRegistroContrato({
               emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
               onFileChange={setArchivo}
             />
-            {otras.length > 0 ? (
+            {paraAgregar.length > 0 ? (
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Este contrato queda incluido. Marque a quién más cubre el documento.</p>
-                <ListaTrabajadores items={otras} marcados={marcados} disabled={pending !== null} onToggle={toggle} />
+                <p className="text-sm text-muted-foreground">
+                  Este contrato queda incluido. Solo aparecen versiones libres (sin solicitud o con fecha fin vencida).
+                </p>
+                <ListaTrabajadores items={paraAgregar} marcados={marcados} disabled={pending !== null} onToggle={toggle} />
               </div>
             ) : null}
             <Button type="button" size="sm" disabled={pending !== null || !archivo} onClick={() => void onCrear()}>
@@ -340,7 +349,7 @@ function ListaTrabajadores({
             />
             <span>
               {item.etiqueta}
-              {item.solicitudId ? " · ya tiene otra solicitud" : ""}
+              {item.solicitudId ? " · contrato vencido (puede renovar)" : ""}
             </span>
           </label>
         </li>

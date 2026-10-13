@@ -1,4 +1,5 @@
 import { errorArchivoDocumento, extensionDocumento, DOCUMENTO_MAX_BYTES } from "@/lib/documento-storage";
+import { excelComoPdf } from "@/lib/excel-a-pdf";
 
 const A4_ANCHO = 595.28;
 const A4_ALTO = 841.89;
@@ -36,8 +37,10 @@ async function convertirAPdf(file: File): Promise<File> {
       ? await imagenArchivoAPdf(file)
       : ext === "docx"
         ? await docxAPdf(await file.arrayBuffer())
-        : ext === "xls" || ext === "xlsx"
-          ? await excelAPdf(await file.arrayBuffer())
+        : ext === "xlsx"
+          ? await excelComoPdf(await file.arrayBuffer())
+          : ext === "xls"
+            ? await excelAPdf(await file.arrayBuffer())
           : null;
   if (!bytes) throw new Error("No se pudo convertir el archivo a PDF.");
   return archivoPdf(bytes, nombrePdf(file.name));
@@ -56,6 +59,37 @@ function copiaBytes(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
 
 function archivoPdf(bytes: Uint8Array, nombre: string): File {
   return new File([copiaBytes(bytes)], nombre, { type: "application/pdf" });
+}
+
+export async function girarPaginasPdf(bytes: ArrayBuffer, grados: number): Promise<Uint8Array<ArrayBuffer>> {
+  const { PDFDocument, degrees } = await import("pdf-lib");
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const delta = ((grados % 360) + 360) % 360;
+  for (const page of doc.getPages()) {
+    const actual = page.getRotation().angle;
+    page.setRotation(degrees((actual + delta) % 360));
+  }
+  return copiaBytes(await doc.save());
+}
+
+export async function contarPaginasPdf(file: File): Promise<number> {
+  const { PDFDocument } = await import("pdf-lib");
+  const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+  return doc.getPageCount();
+}
+
+/** Índices desde 0, en el orden elegido. Si son todas, devuelve el mismo archivo. */
+export async function pdfSoloPaginas(file: File, indices: number[]): Promise<File> {
+  const { PDFDocument } = await import("pdf-lib");
+  const origen = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
+  const total = origen.getPageCount();
+  const validos = [...new Set(indices)].filter((indice) => indice >= 0 && indice < total).sort((a, b) => a - b);
+  if (validos.length === 0) throw new Error("Elija al menos una página.");
+  if (validos.length === total) return file;
+  const destino = await PDFDocument.create();
+  const copiadas = await destino.copyPages(origen, validos);
+  for (const pagina of copiadas) destino.addPage(pagina);
+  return archivoPdf(await destino.save(), nombrePdf(file.name));
 }
 
 async function imagenArchivoAPdf(file: File): Promise<Uint8Array> {
@@ -128,19 +162,21 @@ async function docxAPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
 }
 
 async function excelAPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
+  const { valorExcelATextoDDMMYYYY } = await import("@inventario/types");
   const XLSX = await import("xlsx-js-style");
-  const libro = XLSX.read(buffer, { type: "array" });
+  const libro = XLSX.read(buffer, { type: "array", cellDates: true });
   const bloques: Bloque[] = [];
   let filas = 0;
   for (const nombre of libro.SheetNames) {
     const hoja = libro.Sheets[nombre];
     if (!hoja) continue;
-    const rows = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(hoja, {
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(hoja, {
       header: 1,
       raw: false,
+      dateNF: "dd/mm/yyyy",
       defval: "",
     });
-    const utiles = rows.filter((row) => row.some((celda) => String(celda ?? "").trim()));
+    const utiles = rows.filter((row) => row.some((celda) => valorExcelATextoDDMMYYYY(celda)));
     if (utiles.length === 0) continue;
     bloques.push({ tipo: "titulo", texto: nombre });
     for (const row of utiles) {
@@ -151,7 +187,7 @@ async function excelAPdf(buffer: ArrayBuffer): Promise<Uint8Array> {
       filas += 1;
       bloques.push({
         tipo: "texto",
-        texto: row.map((celda) => String(celda ?? "").replace(/\s+/g, " ").trim()).filter(Boolean).join("  ·  "),
+        texto: row.map((celda) => valorExcelATextoDDMMYYYY(celda)).filter(Boolean).join("  ·  "),
       });
     }
   }

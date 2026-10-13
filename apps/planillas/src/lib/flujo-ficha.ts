@@ -240,16 +240,46 @@ export function fechaFinUltimoContratoValidado(
 
 export type TonoEstadoContrato = "gris" | "verde" | "azul";
 export type EtiquetaEstadoContratoTabla = "Elaborado" | "Validado" | "Alta";
+export type EtiquetaDocumentosContrato = "Contrato firmado" | "Solicitud" | "Contrato y solicitud";
+
+/** Qué respaldo tiene esta versión: el PDF, la solicitud o los dos. */
+export function etiquetaDocumentosSubidos(pdf: boolean, solicitud: boolean): EtiquetaDocumentosContrato | null {
+  if (pdf && solicitud) return "Contrato y solicitud";
+  if (pdf) return "Contrato firmado";
+  if (solicitud) return "Solicitud";
+  return null;
+}
+
+export function documentosSubidosDeContrato(
+  contrato: Pick<FlujoContrato, "documento_id" | "solicitud_storage_path"> | null | undefined,
+  docs: FlujoDocumento[],
+): { pdf: boolean; solicitud: boolean; etiqueta: EtiquetaDocumentosContrato | null } {
+  if (!contrato) return { pdf: false, solicitud: false, etiqueta: null };
+  const pdf = contrato.documento_id
+    ? contratoTienePdfPropio(contrato, docs)
+    : documentoCargado(docs, "CONTRATO_FIRMADO");
+  const solicitud = Boolean(contrato.solicitud_storage_path?.trim());
+  return { pdf, solicitud, etiqueta: etiquetaDocumentosSubidos(pdf, solicitud) };
+}
 
 /** Elaborado sin respaldo, validado al subir PDF o solicitud, alta si el T-Registro ya se dio. */
 export function estadoVisibleContrato(
   contrato: Pick<FlujoContrato, "documento_id" | "solicitud_storage_path">,
   docs: FlujoDocumento[],
   alta: boolean,
-): { etiqueta: EtiquetaEstadoContratoTabla; tono: TonoEstadoContrato } {
-  if (alta) return { etiqueta: "Alta", tono: "azul" };
-  if (contratoTieneFirmado(contrato, docs)) return { etiqueta: "Validado", tono: "verde" };
-  return { etiqueta: "Elaborado", tono: "gris" };
+): {
+  etiqueta: EtiquetaEstadoContratoTabla;
+  tono: TonoEstadoContrato;
+  documentos: EtiquetaDocumentosContrato | null;
+  pdf: boolean;
+  solicitud: boolean;
+} {
+  const respaldo = documentosSubidosDeContrato(contrato, docs);
+  if (alta) return { etiqueta: "Alta", tono: "azul", documentos: respaldo.etiqueta, pdf: respaldo.pdf, solicitud: respaldo.solicitud };
+  if (contratoTieneFirmado(contrato, docs)) {
+    return { etiqueta: "Validado", tono: "verde", documentos: respaldo.etiqueta, pdf: respaldo.pdf, solicitud: respaldo.solicitud };
+  }
+  return { etiqueta: "Elaborado", tono: "gris", documentos: respaldo.etiqueta, pdf: respaldo.pdf, solicitud: respaldo.solicitud };
 }
 
 export function claseTonoEstadoContrato(tono: TonoEstadoContrato): string {
@@ -290,6 +320,193 @@ export function contratoConfirmado(contratos: FlujoContrato[]): FlujoContrato | 
   const confirmados = contratosFirmados(contratos);
   if (confirmados.length === 0) return null;
   return [...confirmados].sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0];
+}
+
+/** Validó con solicitud (u otro respaldo) pero aún no hay PDF firmado de esa versión. */
+export function faltaContratoFirmadoUltimoValidado(
+  contratos: FlujoContrato[],
+  docs: FlujoDocumento[],
+): boolean {
+  const ultimo = contratoConfirmado(contratos);
+  if (!ultimo) return false;
+  return !documentosSubidosDeContrato(ultimo, docs).pdf;
+}
+
+export const ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO = "Falta documento de contrato firmado";
+
+export type PendienteAlertaFicha = {
+  id: string;
+  etiqueta: string;
+  href: string;
+};
+
+function yaTienePrefijoFalta(texto: string): boolean {
+  return /^(falta|faltan|alerta:)\b/i.test(texto.trim());
+}
+
+function conPrefijoFalta(texto: string): string {
+  const t = texto.trim();
+  if (!t) return "Falta completar datos";
+  if (yaTienePrefijoFalta(t)) return t;
+  if (/^[A-Z0-9ÁÉÍÓÚÜÑ.-]+$/.test(t)) return `Falta ${t}`;
+  return `Falta ${t.charAt(0).toLowerCase()}${t.slice(1)}`;
+}
+
+function etiquetaPendienteDocumento(id: string, label: string): string {
+  if (id === "DNI") return "Falta documento DNI escaneado";
+  if (id === "CONTRATO_FIRMADO") return ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO;
+  if (id === "ASISTENCIA") return "Falta PDF de asistencia del mes";
+  const nombre = label.trim();
+  if (/^[A-Z0-9ÁÉÍÓÚÜÑ.-]+$/.test(nombre)) return `Falta documento ${nombre}`;
+  return `Falta documento ${nombre.charAt(0).toLowerCase()}${nombre.slice(1)}`;
+}
+
+function etiquetaPendienteDato(id: string, label: string): string {
+  if (id === "correo") return "Falta correo electrónico";
+  return conPrefijoFalta(label);
+}
+
+/** Lista operativa completa (asistencia, vida ley, vacaciones), sin quedarse en el primero. */
+export function listarPendientesOperativos(input: Parameters<typeof enlaceProcesoOperativo>[0]): EnlaceProceso[] {
+  if (input.estado !== "ACTIVA") return [];
+  const items: EnlaceProceso[] = [];
+  if (input.esEstudio && input.validacion !== "PENDIENTE") {
+    const afiliacionCargada =
+      input.pension !== undefined || input.tRegistro !== undefined || input.documentos !== undefined;
+    const afiliacion = {
+      pension: input.pension ?? null,
+      tRegistro: input.tRegistro ?? [],
+      documentos: input.documentos ?? [],
+    };
+    if (afiliacionCargada && input.contratoCerrado && input.relacionId && !pensionAltaLista(afiliacion)) {
+      items.push({ href: hrefAltaTrabajador(input.relacionId, "alta"), etiqueta: "Falta alta AFP y T-Registro" });
+    } else if (afiliacionCargada && input.contratoCerrado && input.relacionId && !tRegistroAltaLista(afiliacion)) {
+      items.push({ href: hrefAltaTrabajador(input.relacionId, "alta"), etiqueta: "Falta alta T-Registro" });
+    }
+    if (!afiliacionCargada || altasAfiliacionListas(afiliacion)) {
+      const etapa = resolverEtapaVidaLey(input.vidaLey, { hoy: input.hoy, limite: input.limite });
+      if (etapa.pendiente) {
+        items.push({ href: `/vida-ley?entidadId=${input.entidadId}`, etiqueta: conPrefijoFalta(etapa.etiqueta) });
+      }
+    }
+  }
+  if (trabajadorActivoEnMes(input.mes, input.fechaIngreso, input.fechaCese) && !input.pdfAsistenciaMes) {
+    items.push({
+      href: `/asistencias?entidadId=${input.entidadId}`,
+      etiqueta: "Falta PDF de asistencia del mes",
+    });
+  }
+  if (tieneDerechoVacaciones(input.fechaIngreso)) {
+    const saldo = saldoVacaciones(input.diasVacacionPeriodo);
+    if (saldo > 0) {
+      items.push({
+        href: `/vacaciones?entidadId=${input.entidadId}`,
+        etiqueta:
+          input.diasVacacionPeriodo === 0
+            ? `Falta registrar vacaciones en ${input.periodo}`
+            : `Faltan ${saldo} día${saldo === 1 ? "" : "s"} de goce en ${input.periodo}`,
+      });
+    }
+  }
+  return items;
+}
+
+/**
+ * Pendientes de alerta de la ficha: cada falta una sola vez, con texto «Falta…».
+ * No mezcla el resumen del siguiente paso con los ítems ya listados.
+ */
+export function armarPendientesAlertaFicha(input: {
+  relacionId: string;
+  entidadId: string;
+  flujo: FlujoFichaInput;
+  esEstudio: boolean;
+  estado: string;
+  fechaCese?: string | null;
+  vidaLey: { estado?: string | null; fecha_fin?: string | null } | null;
+  pdfAsistenciaMes: boolean;
+  diasVacacionPeriodo: number;
+  mes: string;
+  periodo: number;
+  hoy: string;
+  limite: string;
+}): PendienteAlertaFicha[] {
+  const { relacionId, flujo, esEstudio } = input;
+  const faltas = faltasPorPaso(flujo);
+  const items: PendienteAlertaFicha[] = [];
+  const vistos = new Set<string>();
+
+  const push = (id: string, etiqueta: string, href: string) => {
+    const idKey = id.trim().toLowerCase();
+    const etiqKey = etiqueta.trim().toLowerCase().replace(/\s+/g, " ");
+    if (vistos.has(`id:${idKey}`) || vistos.has(`e:${etiqKey}`)) return;
+    vistos.add(`id:${idKey}`);
+    vistos.add(`e:${etiqKey}`);
+    items.push({ id, etiqueta, href });
+  };
+
+  for (const falta of faltas.documentos) {
+    push(falta.id, etiquetaPendienteDocumento(falta.id, falta.etiqueta), hrefAltaTrabajador(relacionId, "documentos"));
+  }
+  for (const falta of faltas.persona) {
+    push(falta.id, etiquetaPendienteDato(falta.id, falta.etiqueta), hrefAltaTrabajador(relacionId, "persona"));
+  }
+  for (const falta of faltas.puesto) {
+    push(falta.id, etiquetaPendienteDato(falta.id, falta.etiqueta), hrefAltaTrabajador(relacionId, "puesto"));
+  }
+  for (const falta of faltas.contratos) {
+    push(falta.id, conPrefijoFalta(falta.etiqueta), hrefAltaTrabajador(relacionId));
+  }
+  if (faltaContratoFirmadoUltimoValidado(flujo.contratos, flujo.documentos)) {
+    push("CONTRATO_FIRMADO", ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO, hrefAltaTrabajador(relacionId));
+  }
+  for (const falta of faltas.alta) {
+    push(falta.id, conPrefijoFalta(falta.etiqueta), hrefAltaTrabajador(relacionId, "alta"));
+  }
+
+  const siguiente = resolverSiguientePaso(flujo, esEstudio);
+  const pasoYaCubierto =
+    (siguiente.paso === "documentos" && faltas.documentos.length > 0) ||
+    (siguiente.paso === "persona" && faltas.persona.length > 0) ||
+    (siguiente.paso === "puesto" && faltas.puesto.length > 0) ||
+    (siguiente.paso === "contratos" &&
+      (faltas.contratos.length > 0 || faltaContratoFirmadoUltimoValidado(flujo.contratos, flujo.documentos))) ||
+    (siguiente.paso === "alta" && faltas.alta.length > 0) ||
+    (siguiente.rol === "alerta" &&
+      (siguiente.etiqueta === ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO ||
+        faltas.documentos.length > 0));
+
+  if (siguiente.paso !== "listo" && !pasoYaCubierto) {
+    const enlace = enlaceProcesoPendiente(relacionId, siguiente);
+    if (enlace) push(`paso-${siguiente.paso}-${siguiente.etiqueta}`, conPrefijoFalta(enlace.etiqueta), enlace.href);
+  }
+
+  const confirmado = contratoConfirmado(flujo.contratos);
+  for (const operativo of listarPendientesOperativos({
+    entidadId: input.entidadId,
+    relacionId,
+    esEstudio,
+    estado: input.estado,
+    validacion: flujo.validacion,
+    fechaIngreso: flujo.fechaIngreso,
+    fechaCese: input.fechaCese ?? null,
+    pension: flujo.pension,
+    tRegistro: flujo.tRegistro,
+    documentos: flujo.documentos,
+    contratoCerrado: confirmado?.estado === "RECOGIDO" || confirmado?.estado === "COMPLETO",
+    vidaLey: input.vidaLey,
+    pdfAsistenciaMes: input.pdfAsistenciaMes,
+    diasVacacionPeriodo: input.diasVacacionPeriodo,
+    mes: input.mes,
+    periodo: input.periodo,
+    hoy: input.hoy,
+    limite: input.limite,
+  })) {
+    // AFP / T-Registro ya salen de faltas.alta; aquí solo asistencia, vida ley, vacaciones, etc.
+    if (/AFP|T-Registro/i.test(operativo.etiqueta) && faltas.alta.length > 0) continue;
+    push(`op-${operativo.etiqueta}`, operativo.etiqueta, operativo.href);
+  }
+
+  return items;
 }
 
 export function contratoPrimeroFirmado(contratos: FlujoContrato[]): FlujoContrato | null {
@@ -373,46 +590,83 @@ export function textoListaFaltas(etiquetas: string[]): string {
   return `${etiquetas.slice(0, -1).join(", ")} y ${etiquetas[etiquetas.length - 1]}`;
 }
 
+/** Texto para pendientes: «Falta correo» / «Faltan correo y celular». */
+export function etiquetaFaltaEspecifica(faltas: FaltaPaso[]): string {
+  const nombres = faltas.map((item) => item.etiqueta.trim()).filter(Boolean);
+  if (nombres.length === 0) return "Falta completar datos";
+  const lista = nombres.map((nombre) => {
+    if (/^[A-Z0-9ÁÉÍÓÚÜÑ.-]+$/.test(nombre)) return nombre;
+    return nombre.charAt(0).toLowerCase() + nombre.slice(1);
+  });
+  if (lista.length === 1) return `Falta ${lista[0]}`;
+  return `Faltan ${textoListaFaltas(lista)}`;
+}
+
 export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean): SiguientePaso {
   const borrador = contratoBorrador(input.contratos);
   const confirmado = contratoConfirmado(input.contratos);
   const vigente = confirmado ?? contratoVigente(input.contratos);
   const firmado = contratoTieneFirmado(borrador ?? vigente, input.documentos);
   const pasos = estadoPasosAlta(input);
+  const faltas = faltasPorPaso(input);
 
+  if (!pasos.documentos) {
+    return { paso: "documentos", tab: "documentos", etiqueta: etiquetaFaltaEspecifica(faltas.documentos), rol: "empresa" };
+  }
   if (!pasos.persona) {
-    return { paso: "persona", tab: "persona", etiqueta: "Completar persona", rol: "empresa" };
+    return { paso: "persona", tab: "persona", etiqueta: etiquetaFaltaEspecifica(faltas.persona), rol: "empresa" };
   }
   if (!pasos.puesto) {
-    return { paso: "puesto", tab: "puesto", etiqueta: "Completar puesto", rol: "empresa" };
+    return { paso: "puesto", tab: "puesto", etiqueta: etiquetaFaltaEspecifica(faltas.puesto), rol: "empresa" };
+  }
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PENDIENTE_DOCS") &&
+    !vigente.datos_confirmados &&
+    !firmado
+  ) {
+    return { paso: "contratos", tab: "contratos", etiqueta: "Presentar contrato al MTPE", rol: "empresa" };
+  }
+  if (borrador && vigente?.estado === "PRESENTADO_MTPE" && !firmado) {
+    return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado o solicitud de registro", rol: "empresa" };
   }
   if (borrador && !firmado) {
     return { paso: "contratos", tab: "contratos", etiqueta: "Subir contrato firmado o solicitud de registro", rol: "empresa" };
   }
   if (borrador && firmado) {
-    return { paso: "contratos", tab: "contratos", etiqueta: "Confirmar datos del respaldo", rol: "empresa" };
+    return { paso: "contratos", tab: "contratos", etiqueta: "Validar contrato", rol: "empresa" };
   }
   if (input.validacion === "PENDIENTE") {
     return esEstudio
       ? { paso: "contratos", tab: "contratos", etiqueta: "Validar alta", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
-  if (vigente?.estado === "ELABORADO" && firmado) {
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PRESENTADO_MTPE") &&
+    firmado &&
+    vigente.datos_confirmados
+  ) {
     return esEstudio
-      ? { paso: "contratos", tab: "contratos", etiqueta: "Marcar recogido", rol: "estudio" }
+      ? { paso: "contratos", tab: "contratos", etiqueta: "Cerrar contrato (marcar recogido)", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
-  if (!pensionAltaLista(input)) {
-    return esEstudio
-      ? { paso: "alta", tab: "alta", etiqueta: "Dar de alta AFP y T-Registro", rol: "estudio" }
-      : { paso: "alta", tab: "alta", etiqueta: "En alta AFP y T-Registro del estudio", rol: "empresa" };
-  }
-  if (!tRegistroAltaLista(input)) {
-    return esEstudio
-      ? { paso: "alta", tab: "alta", etiqueta: "Dar de alta T-Registro", rol: "estudio" }
-      : { paso: "alta", tab: "alta", etiqueta: "En alta T-Registro del estudio", rol: "empresa" };
+  if (!pensionAltaLista(input) || !tRegistroAltaLista(input)) {
+    const detalle = etiquetaFaltaEspecifica(faltas.alta);
+    return {
+      paso: "alta",
+      tab: "alta",
+      etiqueta: esEstudio ? detalle : `En estudio: ${detalle.charAt(0).toLowerCase()}${detalle.slice(1)}`,
+      rol: esEstudio ? "estudio" : "empresa",
+    };
   }
   if (vigente?.estado === "RECOGIDO" || vigente?.estado === "COMPLETO" || !vigente) {
+    if (faltaContratoFirmadoUltimoValidado(input.contratos, input.documentos)) {
+      return {
+        paso: "contratos",
+        tab: "contratos",
+        etiqueta: ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO,
+        rol: "alerta",
+      };
+    }
     const alertaDocs = etiquetaAlertaDocumentos(input);
     if (alertaDocs) {
       return { paso: "documentos", tab: "documentos", etiqueta: alertaDocs, rol: "alerta" };
@@ -527,6 +781,7 @@ export const HORIZONTE_VENCIMIENTO_DIAS = 30;
 export const ETAPAS_CONTRATO = [
   "alta",
   "generar",
+  "mtpe",
   "firmar",
   "confirmar",
   "validar",
@@ -552,10 +807,11 @@ export const ETAPA_CONTRATO_FILTRO_LABEL: Record<EtapaContratoId | "pendientes",
   pendientes: "Pendientes",
   alta: "Alta incompleta",
   generar: "Generar",
+  mtpe: "Presentar al MTPE",
   firmar: "Subir firmado",
-  confirmar: "Confirmar datos",
+  confirmar: "Validar contrato",
   validar: "Validar alta",
-  recoger: "Marcar recogido",
+  recoger: "Cerrar contrato",
   afp: "Dar de alta",
   "t-registro": "Alta T-Registro",
   vence: "Por vencer",
@@ -575,42 +831,79 @@ export function resolverEtapaContrato(
 ): EtapaContrato {
   const flujo = flujoDesdeTrabajador(trabajador);
   const pasos = estadoPasosAlta(flujo);
+  const faltas = faltasPorPaso(flujo);
   const borrador = contratoBorrador(flujo.contratos);
   const confirmado = contratoConfirmado(flujo.contratos);
   const vigente = confirmado ?? contratoVigente(flujo.contratos);
   const firmado = contratoTieneFirmado(borrador ?? vigente, flujo.documentos);
 
+  if (!pasos.documentos) {
+    return {
+      id: "alta",
+      etiqueta: etiquetaFaltaEspecifica(faltas.documentos),
+      tab: "documentos",
+      rol: "empresa",
+      pendiente: true,
+    };
+  }
   if (!pasos.persona) {
-    return { id: "alta", etiqueta: "Falta completar persona", tab: "persona", rol: "empresa", pendiente: true };
+    return {
+      id: "alta",
+      etiqueta: etiquetaFaltaEspecifica(faltas.persona),
+      tab: "persona",
+      rol: "empresa",
+      pendiente: true,
+    };
   }
   if (!pasos.puesto) {
-    return { id: "alta", etiqueta: "Falta completar puesto", tab: "puesto", rol: "empresa", pendiente: true };
+    return {
+      id: "alta",
+      etiqueta: etiquetaFaltaEspecifica(faltas.puesto),
+      tab: "puesto",
+      rol: "empresa",
+      pendiente: true,
+    };
+  }
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PENDIENTE_DOCS") &&
+    !vigente.datos_confirmados &&
+    !firmado
+  ) {
+    return { id: "mtpe", etiqueta: "Falta presentar el contrato al MTPE", tab: "contratos", rol: "empresa", pendiente: true };
+  }
+  if (borrador && vigente?.estado === "PRESENTADO_MTPE" && !firmado) {
+    return { id: "firmar", etiqueta: "Falta el contrato firmado o la solicitud de registro", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (borrador && !firmado) {
     return { id: "firmar", etiqueta: "Falta el contrato firmado o la solicitud de registro", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (borrador && firmado) {
-    return { id: "confirmar", etiqueta: "Falta confirmar datos del respaldo", tab: "contratos", rol: "empresa", pendiente: true };
+    return { id: "confirmar", etiqueta: "Falta validar el contrato", tab: "contratos", rol: "empresa", pendiente: true };
   }
   if (flujo.validacion === "PENDIENTE") {
     return esEstudio
       ? { id: "validar", etiqueta: "Alta pendiente de validación", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "validar", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
-  if (vigente?.estado === "ELABORADO" && firmado) {
+  if (
+    (vigente?.estado === "ELABORADO" || vigente?.estado === "PRESENTADO_MTPE") &&
+    firmado &&
+    vigente.datos_confirmados
+  ) {
     return esEstudio
-      ? { id: "recoger", etiqueta: "Contrato con respaldo: falta marcar recogido", tab: "contratos", rol: "estudio", pendiente: true }
+      ? { id: "recoger", etiqueta: "Contrato validado: falta cerrar el proceso", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "recoger", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
-  if (!pensionAltaLista(flujo)) {
-    return esEstudio
-      ? { id: "afp", etiqueta: "Falta dar de alta AFP y T-Registro", tab: "alta", rol: "estudio", pendiente: true }
-      : { id: "afp", etiqueta: "En alta AFP y T-Registro del estudio", tab: "alta", rol: "empresa", pendiente: true };
-  }
-  if (!tRegistroAltaLista(flujo)) {
-    return esEstudio
-      ? { id: "t-registro", etiqueta: "Falta dar de alta T-Registro", tab: "alta", rol: "estudio", pendiente: true }
-      : { id: "t-registro", etiqueta: "En alta T-Registro del estudio", tab: "alta", rol: "empresa", pendiente: true };
+  if (!pensionAltaLista(flujo) || !tRegistroAltaLista(flujo)) {
+    const faltasAlta = faltas.alta;
+    const detalle = etiquetaFaltaEspecifica(faltasAlta);
+    return {
+      id: !pensionAltaLista(flujo) ? "afp" : "t-registro",
+      etiqueta: esEstudio ? detalle : `En estudio: ${detalle.charAt(0).toLowerCase()}${detalle.slice(1)}`,
+      tab: "alta",
+      rol: esEstudio ? "estudio" : "empresa",
+      pendiente: true,
+    };
   }
 
   const hoy = opts?.hoy ?? new Date().toISOString().slice(0, 10);
@@ -629,6 +922,15 @@ export function resolverEtapaContrato(
       etiqueta: `Contrato: ${ESTADO_CONTRATO_LABEL[vigente.estado]}`,
       tab: "contratos",
       rol: "empresa",
+      pendiente: true,
+    };
+  }
+  if (faltaContratoFirmadoUltimoValidado(flujo.contratos, flujo.documentos)) {
+    return {
+      id: "firmar",
+      etiqueta: ETIQUETA_FALTA_CONTRATO_FIRMADO_VALIDADO,
+      tab: "contratos",
+      rol: "alerta",
       pendiente: true,
     };
   }

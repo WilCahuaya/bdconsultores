@@ -21,11 +21,13 @@ export function FeriadosMesPicker({
   mes,
   fechasIniciales,
   canWrite,
+  onChange,
 }: {
   entidadId: string;
   mes: string;
   fechasIniciales?: string[];
   canWrite: boolean;
+  onChange?: (fechas: string[]) => void;
 }) {
   const { pushToast } = useToast();
   const dias = diasIsoDelMes(mes);
@@ -51,6 +53,7 @@ export function FeriadosMesPicker({
         if (cancel) return;
         seleccionRef.current = fechas;
         setSeleccion(fechas);
+        onChange?.(fechas);
       })
       .catch(() => {
         if (!cancel) toastRef.current("No se pudieron cargar los feriados.", "error");
@@ -66,6 +69,7 @@ export function FeriadosMesPicker({
     const next = prev.includes(iso) ? prev.filter((dia) => dia !== iso) : [...prev, iso].sort();
     seleccionRef.current = next;
     setSeleccion(next);
+    onChange?.(next);
     const fechas = next;
     cola.current = cola.current.then(async () => {
       setGuardando(true);
@@ -85,7 +89,7 @@ export function FeriadosMesPicker({
       <div>
         <p className="text-sm font-medium">Feriados</p>
         <p className="text-sm text-muted-foreground">
-          Elija uno o más días del mes. En el Excel se escribe Feriado y no se cruza la línea.
+          Elija uno o más días del mes. En el Excel se escribe Feriado y esas horas no se acumulan.
         </p>
       </div>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Días feriados del mes">

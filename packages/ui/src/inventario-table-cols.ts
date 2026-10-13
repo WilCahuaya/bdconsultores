@@ -4,7 +4,9 @@ export const INVENTARIO_TABLE_COL_WIDTHS_PCT = [
   2.8, // Cat.
   9.5, // Código (catálogo-correlativo)
   11.5, // Nombre del bien
-  10, // Descripción
+  4, // Marca
+  3.5, // Modelo
+  3.5, // Serie
   5.8, // Fecha adq.
   6.5, // Cuenta contable
   4.2, // Estado
@@ -24,7 +26,9 @@ export const INVENTARIO_TABLE_COMPACT_COL_WIDTHS_PCT = [
   3, // Cat.
   10, // Código
   13, // Nombre
-  13, // Descripción
+  5, // Marca
+  4, // Modelo
+  4, // Serie
   7, // Fecha
   7, // Cuenta contable
   6, // Estado
@@ -45,7 +49,9 @@ export const INVENTARIO_TABLE_PREREGISTRO_COL_WIDTHS_PCT = [
   9, // Código
   14, // Nombre del bien
   11, // Posible ambiente
-  16, // Descripción
+  6, // Marca
+  5, // Modelo
+  5, // Serie
   7, // Fecha adq.
   7, // Cuenta contable
   6, // Estado
@@ -63,7 +69,9 @@ export const INVENTARIO_TABLE_FULL_PREREGISTRO_COL_WIDTHS_PCT = [
   8.5, // Código
   10.5, // Nombre del bien
   7, // Posible ambiente
-  8.5, // Descripción
+  3.2, // Marca
+  3.2, // Modelo
+  3.2, // Serie
   5.5, // Fecha adq.
   6.2, // Cuenta contable
   4, // Estado
@@ -86,7 +94,9 @@ export const INVENTARIO_TABLE_ADMIN_COL_WIDTHS_PX = [
   56, // Cat.
   108, // Código
   180, // Nombre del bien
-  160, // Descripción
+  112, // Marca
+  128, // Modelo
+  140, // Serie
   100, // Fecha adq.
   84, // Estado
   118, // Importe PA/VM
@@ -105,7 +115,9 @@ export const INVENTARIO_TABLE_ADMIN_PREREGISTRO_COL_WIDTHS_PX = [
   108, // Código
   180, // Nombre del bien
   160, // Posible ambiente
-  160, // Descripción
+  112, // Marca
+  128, // Modelo
+  140, // Serie
   100, // Fecha adq.
   84, // Estado
   118, // Importe PA/VM
@@ -134,7 +146,9 @@ export const INVENTARIO_TABLE_COL_WIDTHS_PX = [
   56, // Cat.
   108, // Código
   180, // Nombre del bien
-  160, // Descripción
+  112, // Marca
+  128, // Modelo
+  140, // Serie
   100, // Fecha adq.
   148, // Cuenta contable
   84, // Estado
@@ -176,7 +190,9 @@ export const INVENTARIO_TABLE_COMPACT_COL_WIDTHS_PX = [
   56, // Cat.
   108, // Código
   180, // Nombre
-  160, // Descripción
+  112, // Marca
+  128, // Modelo
+  140, // Serie
   100, // Fecha
   148, // Cuenta contable
   84, // Estado
@@ -193,7 +209,9 @@ export const INVENTARIO_TABLE_PREREGISTRO_COL_WIDTHS_PX = [
   108, // Código
   180, // Nombre del bien
   160, // Posible ambiente
-  160, // Descripción
+  112, // Marca
+  128, // Modelo
+  140, // Serie
   100, // Fecha adq.
   148, // Cuenta contable
   84, // Estado
@@ -208,7 +226,9 @@ export const INVENTARIO_TABLE_FULL_PREREGISTRO_COL_WIDTHS_PX = [
   108, // Código
   180, // Nombre del bien
   160, // Posible ambiente
-  160, // Descripción
+  112, // Marca
+  128, // Modelo
+  140, // Serie
   100, // Fecha adq.
   148, // Cuenta contable
   84, // Estado
@@ -256,12 +276,12 @@ export const INVENTARIO_TABLE_COMPROBANTE_MIN_WIDTH_PX = 140;
 export const INVENTARIO_TABLE_ACCIONES_MIN_WIDTH_PX = 136;
 
 export function inventarioFechaColIndex(modoPreregistro: boolean, withSelection: boolean): number {
-  const base = 5 + (modoPreregistro ? 1 : 0);
+  const base = 7 + (modoPreregistro ? 1 : 0);
   return withSelection ? base + 1 : base;
 }
 
 export function inventarioComprobanteColIndex(modoPreregistro: boolean, withSelection: boolean): number {
-  const base = 14 + (modoPreregistro ? 1 : 0);
+  const base = 16 + (modoPreregistro ? 1 : 0);
   return withSelection ? base + 1 : base;
 }
 

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ActivoAtributoCampo } from "@inventario/types";
 import { computeFloatingMenuLayout, type FloatingMenuLayout } from "./dropdown-position";
-import { Input, Label } from "./components";
+import { cn, Input, Label } from "./components";
 
 const DEBOUNCE_MS = 250;
 
@@ -34,12 +34,15 @@ export function ActivoAtributoAutocomplete({
   const [loading, setLoading] = useState(false);
   const [menuLayout, setMenuLayout] = useState<FloatingMenuLayout | null>(null);
   const [focused, setFocused] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const onSearchRef = useRef(onSearch);
   onSearchRef.current = onSearch;
   const requestIdRef = useRef(0);
+  const focusedRef = useRef(false);
+  focusedRef.current = focused;
 
   const showList = open && (loading || results.length > 0);
 
@@ -57,7 +60,8 @@ export function ActivoAtributoAutocomplete({
           if (requestId !== requestIdRef.current) return;
           const next = items.filter((item) => item.trim().toLowerCase() !== trimmed.toLowerCase());
           setResults(next);
-          setOpen(next.length > 0);
+          setActiveIndex(-1);
+          setOpen(focusedRef.current && next.length > 0);
         })
         .finally(() => {
           if (requestId === requestIdRef.current) setLoading(false);
@@ -107,12 +111,26 @@ export function ActivoAtributoAutocomplete({
 
   function selectSuggestion(suggestion: string) {
     onChange(suggestion);
+    setActiveIndex(-1);
     setOpen(false);
+  }
+
+  function scrollOptionIntoView(button: HTMLButtonElement) {
+    const list = button.closest("ul");
+    if (!list) return;
+    const itemTop = button.offsetTop;
+    const itemBottom = itemTop + button.offsetHeight;
+    if (itemTop < list.scrollTop) {
+      list.scrollTop = itemTop;
+    } else if (itemBottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = itemBottom - list.clientHeight;
+    }
   }
 
   const listbox =
     showList && menuLayout ? (
       <ul
+        id={`${id}_listbox`}
         ref={listRef}
         role="listbox"
         className="overflow-auto rounded-md border border-border bg-card py-1 text-card-foreground shadow-lg ring-1 ring-border/50"
@@ -130,12 +148,22 @@ export function ActivoAtributoAutocomplete({
         {loading && results.length === 0 && (
           <li className="px-3 py-2 text-sm text-muted-foreground">Buscando…</li>
         )}
-        {results.map((item) => (
-          <li key={item} role="option">
+        {results.map((item, index) => (
+          <li key={item}>
             <button
+              id={`${id}_option_${index}`}
               type="button"
-              className="w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
+              role="option"
+              aria-selected={index === activeIndex}
+              className={cn(
+                "w-full px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                index === activeIndex && "bg-accent text-accent-foreground",
+              )}
+              ref={(node) => {
+                if (node && index === activeIndex) scrollOptionIntoView(node);
+              }}
               onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={() => setActiveIndex(index)}
               onClick={() => selectSuggestion(item)}
             >
               {item}
@@ -151,28 +179,67 @@ export function ActivoAtributoAutocomplete({
       <div ref={anchorRef} className="relative">
         <Input
           id={id}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={showList}
+          aria-controls={showList ? `${id}_listbox` : undefined}
+          aria-activedescendant={
+            showList && activeIndex >= 0 ? `${id}_option_${activeIndex}` : undefined
+          }
           autoComplete="off"
           spellCheck={campo === "serie" || campo === "medidas" ? false : undefined}
           value={value}
           disabled={disabled}
           placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => {
+            setActiveIndex(-1);
+            onChange(e.target.value);
+          }}
           onFocus={() => {
             setFocused(true);
             if (results.length > 0) setOpen(true);
           }}
-          onBlur={() => {
+          onBlur={(event) => {
+            const input = event.currentTarget;
             // Retraso para permitir click en una sugerencia (mousedown + blur).
-            window.setTimeout(() => setFocused(false), 150);
+            window.setTimeout(() => {
+              if (document.activeElement === input) return;
+              requestIdRef.current += 1;
+              setFocused(false);
+              setOpen(false);
+            }, 150);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
+            if (e.key === "Tab") {
+              requestIdRef.current += 1;
+              setFocused(false);
               setOpen(false);
               return;
             }
-            if (e.key === "Enter" && open && results[0]) {
+            if (e.key === "Escape") {
+              setOpen(false);
+              setActiveIndex(-1);
+              return;
+            }
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              if (results.length === 0) return;
               e.preventDefault();
-              selectSuggestion(results[0]);
+              setOpen(true);
+              setActiveIndex((current) => {
+                const last = results.length - 1;
+                if (e.key === "ArrowDown") {
+                  if (current < 0) return 0;
+                  return current >= last ? 0 : current + 1;
+                }
+                if (current < 0) return last;
+                return current <= 0 ? last : current - 1;
+              });
+              return;
+            }
+            if (e.key === "Enter" && open && results.length > 0) {
+              e.preventDefault();
+              const picked = results[activeIndex] ?? results[0];
+              if (picked) selectSuggestion(picked);
             }
           }}
         />

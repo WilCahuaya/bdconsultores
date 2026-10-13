@@ -56,7 +56,7 @@ export function AgregarBienesSimilaresDialog({
 }: AgregarBienesSimilaresDialogProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [cantidad, setCantidad] = useState("10");
+  const [cantidad, setCantidad] = useState("1");
   const [destinoUbicacion, setDestinoUbicacion] = useState<DestinoUbicacion>("actual");
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
@@ -74,7 +74,7 @@ export function AgregarBienesSimilaresDialog({
 
   useEffect(() => {
     if (!open) {
-      setCantidad("10");
+      setCantidad("1");
       setDestinoUbicacion("actual");
       setOtraSedeId("");
       setOtroAmbienteId("");

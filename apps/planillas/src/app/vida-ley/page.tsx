@@ -121,13 +121,7 @@ export default async function VidaLeyPage({
             ) : null}
           </div>
           {esEstudio && selectedId ? (
-            <div className="flex max-w-xl flex-col items-end gap-2">
-              <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
-              <p className="text-right text-sm text-muted-foreground">
-                Cada grupo comparte su constancia y, si llega, su factura. El comprobante de envío es uno para toda la
-                empresa y se sustituye cuando hay un alta nueva. El certificado se sube en cada ficha.
-              </p>
-            </div>
+            <GenerarVidaLeyGrupoButton entidadId={selectedId} cantidad={cantidadGrupo} />
           ) : null}
         </div>
 
@@ -156,20 +150,32 @@ export default async function VidaLeyPage({
               </div>
             </div>
 
-            <div className={`${panelCardClass} panel-scroll-table overflow-x-auto p-0`}>
-              <table className="w-full min-w-[1040px] text-left text-sm">
-                <thead className="border-b bg-muted/40 text-muted-foreground">
+            <div className={panelCardClass}>
+              <div className="panel-scroll-table max-h-[calc(100dvh-16rem)] overflow-auto">
+              <table className="w-full min-w-[1040px] border-separate border-spacing-0 text-left text-sm">
+                <thead>
                   <tr>
-                    <th className="px-4 py-2 font-medium">Nº</th>
-                    <th className="px-4 py-2 font-medium">DNI</th>
-                    <th className="px-4 py-2 font-medium">Nombre</th>
-                    <th className="px-4 py-2 font-medium">Paso</th>
-                    <th className="px-4 py-2 font-medium">Estado</th>
-                    <th className="px-4 py-2 font-medium">Certificado</th>
-                    <th className="px-4 py-2 font-medium">Alta</th>
-                    <th className="px-4 py-2 font-medium">Póliza</th>
-                    <th className="px-4 py-2 font-medium">Inicio</th>
-                    <th className="px-4 py-2 font-medium">Fin</th>
+                    {(
+                      [
+                        "Nº",
+                        "DNI",
+                        "Nombre",
+                        "Paso",
+                        "Estado",
+                        "Certificado",
+                        "Alta",
+                        "Póliza",
+                        "Inicio",
+                        "Fin",
+                      ] as const
+                    ).map((col) => (
+                      <th
+                        key={col}
+                        className="sticky top-0 z-20 whitespace-nowrap border-b bg-muted px-4 py-2 font-medium text-muted-foreground"
+                      >
+                        {col}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -220,6 +226,7 @@ export default async function VidaLeyPage({
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           </>
         )}

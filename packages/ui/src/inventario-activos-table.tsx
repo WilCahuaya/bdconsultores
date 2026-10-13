@@ -34,7 +34,6 @@ import {
   ObservacionCell,
   inventarioCuentaContable,
   inventarioDepreciacionFila,
-  inventarioDescripcion,
   inventarioTdAccionesClass,
   inventarioTdComprobanteClass,
   inventarioTdFechaClass,
@@ -314,6 +313,8 @@ function TotalsFooter({
         {modoPreregistro && <td className={tdTotalBase} />}
         <td className={tdTotalBase} />
         <td className={tdTotalBase} />
+        <td className={tdTotalBase} />
+        <td className={tdTotalBase} />
         {!modoAdmin && <td className={tdTotalBase} />}
         <td className={tdTotalBase} />
         <td className={`${tdTotalAccent} inventario-totales-monto`} title={`Importe: ${importe}`}>
@@ -391,7 +392,6 @@ function FullTableBody<T extends Activo>({
       )}
       {paginated.map((activo, index) => {
         const rowIndex = rowOffset + index;
-        const descripcion = inventarioDescripcion(activo);
         const inactivo = activo.estado_registro === "DADO_DE_BAJA";
         const { periodo, depAcum, valorNeto } = inventarioDepreciacionFila(activo, inactivo, corte);
         const stickySel = stickyCellProps(stickyOffsets, 0, stickyWidths);
@@ -461,8 +461,14 @@ function FullTableBody<T extends Activo>({
                 {posibleAmbienteLabel(activo)}
               </InventarioTextCell>
             )}
-            <InventarioTextCell title={descripcion} lineClamp2>
-              {descripcion}
+            <InventarioTextCell title={activo.marca ?? ""}>
+              {activo.marca?.trim() || ""}
+            </InventarioTextCell>
+            <InventarioTextCell title={activo.modelo ?? ""}>
+              {activo.modelo?.trim() || ""}
+            </InventarioTextCell>
+            <InventarioTextCell title={activo.serie ?? ""}>
+              {activo.serie?.trim() || ""}
             </InventarioTextCell>
             <InventarioFechaCell
               fecha={activo.fecha_adquisicion}
@@ -684,9 +690,9 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
                   Posible ambiente
                 </Th>
               )}
-              <Th multiline className={`${inventarioThStd} normal-case`}>
-                Descripción
-              </Th>
+              <Th className={`${inventarioThStd} normal-case`}>Marca</Th>
+              <Th className={`${inventarioThStd} normal-case`}>Modelo</Th>
+              <Th className={`${inventarioThStd} normal-case`}>Serie</Th>
               {showColumnFilters && columnFilters ? (
                 <ColumnHeaderFilter
                   label="Fecha adq."
