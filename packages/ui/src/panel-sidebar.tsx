@@ -16,12 +16,18 @@ export interface PanelSidebarUser {
   email: string;
 }
 
+export type PanelMobileBreakpoint = "md" | "lg";
+
 interface PanelSidebarCoreProps {
   sections: PanelNavSection[];
   user?: PanelSidebarUser;
   mobileOpen: boolean;
   onMobileClose: () => void;
   storageKey?: string;
+  /** Por debajo de este ancho el menú es un cajón. `md` = 768, `lg` = 1024. */
+  mobileBreakpoint?: PanelMobileBreakpoint;
+  /** Si es false, cada visita empieza con el menú abierto. */
+  persistCollapsed?: boolean;
   isItemActive: (item: PanelNavItem) => boolean;
   renderNavItem: (item: PanelNavItem, content: ReactNode, props: NavItemShellProps) => ReactNode;
   renderFooter?: (collapsed: boolean) => ReactNode;
@@ -213,28 +219,34 @@ function PanelSidebarCore({
   mobileOpen,
   onMobileClose,
   storageKey = DEFAULT_STORAGE_KEY,
+  mobileBreakpoint = "md",
+  persistCollapsed = true,
   isItemActive,
   renderNavItem,
   renderFooter,
 }: PanelSidebarCoreProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const wide = mobileBreakpoint === "lg";
 
   useEffect(() => {
+    if (!persistCollapsed) return;
     try {
       const saved = localStorage.getItem(storageKey);
       if (saved === "true") setCollapsed(true);
     } catch {
       /* ignore */
     }
-  }, [storageKey]);
+  }, [persistCollapsed, storageKey]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
       const next = !prev;
-      try {
-        localStorage.setItem(storageKey, String(next));
-      } catch {
-        /* ignore */
+      if (persistCollapsed) {
+        try {
+          localStorage.setItem(storageKey, String(next));
+        } catch {
+          /* ignore */
+        }
       }
       return next;
     });
@@ -256,12 +268,20 @@ function PanelSidebarCore({
     };
   }, [mobileOpen]);
 
-  const sidebarWidth = collapsed ? "md:w-[4.5rem]" : "md:w-60 lg:w-64 xl:w-72";
+  const sidebarWidth = wide
+    ? collapsed
+      ? "lg:w-[4.5rem]"
+      : "lg:w-60 xl:w-72"
+    : collapsed
+      ? "md:w-[4.5rem]"
+      : "md:w-60 lg:w-64 xl:w-72";
+  const drawerVisibility = wide ? "lg:hidden" : "md:hidden";
+  const asideVisibility = wide ? "hidden lg:flex" : "hidden md:flex";
 
   return (
     <>
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="presentation">
+        <div className={`fixed inset-0 z-50 ${drawerVisibility}`} role="presentation">
           <button
             type="button"
             aria-label="Cerrar menú"
@@ -298,7 +318,7 @@ function PanelSidebarCore({
       )}
 
       <aside
-        className={`hidden min-h-0 shrink-0 flex-col self-stretch border-r border-border/70 bg-card transition-[width] duration-200 md:flex ${sidebarWidth}`}
+        className={`${asideVisibility} min-h-0 shrink-0 flex-col self-stretch border-r border-border/70 bg-card transition-[width] duration-200 ${sidebarWidth}`}
       >
         <div
           className={`flex shrink-0 items-center gap-2 border-b border-border/50 py-3 ${
@@ -342,6 +362,8 @@ export interface PanelSidebarSpaProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
   storageKey?: string;
+  mobileBreakpoint?: PanelMobileBreakpoint;
+  persistCollapsed?: boolean;
   activeKey: string;
   onSelect: (key: string) => void;
   renderFooter?: (collapsed: boolean) => ReactNode;
@@ -353,6 +375,8 @@ export function PanelSidebarSpa({
   mobileOpen,
   onMobileClose,
   storageKey,
+  mobileBreakpoint,
+  persistCollapsed,
   activeKey,
   onSelect,
   renderFooter,
@@ -364,6 +388,8 @@ export function PanelSidebarSpa({
       mobileOpen={mobileOpen}
       onMobileClose={onMobileClose}
       storageKey={storageKey}
+      mobileBreakpoint={mobileBreakpoint}
+      persistCollapsed={persistCollapsed}
       renderFooter={renderFooter}
       isItemActive={(item) => item.href === activeKey}
       renderNavItem={(item, content, shell) => (
@@ -390,6 +416,8 @@ export interface PanelSidebarLinkProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
   storageKey?: string;
+  mobileBreakpoint?: PanelMobileBreakpoint;
+  persistCollapsed?: boolean;
   pathname: string;
   isPathActive?: (pathname: string, href: string) => boolean;
   renderFooter?: (collapsed: boolean) => ReactNode;
@@ -409,6 +437,8 @@ export function PanelSidebarLink({
   mobileOpen,
   onMobileClose,
   storageKey,
+  mobileBreakpoint,
+  persistCollapsed,
   pathname,
   isPathActive,
   renderFooter,
@@ -423,6 +453,8 @@ export function PanelSidebarLink({
       mobileOpen={mobileOpen}
       onMobileClose={onMobileClose}
       storageKey={storageKey}
+      mobileBreakpoint={mobileBreakpoint}
+      persistCollapsed={persistCollapsed}
       renderFooter={renderFooter}
       isItemActive={(item) => match(pathname, item.href)}
       renderNavItem={(item, content, shell) => (

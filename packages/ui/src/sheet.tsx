@@ -64,7 +64,7 @@ export function Sheet({
         aria-modal="true"
         aria-labelledby="sheet-title"
         className={cn(
-          "relative flex h-full w-full max-w-md flex-col border-l border-border/70 bg-card shadow-2xl sm:max-w-lg",
+          "bd-dialog-panel relative flex h-full w-full max-w-md flex-col border-l border-border/70 bg-card shadow-2xl sm:max-w-lg",
           className,
         )}
       >

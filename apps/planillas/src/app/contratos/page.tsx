@@ -143,7 +143,7 @@ export default async function ContratosPage({
               </div>
             </div>
 
-            <div className={`${panelCardClass} overflow-x-auto p-0`}>
+            <div className={`${panelCardClass} panel-scroll-table overflow-x-auto p-0`}>
               <table className="w-full min-w-[1180px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>

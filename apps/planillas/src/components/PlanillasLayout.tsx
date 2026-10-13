@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { MODULE_PLANILLAS, PLATFORM_NAME } from "@inventario/types";
 import {
+  IconChevronLeft,
   IconMenu,
   panelMainScrollClass,
   panelPageClass,
@@ -47,7 +48,7 @@ export function PlanillasLayout({
               aria-label="Abrir menú de navegación"
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen(true)}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border/60 text-foreground hover:bg-muted md:hidden"
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border/60 text-foreground hover:bg-muted lg:hidden"
             >
               <IconMenu />
             </button>
@@ -61,15 +62,18 @@ export function PlanillasLayout({
           <div className="flex shrink-0 items-center gap-2">
             <a
               href={modulesHref}
-              className="inline-flex h-9 items-center rounded-md border border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted"
+              aria-label="Volver a módulos"
+              title="Volver a módulos"
+              className="inline-flex h-9 items-center justify-center rounded-md border border-border/70 bg-background px-2.5 text-sm font-medium text-foreground hover:bg-muted lg:px-3"
             >
-              Volver a módulos
+              <IconChevronLeft className="h-4 w-4 lg:hidden" />
+              <span className="hidden lg:inline">Volver a módulos</span>
             </a>
             <ThemeToggle />
           </div>
         </div>
       </header>
-      <div className="flex min-h-0 w-full max-w-full flex-1 overflow-hidden md:flex-row">
+      <div className="flex min-h-0 w-full max-w-full flex-1 overflow-hidden lg:flex-row">
         <PlanillasSidebar
           sections={sections}
           user={user}

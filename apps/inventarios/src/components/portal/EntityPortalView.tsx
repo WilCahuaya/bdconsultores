@@ -61,7 +61,7 @@ export function EntityPortalView({
   );
 
   return (
-    <BdPortalShell onExit={() => void handleLogout()} showBranding={false}>
+    <BdPortalShell splitAt="lg" onExit={() => void handleLogout()} showBranding={false}>
       <EntityPortalMenu
         sectionLabel="Entidad"
         entidadNombre={entidad.nombre}

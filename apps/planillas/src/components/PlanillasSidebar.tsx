@@ -49,6 +49,8 @@ export function PlanillasSidebar({
       mobileOpen={mobileOpen}
       onMobileClose={onMobileClose}
       storageKey="planillas-panel-sidebar-collapsed"
+      mobileBreakpoint="lg"
+      persistCollapsed={false}
       pathname={pathname}
       isPathActive={matchPlanillasNavPath}
       LinkComponent={NavLink}

@@ -30,7 +30,7 @@ export function EntidadInactivaBlockedView({
       : "Su cuenta ya no está vinculada a una entidad activa. Contacte al contador para que la reactiven o le asignen acceso.";
 
   return (
-    <BdPortalShell onExit={() => void handleLogout()} showBranding={false}>
+    <BdPortalShell splitAt="lg" onExit={() => void handleLogout()} showBranding={false}>
       <div className="bd-portal-card space-y-4">
         <p className="bd-portal-section-label">Acceso restringido</p>
         <h2 className="bd-portal-entity-title text-2xl font-semibold leading-tight sm:text-[1.65rem]">

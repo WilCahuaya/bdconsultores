@@ -157,6 +157,7 @@ export interface ActivosInventarioTableProps<T extends Activo> {
   renderAcciones: (activo: T) => ReactNode;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
   embeddedInParentScroll?: boolean;
+  wrapClassName?: string;
 }
 
 type ActivoConPosible = Activo & {
@@ -520,6 +521,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     modoAdmin,
     tableScrollRef,
     embeddedInParentScroll,
+    wrapClassName,
     columnFilters,
     onColumnFiltersChange,
     columnFilterOptions = emptyInventarioColumnFilterOptions(),
@@ -575,9 +577,14 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths, 40)
     : undefined;
   const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths, 40);
-  const tableWrapClass = embeddedInParentScroll
-    ? `${panelDataTableWrapClass} ${panelDataTableWrapEmbeddedClass}`
-    : panelDataTableWrapClass;
+  const tableWrapClass = [
+    embeddedInParentScroll
+      ? `${panelDataTableWrapClass} ${panelDataTableWrapEmbeddedClass}`
+      : panelDataTableWrapClass,
+    wrapClassName,
+  ]
+    .filter(Boolean)
+    .join(" ");
   const showColumnFilters = Boolean(columnFilters && onColumnFiltersChange);
 
   function patchFilters(partial: Partial<InventarioColumnFilters>) {

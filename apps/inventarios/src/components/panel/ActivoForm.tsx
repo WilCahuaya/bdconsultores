@@ -2266,6 +2266,7 @@ export function ActivoForm({
         {formActionButtons}
       </div>
       )}
+      <div className="panel-mobile-save">{formActionButtons}</div>
     </form>
 
     <Dialog

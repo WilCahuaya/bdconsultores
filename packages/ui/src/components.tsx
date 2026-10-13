@@ -508,7 +508,7 @@ export function Dialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[300] flex items-end justify-center overflow-hidden bg-black/50 p-2 sm:items-center sm:p-4"
+      className="bd-dialog-overlay fixed inset-0 z-[300] flex items-end justify-center overflow-hidden bg-black/50 p-2 sm:items-center sm:p-4"
       role="presentation"
     >
       <div
@@ -517,7 +517,7 @@ export function Dialog({
         aria-labelledby="dialog-title"
         style={style}
         className={cn(
-          "flex max-h-[92vh] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-lg sm:max-h-[90vh]",
+          "bd-dialog-panel flex max-h-[92vh] w-full min-w-0 max-w-full flex-col overflow-hidden rounded-xl border border-border/70 bg-card shadow-lg sm:max-h-[90vh]",
           className ?? "max-w-lg",
         )}
       >

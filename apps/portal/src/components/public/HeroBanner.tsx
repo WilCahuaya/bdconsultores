@@ -6,7 +6,7 @@ export function HeroBanner() {
   return (
     <section className="rounded-xl border bg-gradient-to-br from-primary/15 via-card to-card p-8 dark:from-primary/25 dark:via-card dark:to-background md:p-12">
       <p className="text-sm font-medium text-primary">{APP_CLIENT}</p>
-      <blockquote className="mt-4 text-2xl font-bold leading-tight text-foreground md:text-3xl">
+      <blockquote className="mt-4 break-words text-2xl font-bold leading-tight text-foreground md:text-3xl">
         &ldquo;{HERO.quote}&rdquo;
       </blockquote>
       <p className="mt-4 max-w-3xl text-lg text-muted-foreground">{HERO.subtitle}</p>

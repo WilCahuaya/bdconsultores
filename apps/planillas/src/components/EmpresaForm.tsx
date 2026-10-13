@@ -252,6 +252,11 @@ export function EmpresaForm({ entidad }: { entidad?: Entidad }) {
       <Button type="submit" disabled={pending || buscando || buscandoDni || buscandoRl}>
         {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear empresa"}
       </Button>
+      <div className="panel-mobile-save">
+        <Button type="submit" disabled={pending || buscando || buscandoDni || buscandoRl}>
+          {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear empresa"}
+        </Button>
+      </div>
     </form>
   );
 }

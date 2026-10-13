@@ -177,6 +177,11 @@ export function NuevoTrabajadorForm({
                 {pending ? "Guardando…" : "Guardar datos del DNI"}
               </Button>
             </div>
+            <div className="panel-mobile-save">
+              <Button type="submit" disabled={pending || buscando}>
+                {pending ? "Guardando…" : "Guardar datos del DNI"}
+              </Button>
+            </div>
           </>
         }
       />

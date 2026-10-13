@@ -60,7 +60,7 @@ export default function LoginPage() {
   }
 
   return (
-    <BdPortalShell onExit={() => { window.location.href = "/"; }} exitLabel="SALIR">
+    <BdPortalShell splitAt="lg" onExit={() => { window.location.href = "/"; }} exitLabel="SALIR">
       <div className="bd-portal-card">
         <p className="bd-portal-login-hint">{BD_PORTAL_LOGIN_HINT}</p>
         {error && <p className="bd-portal-error">{error}</p>}

@@ -7,6 +7,7 @@ import {
   ActivosInventarioTable,
   EliminarPreregistradosBulkDialog,
   InventarioTablaLeyenda,
+  PanelViewToggle,
   PreregistroGestionToolbar,
   TablePagination,
   panelDataCardsWrapClass,
@@ -104,6 +105,8 @@ export function ActivosInventarioExcelView({
   renderVisita,
   procedenciaPorActivo,
 }: ActivosInventarioExcelViewProps) {
+  const [viewMode, setViewMode] = useState<"cards" | "list">("list");
+  const cardsWrapClass = `${panelDataCardsWrapClass}${viewMode === "cards" ? " is-active" : ""}`;
   const paginationKey = useMemo(
     () => `${activos.length}:${activos[0]?.id ?? ""}`,
     [activos],
@@ -238,6 +241,7 @@ export function ActivosInventarioExcelView({
       procedenciaPorActivo={procedenciaPorActivo}
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
+      wrapClassName={viewMode === "cards" ? "is-hidden" : undefined}
       selection={
         gestionEnabled
           ? {
@@ -286,6 +290,12 @@ export function ActivosInventarioExcelView({
     />
   );
 
+  const viewToggle = (
+    <div className="flex justify-end px-2 pb-1 pt-2">
+      <PanelViewToggle value={viewMode} onChange={setViewMode} listLabel="Tabla" />
+    </div>
+  );
+
   const mobileCards = (
     <ActivosInventarioMobileCards
       activos={paginated}
@@ -320,7 +330,8 @@ export function ActivosInventarioExcelView({
               {toolbar}
               {inlinePreregistroToolbar}
               {leyendaVisita}
-              <div className={panelDataCardsWrapClass}>{mobileCards}</div>
+              {viewToggle}
+              <div className={cardsWrapClass}>{mobileCards}</div>
               {tableBlock}
             </div>
           </div>
@@ -335,7 +346,8 @@ export function ActivosInventarioExcelView({
     <div className={excelViewShellClass(embeddedInParentScroll)}>
       {inlinePreregistroToolbar}
       {leyendaVisita}
-      <div className={panelDataCardsWrapClass}>{mobileCards}</div>
+      {viewToggle}
+      <div className={cardsWrapClass}>{mobileCards}</div>
       {tableBlock}
       {paginationBlock}
       {bulkDialogNode}

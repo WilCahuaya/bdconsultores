@@ -118,9 +118,16 @@ export function FichaPersonaForm({
         </div>
       </FormSection>
       {canWrite ? (
-        <Button type="submit" disabled={pending}>
-          {pending ? "Guardando…" : "Guardar persona"}
-        </Button>
+        <>
+          <Button type="submit" disabled={pending}>
+            {pending ? "Guardando…" : "Guardar persona"}
+          </Button>
+          <div className="panel-mobile-save">
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar persona"}
+            </Button>
+          </div>
+        </>
       ) : (
         <p className="text-sm text-muted-foreground">Solo consulta.</p>
       )}
@@ -246,9 +253,16 @@ export function FichaPuestoForm({
           </div>
         </FormSection>
         {canWrite ? (
-          <Button type="submit" disabled={pending}>
-            {pending ? "Guardando…" : "Guardar puesto"}
-          </Button>
+          <>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Guardando…" : "Guardar puesto"}
+            </Button>
+            <div className="panel-mobile-save">
+              <Button type="submit" disabled={pending}>
+                {pending ? "Guardando…" : "Guardar puesto"}
+              </Button>
+            </div>
+          </>
         ) : (
           <p className="text-sm text-muted-foreground">Solo consulta.</p>
         )}

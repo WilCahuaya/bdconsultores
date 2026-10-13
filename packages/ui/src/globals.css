@@ -923,7 +923,14 @@
 
   /* Sitio público (marketing) */
   .public-page {
-    @apply mx-auto w-full min-w-0 max-w-full px-4 py-8 sm:px-5 sm:py-9 md:px-6 md:py-10 lg:px-8 xl:px-10 2xl:px-12;
+    @apply mx-auto w-full min-w-0 max-w-full overflow-x-clip px-4 py-8 sm:px-5 sm:py-9 md:px-6 md:py-10 lg:px-8 xl:px-10 2xl:px-12;
+  }
+
+  .public-page img,
+  .public-page video,
+  .public-page table,
+  .public-page pre {
+    max-width: 100%;
   }
 
   @media (min-width: 640px) {
@@ -1106,5 +1113,120 @@
     flex: 1 1 0%;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  /* Web (portal, inventarios, planillas). La app de escritorio no marca data-bd-shell. */
+  html[data-bd-shell="web"] .panel-shell .panel-data-cards-wrap.is-active {
+    display: block;
+  }
+
+  html[data-bd-shell="web"] .panel-shell .panel-data-table-wrap.is-hidden {
+    display: none;
+  }
+
+  html[data-bd-shell="web"] .panel-mobile-save {
+    display: none;
+  }
+
+  @media (max-width: 1023px) {
+    html[data-bd-shell="web"] .panel-shell .panel-data-table-wrap {
+      display: block;
+      max-height: none;
+    }
+
+    html[data-bd-shell="web"] .panel-shell .panel-data-cards-wrap {
+      display: none;
+    }
+
+    html[data-bd-shell="web"] .panel-shell main.panel-main-padding {
+      padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    html[data-bd-shell="web"] .panel-shell:not(:has(.panel-mobile-save)) .panel-toolbar-actions {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 40;
+      width: 100%;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      border-top: 1px solid hsl(var(--border) / 0.7);
+      background: hsl(var(--card));
+      padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+      box-shadow: 0 -8px 24px -16px rgb(0 0 0 / 0.35);
+    }
+
+    html[data-bd-shell="web"] .panel-shell:not(:has(.panel-mobile-save)) .panel-toolbar-actions a,
+    html[data-bd-shell="web"] .panel-shell:not(:has(.panel-mobile-save)) .panel-toolbar-actions button {
+      min-height: 2.75rem;
+    }
+
+    html[data-bd-shell="web"] .panel-mobile-save {
+      position: fixed;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 40;
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      border-top: 1px solid hsl(var(--border) / 0.7);
+      background: hsl(var(--card));
+      padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+      box-shadow: 0 -8px 24px -16px rgb(0 0 0 / 0.35);
+    }
+
+    html[data-bd-shell="web"] .bd-dialog-overlay {
+      align-items: stretch;
+      padding: 0;
+    }
+
+    html[data-bd-shell="web"] .bd-dialog-panel {
+      height: 100%;
+      max-height: 100dvh;
+      width: 100%;
+      max-width: none;
+      border-radius: 0;
+    }
+  }
+
+  html[data-bd-shell="web"] .panel-scroll-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: hsl(var(--muted));
+  }
+
+  html[data-bd-shell="web"] .panel-scroll-table th:nth-child(3),
+  html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+    min-width: 11rem;
+    max-width: 16rem;
+    white-space: normal;
+    background: hsl(var(--card));
+    box-shadow: 2px 0 0 hsl(var(--border) / 0.55);
+  }
+
+  html[data-bd-shell="web"] .panel-scroll-table thead th:nth-child(3) {
+    z-index: 4;
+    background: hsl(var(--muted));
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    html[data-bd-shell="web"] .bd-portal-shell--lg {
+      background-color: var(--bd-portal-ivory);
+    }
+
+    html.dark[data-bd-shell="web"] .bd-portal-shell--lg {
+      background-color: var(--bd-portal-carbon);
+    }
+
+    html[data-bd-shell="web"] .bd-portal-shell--lg .bd-portal-panel {
+      width: 100%;
+      max-width: 100%;
+    }
   }
 }

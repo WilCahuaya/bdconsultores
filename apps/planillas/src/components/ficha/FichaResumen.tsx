@@ -164,13 +164,14 @@ function Grupo({
   extra?: ReactNode;
 }) {
   if (lineas.length === 0 && !extra) return null;
-  return (
-    <section className={`${panelCardClass} mb-4 break-inside-avoid p-4`}>
-      <h2 className="flex items-center gap-2 text-[15px] font-bold text-foreground">
-        {icon}
-        {title}
-      </h2>
-      <ul className="mt-1 pl-6">
+  const heading = (
+    <h2 className="flex items-center gap-2 text-[15px] font-bold text-foreground">
+      {icon}
+      {title}
+    </h2>
+  );
+  const body = (
+    <ul className="mt-1 pl-6">
         {lineas.map((linea, index) => (
           <li
             key={`${linea.texto}-${index}`}
@@ -191,7 +192,20 @@ function Grupo({
         ))}
         {extra}
       </ul>
-    </section>
+  );
+  return (
+    <>
+      <details className={`${panelCardClass} mb-4 p-4 lg:hidden`}>
+        <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          {heading}
+        </summary>
+        {body}
+      </details>
+      <section className={`${panelCardClass} mb-4 hidden break-inside-avoid p-4 lg:block`}>
+        {heading}
+        {body}
+      </section>
+    </>
   );
 }
 

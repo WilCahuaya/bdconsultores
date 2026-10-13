@@ -22,6 +22,8 @@ export interface BdPortalShellProps {
   /** Rutas del hero (p. ej. `./images/...` en Electron). */
   heroLightSrc?: string;
   heroDarkSrc?: string;
+  /** `lg` deja el panel a ancho completo hasta 1024 px. */
+  splitAt?: "md" | "lg";
 }
 
 function LogoutIcon({ className = "h-4 w-4" }: { className?: string }) {
@@ -51,9 +53,11 @@ export function BdPortalShell({
   footerNote = BD_PORTAL_FOOTER_INSTITUCIONAL,
   heroLightSrc = BD_PORTAL_HERO_LIGHT,
   heroDarkSrc = BD_PORTAL_HERO_DARK,
+  splitAt = "md",
 }: BdPortalShellProps) {
+  const wide = splitAt === "lg";
   return (
-    <div className="bd-portal-shell">
+    <div className={wide ? "bd-portal-shell bd-portal-shell--lg" : "bd-portal-shell"}>
       <section className="bd-portal-panel">
         <div className="bd-portal-panel-glow" aria-hidden />
 
@@ -94,7 +98,7 @@ export function BdPortalShell({
         )}
       </section>
 
-      <section className="bd-portal-hero hidden md:block" aria-hidden={false}>
+      <section className={wide ? "bd-portal-hero hidden lg:block" : "bd-portal-hero hidden md:block"} aria-hidden={false}>
         {/* Tema claro: oficina diurna */}
         <img
           src={heroLightSrc}
@@ -135,7 +139,11 @@ export function BdPortalShell({
       </section>
 
       {onExit && (
-        <button type="button" onClick={onExit} className="bd-portal-exit-btn-mobile md:hidden">
+        <button
+          type="button"
+          onClick={onExit}
+          className={wide ? "bd-portal-exit-btn-mobile lg:hidden" : "bd-portal-exit-btn-mobile md:hidden"}
+        >
           {exitLabel}
           <LogoutIcon className="h-3.5 w-3.5" />
         </button>

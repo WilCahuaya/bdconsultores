@@ -35,9 +35,11 @@ export function useStoredViewMode(
 export function PanelViewToggle({
   value,
   onChange,
+  listLabel = "Lista",
 }: {
   value: PanelViewMode;
   onChange: (mode: PanelViewMode) => void;
+  listLabel?: string;
 }) {
   return (
     <div
@@ -63,7 +65,7 @@ export function PanelViewToggle({
         onClick={() => onChange("list")}
         aria-pressed={value === "list"}
       >
-        Lista
+        {listLabel}
       </Button>
     </div>
   );

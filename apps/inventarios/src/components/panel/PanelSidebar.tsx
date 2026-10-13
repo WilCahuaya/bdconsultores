@@ -51,6 +51,8 @@ export function PanelSidebar({ sections, user, mobileOpen, onMobileClose }: Pane
       user={user}
       mobileOpen={mobileOpen}
       onMobileClose={onMobileClose}
+      mobileBreakpoint="lg"
+      persistCollapsed={false}
       pathname={pathname}
       isPathActive={matchPanelNavPath}
       LinkComponent={NavLink}

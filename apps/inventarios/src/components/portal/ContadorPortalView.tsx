@@ -42,7 +42,7 @@ export function ContadorPortalView({ nombre, email }: ContadorPortalViewProps) {
   ];
 
   return (
-    <BdPortalShell onExit={() => void handleLogout()} showBranding={false}>
+    <BdPortalShell splitAt="lg" onExit={() => void handleLogout()} showBranding={false}>
       <EntityPortalMenu
         entidadNombre={displayContadorNombre(nombre, email)}
         subtitleLines={[email]}
