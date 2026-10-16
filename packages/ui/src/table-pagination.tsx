@@ -129,13 +129,17 @@ export function TablePagination({
   const showPageNav = total > pageSize;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 bg-muted/30 px-3 py-2">
+    <div className="flex flex-nowrap items-center justify-between gap-2 border-t border-border/40 bg-muted/30 px-3 py-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
-        <p className="shrink-0 text-xs text-muted-foreground">
-          {rangeStart}–{rangeEnd} de {total.toLocaleString("es-PE")} {unitLabel}
+        <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+          {rangeStart}–{rangeEnd}
+          <span className="hidden sm:inline">
+            {" "}
+            de {total.toLocaleString("es-PE")} {unitLabel}
+          </span>
         </p>
         {onPageSizeChange && (
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
             <span className="text-xs text-muted-foreground">Mostrar</span>
             <Select
               aria-label={`${unitLabel} por página`}
@@ -152,7 +156,7 @@ export function TablePagination({
             />
           </div>
         )}
-        {legend ? <div className="min-w-0 flex-1 basis-full sm:basis-auto">{legend}</div> : null}
+        {legend ? <div className="hidden min-w-0 flex-1 basis-full lg:block lg:basis-auto">{legend}</div> : null}
       </div>
       {showPageNav && (
         <div className="flex items-center gap-1.5">
@@ -166,7 +170,7 @@ export function TablePagination({
           >
             Anterior
           </Button>
-          <span className="min-w-[5.5rem] text-center text-xs text-muted-foreground">
+          <span className="hidden min-w-[5.5rem] text-center text-xs text-muted-foreground sm:inline">
             Pág. {page} / {totalPages}
           </span>
           <Button

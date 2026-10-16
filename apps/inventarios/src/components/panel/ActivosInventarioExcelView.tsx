@@ -54,7 +54,7 @@ interface ActivosInventarioExcelViewProps {
   modoAdmin?: boolean;
   layout?: "default" | "global-panel";
   bodyScrollRef?: (node: HTMLDivElement | null) => void;
-  toolbar?: ReactNode;
+  toolbar?: ReactNode | ((viewToggle: ReactNode) => ReactNode);
   embeddedInParentScroll?: boolean;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
   className?: string;
@@ -291,10 +291,9 @@ export function ActivosInventarioExcelView({
   );
 
   const viewToggle = (
-    <div className="flex justify-end px-2 pb-1 pt-2">
-      <PanelViewToggle value={viewMode} onChange={setViewMode} listLabel="Tabla" />
-    </div>
+    <PanelViewToggle value={viewMode} onChange={setViewMode} listLabel="Tabla" />
   );
+  const toolbarNode = typeof toolbar === "function" ? toolbar(viewToggle) : toolbar;
 
   const mobileCards = (
     <ActivosInventarioMobileCards
@@ -327,10 +326,10 @@ export function ActivosInventarioExcelView({
         <div className={listClass}>
           <div className={panelInventarioScrollClass}>
             <div ref={bodyScrollRef} className={panelInventarioBodyScrollClass}>
-              {toolbar}
+              {toolbarNode}
               {inlinePreregistroToolbar}
               {leyendaVisita}
-              {viewToggle}
+              {typeof toolbar === "function" ? null : viewToggle}
               <div className={cardsWrapClass}>{mobileCards}</div>
               {tableBlock}
             </div>

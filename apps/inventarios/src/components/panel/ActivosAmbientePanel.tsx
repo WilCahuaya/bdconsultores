@@ -449,7 +449,7 @@ export function ActivosAmbientePanel({
           className="min-h-0 flex-1"
           layout="global-panel"
           bodyScrollRef={panelScrollRef}
-          toolbar={
+          toolbar={(viewToggle) => (
             <div className={panelInventarioToolbarClass}>
               <div
                 className={panelFilterRowClass}
@@ -457,7 +457,7 @@ export function ActivosAmbientePanel({
                 aria-label={esAmbientePreregistro ? "Filtros de inventario" : "Filtros de inventario"}
               >
                 {!esAmbientePreregistro && (
-                  <div className="inline-flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5">
+                  <div className="inline-flex w-full max-w-full flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5 lg:w-auto">
                     {FILTROS_ESTADO_AMBIENTE.map((f) => (
                       <button
                         key={f.value || "all"}
@@ -478,7 +478,7 @@ export function ActivosAmbientePanel({
                 )}
 
                 <div
-                  className={`min-w-[10rem] flex-1 md:max-w-md [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm ${esAmbientePreregistro ? "w-full max-w-none" : ""}`}
+                  className={`w-full min-w-0 basis-full lg:basis-auto lg:max-w-md lg:flex-1 [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm ${esAmbientePreregistro ? "max-w-none" : ""}`}
                 >
                   <PanelSearchInput
                     value={busqueda}
@@ -487,7 +487,7 @@ export function ActivosAmbientePanel({
                   />
                 </div>
 
-                <div className="w-[9.5rem] shrink-0 space-y-0.5">
+                <div className="w-full min-w-0 space-y-0.5 sm:w-[9.5rem] sm:shrink-0">
                   <label htmlFor="ambiente_fecha_corte" className="sr-only">
                     Fecha de corte
                   </label>
@@ -510,6 +510,7 @@ export function ActivosAmbientePanel({
                   )}
                 </div>
 
+                {viewToggle}
                 <div className={`${panelToolbarActionsClass} ml-auto`}>
                   {!esAmbientePreregistro && (
                     <AmbienteReportesExport
@@ -540,7 +541,7 @@ export function ActivosAmbientePanel({
                 </div>
               </div>
             </div>
-          }
+          )}
           activos={filtrados}
           onEditActivo={setEditActivo}
           puedeDarDeBaja={!isAdmin && !esAmbientePreregistro}

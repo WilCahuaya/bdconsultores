@@ -1124,6 +1124,17 @@
     display: none;
   }
 
+  /* Laptop desde 1024: lista. El corte xl (1280) dejaba tarjetas hasta ~1300. */
+  @media (min-width: 1024px) {
+    html[data-bd-shell="web"] .panel-shell .panel-data-table-wrap:not(.is-hidden) {
+      display: block;
+    }
+
+    html[data-bd-shell="web"] .panel-shell .panel-data-cards-wrap:not(.is-active) {
+      display: none;
+    }
+  }
+
   html[data-bd-shell="web"] .panel-mobile-save {
     display: none;
   }

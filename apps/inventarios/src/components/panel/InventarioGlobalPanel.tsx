@@ -387,7 +387,7 @@ export function InventarioGlobalPanel({
           className="min-h-0 flex-1"
           layout="global-panel"
           bodyScrollRef={panelScrollRef}
-          toolbar={
+          toolbar={(viewToggle) => (
             <div className={panelInventarioToolbarClass}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="panel-toolbar-title min-w-0">
@@ -412,7 +412,7 @@ export function InventarioGlobalPanel({
               </div>
 
               <div className={panelFilterRowClass} role="tablist" aria-label="Filtros de inventario">
-                <div className="inline-flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5">
+                <div className="inline-flex w-full max-w-full flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5 lg:w-auto">
                   {FILTROS_ESTADO.map((f) => (
                     <button
                       key={f.value || "all"}
@@ -431,8 +431,8 @@ export function InventarioGlobalPanel({
                   ))}
                 </div>
 
-                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:justify-end">
-                  <div className="min-w-[10rem] flex-1 md:max-w-md [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm">
+                <div className="flex w-full min-w-0 basis-full flex-col gap-2 lg:basis-auto lg:flex-row lg:flex-wrap lg:items-center lg:justify-end">
+                  <div className="w-full min-w-0 lg:max-w-md lg:flex-1 [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm">
                     <PanelSearchInput
                       value={busqueda}
                       onChange={setBusqueda}
@@ -440,7 +440,8 @@ export function InventarioGlobalPanel({
                     />
                   </div>
 
-                  <div className="w-[9.5rem] shrink-0 space-y-0.5">
+                  <div className="flex w-full items-center gap-2 lg:w-auto">
+                  <div className="min-w-0 flex-1 space-y-0.5 lg:w-[9.5rem] lg:flex-none">
                     <label
                       htmlFor="inventario_fecha_corte"
                       className="sr-only"
@@ -467,9 +468,11 @@ export function InventarioGlobalPanel({
                   </div>
 
                   {!hasFixedEntidad && !isAdmin && (
+                    <div className="min-w-0 flex-1 lg:w-auto lg:flex-none [&>div]:w-full [&>div]:max-w-none">
                     <Select
                       aria-label="Entidad"
                       size="compact"
+                      className="w-full max-w-none"
                       value={entidadId}
                       onChange={setEntidadId}
                       options={[
@@ -477,7 +480,10 @@ export function InventarioGlobalPanel({
                         ...entidades.map((e) => ({ value: e.id, label: e.nombre })),
                       ]}
                     />
+                    </div>
                   )}
+                  {viewToggle}
+                  </div>
 
                   {hasActiveFilters && (
                     <Button
@@ -493,7 +499,7 @@ export function InventarioGlobalPanel({
                 </div>
               </div>
             </div>
-          }
+          )}
           activos={filtrados}
           onEditActivo={setEditActivo}
           onIrAmbiente={irAlAmbiente}

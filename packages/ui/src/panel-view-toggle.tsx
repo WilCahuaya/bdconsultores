@@ -32,6 +32,26 @@ export function useStoredViewMode(
   return [mode, setStored];
 }
 
+function IconCards() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 lg:hidden" aria-hidden="true">
+      <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor" />
+      <rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor" />
+      <rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor" />
+      <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconTable() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-4 w-4 lg:hidden" aria-hidden="true">
+      <rect x="1" y="2" width="14" height="12" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M1 6h14M1 10h14M6 2v12" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 export function PanelViewToggle({
   value,
   onChange,
@@ -43,7 +63,7 @@ export function PanelViewToggle({
 }) {
   return (
     <div
-      className="inline-flex rounded-md border border-border/70 bg-muted/30 p-0.5"
+      className="inline-flex shrink-0 rounded-md border border-border/70 bg-muted/30 p-0.5"
       role="group"
       aria-label="Modo de vista"
     >
@@ -51,21 +71,25 @@ export function PanelViewToggle({
         type="button"
         variant={value === "cards" ? "default" : "ghost"}
         size="sm"
-        className="h-8 px-2.5 text-xs sm:text-sm"
+        className="h-8 px-2 text-xs lg:px-2.5 lg:text-sm"
         onClick={() => onChange("cards")}
         aria-pressed={value === "cards"}
+        aria-label="Tarjetas"
       >
-        Tarjetas
+        <IconCards />
+        <span className="hidden lg:inline">Tarjetas</span>
       </Button>
       <Button
         type="button"
         variant={value === "list" ? "default" : "ghost"}
         size="sm"
-        className="h-8 px-2.5 text-xs sm:text-sm"
+        className="h-8 px-2 text-xs lg:px-2.5 lg:text-sm"
         onClick={() => onChange("list")}
         aria-pressed={value === "list"}
+        aria-label={listLabel}
       >
-        {listLabel}
+        <IconTable />
+        <span className="hidden lg:inline">{listLabel}</span>
       </Button>
     </div>
   );
