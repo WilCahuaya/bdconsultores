@@ -8,6 +8,8 @@ interface ActivoEditScopeNavProps {
   onScopeChange: (scope: ActivoEditScope) => void;
   disabled?: boolean;
   className?: string;
+  singleHint?: string;
+  bulkHint?: string;
 }
 
 export function ActivoEditScopeNav({
@@ -16,6 +18,8 @@ export function ActivoEditScopeNav({
   onScopeChange,
   disabled = false,
   className = "",
+  singleHint = "Solo se modifica el activo seleccionado.",
+  bulkHint = "Los cambios se aplican a todas las unidades del mismo lote de compra.",
 }: ActivoEditScopeNavProps) {
   if (ejemplaresTotal < 2) return null;
 
@@ -52,9 +56,7 @@ export function ActivoEditScopeNav({
         </button>
       </div>
       <p className="text-xs text-muted-foreground">
-        {scope === "bulk"
-          ? "Los cambios se aplican a todas las unidades del mismo lote de compra."
-          : "Solo se modifica el activo seleccionado."}
+        {scope === "bulk" ? bulkHint : singleHint}
       </p>
     </nav>
   );

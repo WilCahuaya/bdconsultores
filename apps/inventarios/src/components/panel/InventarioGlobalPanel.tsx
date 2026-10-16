@@ -16,7 +16,6 @@ import {
 import { ActivoEditScopeNav, type ActivoEditScope } from "@inventario/ui/panel";
 import {
   Button,
-  EliminarActivosPorCodigosButton,
   FechaDdMmYyyyInput,
   Select,
   useToast,
@@ -82,8 +81,6 @@ interface InventarioGlobalPanelProps {
   /** Dentro de la página de entidad: títulos y migas acordes. */
   embeddedInEntityPage?: boolean;
   entityPageHref?: string;
-  /** Abre el diálogo de eliminación por códigos (inventario de entidad, contador). */
-  onOpenEliminarPorCodigos?: () => void;
 }
 
 const FILTROS_ESTADO: { value: "" | EstadoRegistro; label: string }[] = [
@@ -102,7 +99,6 @@ export function InventarioGlobalPanel({
   fixedEntidadNombre,
   embeddedInEntityPage = false,
   entityPageHref,
-  onOpenEliminarPorCodigos,
 }: InventarioGlobalPanelProps) {
   const isAdmin = mode === "admin";
   const hasFixedEntidad = Boolean(fixedEntidadId);
@@ -404,10 +400,12 @@ export function InventarioGlobalPanel({
                   {preregistroHeaderToolbar && (
                     <PreregistroGestionToolbar {...preregistroHeaderToolbar} />
                   )}
-                  {onOpenEliminarPorCodigos && (
-                    <EliminarActivosPorCodigosButton onClick={onOpenEliminarPorCodigos} />
-                  )}
-                  <PanelCountLabel count={filtrados.length} singular="activo" plural="activos" />
+                  <PanelCountLabel
+                    count={filtrados.length}
+                    singular="activo"
+                    plural="activos"
+                    className="hidden lg:block"
+                  />
                 </div>
               </div>
 

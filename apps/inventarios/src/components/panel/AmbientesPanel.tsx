@@ -73,11 +73,6 @@ import { useTrabajadoresPlanilla } from "./use-trabajadores-planilla";
 import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
 import { AmbientesImportDialog } from "./AmbientesImportDialog";
 import { InventarioImportDialog } from "./InventarioImportDialog";
-import {
-  deleteActivosPorCodigos,
-  previewDeleteActivosPorCodigos,
-} from "@/lib/actions/activos";
-import { EliminarActivosPorCodigosDialog } from "@inventario/ui";
 import { GestionarSucursales } from "./GestionarSucursales";
 import { InventarioGlobalPanel } from "./InventarioGlobalPanel";
 import {
@@ -274,8 +269,6 @@ export function AmbientesPanel({
   const [abrirVisitaError, setAbrirVisitaError] = useState<string | null>(null);
   const [importAmbientesOpen, setImportAmbientesOpen] = useState(false);
   const [importActivosOpen, setImportActivosOpen] = useState(false);
-  const [eliminarOpen, setEliminarOpen] = useState(false);
-
   const puedeGestionarVisita = panelMode === "contador";
   const visitaAbierta = visitasActivas.length > 0;
   const sedesEnVisita = visitasActivas
@@ -672,7 +665,6 @@ export function AmbientesPanel({
           fixedEntidadNombre={entidad.nombre}
           embeddedInEntityPage
           entityPageHref={entidadHref}
-          onOpenEliminarPorCodigos={!isAdmin ? () => setEliminarOpen(true) : undefined}
         />
       ) : !sedeFocus && tab === "visitas" ? (
         <>
@@ -1191,18 +1183,6 @@ export function AmbientesPanel({
             entidades={[entidad]}
             fixedEntidad={entidad}
             onImported={() => void syncAmbientesYResponsables()}
-          />
-          <EliminarActivosPorCodigosDialog
-            open={eliminarOpen}
-            onClose={() => setEliminarOpen(false)}
-            entidades={[entidad]}
-            fixedEntidadId={entidad.id}
-            onPreview={previewDeleteActivosPorCodigos}
-            onDelete={deleteActivosPorCodigos}
-            onDeleted={() => {
-              void syncAmbientesYResponsables();
-              router.refresh();
-            }}
           />
         </>
       )}

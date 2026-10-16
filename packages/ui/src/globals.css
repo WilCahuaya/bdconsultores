@@ -1149,8 +1149,12 @@
       display: none;
     }
 
-    html[data-bd-shell="web"] .panel-shell main.panel-main-padding {
+    html[data-bd-shell="web"] .panel-shell:not(:has(.panel-mobile-save)):has(.panel-toolbar-actions a, .panel-toolbar-actions button) main.panel-main-padding {
       padding-bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    html[data-bd-shell="web"] .panel-shell:not(:has(.panel-mobile-save)) .panel-toolbar-actions:not(:has(a, button)) {
+      display: none;
     }
 
     html[data-bd-shell="web"] .panel-shell:not(:has(.panel-mobile-save)) .panel-toolbar-actions {

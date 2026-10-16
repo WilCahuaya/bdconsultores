@@ -529,7 +529,7 @@ export function ActivosAmbientePanel({
                   {preregistroHeaderToolbar && (
                     <PreregistroGestionToolbar {...preregistroHeaderToolbar} />
                   )}
-                  <span className="text-xs text-muted-foreground">
+                  <span className="panel-count-label hidden text-xs text-muted-foreground lg:inline">
                     {filtrados.length} {filtrados.length === 1 ? "activo" : "activos"}
                   </span>
                   <Link

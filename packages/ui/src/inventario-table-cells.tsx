@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { Activo, CategoriaBien, EstadoBien } from "@inventario/types";
 import {
   buildDescripcionBien,
@@ -48,18 +48,56 @@ export function InventarioTablaLeyendaBadge({ kind }: { kind: InventarioTablaBad
   );
 }
 
+const LEYENDA_ITEMS: ReadonlyArray<{
+  kind: InventarioTablaBadgeKind;
+  full: string;
+  short: string;
+}> = [
+  { kind: "A", full: "Activo", short: "Activo" },
+  { kind: "C", full: "Cuenta de orden", short: "Cta. Orden" },
+  { kind: "PA", full: "Precio adquisición", short: "Prc. Adq." },
+  { kind: "VM", full: "Valor mercado", short: "Val. Mercado" },
+];
+
 function InventarioTablaLeyendaItem({
   kind,
   label,
+  withEquals,
 }: {
   kind: InventarioTablaBadgeKind;
   label: string;
+  withEquals: boolean;
 }) {
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap">
       <InventarioTablaLeyendaBadge kind={kind} />
-      <span>= {label}</span>
+      <span>
+        {withEquals ? "= " : ""}
+        {label}
+      </span>
     </span>
+  );
+}
+
+function LeyendaItems({
+  variant,
+}: {
+  variant: "full" | "short";
+}) {
+  const withEquals = variant === "full";
+  return (
+    <>
+      {LEYENDA_ITEMS.map((item, index) => (
+        <span key={item.kind} className="inline-flex shrink-0 items-center gap-1">
+          {variant === "short" && index > 0 ? <span aria-hidden="true">·</span> : null}
+          <InventarioTablaLeyendaItem
+            kind={item.kind}
+            label={variant === "full" ? item.full : item.short}
+            withEquals={withEquals}
+          />
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -70,21 +108,57 @@ export function InventarioTablaLeyenda({
   className?: string;
   inline?: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [short, setShort] = useState(false);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const measure = measureRef.current;
+    if (!container || !measure) return;
+
+    const media = window.matchMedia("(max-width: 639px)");
+
+    const update = () => {
+      if (!media.matches) {
+        setShort(false);
+        return;
+      }
+      setShort(measure.scrollWidth > container.clientWidth + 1);
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    media.addEventListener("change", update);
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", update);
+    };
+  }, []);
+
   return (
     <div
       role="note"
       aria-label={INVENTARIO_TABLA_LEYENDA}
       className={
         inline
-          ? `text-[10px] leading-relaxed text-muted-foreground sm:text-xs ${className ?? ""}`
-          : `border-t border-border/50 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground sm:px-4 sm:text-xs ${className ?? ""}`
+          ? `relative min-w-0 text-[10px] leading-tight text-muted-foreground sm:text-xs ${className ?? ""}`
+          : `relative border-t border-border/50 px-3 py-2 text-[10px] leading-tight text-muted-foreground sm:px-4 sm:text-xs ${className ?? ""}`
       }
     >
-      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 sm:gap-x-3">
-        <InventarioTablaLeyendaItem kind="A" label="Activo" />
-        <InventarioTablaLeyendaItem kind="C" label="Cuenta de orden" />
-        <InventarioTablaLeyendaItem kind="PA" label="Precio adquisición" />
-        <InventarioTablaLeyendaItem kind="VM" label="Valor mercado" />
+      <div
+        ref={containerRef}
+        className="flex min-w-0 flex-nowrap items-center gap-x-2.5 overflow-hidden sm:flex-wrap sm:gap-x-3 sm:overflow-visible"
+      >
+        <LeyendaItems variant={short ? "short" : "full"} />
+      </div>
+      <div
+        ref={measureRef}
+        aria-hidden
+        className="pointer-events-none invisible absolute left-0 top-0 flex w-max flex-nowrap items-center gap-x-2.5"
+      >
+        <LeyendaItems variant="full" />
       </div>
     </div>
   );

@@ -17,12 +17,14 @@ import {
   ActivoIconButton,
   IconAmbiente,
   IconEditar,
+  IconEliminar,
   IconFoto,
   IconMover,
   IconSimilares,
   IconValidar,
   IconVer,
 } from "./activo-icons";
+import { EliminarBienDialog } from "./EliminarBienDialog";
 
 interface ActivoAccionesBarProps {
   activo: ActivoDetalle;
@@ -61,8 +63,10 @@ export function ActivoAccionesBar({
   const [similaresOpen, setSimilaresOpen] = useState(false);
   const [validarOpen, setValidarOpen] = useState(false);
   const [moverOpen, setMoverOpen] = useState(false);
+  const [eliminarBienOpen, setEliminarBienOpen] = useState(false);
   const inactivo = activo.estado_registro === "DADO_DE_BAJA";
   const esPreregistrado = activo.estado_registro === "PREREGISTRADO";
+  const mostrarEliminarBien = puedeDarDeBaja && activo.estado_registro === "REGISTRADO";
   const mostrarValidar = puedeValidarPreregistro && esPreregistrado;
   const mostrarMover = puedeMoverDesdeFaltante && activo.estado_registro === "REGISTRADO";
   const iconSize = compact ? "h-7 w-7" : "h-9 w-9";
@@ -124,6 +128,15 @@ export function ActivoAccionesBar({
       icon: <IconVer />,
       onClick: () => setDetalleOpen(true),
     });
+    if (mostrarEliminarBien) {
+      list.push({
+        id: "eliminar",
+        label: "Eliminar bien",
+        icon: <IconEliminar />,
+        tone: "danger",
+        onClick: () => setEliminarBienOpen(true),
+      });
+    }
     return list;
   }, [
     activo,
@@ -132,6 +145,7 @@ export function ActivoAccionesBar({
     editarLabel,
     inactivo,
     mostrarMover,
+    mostrarEliminarBien,
     mostrarValidar,
     onEdit,
     onIrAmbiente,
@@ -202,6 +216,16 @@ export function ActivoAccionesBar({
           >
             <IconVer />
           </ActivoIconButton>
+          {mostrarEliminarBien && (
+            <ActivoIconButton
+              label="Eliminar bien"
+              variant="danger"
+              onClick={() => setEliminarBienOpen(true)}
+              className={iconSize}
+            >
+              <IconEliminar />
+            </ActivoIconButton>
+          )}
         </div>
       )}
 
@@ -256,6 +280,18 @@ export function ActivoAccionesBar({
           nombre={activo.nombre}
         />
       ) : null}
+
+      {mostrarEliminarBien && (
+        <EliminarBienDialog
+          activo={activo}
+          open={eliminarBienOpen}
+          onClose={() => setEliminarBienOpen(false)}
+          onDeleted={(ids) => {
+            for (const id of ids) onActivoEliminado?.(id);
+            router.refresh();
+          }}
+        />
+      )}
 
       <AgregarBienesSimilaresDialog
         open={similaresOpen}

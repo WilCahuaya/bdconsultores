@@ -1249,6 +1249,69 @@ export async function deleteActivosPreregistrados(entidadId: string, activoIds: 
   };
 }
 
+export async function deleteBienRegistrado(
+  activoId: string,
+  scope: "single" | "bulk" = "single",
+): Promise<{ data?: { eliminados: number; activo_ids: string[] }; error?: string }> {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") return { error: "Solo el contador puede eliminar bienes." };
+  if (!activoId) return { error: "Bien no válido." };
+
+  const supabase = await createClient();
+  const { data: existing, error: fetchError } = await supabase
+    .from("activos")
+    .select("id, entidad_id, estado_registro")
+    .eq("id", activoId)
+    .maybeSingle();
+
+  if (fetchError || !existing) {
+    return { error: fetchError?.message ?? "Bien no encontrado." };
+  }
+  if (existing.estado_registro !== "REGISTRADO") {
+    return { error: "Solo se pueden eliminar bienes registrados." };
+  }
+
+  let ids = [activoId];
+  if (scope === "bulk") {
+    const { data, error } = await supabase.rpc("list_activos_similares_ids", {
+      p_activo_id: activoId,
+      p_solo_registrados: true,
+    });
+    if (error) return { error: error.message };
+    const listed = (data as string[] | null) ?? [];
+    if (listed.length > 0) ids = listed;
+  }
+
+  const { data: rows, error: rowsError } = await supabase
+    .from("activos")
+    .select("id, codigo_barras, estado_registro")
+    .eq("entidad_id", existing.entidad_id)
+    .in("id", ids);
+
+  if (rowsError) return { error: rowsError.message };
+
+  const elegibles = (rows ?? []).filter(
+    (row) => row.estado_registro === "REGISTRADO" && Boolean(row.codigo_barras),
+  );
+  if (elegibles.length === 0) {
+    return { error: "No hay bienes registrados para eliminar." };
+  }
+
+  const result = await deleteActivosPorCodigos(
+    existing.entidad_id,
+    elegibles.map((row) => row.codigo_barras as string).join("\n"),
+  );
+  if (result.error || !result.data) return { error: result.error ?? "No se pudo eliminar." };
+
+  return {
+    data: {
+      eliminados: result.data.eliminados,
+      activo_ids: elegibles.map((row) => row.id as string),
+    },
+  };
+}
+
 export async function deleteActivoPreregistrado(activoId: string) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };

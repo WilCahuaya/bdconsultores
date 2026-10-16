@@ -17,6 +17,7 @@ export interface TableActionItem {
   icon: ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  tone?: "default" | "danger";
 }
 
 function IconKebab({ className }: { className?: string }) {
@@ -151,7 +152,11 @@ export function TableActionsOverflow({
         <button
           type="button"
           aria-label={item.label}
-          className={btnClass}
+          className={cn(
+            btnClass,
+            item.tone === "danger" &&
+              "!border-destructive/30 !text-destructive hover:!bg-destructive/10 hover:!text-destructive",
+          )}
           disabled={item.disabled}
           onClick={item.onClick}
         >
@@ -176,7 +181,10 @@ export function TableActionsOverflow({
                 type="button"
                 role="menuitem"
                 disabled={item.disabled}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                className={cn(
+                  "flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40",
+                  item.tone === "danger" && "text-destructive",
+                )}
                 onClick={() => {
                   setMenuOpen(false);
                   item.onClick();

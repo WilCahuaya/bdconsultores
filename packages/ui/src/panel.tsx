@@ -224,13 +224,15 @@ export function PanelCountLabel({
   count,
   singular,
   plural,
+  className,
 }: {
   count: number;
   singular: string;
   plural: string;
+  className?: string;
 }) {
   return (
-    <p className="text-sm text-muted-foreground">
+    <p className={`panel-count-label text-sm text-muted-foreground ${className ?? ""}`}>
       {count} {count === 1 ? singular : plural}
     </p>
   );

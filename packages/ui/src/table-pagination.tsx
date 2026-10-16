@@ -98,6 +98,34 @@ export function useTablePagination<T>(
   };
 }
 
+function PageSizeSelect({
+  pageSize,
+  pageSizeOptions,
+  unitLabel,
+  onPageSizeChange,
+}: {
+  pageSize: number;
+  pageSizeOptions: readonly number[];
+  unitLabel: string;
+  onPageSizeChange: (pageSize: TablePageSize) => void;
+}) {
+  return (
+    <Select
+      aria-label={`${unitLabel} por página`}
+      size="compact"
+      value={String(pageSize)}
+      onChange={(value) => {
+        const n = Number(value);
+        if (isTablePageSize(n)) onPageSizeChange(n);
+      }}
+      options={pageSizeOptions.map((n) => ({
+        value: String(n),
+        label: String(n),
+      }))}
+    />
+  );
+}
+
 export function TablePagination({
   page,
   totalPages,
@@ -128,38 +156,73 @@ export function TablePagination({
 
   const showPageNav = total > pageSize;
 
+  const rangeLabel = `${rangeStart}–${rangeEnd} de ${total.toLocaleString("es-PE")} ${unitLabel}`;
+
+  const pageSizeSelect = onPageSizeChange ? (
+    <PageSizeSelect
+      pageSize={pageSize}
+      pageSizeOptions={pageSizeOptions}
+      unitLabel={unitLabel}
+      onPageSizeChange={onPageSizeChange}
+    />
+  ) : null;
+
   return (
-    <div className="flex flex-nowrap items-center justify-between gap-2 border-t border-border/40 bg-muted/30 px-3 py-2">
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
-        <p className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
-          {rangeStart}–{rangeEnd}
-          <span className="hidden sm:inline">
-            {" "}
-            de {total.toLocaleString("es-PE")} {unitLabel}
-          </span>
+    <div className="flex flex-col gap-1 border-t border-border/40 bg-muted/30 px-3 py-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-x-3 sm:gap-y-1">
+      <div className="flex min-w-0 items-center justify-between gap-2 sm:contents">
+        <p className="min-w-0 truncate text-xs text-muted-foreground sm:shrink-0 sm:whitespace-nowrap">
+          {rangeLabel}
         </p>
-        {onPageSizeChange && (
-          <div className="hidden shrink-0 items-center gap-1.5 lg:flex">
-            <span className="text-xs text-muted-foreground">Mostrar</span>
-            <Select
-              aria-label={`${unitLabel} por página`}
-              size="compact"
-              value={String(pageSize)}
-              onChange={(value) => {
-                const n = Number(value);
-                if (isTablePageSize(n)) onPageSizeChange(n);
-              }}
-              options={pageSizeOptions.map((n) => ({
-                value: String(n),
-                label: String(n),
-              }))}
-            />
+        {(pageSizeSelect || showPageNav) && (
+          <div className="flex shrink-0 items-center gap-1 sm:hidden">
+            {pageSizeSelect ? (
+              <div className="w-14 shrink-0 [&>div]:w-full [&>div]:max-w-none [&_button]:h-8 [&_button]:w-full [&_button]:min-w-0 [&_button]:max-w-none [&_button]:px-1.5 [&_button]:pr-5 [&_svg]:right-1">
+                {pageSizeSelect}
+              </div>
+            ) : null}
+            {showPageNav ? (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 w-8 px-0 text-base"
+                  disabled={page <= 1}
+                  onClick={() => onPageChange(page - 1)}
+                  aria-label="Anterior"
+                >
+                  ‹
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 w-8 px-0 text-base"
+                  disabled={page >= totalPages}
+                  onClick={() => onPageChange(page + 1)}
+                  aria-label="Siguiente"
+                >
+                  ›
+                </Button>
+              </>
+            ) : null}
           </div>
         )}
-        {legend ? <div className="hidden min-w-0 flex-1 basis-full lg:block lg:basis-auto">{legend}</div> : null}
       </div>
+      {onPageSizeChange ? (
+        <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+          <span className="hidden text-xs text-muted-foreground lg:inline">Mostrar</span>
+          <PageSizeSelect
+            pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
+            unitLabel={unitLabel}
+            onPageSizeChange={onPageSizeChange}
+          />
+        </div>
+      ) : null}
+      {legend ? <div className="min-w-0 w-full sm:w-auto sm:flex-1">{legend}</div> : null}
       {showPageNav && (
-        <div className="flex items-center gap-1.5">
+        <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
           <Button
             type="button"
             size="sm"
@@ -170,7 +233,7 @@ export function TablePagination({
           >
             Anterior
           </Button>
-          <span className="hidden min-w-[5.5rem] text-center text-xs text-muted-foreground sm:inline">
+          <span className="min-w-[5.5rem] text-center text-xs text-muted-foreground">
             Pág. {page} / {totalPages}
           </span>
           <Button
