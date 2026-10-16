@@ -55,11 +55,21 @@ const tdTotalBase =
 const tdTotalAccent =
   "border-t border-b border-r border-border/60 px-2 py-2 text-right text-[11px] font-semibold tabular-nums leading-none whitespace-nowrap text-primary last:border-r-0";
 
-function Colgroup({ widthsPx }: { widthsPx: readonly number[] }) {
+function Colgroup({
+  widthsPx,
+  nameColIndex,
+}: {
+  widthsPx: readonly number[];
+  nameColIndex: number;
+}) {
   return (
     <colgroup>
       {widthsPx.map((w, i) => (
-        <col key={i} style={{ width: w, minWidth: w }} />
+        <col
+          key={i}
+          className={i === nameColIndex ? "inventario-name-col" : undefined}
+          style={{ width: w, minWidth: w }}
+        />
       ))}
     </colgroup>
   );
@@ -604,7 +614,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
           className={`${tableClass} w-full table-fixed border-separate border-spacing-0`}
           style={{ minWidth: tableMinWidth }}
         >
-          <Colgroup widthsPx={widthValues} />
+          <Colgroup widthsPx={widthValues} nameColIndex={nombreStickyAt} />
           <thead>
             <tr>
               {withSelection && selection && (

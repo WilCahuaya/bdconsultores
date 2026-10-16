@@ -1201,7 +1201,7 @@
       border-radius: 0;
     }
 
-    /* Lista: scroll horizontal. El nombre va en una fila y se desplaza con la tabla. */
+    /* Lista: scroll horizontal. El nombre se fija más abajo, en una sola línea. */
     html[data-bd-shell="web"] .panel-list-table {
       overflow-x: auto;
     }
@@ -1218,26 +1218,13 @@
       max-width: none;
     }
 
-    html[data-bd-shell="web"] .panel-name-cell,
-    html[data-bd-shell="web"] .panel-scroll-table th:nth-child(3),
-    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3),
-    html[data-bd-shell="web"] .inventario-activos-table th.inventario-sticky-col,
-    html[data-bd-shell="web"] .inventario-activos-table td.inventario-sticky-col {
-      position: static;
-      left: auto;
+    /* Nº, Cat., Código y Visita se van con el scroll. Solo el nombre queda fijo. */
+    html[data-bd-shell="web"] .inventario-activos-table th.inventario-sticky-col:not(.inventario-sticky-col--last),
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col:not(.inventario-sticky-col--last),
+    html[data-bd-shell="web"] .inventario-activos-table tfoot td.inventario-sticky-col {
+      position: static !important;
+      left: auto !important;
       box-shadow: none;
-      white-space: nowrap;
-    }
-
-    html[data-bd-shell="web"] .panel-name-cell > span,
-    html[data-bd-shell="web"] .panel-name-cell > a,
-    html[data-bd-shell="web"] .panel-name-cell > button,
-    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > a {
-      display: block;
-      overflow: visible;
-      white-space: nowrap;
-      text-overflow: unset;
-      -webkit-line-clamp: unset;
     }
   }
 
@@ -1265,15 +1252,88 @@
     background: hsl(var(--muted));
   }
 
+  /* Celular y tablet: solo el nombre queda fijo, una línea y puntos suspensivos. */
   @media (max-width: 1023px) {
+    html[data-bd-shell="web"] .panel-list-table th.panel-name-cell,
+    html[data-bd-shell="web"] .panel-list-table td.panel-name-cell,
     html[data-bd-shell="web"] .panel-scroll-table th:nth-child(3),
-    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) {
-      position: static;
-      left: auto;
-      z-index: auto;
-      max-width: none;
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3),
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last {
+      position: sticky !important;
+      left: 0 !important;
+      z-index: 3;
+      box-sizing: border-box;
+      width: 10.5rem !important;
+      min-width: 10.5rem !important;
+      max-width: 10.5rem !important;
+      overflow: hidden;
       white-space: nowrap;
-      box-shadow: none;
+      background: hsl(var(--card));
+      box-shadow: 2px 0 0 hsl(var(--border) / 0.55);
+    }
+
+    html[data-bd-shell="web"] .panel-list-table thead th.panel-name-cell,
+    html[data-bd-shell="web"] .panel-scroll-table thead th:nth-child(3),
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last {
+      top: 0;
+      z-index: 4;
+      background: hsl(var(--muted));
+    }
+
+    html[data-bd-shell="web"] .panel-list-table tbody tr:hover > td.panel-name-cell,
+    html[data-bd-shell="web"] .panel-scroll-table tbody tr:hover > td:nth-child(3) {
+      background: hsl(var(--muted));
+    }
+
+    html[data-bd-shell="web"] .panel-name-cell > span,
+    html[data-bd-shell="web"] .panel-name-cell > a,
+    html[data-bd-shell="web"] .panel-name-cell > button,
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > a,
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > span,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last > span,
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last > span,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last > span > span:first-child {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    html[data-bd-shell="web"] .panel-name-cell > span.flex {
+      display: flex;
+      min-width: 0;
+    }
+
+    html[data-bd-shell="web"] .panel-name-cell > span.flex > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table col.inventario-name-col {
+      width: 10.5rem !important;
+      min-width: 10.5rem !important;
+    }
+  }
+
+  @media (min-width: 640px) and (max-width: 1023px) {
+    html[data-bd-shell="web"] .panel-list-table th.panel-name-cell,
+    html[data-bd-shell="web"] .panel-list-table td.panel-name-cell,
+    html[data-bd-shell="web"] .panel-scroll-table th:nth-child(3),
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3),
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last {
+      width: 14rem !important;
+      min-width: 14rem !important;
+      max-width: 14rem !important;
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table col.inventario-name-col {
+      width: 14rem !important;
+      min-width: 14rem !important;
     }
   }
 
