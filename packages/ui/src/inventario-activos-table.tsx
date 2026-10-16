@@ -436,7 +436,6 @@ function FullTableBody<T extends Activo>({
             )}
             <InventarioTextCell
               title={activo.nombre}
-              lineClamp2
               className={filteredColClass(nomOn, stickyNom?.className)}
               style={stickyNom?.style}
             >

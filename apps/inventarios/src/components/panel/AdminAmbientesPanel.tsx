@@ -26,6 +26,7 @@ import {
   panelTableShrinkCellClass,
   panelTableStickyHeadClass,
   panelTableNowrapCellClass,
+  panelTableNameCellClass,
   useStoredViewMode,
   SedeAmbienteFilterSelect,
   VisitasCampoBanner,
@@ -583,7 +584,7 @@ export function AdminAmbientesPanel({
           }
         />
       ) : viewMode === "list" ? (
-        <PanelDataTable layout="auto">
+        <PanelDataTable layout="auto" scroll>
           <PanelTableColgroup
             cols={
               ocultarSucursalEnLista
@@ -597,10 +598,10 @@ export function AdminAmbientesPanel({
           />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
-              <PanelTableTh>Ambiente</PanelTableTh>
+              <PanelTableTh className={panelTableNameCellClass}>Ambiente</PanelTableTh>
               <PanelTableTh className={panelTableNowrapCellClass}>Espacio que ocupa</PanelTableTh>
-              <PanelTableTh>Responsable</PanelTableTh>
-              <PanelTableTh>Descripción</PanelTableTh>
+              <PanelTableTh className="min-w-[11rem]">Responsable</PanelTableTh>
+              <PanelTableTh className="min-w-[12rem]">Descripción</PanelTableTh>
               {!ocultarSucursalEnLista && <PanelTableTh className={panelTableShrinkCellClass}>Sucursal</PanelTableTh>}
               <PanelTableTh align="center" className={panelTableShrinkCellClass}>
                 Activos
@@ -618,7 +619,7 @@ export function AdminAmbientesPanel({
             {filtrados.map((amb) => (
               <tr
                 key={amb.id}
-                className={panelTableClickableRowClass}
+                className={`${panelTableClickableRowClass} group`}
                 onClick={() => router.push(adminActivoHref(amb.id))}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -629,7 +630,7 @@ export function AdminAmbientesPanel({
                 tabIndex={0}
                 role="link"
               >
-                <PanelTableTd className="font-medium text-primary" title={amb.nombre}>
+                <PanelTableTd className={panelTableNameCellClass} title={amb.nombre}>
                   {amb.nombre}
                 </PanelTableTd>
                 <PanelTableTd
@@ -645,10 +646,10 @@ export function AdminAmbientesPanel({
                     espacioNombre: amb.espacio_nombre,
                   })}
                 </PanelTableTd>
-                <PanelTableTd title={amb.responsable ?? undefined}>
+                <PanelTableTd className="min-w-[11rem]" title={amb.responsable ?? undefined}>
                   {amb.responsable ?? "—"}
                 </PanelTableTd>
-                <PanelTableTd className="text-muted-foreground" title={amb.descripcion ?? undefined}>
+                <PanelTableTd className="min-w-[12rem] text-muted-foreground" title={amb.descripcion ?? undefined}>
                   {amb.descripcion ?? "—"}
                 </PanelTableTd>
                 {!ocultarSucursalEnLista && (

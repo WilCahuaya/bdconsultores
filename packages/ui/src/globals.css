@@ -1189,6 +1189,45 @@
       max-width: none;
       border-radius: 0;
     }
+
+    /* Lista: scroll horizontal. El nombre va en una fila y se desplaza con la tabla. */
+    html[data-bd-shell="web"] .panel-list-table {
+      overflow-x: auto;
+    }
+
+    html[data-bd-shell="web"] .panel-list-table > table {
+      width: max-content;
+      min-width: 100%;
+      max-width: none;
+    }
+
+    html[data-bd-shell="web"] .panel-list-table th,
+    html[data-bd-shell="web"] .panel-list-table td {
+      width: auto;
+      max-width: none;
+    }
+
+    html[data-bd-shell="web"] .panel-name-cell,
+    html[data-bd-shell="web"] .panel-scroll-table th:nth-child(3),
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3),
+    html[data-bd-shell="web"] .inventario-activos-table th.inventario-sticky-col,
+    html[data-bd-shell="web"] .inventario-activos-table td.inventario-sticky-col {
+      position: static;
+      left: auto;
+      box-shadow: none;
+      white-space: nowrap;
+    }
+
+    html[data-bd-shell="web"] .panel-name-cell > span,
+    html[data-bd-shell="web"] .panel-name-cell > a,
+    html[data-bd-shell="web"] .panel-name-cell > button,
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > a {
+      display: block;
+      overflow: visible;
+      white-space: nowrap;
+      text-overflow: unset;
+      -webkit-line-clamp: unset;
+    }
   }
 
   html[data-bd-shell="web"] .panel-scroll-table thead th {
@@ -1213,6 +1252,18 @@
   html[data-bd-shell="web"] .panel-scroll-table thead th:nth-child(3) {
     z-index: 4;
     background: hsl(var(--muted));
+  }
+
+  @media (max-width: 1023px) {
+    html[data-bd-shell="web"] .panel-scroll-table th:nth-child(3),
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) {
+      position: static;
+      left: auto;
+      z-index: auto;
+      max-width: none;
+      white-space: nowrap;
+      box-shadow: none;
+    }
   }
 
   @media (min-width: 768px) and (max-width: 1023px) {

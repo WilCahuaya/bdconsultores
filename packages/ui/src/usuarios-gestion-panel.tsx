@@ -32,6 +32,7 @@ import {
   PanelTableColgroup,
   PanelTableTd,
   PanelTableTh,
+  panelTableNameCellClass,
   panelTableNowrapCellClass,
 } from "./panel-table-layout";
 
@@ -311,7 +312,7 @@ export function UsuariosGestionPanel({
           <PanelTableColgroup cols={USUARIOS_TABLE_COLS} />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
-              <PanelTableTh>Nombre</PanelTableTh>
+              <PanelTableTh className={panelTableNameCellClass}>Nombre</PanelTableTh>
               <PanelTableTh>Correo</PanelTableTh>
               <PanelTableTh className={panelTableNowrapCellClass}>Rol</PanelTableTh>
               <PanelTableTh>Entidad</PanelTableTh>
@@ -332,7 +333,7 @@ export function UsuariosGestionPanel({
 
               return (
                 <tr key={usuario.id} className={panelTableBodyRowClass}>
-                  <PanelTableTd className="font-medium">
+                  <PanelTableTd className={panelTableNameCellClass}>
                     {usuario.nombre}
                     {esYo && (
                       <span className="ml-2 text-xs font-normal text-muted-foreground">(usted)</span>

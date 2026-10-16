@@ -18,6 +18,7 @@ import {
   panelTableClickableRowClass,
   panelTableHeadRowClass,
   panelTableStickyHeadClass,
+  panelTableNameCellClass,
   ENTIDADES_TABLE_COLS,
 } from "@inventario/ui/panel";
 import { listActivos, type ActivoConUbicacion } from "@/lib/actions/activos";
@@ -157,7 +158,7 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
             <PanelTableColgroup cols={ENTIDAD_COLS} />
             <thead className={panelTableStickyHeadClass}>
               <tr className={panelTableHeadRowClass}>
-                <PanelTableTh>Razón social</PanelTableTh>
+                <PanelTableTh className={panelTableNameCellClass}>Razón social</PanelTableTh>
                 <PanelTableTh className="shrink-0">RUC</PanelTableTh>
                 <PanelTableTh align="center" className="shrink-0">
                   Ambientes
@@ -170,7 +171,7 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
                 return (
                   <tr
                     key={entidad.id}
-                    className={`${panelTableClickableRowClass} ${
+                    className={`${panelTableClickableRowClass} group ${
                       selected ? "bg-primary/10 hover:bg-primary/15" : ""
                     }`}
                     onClick={() => seleccionarEntidad(entidad.id)}
@@ -184,7 +185,7 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
                     role="link"
                     aria-current={selected ? "true" : undefined}
                   >
-                    <PanelTableTd className="font-medium text-primary">{entidadEtiqueta(entidad)}</PanelTableTd>
+                    <PanelTableTd className={panelTableNameCellClass}>{entidadEtiqueta(entidad)}</PanelTableTd>
                     <PanelTableTd className="font-mono text-xs text-muted-foreground">
                       {entidad.ruc ?? "—"}
                     </PanelTableTd>

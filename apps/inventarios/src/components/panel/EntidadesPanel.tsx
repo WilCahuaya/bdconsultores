@@ -31,6 +31,7 @@ import {
   panelTableClickableRowClass,
   panelTableHeadRowClass,
   panelTableStickyHeadClass,
+  panelTableNameCellClass,
   useStoredViewMode,
 } from "@inventario/ui/panel";
 import {
@@ -706,7 +707,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
           <PanelTableColgroup cols={ENTIDADES_TABLE_COLS} />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
-              <PanelTableTh>Razón social</PanelTableTh>
+              <PanelTableTh className={panelTableNameCellClass}>Razón social</PanelTableTh>
               <PanelTableTh className={panelTableShrinkCellClass}>RUC</PanelTableTh>
               <PanelTableTh className={panelTableNowrapCellClass}>Módulos</PanelTableTh>
               <PanelTableTh>Administrador</PanelTableTh>
@@ -724,7 +725,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
             {filtradas.map((entidad) => (
               <tr
                 key={entidad.id}
-                className={panelTableClickableRowClass}
+                className={`${panelTableClickableRowClass} group`}
                 onClick={() => router.push(entidadPageHref(entidad.id))}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -735,7 +736,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
                 tabIndex={0}
                 role="link"
               >
-                <PanelTableTd className="font-medium text-primary" title={entidad.nombre}>
+                <PanelTableTd className={panelTableNameCellClass} title={entidad.nombre}>
                   {entidadEtiqueta(entidad)}
                 </PanelTableTd>
                 <PanelTableTd

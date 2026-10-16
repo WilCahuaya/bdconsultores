@@ -27,6 +27,7 @@ import {
   panelTableShrinkCellClass,
   panelTableNowrapCellClass,
   panelTableStickyHeadClass,
+  panelTableNameCellClass,
 } from "./panel";
 import { scrollbarThemedClass } from "./responsive-layout";
 
@@ -441,7 +442,7 @@ export function EntidadResumenPanel({
                     <PanelTableColgroup widths={AMBIENTES_RESUMEN_TABLE_WIDTHS_PCT} />
                     <thead className={panelTableStickyHeadClass}>
                       <tr className={panelTableHeadRowClass}>
-                        <PanelTableTh>Ambiente</PanelTableTh>
+                        <PanelTableTh className={panelTableNameCellClass}>Ambiente</PanelTableTh>
                         <PanelTableTh>Responsable</PanelTableTh>
                         <PanelTableTh>Descripción</PanelTableTh>
                         <PanelTableTh align="center" className={panelTableShrinkCellClass}>
@@ -453,7 +454,7 @@ export function EntidadResumenPanel({
                     <tbody>
                       {lista.map((amb) => (
                         <tr key={amb.id} className="border-b border-border/40 last:border-b-0">
-                          <PanelTableTd className="font-medium" title={amb.nombre}>
+                          <PanelTableTd className={panelTableNameCellClass} title={amb.nombre}>
                             {amb.nombre}
                           </PanelTableTd>
                           <PanelTableTd title={amb.responsable ?? undefined}>

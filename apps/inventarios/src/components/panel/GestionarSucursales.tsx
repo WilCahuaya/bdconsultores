@@ -21,6 +21,7 @@ import {
   panelTableNowrapCellClass,
   panelTableShrinkCellClass,
   panelTableStickyHeadClass,
+  panelTableNameCellClass,
 } from "@inventario/ui/panel";
 import {
   createEspacio,
@@ -170,7 +171,7 @@ export function GestionarSucursales({
           <PanelTableColgroup widths={SUCURSALES_TABLE_COL_WIDTHS_PCT} />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
-              <PanelTableTh>Sucursal</PanelTableTh>
+              <PanelTableTh className={panelTableNameCellClass}>Sucursal</PanelTableTh>
               <PanelTableTh>Dirección</PanelTableTh>
               <PanelTableTh align="center" className={panelTableShrinkCellClass}>
                 Ambientes
@@ -184,11 +185,11 @@ export function GestionarSucursales({
           <tbody>
             {sedes.map((sede) => (
               <tr key={sede.id} className={panelTableBodyRowClass}>
-                <PanelTableTd className="font-medium" title={sede.nombre}>
+                <PanelTableTd className={panelTableNameCellClass} title={sede.nombre}>
                   {onViewAmbientes ? (
                     <button
                       type="button"
-                      className="font-medium text-primary hover:underline"
+                      className="block truncate text-left font-medium text-primary hover:underline"
                       title="Ver ambientes de esta sucursal"
                       onClick={() => onViewAmbientes(sede.id)}
                     >

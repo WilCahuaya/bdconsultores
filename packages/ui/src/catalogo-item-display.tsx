@@ -5,6 +5,7 @@ import { panelTableMutedClass } from "./panel-list-table";
 import {
   PanelTableTd,
   PanelTableTh,
+  panelTableNameCellClass,
   panelTableNowrapCellClass,
 } from "./panel-table-layout";
 import type { PanelTableColSpec } from "./panel-table-layout";
@@ -34,7 +35,7 @@ export function CatalogoItemTableHead({
   return (
     <>
       <PanelTableTh className={panelTableNowrapCellClass}>Código</PanelTableTh>
-      <PanelTableTh>Denominación</PanelTableTh>
+      <PanelTableTh className={panelTableNameCellClass}>Denominación</PanelTableTh>
       <PanelTableTh>Grupo</PanelTableTh>
       <PanelTableTh>Clase</PanelTableTh>
       <PanelTableTh className={panelTableNowrapCellClass}>Código cuenta contable</PanelTableTh>
@@ -63,7 +64,7 @@ export function CatalogoItemTableCells({
       <PanelTableTd className={`font-mono text-xs ${panelTableNowrapCellClass}`}>
         {item.codigo}
       </PanelTableTd>
-      <PanelTableTd className="font-medium" title={item.denominacion}>
+      <PanelTableTd className={panelTableNameCellClass} title={item.denominacion}>
         {item.denominacion}
       </PanelTableTd>
       <PanelTableTd className={panelTableMutedClass} title={item.grupo ?? undefined}>

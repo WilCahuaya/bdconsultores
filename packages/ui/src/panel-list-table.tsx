@@ -5,18 +5,25 @@ export function PanelDataTable({
   children,
   minWidth: _minWidth,
   layout = "fixed",
+  scroll = false,
 }: {
   children: ReactNode;
   /** @deprecated Las tablas usan ancho fluido sin scroll horizontal. */
   minWidth?: number;
   layout?: "fixed" | "auto";
+  /** La tabla crece con el contenido y se desplaza en horizontal. */
+  scroll?: boolean;
 }) {
   return (
-    <div className={`${panelCardClass} min-w-0 max-w-full overflow-hidden`}>
+    <div
+      className={`${panelCardClass} panel-list-table min-w-0 max-w-full ${
+        scroll ? "overflow-x-auto" : "overflow-hidden"
+      }`}
+    >
       <table
-        className={`min-w-0 w-full max-w-full text-left text-sm ${
+        className={`text-left text-sm ${
           layout === "auto" ? "table-auto" : "table-fixed"
-        }`}
+        } ${scroll ? "w-max min-w-full" : "min-w-0 w-full max-w-full"}`}
       >
         {children}
       </table>

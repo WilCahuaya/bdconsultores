@@ -35,6 +35,7 @@ import {
   PanelTableTd,
   PanelTableTh,
   RESPONSABLES_TABLE_COLS,
+  panelTableNameCellClass,
   panelTableNowrapCellClass,
   panelTableShrinkCellClass,
 } from "./panel-table-layout";
@@ -287,7 +288,7 @@ export function ResponsablesPanel({
           <PanelTableColgroup cols={RESPONSABLES_TABLE_COLS} />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
-              <PanelTableTh>Nombre</PanelTableTh>
+              <PanelTableTh className={panelTableNameCellClass}>Nombre</PanelTableTh>
               <PanelTableTh className={panelTableShrinkCellClass}>DNI</PanelTableTh>
               <PanelTableTh className={panelTableShrinkCellClass}>Cargo</PanelTableTh>
               <PanelTableTh>Correo</PanelTableTh>
@@ -302,9 +303,9 @@ export function ResponsablesPanel({
           <tbody>
             {filtrados.map((item) => (
               <tr key={item.id} className={panelTableBodyRowClass}>
-                <PanelTableTd className="font-medium" title={item.nombre}>
-                  <span className="flex items-center gap-1.5 truncate">
-                    <span className="truncate">{item.nombre}</span>
+                <PanelTableTd className={panelTableNameCellClass} title={item.nombre}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="block truncate">{item.nombre}</span>
                     {item.es_administrador && (
                       <StatusBadge variant="pending">Administrador</StatusBadge>
                     )}
