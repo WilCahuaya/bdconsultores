@@ -13,7 +13,7 @@ import {
   pasoFiltrosColumnaInventario,
   validarFechaDDMMYYYY,
 } from "@inventario/types";
-import { useToast, mensajeEliminacionPreregistros, FechaDdMmYyyyInput } from "@inventario/ui";
+import { useToast, mensajeEliminacionPreregistros, FechaDdMmYyyyInput, Select } from "@inventario/ui";
 import {
   ActivoEditScopeNav,
   type ActivoEditScope,
@@ -26,11 +26,19 @@ import {
 import { ActivoForm } from "./ActivoForm";
 import { listProcedenciaFaltanteDetalle } from "@/lib/actions/visitas-campo";
 import { FaltanteBienesPanel, useVisitaRevision } from "./VisitaRevisionPanel";
-import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
+import {
+  ActivosInventarioExcelView,
+  type CopiarToolbarState,
+} from "./ActivosInventarioExcelView";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
 import type { FichaAsignacionExportMeta } from "@/lib/actions/ficha-asignacion-meta";
 import { fetchAmbientesPorSedeWeb } from "@/lib/ambiente-nav";
 import { deleteActivosPreregistrados } from "@/lib/actions/activos";
+import {
+  ORDEN_INVENTARIO_OPCIONES,
+  ordenarActivosInventario,
+  type OrdenInventario,
+} from "@/lib/inventario-orden";
 import { useEjemplaresResumen } from "@/hooks/useEjemplaresResumen";
 import {
   PanelPageHeader,
@@ -111,6 +119,18 @@ export function ActivosAmbientePanel({
   const { pushToast } = useToast();
   const [activosList, setActivosList] = useState(activos);
   const [editActivo, setEditActivo] = useState<Activo | null>(null);
+  const [copiarToolbar, setCopiarToolbar] = useState<CopiarToolbarState | null>(null);
+  const [orden, setOrden] = useState<OrdenInventario>("codigo");
+  const [seleccionIds, setSeleccionIds] = useState<string[]>([]);
+  const handleCopiarState = useCallback((state: CopiarToolbarState | null) => {
+    setCopiarToolbar(state);
+  }, []);
+  const handleSeleccion = useCallback((ids: string[]) => {
+    setSeleccionIds((prev) => {
+      if (prev.length === ids.length && prev.every((id, index) => id === ids[index])) return prev;
+      return ids;
+    });
+  }, []);
   const [editScope, setEditScope] = useState<ActivoEditScope>("single");
   const { resumen: ejemplaresResumen } = useEjemplaresResumen(editActivo?.id);
   const ejemplaresTotal = ejemplaresResumen?.total ?? 0;
@@ -342,13 +362,14 @@ export function ActivosAmbientePanel({
   );
 
   const filtrados = useMemo(() => {
-    return activosBase.filter((a) =>
+    const rows = activosBase.filter((a) =>
       pasoFiltrosColumnaInventario(a, columnFilters, {
         aplicarUbicacion: false,
         aplicarCuenta: !isAdmin,
       }),
     );
-  }, [activosBase, columnFilters, isAdmin]);
+    return ordenarActivosInventario(rows, orden);
+  }, [activosBase, columnFilters, isAdmin, orden]);
 
   function handleSuccess() {
     setEditActivo(null);
@@ -487,30 +508,39 @@ export function ActivosAmbientePanel({
                   />
                 </div>
 
-                <div className="w-full min-w-0 space-y-0.5 sm:w-[9.5rem] sm:shrink-0">
-                  <label htmlFor="ambiente_fecha_corte" className="sr-only">
-                    Fecha de corte
-                  </label>
-                  <FechaDdMmYyyyInput
-                    id="ambiente_fecha_corte"
-                    value={fechaCorteText}
-                    onChange={(next) => {
-                      setFechaCorteText(next);
-                      aplicarFechaCorte(next);
-                    }}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onBlur={(e) => aplicarFechaCorte(e.currentTarget.value, { fromBlur: true })}
-                    aria-invalid={Boolean(fechaCorteError)}
-                    aria-label="Fecha de corte"
-                    title="Fecha de corte (depreciación y valor neto)"
-                    className="h-8 text-sm"
+                <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+                  <div className="min-w-0 flex-1 space-y-0.5 sm:w-[9.5rem] sm:flex-none">
+                    <label htmlFor="ambiente_fecha_corte" className="sr-only">
+                      Fecha de corte
+                    </label>
+                    <FechaDdMmYyyyInput
+                      id="ambiente_fecha_corte"
+                      value={fechaCorteText}
+                      onChange={(next) => {
+                        setFechaCorteText(next);
+                        aplicarFechaCorte(next);
+                      }}
+                      onFocus={(e) => e.currentTarget.select()}
+                      onBlur={(e) => aplicarFechaCorte(e.currentTarget.value, { fromBlur: true })}
+                      aria-invalid={Boolean(fechaCorteError)}
+                      aria-label="Fecha de corte"
+                      title="Fecha de corte (depreciación y valor neto)"
+                      className="h-8 text-sm"
+                    />
+                    {fechaCorteError && (
+                      <p className="text-[10px] leading-tight text-destructive">{fechaCorteError}</p>
+                    )}
+                  </div>
+                  <Select
+                    aria-label="Orden de la lista"
+                    size="compact"
+                    value={orden}
+                    onChange={(value) => setOrden(value as OrdenInventario)}
+                    options={ORDEN_INVENTARIO_OPCIONES}
+                    className="w-[7.25rem] shrink-0"
                   />
-                  {fechaCorteError && (
-                    <p className="text-[10px] leading-tight text-destructive">{fechaCorteError}</p>
-                  )}
+                  {viewToggle}
                 </div>
-
-                {viewToggle}
                 <div className={`${panelToolbarActionsClass} ml-auto`}>
                   {!esAmbientePreregistro && (
                     <AmbienteReportesExport
@@ -524,6 +554,7 @@ export function ActivosAmbientePanel({
                       usuarioNombre={usuarioNombre}
                       usuarioEmail={usuarioEmail}
                       esAdmin={isAdmin}
+                      selectedIds={seleccionIds}
                     />
                   )}
                   {preregistroHeaderToolbar && (
@@ -532,6 +563,15 @@ export function ActivosAmbientePanel({
                   <span className="panel-count-label hidden text-xs text-muted-foreground lg:inline">
                     {filtrados.length} {filtrados.length === 1 ? "activo" : "activos"}
                   </span>
+                  {copiarToolbar && (
+                    <button
+                      type="button"
+                      onClick={copiarToolbar.onOpen}
+                      className="inline-flex h-8 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90"
+                    >
+                      Copiar ({copiarToolbar.count})
+                    </button>
+                  )}
                   <Link
                     href={nuevoHref}
                     className="inline-flex h-8 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90"
@@ -562,6 +602,8 @@ export function ActivosAmbientePanel({
           leyendaVisita={visita.activa ? visita.leyenda : null}
           renderVisita={visita.activa ? visita.renderCelda : undefined}
           procedenciaPorActivo={esAmbienteFaltante ? procedenciaPorActivo : undefined}
+          onCopiarStateChange={handleCopiarState}
+          onSeleccionChange={handleSeleccion}
         />
     </div>
   );

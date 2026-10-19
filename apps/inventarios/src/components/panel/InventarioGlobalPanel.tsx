@@ -24,6 +24,11 @@ import {
   type PreregistroGestionToolbarState,
 } from "@inventario/ui";
 import { deleteActivosPreregistrados } from "@/lib/actions/activos";
+import {
+  ORDEN_INVENTARIO_OPCIONES,
+  ordenarActivosInventario,
+  type OrdenInventario,
+} from "@/lib/inventario-orden";
 import { ActivoForm } from "./ActivoForm";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { useEjemplaresResumen } from "@/hooks/useEjemplaresResumen";
@@ -116,6 +121,7 @@ export function InventarioGlobalPanel({
   const [fechaCorteText, setFechaCorteText] = useState(() => dateToDDMMYYYY(fechaCorteInicial()));
   const [fechaCorte, setFechaCorte] = useState(() => fechaCorteInicial());
   const [fechaCorteError, setFechaCorteError] = useState<string | null>(null);
+  const [orden, setOrden] = useState<OrdenInventario>("codigo");
   const [editActivo, setEditActivo] = useState<InventarioItem | null>(null);
   const [editScope, setEditScope] = useState<ActivoEditScope>("single");
   const { resumen: ejemplaresResumen } = useEjemplaresResumen(editActivo?.id);
@@ -267,14 +273,15 @@ export function InventarioGlobalPanel({
   );
 
   const filtrados = useMemo(() => {
-    return activosBase.filter((a) =>
+    const rows = activosBase.filter((a) =>
       pasoFiltrosColumnaInventario(a, columnFilters, {
         aplicarUbicacion: true,
         aplicarCuenta: !isAdmin,
         ubicacionConSede: ubicacionMultiplesSedes,
       }),
     );
-  }, [activosBase, columnFilters, isAdmin, ubicacionMultiplesSedes]);
+    return ordenarActivosInventario(rows, orden);
+  }, [activosBase, columnFilters, isAdmin, ubicacionMultiplesSedes, orden]);
 
   const hasActiveFilters = Boolean(
     (!hasFixedEntidad && !isAdmin && entidadId) ||
@@ -464,6 +471,15 @@ export function InventarioGlobalPanel({
                       <p className="text-[10px] leading-tight text-destructive">{fechaCorteError}</p>
                     )}
                   </div>
+
+                  <Select
+                    aria-label="Orden de la lista"
+                    size="compact"
+                    value={orden}
+                    onChange={(value) => setOrden(value as OrdenInventario)}
+                    options={ORDEN_INVENTARIO_OPCIONES}
+                    className="w-[7.25rem] shrink-0"
+                  />
 
                   {!hasFixedEntidad && !isAdmin && (
                     <div className="min-w-0 flex-1 lg:w-auto lg:flex-none [&>div]:w-full [&>div]:max-w-none">

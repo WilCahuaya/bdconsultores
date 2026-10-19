@@ -5,6 +5,7 @@ import type { RolUsuario } from "@inventario/types";
 import { AmbienteReportesExportMenu } from "@inventario/ui/panel";
 import { cargarActivosReporte } from "@/lib/actions/reportes";
 import type { FichaAsignacionExportMeta } from "@/lib/actions/ficha-asignacion-meta";
+import { compararActivosPorCodigo } from "@/lib/inventario-orden";
 import {
   exportReporte,
   reportesAmbienteParaRol,
@@ -24,6 +25,8 @@ interface AmbienteReportesExportProps {
   usuarioEmail: string;
   esAdmin?: boolean;
   size?: "sm" | "default";
+  /** Si hay bienes marcados, el reporte incluye solo esos, en orden de código. */
+  selectedIds?: string[];
 }
 
 function hoyISO(): string {
@@ -42,6 +45,7 @@ export function AmbienteReportesExport({
   usuarioEmail,
   esAdmin = false,
   size = "sm",
+  selectedIds,
 }: AmbienteReportesExportProps) {
   const rol: RolUsuario = esAdmin ? "ADMIN_ENTIDAD" : "CONTADOR";
   const reportes = useMemo(() => reportesAmbienteParaRol(rol), [rol]);
@@ -61,9 +65,18 @@ export function AmbienteReportesExport({
         window.alert(result.error);
         return;
       }
-      const data = result.data ?? [];
+      let data = result.data ?? [];
+      if (selectedIds && selectedIds.length > 0) {
+        const marcados = new Set(selectedIds);
+        data = data.filter((activo) => marcados.has(activo.id));
+      }
+      data = [...data].sort(compararActivosPorCodigo);
       if (data.length === 0) {
-        window.alert("No hay activos registrados en este ambiente para el reporte seleccionado.");
+        window.alert(
+          selectedIds && selectedIds.length > 0
+            ? "Ninguno de los bienes marcados corresponde a este reporte."
+            : "No hay activos registrados en este ambiente para el reporte seleccionado.",
+        );
         return;
       }
 

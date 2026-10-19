@@ -25,9 +25,12 @@ export function AmbienteReportesExportMenu({
   size = "sm",
 }: AmbienteReportesExportMenuProps) {
   const [open, setOpen] = useState(false);
-  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(
-    null,
-  );
+  const [menuRect, setMenuRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const compact = size === "sm";
@@ -44,22 +47,50 @@ export function AmbienteReportesExportMenu({
       const anchor = rootRef.current;
       if (!anchor) return;
       const rect = anchor.getBoundingClientRect();
-      const width = Math.min(menuWidth, window.innerWidth - 16);
+      const margin = 8;
+      const gap = 4;
+      const width = Math.min(menuWidth, window.innerWidth - margin * 2);
       const left = Math.min(
-        Math.max(8, rect.right - width),
-        window.innerWidth - width - 8,
+        Math.max(margin, rect.right - width),
+        window.innerWidth - width - margin,
       );
-      setMenuRect({ top: rect.bottom + 4, left, width });
+      const measured = menuRef.current?.offsetHeight ?? 0;
+      const estimated = Math.min(48 + reportes.length * 40, 360);
+      const height = measured || estimated;
+      const spaceBelow = window.innerHeight - rect.bottom - gap;
+      const spaceAbove = rect.top - gap;
+      const openUp = spaceBelow < Math.min(height, 160) && spaceAbove > spaceBelow;
+      const maxHeight = Math.max(
+        120,
+        Math.min(window.innerHeight - margin * 2, openUp ? spaceAbove : spaceBelow),
+      );
+      const usedHeight = Math.min(height, maxHeight);
+      let top = openUp ? rect.top - usedHeight - gap : rect.bottom + gap;
+      if (top < margin) top = margin;
+      setMenuRect((prev) => {
+        if (
+          prev &&
+          prev.top === top &&
+          prev.left === left &&
+          prev.width === width &&
+          prev.maxHeight === maxHeight
+        ) {
+          return prev;
+        }
+        return { top, left, width, maxHeight };
+      });
     }
 
     updatePosition();
+    const frame = requestAnimationFrame(updatePosition);
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
     return () => {
+      cancelAnimationFrame(frame);
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [open]);
+  }, [open, reportes.length]);
 
   useEffect(() => {
     if (!open) return;
@@ -126,9 +157,10 @@ export function AmbienteReportesExportMenu({
               top: menuRect.top,
               left: menuRect.left,
               width: menuRect.width,
+              maxHeight: menuRect.maxHeight,
               zIndex: 9999,
             }}
-            className="overflow-hidden rounded-lg border border-border bg-card p-1 shadow-lg"
+            className="overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg"
           >
             <p className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               Descargar reporte del ambiente

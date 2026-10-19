@@ -7,8 +7,10 @@ import {
   categoriaBienLetra,
   esActivoPreregistrado,
 } from "@inventario/types";
+import { Button, useToast } from "@inventario/ui";
 import {
   ActivosInventarioTable,
+  CopiarBienesSeleccionDialog,
   EliminarPreregistradosBulkDialog,
   EstadoBienBadge,
   fechaAdquisicionToneClass,
@@ -30,14 +32,19 @@ import {
   type EliminarPreregistradosBulkMode,
   type PreregistroGestionToolbarState,
 } from "@inventario/ui/panel";
-import type { ActivoConUbicacion } from "../lib/activos";
+import { createActivosSimilares, type ActivoConUbicacion } from "../lib/activos";
+import { listAmbientes, listSedes } from "../lib/ubicacion";
 import type { AmbienteDestinoNavigation } from "./AgregarBienesSimilaresDialog";
 import { ActivosCampoAcciones } from "./ActivosCampoAcciones";
 import { ComprobanteCell } from "./ComprobanteCell";
 import { ComprobanteInline } from "./ComprobanteInline";
 
-function puedeImprimirEtiqueta(activo: ActivoConUbicacion): boolean {
+function puedeImprimirEtiqueta(activo: Activo): boolean {
   return activo.estado_registro === "REGISTRADO" && Boolean(activo.codigo_barras);
+}
+
+function puedeCopiarBien(activo: Activo): boolean {
+  return activo.estado_registro !== "DADO_DE_BAJA";
 }
 
 export interface GestionPreregistrosConfig {
@@ -153,7 +160,8 @@ function ActivosInventarioMobileCards({
             }`}
           >
             <div className="mb-3 flex items-start justify-between gap-3">
-              {((withSelection && puedeImprimirEtiqueta(activo)) ||
+              {((withSelection &&
+                (puedeSeleccionar ? puedeSeleccionar(activo) : puedeImprimirEtiqueta(activo))) ||
                 (withPreregistroSelection && puedeSeleccionar?.(activo))) &&
                 selectedIds &&
                 onToggleSelect && (
@@ -344,8 +352,10 @@ export function ActivosInventarioExcelView({
   const gestionEnabled = Boolean(gestionPreregistros && preregistrados.length > 0);
   const puedeEliminarPreregistro = Boolean(gestionPreregistros);
   const printSelectionEnabled = Boolean(onPrintBatch && !mostrarPosibleAmbiente && !gestionEnabled);
+  const copiaEnabled = !mostrarPosibleAmbiente;
+  const { pushToast } = useToast();
+  const [copiarOpen, setCopiarOpen] = useState(false);
 
-  const [printSelectedIds, setPrintSelectedIds] = useState<Set<string>>(() => new Set());
   const [bulkDialog, setBulkDialog] = useState<{
     open: boolean;
     mode: EliminarPreregistradosBulkMode;
@@ -378,48 +388,37 @@ export function ActivosInventarioExcelView({
     rowOffset,
   } = useTablePagination(activos, paginationKey);
 
-  const {
-    selectedIds: preregSelectedIds,
-    selectableOnPage: preregSelectableOnPage,
-    allPageSelected: preregAllPageSelected,
-    toggleSelect: togglePreregSelect,
-    toggleSelectAllPage: togglePreregSelectAllPage,
-    clearSelection: clearPreregSelection,
-    selectedActivos: preregSelectedActivos,
-  } = useInventarioSelection(activos, paginated, esActivoPreregistrado, gestionEnabled);
+  const selectionEnabled = copiaEnabled || gestionEnabled || printSelectionEnabled;
+  const puedeMarcarActivo = copiaEnabled
+    ? puedeCopiarBien
+    : gestionEnabled
+      ? esActivoPreregistrado
+      : puedeImprimirEtiqueta;
 
-  const printableOnPage = paginated.filter(puedeImprimirEtiqueta);
-  const printAllPageSelected =
-    printableOnPage.length > 0 && printableOnPage.every((a) => printSelectedIds.has(a.id));
+  const {
+    selectedIds,
+    selectableOnPage,
+    allPageSelected,
+    toggleSelect,
+    toggleSelectAllPage,
+    clearSelection,
+    selectedActivos,
+  } = useInventarioSelection(activos, paginated, puedeMarcarActivo, selectionEnabled);
+
+  const preregSelectedActivos = selectedActivos.filter(esActivoPreregistrado);
+
+  const seleccionFirma = selectedActivos.map((activo) => activo.id).join(",");
 
   useEffect(() => {
-    if (!onSelectionChange || !printSelectionEnabled) return;
-    const selected = activos.filter(
-      (a) => printSelectedIds.has(a.id) && puedeImprimirEtiqueta(a),
-    );
-    onSelectionChange(selected);
-  }, [activos, printSelectedIds, onSelectionChange, printSelectionEnabled]);
-
-  function togglePrintSelect(id: string) {
-    setPrintSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function togglePrintSelectAllPage() {
-    setPrintSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (printAllPageSelected) {
-        for (const a of printableOnPage) next.delete(a.id);
-      } else {
-        for (const a of printableOnPage) next.add(a.id);
-      }
-      return next;
-    });
-  }
+    if (!onSelectionChange) return;
+    if (!printSelectionEnabled) {
+      onSelectionChange([]);
+      return;
+    }
+    onSelectionChange(selectedActivos.filter(puedeImprimirEtiqueta));
+    // seleccionFirma representa los ids marcados; selectedActivos cambia de referencia en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionFirma, onSelectionChange, printSelectionEnabled]);
 
   const preregistroToolbarState = useMemo((): PreregistroGestionToolbarState | null => {
     if (!gestionEnabled || !gestionPreregistros) return null;
@@ -469,11 +468,65 @@ export function ActivosInventarioExcelView({
           return gestionPreregistros.onDeleteActivos(targets);
         }}
         onSuccess={() => {
-          clearPreregSelection();
+          clearSelection();
           gestionPreregistros.onSuccess?.();
         }}
       />
     ) : null;
+
+  const confirmarCopia = useCallback(
+    async (
+      items: { id: string; cantidad: number }[],
+      ubicacion?: { sedeId: string; ambienteId: string },
+    ) => {
+      let creados = 0;
+      for (const item of items) {
+        const result = await createActivosSimilares(item.id, item.cantidad, ubicacion);
+        if (result.error) {
+          return {
+            error:
+              creados > 0
+                ? `${result.error} Se crearon ${creados} antes de detenerse.`
+                : result.error,
+          };
+        }
+        creados += result.data?.creados ?? item.cantidad;
+      }
+      clearSelection();
+      pushToast(
+        creados === 1 ? "Se creó 1 copia." : `Se crearon ${creados} copias.`,
+        "success",
+      );
+      onActivoDeleted?.();
+      return {};
+    },
+    [clearSelection, onActivoDeleted, pushToast],
+  );
+
+  const copiarBar =
+    copiaEnabled && selectedActivos.length > 0 ? (
+      <div className="flex justify-end px-3 py-2">
+        <Button type="button" size="sm" onClick={() => setCopiarOpen(true)}>
+          Copiar ({selectedActivos.length})
+        </Button>
+      </div>
+    ) : null;
+
+  const copiarDialog = copiaEnabled ? (
+    <CopiarBienesSeleccionDialog
+      open={copiarOpen}
+      bienes={selectedActivos.map((activo) => ({
+        id: activo.id,
+        nombre: activo.nombre,
+        codigo: formatActivoCodigoDisplay(activo),
+        entidadId: activo.entidad_id,
+      }))}
+      onClose={() => setCopiarOpen(false)}
+      onListSedes={listSedes}
+      onListAmbientes={listAmbientes}
+      onConfirm={confirmarCopia}
+    />
+  ) : null;
 
   const mobileCards = (
     <div className={panelDataCardsWrapClass}>
@@ -490,19 +543,10 @@ export function ActivosInventarioExcelView({
         onActivoUpdated={onActivoUpdated}
         onActivoDeleted={onActivoDeleted}
         onActivoEliminado={onActivoEliminado}
-        withSelection={printSelectionEnabled}
-        withPreregistroSelection={gestionEnabled}
-        selectedIds={
-          gestionEnabled ? preregSelectedIds : printSelectionEnabled ? printSelectedIds : undefined
-        }
-        onToggleSelect={
-          gestionEnabled
-            ? togglePreregSelect
-            : printSelectionEnabled
-              ? togglePrintSelect
-              : undefined
-        }
-        puedeSeleccionar={gestionEnabled ? esActivoPreregistrado : undefined}
+        withSelection={selectionEnabled}
+        selectedIds={selectionEnabled ? selectedIds : undefined}
+        onToggleSelect={selectionEnabled ? toggleSelect : undefined}
+        puedeSeleccionar={selectionEnabled ? puedeMarcarActivo : undefined}
         mostrarUbicacion={mostrarUbicacion}
         ubicacionMultiplesSedes={ubicacionMultiplesSedes}
         puedeEliminarPreregistro={puedeEliminarPreregistro}
@@ -524,27 +568,17 @@ export function ActivosInventarioExcelView({
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       selection={
-        gestionEnabled
+        selectionEnabled
           ? {
               withSelection: true,
-              selectedIds: preregSelectedIds,
-              selectableOnPage: preregSelectableOnPage,
-              allPageSelected: preregAllPageSelected,
-              onToggleSelect: togglePreregSelect,
-              onToggleSelectAllPage: togglePreregSelectAllPage,
-              puedeSeleccionar: esActivoPreregistrado,
+              selectedIds,
+              selectableOnPage,
+              allPageSelected,
+              onToggleSelect: toggleSelect,
+              onToggleSelectAllPage: toggleSelectAllPage,
+              puedeSeleccionar: puedeMarcarActivo,
             }
-          : printSelectionEnabled
-            ? {
-                withSelection: true,
-                selectedIds: printSelectedIds,
-                selectableOnPage: printableOnPage,
-                allPageSelected: printAllPageSelected,
-                onToggleSelect: togglePrintSelect,
-                onToggleSelectAllPage: togglePrintSelectAllPage,
-                puedeImprimir: puedeImprimirEtiqueta,
-              }
-            : undefined
+          : undefined
       }
       renderVisita={renderVisita}
       procedenciaPorActivo={procedenciaPorActivo}
@@ -597,6 +631,7 @@ export function ActivosInventarioExcelView({
             <div ref={bodyScrollRef} className={panelInventarioBodyScrollClass}>
               {toolbar}
               {inlinePreregistroToolbar}
+              {copiarBar}
               {leyendaVisita}
               <div className={panelDataCardsWrapClass}>{mobileCards}</div>
               {tableBlock}
@@ -605,6 +640,7 @@ export function ActivosInventarioExcelView({
         </div>
         <div className={panelInventarioPaginationFooterClass}>{paginationBlock}</div>
         {bulkDialogNode}
+        {copiarDialog}
       </>
     );
   }
@@ -618,11 +654,13 @@ export function ActivosInventarioExcelView({
       }
     >
       {inlinePreregistroToolbar}
+      {copiarBar}
       {leyendaVisita}
       {mobileCards}
       {tableBlock}
       {paginationBlock}
       {bulkDialogNode}
+      {copiarDialog}
     </div>
   );
 }

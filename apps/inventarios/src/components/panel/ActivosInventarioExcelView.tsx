@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type { Activo, InventarioColumnFilterOptions, InventarioColumnFilters } from "@inventario/types";
-import { esActivoPreregistrado } from "@inventario/types";
+import { esActivoPreregistrado, formatActivoCodigoDisplay } from "@inventario/types";
+import { Button, useToast } from "@inventario/ui";
 import {
   ActivosInventarioTable,
+  CopiarBienesSeleccionDialog,
   EliminarPreregistradosBulkDialog,
   InventarioTablaLeyenda,
   PanelViewToggle,
@@ -20,9 +23,16 @@ import {
   type EliminarPreregistradosBulkMode,
   type PreregistroGestionToolbarState,
 } from "@inventario/ui/panel";
+import { createActivosSimilares } from "@/lib/actions/activos";
+import { listAmbientes, listSedes } from "@/lib/actions/ubicacion";
 import { ActivoAccionesBar } from "./ActivoAccionesBar";
 import { ActivosInventarioMobileCards } from "./ActivosInventarioMobileCards";
 import { ComprobanteCell } from "./ComprobanteCell";
+
+export interface CopiarToolbarState {
+  count: number;
+  onOpen: () => void;
+}
 
 export interface GestionPreregistrosConfig {
   alcanceLabel?: string;
@@ -66,6 +76,14 @@ interface ActivosInventarioExcelViewProps {
   leyendaVisita?: ReactNode;
   renderVisita?: (activo: Activo) => ReactNode;
   procedenciaPorActivo?: Record<string, string>;
+  /** Si se informa, el botón Copiar lo pinta el padre (barra de Nuevo activo). */
+  onCopiarStateChange?: (state: CopiarToolbarState | null) => void;
+  /** Ids marcados, para imprimir solo esos en orden de código. */
+  onSeleccionChange?: (ids: string[]) => void;
+}
+
+function puedeCopiarBien(activo: Activo): boolean {
+  return activo.estado_registro !== "DADO_DE_BAJA";
 }
 
 function excelViewShellClass(embeddedInParentScroll: boolean): string {
@@ -104,7 +122,12 @@ export function ActivosInventarioExcelView({
   leyendaVisita,
   renderVisita,
   procedenciaPorActivo,
+  onCopiarStateChange,
+  onSeleccionChange,
 }: ActivosInventarioExcelViewProps) {
+  const router = useRouter();
+  const { pushToast } = useToast();
+  const [copiarOpen, setCopiarOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "list">("list");
   const cardsWrapClass = `${panelDataCardsWrapClass}${viewMode === "cards" ? " is-active" : ""}`;
   const paginationKey = useMemo(
@@ -129,6 +152,9 @@ export function ActivosInventarioExcelView({
   const gestionEnabled = Boolean(
     gestionPreregistros && puedeEliminarPreregistro && preregistrados.length > 0,
   );
+  const copiaEnabled = !mostrarPosibleAmbiente;
+  const selectionEnabled = copiaEnabled || gestionEnabled;
+  const puedeMarcarActivo = copiaEnabled ? puedeCopiarBien : esActivoPreregistrado;
 
   const {
     selectedIds,
@@ -138,7 +164,9 @@ export function ActivosInventarioExcelView({
     toggleSelectAllPage,
     clearSelection,
     selectedActivos,
-  } = useInventarioSelection(activos, paginated, esActivoPreregistrado, gestionEnabled);
+  } = useInventarioSelection(activos, paginated, puedeMarcarActivo, selectionEnabled);
+
+  const preregSeleccionados = selectedActivos.filter(esActivoPreregistrado);
 
   const [bulkDialog, setBulkDialog] = useState<{
     open: boolean;
@@ -175,7 +203,7 @@ export function ActivosInventarioExcelView({
     if (!gestionEnabled || !gestionPreregistros) return null;
     return {
       totalPreregistrados: preregistrados.length,
-      selectedCount: selectedActivos.length,
+      selectedCount: preregSeleccionados.length,
       disabled: gestionPreregistros.disabled,
       disabledReason: gestionPreregistros.disabledReason,
       onEliminarSeleccionados: openEliminarSeleccionados,
@@ -186,7 +214,7 @@ export function ActivosInventarioExcelView({
     gestionPreregistros?.disabled,
     gestionPreregistros?.disabledReason,
     preregistrados.length,
-    selectedActivos.length,
+    preregSeleccionados.length,
     openEliminarSeleccionados,
     openVaciarPreregistrados,
   ]);
@@ -208,11 +236,11 @@ export function ActivosInventarioExcelView({
       <EliminarPreregistradosBulkDialog
         open={bulkDialog.open}
         mode={bulkDialog.mode}
-        count={bulkDialog.mode === "vaciar" ? preregistrados.length : selectedActivos.length}
+        count={bulkDialog.mode === "vaciar" ? preregistrados.length : preregSeleccionados.length}
         alcanceLabel={bulkDialog.mode === "vaciar" ? gestionPreregistros.alcanceLabel : undefined}
         onClose={() => setBulkDialog((prev) => ({ ...prev, open: false }))}
         onConfirm={async () => {
-          const targets = bulkDialog.mode === "vaciar" ? preregistrados : selectedActivos;
+          const targets = bulkDialog.mode === "vaciar" ? preregistrados : preregSeleccionados;
           return gestionPreregistros.onDeleteActivos(targets);
         }}
         onSuccess={() => {
@@ -243,7 +271,7 @@ export function ActivosInventarioExcelView({
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       wrapClassName={viewMode === "cards" ? "is-hidden" : undefined}
       selection={
-        gestionEnabled
+        selectionEnabled
           ? {
               withSelection: true,
               selectedIds,
@@ -251,7 +279,7 @@ export function ActivosInventarioExcelView({
               allPageSelected,
               onToggleSelect: toggleSelect,
               onToggleSelectAllPage: toggleSelectAllPage,
-              puedeSeleccionar: esActivoPreregistrado,
+              puedeSeleccionar: puedeMarcarActivo,
             }
           : undefined
       }
@@ -290,6 +318,80 @@ export function ActivosInventarioExcelView({
     />
   );
 
+  const confirmarCopia = useCallback(
+    async (
+      items: { id: string; cantidad: number }[],
+      ubicacion?: { sedeId: string; ambienteId: string },
+    ) => {
+      let creados = 0;
+      for (const item of items) {
+        const result = await createActivosSimilares(item.id, item.cantidad, ubicacion);
+        if (result.error) {
+          return {
+            error:
+              creados > 0
+                ? `${result.error} Se crearon ${creados} antes de detenerse.`
+                : result.error,
+          };
+        }
+        creados += result.data?.creados ?? item.cantidad;
+      }
+      clearSelection();
+      pushToast(
+        creados === 1 ? "Se creó 1 copia." : `Se crearon ${creados} copias.`,
+        "success",
+      );
+      router.refresh();
+      return {};
+    },
+    [clearSelection, pushToast, router],
+  );
+
+  const openCopiar = useCallback(() => setCopiarOpen(true), []);
+
+  useEffect(() => {
+    if (!onCopiarStateChange) return;
+    if (!copiaEnabled || selectedActivos.length === 0) {
+      onCopiarStateChange(null);
+      return;
+    }
+    onCopiarStateChange({ count: selectedActivos.length, onOpen: openCopiar });
+  }, [copiaEnabled, onCopiarStateChange, openCopiar, selectedActivos.length]);
+
+  useEffect(() => {
+    return () => onCopiarStateChange?.(null);
+  }, [onCopiarStateChange]);
+
+  const seleccionKey = selectedActivos.map((activo) => activo.id).join("\n");
+  useEffect(() => {
+    onSeleccionChange?.(seleccionKey ? seleccionKey.split("\n") : []);
+  }, [onSeleccionChange, seleccionKey]);
+
+  const copiarBar =
+    !onCopiarStateChange && copiaEnabled && selectedActivos.length > 0 ? (
+      <div className="flex justify-end px-3 py-2">
+        <Button type="button" size="sm" onClick={openCopiar}>
+          Copiar ({selectedActivos.length})
+        </Button>
+      </div>
+    ) : null;
+
+  const copiarDialog = copiaEnabled ? (
+    <CopiarBienesSeleccionDialog
+      open={copiarOpen}
+      bienes={selectedActivos.map((activo) => ({
+        id: activo.id,
+        nombre: activo.nombre,
+        codigo: formatActivoCodigoDisplay(activo),
+        entidadId: activo.entidad_id,
+      }))}
+      onClose={() => setCopiarOpen(false)}
+      onListSedes={listSedes}
+      onListAmbientes={listAmbientes}
+      onConfirm={confirmarCopia}
+    />
+  ) : null;
+
   const viewToggle = (
     <PanelViewToggle value={viewMode} onChange={setViewMode} listLabel="Tabla" />
   );
@@ -306,10 +408,10 @@ export function ActivosInventarioExcelView({
       mostrarEstadoRegistro={mostrarEstadoRegistro}
       mostrarUbicacion={mostrarUbicacion}
       ubicacionMultiplesSedes={ubicacionMultiplesSedes}
-      withPreregistroSelection={gestionEnabled}
-      selectedIds={gestionEnabled ? selectedIds : undefined}
-      onToggleSelect={gestionEnabled ? toggleSelect : undefined}
-      puedeSeleccionar={gestionEnabled ? esActivoPreregistrado : undefined}
+      withPreregistroSelection={selectionEnabled}
+      selectedIds={selectionEnabled ? selectedIds : undefined}
+      onToggleSelect={selectionEnabled ? toggleSelect : undefined}
+      puedeSeleccionar={selectionEnabled ? puedeMarcarActivo : undefined}
       fechaCorte={fechaCorte}
       renderVisita={renderVisita}
       procedenciaPorActivo={procedenciaPorActivo}
@@ -328,6 +430,7 @@ export function ActivosInventarioExcelView({
             <div ref={bodyScrollRef} className={panelInventarioBodyScrollClass}>
               {toolbarNode}
               {inlinePreregistroToolbar}
+              {copiarBar}
               {leyendaVisita}
               {typeof toolbar === "function" ? null : viewToggle}
               <div className={cardsWrapClass}>{mobileCards}</div>
@@ -337,6 +440,7 @@ export function ActivosInventarioExcelView({
         </div>
         <div className={panelInventarioPaginationFooterClass}>{paginationBlock}</div>
         {bulkDialogNode}
+        {copiarDialog}
       </>
     );
   }
@@ -344,12 +448,14 @@ export function ActivosInventarioExcelView({
   return (
     <div className={excelViewShellClass(embeddedInParentScroll)}>
       {inlinePreregistroToolbar}
+      {copiarBar}
       {leyendaVisita}
       {viewToggle}
       <div className={cardsWrapClass}>{mobileCards}</div>
       {tableBlock}
       {paginationBlock}
       {bulkDialogNode}
+      {copiarDialog}
     </div>
   );
 }

@@ -23,6 +23,7 @@ import {
   type ReportePlantilla,
   type ValorizacionTotales,
 } from "./types";
+import { compararActivosPorCodigo } from "@/lib/inventario-orden";
 
 function esPlantilla(reporteId: ReporteId, ...plantillas: ReportePlantilla[]): boolean {
   return plantillas.includes(plantillaReporte(reporteId));
@@ -197,7 +198,9 @@ export function ordenarActivosParaReporte(
   activos: ActivoReporte[],
   reporteId: ReporteId,
 ): ActivoReporte[] {
-  if (!esReporteScopeEntidad(reporteId)) return activos;
+  if (!esReporteScopeEntidad(reporteId)) {
+    return [...activos].sort(compararActivosPorCodigo);
+  }
 
   return [...activos].sort((a, b) => {
     const sede = (a.sede_nombre ?? "").localeCompare(b.sede_nombre ?? "", "es", {

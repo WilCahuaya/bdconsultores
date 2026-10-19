@@ -4,29 +4,29 @@
 
 /*
  * Paleta AZUL OCÉANO (#3a91b5)
- * Tema claro: fondo #f4f9fc · tarjetas #ffffff · acento #3a91b5 · texto #1c2d37 · secundario #5a7380
+ * Tema claro: fondo #e6eef2 · tarjetas #ffffff · campos #e6eef2 · borde #b3c2cb · texto #142833 · secundario #4a616c
  * Tema oscuro: fondo #0f171c · tarjetas #1a262f · acento #56add1 · texto #e2ecef · secundario #8fa3ad
  */
 
 @layer base {
   :root {
-    --background: 200 33% 97%;
-    --foreground: 203 33% 16%;
+    --background: 204 24% 92%;
+    --foreground: 203 42% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 203 33% 16%;
-    --primary: 198 51% 47%;
+    --card-foreground: 203 42% 14%;
+    --primary: 198 58% 36%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 200 28% 93%;
-    --secondary-foreground: 203 33% 16%;
-    --muted: 200 30% 94%;
-    --muted-foreground: 200 17% 43%;
-    --accent: 200 35% 92%;
-    --accent-foreground: 203 33% 16%;
-    --destructive: 0 84% 60%;
+    --secondary: 204 16% 88%;
+    --secondary-foreground: 203 42% 14%;
+    --muted: 204 18% 87%;
+    --muted-foreground: 203 14% 34%;
+    --accent: 198 26% 89%;
+    --accent-foreground: 203 42% 14%;
+    --destructive: 0 72% 46%;
     --destructive-foreground: 0 0% 100%;
-    --border: 200 25% 89%;
-    --input: 200 25% 89%;
-    --ring: 198 51% 47%;
+    --border: 204 14% 74%;
+    --input: 204 16% 64%;
+    --ring: 198 58% 36%;
     --brand: 198 51% 47%;
     --radius: 0.625rem;
   }
@@ -71,12 +71,22 @@
     border-color: hsl(192 18% 88% / 0.18);
   }
 
+  html:not(.dark) .detalle-surface {
+    border-color: hsl(var(--border));
+    box-shadow: 0 1px 2px hsl(204 30% 20% / 0.06);
+  }
+
   .detalle-surface-header {
     @apply border-b border-border/50 bg-muted/20;
   }
 
   .dark .detalle-surface-header {
     border-color: hsl(192 18% 88% / 0.14);
+  }
+
+  html:not(.dark) .detalle-surface-header {
+    border-bottom-color: hsl(var(--border));
+    background-color: hsl(var(--muted));
   }
 
   /* —— Portal institucional B&D (login + menú entidad) —— */
@@ -444,6 +454,10 @@
     border-color: hsl(192 18% 88% / 0.14);
   }
 
+  html:not(.dark) .detalle-surface-divider {
+    border-right-color: hsl(var(--border));
+  }
+
   .detalle-surface-button {
     @apply rounded-lg border border-border/60 bg-muted/10 transition-colors hover:bg-muted/25;
   }
@@ -694,6 +708,15 @@
 
   .inventario-activos-table tbody tr.inventario-row-odd td {
     background-color: hsl(var(--muted) / 0.25);
+  }
+
+  html:not(.dark) .inventario-activos-table tbody tr.inventario-row-odd td {
+    background-color: hsl(204 18% 95%);
+  }
+
+  html:not(.dark) .inventario-activos-table thead th.inventario-th-std,
+  html:not(.dark) .inventario-activos-table thead {
+    background-color: hsl(204 16% 93%);
   }
 
   .inventario-activos-table tbody tr.inventario-row-inactivo td {
