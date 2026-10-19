@@ -28,7 +28,6 @@ import {
   createSede,
   deleteEspacio,
   deleteSede,
-  ensureEspaciosHasta,
   updateEspacio,
   listEspacios,
   updateSede,
@@ -334,12 +333,6 @@ export function GestionarSucursales({
           const result = await createEspacio(espaciosSede.id, nombre, descripcion);
           if (result.error) return { error: result.error };
           return {};
-        }}
-        onEnsureHasta={async (cantidad, descripcion) => {
-          if (!espaciosSede) return { error: "Sucursal no válida." };
-          const result = await ensureEspaciosHasta(espaciosSede.id, cantidad, descripcion);
-          if (result.error) return { error: result.error };
-          return { creados: result.creados };
         }}
         onUpdateDescripcion={async (espacioId, descripcion) => {
           const result = await updateEspacio(espacioId, descripcion);

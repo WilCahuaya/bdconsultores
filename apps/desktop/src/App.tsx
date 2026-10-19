@@ -545,8 +545,8 @@ function MainApp({ userId }: { userId: string; email: string }) {
     }
   } else if (mainNav === "espacios") {
     subheader = {
-      breadcrumbs: [{ label: "Espacios" }],
-      subtitle: "Locales físicos de la entidad. Varios ambientes pueden ocupar el mismo espacio.",
+      breadcrumbs: [{ label: "Ubicación física" }],
+      subtitle: "Edificio, piso y espacios de la entidad. Varios ambientes pueden ocupar el mismo espacio.",
     };
   } else if (mainNav === "inventario") {
     if (inventarioFlow.type === "edit") {

@@ -225,6 +225,7 @@ export function InventarioEstadoRegistroFilaHint({
 export type ActivoConUbicacionLista = Activo & {
   sede_nombre?: string | null;
   ambiente_nombre?: string | null;
+  ubicacion_detalle?: string | null;
 };
 
 export function InventarioUbicacionCell({
@@ -238,14 +239,17 @@ export function InventarioUbicacionCell({
 }) {
   const ambiente = activo.ambiente_nombre?.trim() || "—";
   const sede = activo.sede_nombre?.trim();
-  const title = mostrarSede && sede ? `${sede} · ${ambiente}` : ambiente;
+  const detalle = activo.ubicacion_detalle?.trim();
+  const segunda =
+    detalle && mostrarSede && sede && !detalle.startsWith(sede) ? `${sede} → ${detalle}` : detalle || (mostrarSede ? sede : "");
+  const title = segunda ? `${ambiente} · ${segunda}` : ambiente;
 
   return (
     <InventarioTextCell title={title} lineClamp2 className={className}>
-      {mostrarSede && sede ? (
+      {segunda ? (
         <>
           <span className="block truncate">{ambiente}</span>
-          <span className="block truncate text-[10px] leading-tight text-muted-foreground">{sede}</span>
+          <span className="block truncate text-[10px] leading-tight text-muted-foreground">{segunda}</span>
         </>
       ) : (
         ambiente

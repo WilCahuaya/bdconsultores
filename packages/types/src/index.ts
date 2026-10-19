@@ -214,15 +214,74 @@ export interface Sede {
   updated_at: string;
 }
 
+export interface Edificio {
+  id: string;
+  sede_id: string;
+  nombre: string;
+  orden: number;
+  activo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Planta de un edificio. El número 1 nace al crear el edificio. */
+export interface Piso {
+  id: string;
+  edificio_id: string;
+  numero: number;
+  created_at: string;
+}
+
 export interface Espacio {
   id: string;
   sede_id: string;
   nombre: string;
   /** Texto del local. Opcional. */
   descripcion: string;
+  /** Edificio dentro de la sucursal. Vacío si los espacios están directo en el predio. */
+  edificio_id: string | null;
+  /** Planta del edificio o de la sucursal. 1 cuando todo está en el primer piso. */
+  piso: number;
+  /** Nombre del edificio, cuando la consulta lo trae junto. */
+  edificio_nombre?: string | null;
   activo: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export type UbicacionEspacioInput = {
+  edificioId?: string | null;
+  piso?: number;
+};
+
+export function pisoEspacio(piso: number | null | undefined): number {
+  const n = Math.floor(Number(piso ?? 1));
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+/** Ruta física que hereda un ambiente. Omite el piso 1 y el edificio cuando no existen. */
+export function rutaUbicacionFisica(input: {
+  sedeNombre?: string | null;
+  edificioNombre?: string | null;
+  piso?: number | null;
+  espacioNombre?: string | null;
+  incluirSede?: boolean;
+}): string {
+  const sede = input.sedeNombre?.trim() ?? "";
+  const edificio = input.edificioNombre?.trim() ?? "";
+  const espacio = input.espacioNombre?.trim() ?? "";
+  const piso = pisoEspacio(input.piso);
+  const partes: string[] = [];
+  if (edificio) {
+    if (input.incluirSede && sede) partes.push(sede);
+    partes.push(edificio);
+    if (piso > 1) partes.push(`Piso ${piso}`);
+  } else if (espacio || piso > 1) {
+    if (sede) partes.push(sede);
+    if (piso > 1) partes.push(`Piso ${piso}`);
+  }
+  if (espacio) partes.push(espacio);
+  return partes.join(" → ");
 }
 
 export interface EspacioConOcupacion extends Espacio {
@@ -245,6 +304,43 @@ export function numeroEspacioDesdeEtiqueta(etiqueta: string | null | undefined):
   if (!match) return null;
   const n = Number(match[1]);
   return Number.isFinite(n) ? n : null;
+}
+
+/** «7» o «Espacio 7» se guardan como «Espacio 07». Null si no es un número de 1 a 9999. */
+export function nombreEspacioDesdeNumero(raw: string | number | null | undefined): string | null {
+  if (raw == null) return null;
+  const texto = String(raw).trim();
+  if (!texto) return null;
+  const desdeEtiqueta = numeroEspacioDesdeEtiqueta(texto);
+  const soloDigitos = texto.replace(/\D/g, "");
+  const n =
+    desdeEtiqueta ??
+    (soloDigitos.length > 0 && soloDigitos === texto.replace(/\s/g, "") ? Number(soloDigitos) : Number.NaN);
+  if (!Number.isFinite(n) || n < 1 || n > 9999) return null;
+  return `Espacio ${String(Math.trunc(n)).padStart(2, "0")}`;
+}
+
+/** El número es único en la sucursal, aunque el espacio esté en otro edificio. */
+export function espacioRepetidoEnSucursal(
+  nombre: string,
+  existentes: Array<{ nombre: string }>,
+): boolean {
+  const canonico = nombreEspacioDesdeNumero(nombre) ?? nombre.trim();
+  const n = numeroEspacioDesdeEtiqueta(canonico);
+  if (n != null) {
+    return existentes.some((e) => numeroEspacioDesdeEtiqueta(e.nombre) === n);
+  }
+  const norm = canonico.toLowerCase();
+  return existentes.some((e) => e.nombre.trim().toLowerCase() === norm);
+}
+
+export function mensajeEspacioRepetido(nombre: string): string {
+  const canonico = nombreEspacioDesdeNumero(nombre) ?? nombre.trim();
+  const n = numeroEspacioDesdeEtiqueta(canonico);
+  if (n != null) {
+    return `El espacio ${String(n).padStart(2, "0")} ya existe en esta sucursal.`;
+  }
+  return "No puede haber dos espacios con el mismo nombre en la sucursal.";
 }
 
 /** Preregistro y faltante primero; luego sucursal; dentro, espacio de menor a mayor. Sin espacio, al final. */
@@ -335,6 +431,24 @@ export interface ResponsableConConteo extends Responsable {
   ambiente_nombres?: string[];
   /** Coincide con el administrador de la entidad (correo en entidades.admin_email). */
   es_administrador?: boolean;
+  /** El DNI coincide con un trabajador activo de Planillas. Esos datos no se editan en inventario. */
+  desde_planilla?: boolean;
+}
+
+export const MENSAJE_RESPONSABLE_DESDE_PLANILLA =
+  "Los datos de este responsable vienen de Planillas y se actualizan allí.";
+
+export function marcarResponsablesDesdePlanilla<T extends { dni?: string | null }>(
+  rows: T[],
+  dnisPlanilla: Iterable<string>,
+): Array<T & { desde_planilla: boolean }> {
+  const set = new Set(
+    [...dnisPlanilla].map((dni) => normalizeResponsableDniForAdmin(dni)).filter(Boolean),
+  );
+  return rows.map((row) => ({
+    ...row,
+    desde_planilla: set.has(normalizeResponsableDniForAdmin(row.dni ?? "")),
+  }));
 }
 
 /** Trabajador activo de Planillas, para copiarlo como responsable de inventario. */

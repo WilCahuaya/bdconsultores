@@ -8,6 +8,8 @@ import type {
   UpdateResponsableInput,
 } from "@inventario/types";
 import {
+  marcarResponsablesDesdePlanilla,
+  MENSAJE_RESPONSABLE_DESDE_PLANILLA,
   normalizeResponsableDni,
   normalizeResponsableNombre,
   RESPONSABLE_CARGO_DEFAULT,
@@ -57,6 +59,36 @@ function mapResponsableRow(
   };
 }
 
+async function dnisTrabajadoresActivosPlanilla(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entidadId: string,
+): Promise<string[]> {
+  const { data: entidad } = await supabase
+    .from("entidades")
+    .select("usa_planillas")
+    .eq("id", entidadId)
+    .maybeSingle();
+  if (!entidad || entidad.usa_planillas === false) return [];
+
+  const { data, error } = await supabase
+    .schema("planillas")
+    .from("relaciones_laborales")
+    .select("personas!inner(dni)")
+    .eq("entidad_id", entidadId)
+    .eq("estado", "ACTIVA")
+    .is("fecha_cese", null);
+  if (error || !data) return [];
+
+  const dnis: string[] = [];
+  for (const row of data) {
+    const personas = row.personas as { dni?: string } | { dni?: string }[] | null;
+    const persona = Array.isArray(personas) ? personas[0] : personas;
+    const dni = normalizeResponsableDni(persona?.dni ?? "");
+    if (dni) dnis.push(dni);
+  }
+  return dnis;
+}
+
 export async function listResponsables(entidadId: string): Promise<ResponsableConConteo[]> {
   const profile = await getProfile();
   if (!profile) return [];
@@ -94,8 +126,9 @@ export async function listResponsables(entidadId: string): Promise<ResponsableCo
   const rows = (data ?? []).map((row) =>
     mapResponsableRow(row as Responsable & { ambientes?: AmbienteRow[] | null }, adminEmailNorm),
   );
+  const dnisPlanilla = await dnisTrabajadoresActivosPlanilla(supabase, entidadId);
 
-  return rows.sort((a, b) => {
+  return marcarResponsablesDesdePlanilla(rows, dnisPlanilla).sort((a, b) => {
     if (a.es_administrador !== b.es_administrador) return a.es_administrador ? -1 : 1;
     return a.nombre.localeCompare(b.nombre, "es");
   });
@@ -205,6 +238,14 @@ export async function updateResponsable(
 
     revalidateEntidadResponsables(existing.entidad_id as string);
     return {};
+  }
+
+  const dnisPlanilla = await dnisTrabajadoresActivosPlanilla(
+    supabase,
+    existing.entidad_id as string,
+  );
+  if (dnisPlanilla.includes(normalizeResponsableDni(existing.dni ?? ""))) {
+    return { error: MENSAJE_RESPONSABLE_DESDE_PLANILLA };
   }
 
   const validationError = validarCreateResponsableInput(input);

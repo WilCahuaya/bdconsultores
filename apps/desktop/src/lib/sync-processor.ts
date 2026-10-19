@@ -372,12 +372,35 @@ async function processMasterOp(
     return;
   }
 
+  if (op === "edificio:create") {
+    const { error } = await supabase.from("edificios").insert({
+      id: String(payload.id),
+      sede_id: String(payload.sedeId),
+      nombre: String(payload.nombre),
+    });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (op === "piso:create") {
+    const { error } = await supabase.from("pisos").insert({
+      id: String(payload.id),
+      edificio_id: String(payload.edificioId),
+      numero: Math.floor(Number(payload.numero)),
+    });
+    if (error && !error.message.toLowerCase().includes("duplicate")) throw new Error(error.message);
+    return;
+  }
+
   if (op === "espacio:create") {
+    const pisoRaw = Math.floor(Number(payload.piso ?? 1));
     const { error } = await supabase.from("espacios").insert({
       id: String(payload.id),
       sede_id: String(payload.sedeId),
       nombre: String(payload.nombre),
       descripcion: String(payload.descripcion ?? "").trim(),
+      edificio_id: payload.edificio_id ? String(payload.edificio_id) : null,
+      piso: Number.isFinite(pisoRaw) && pisoRaw >= 1 ? pisoRaw : 1,
     });
     if (error) throw new Error(error.message);
     return;
@@ -385,9 +408,15 @@ async function processMasterOp(
 
   if (op === "espacio:update") {
     const descripcion = String(payload.descripcion ?? "").trim();
+    const patch: { descripcion: string; edificio_id?: string | null; piso?: number } = { descripcion };
+    if ("edificio_id" in payload || "piso" in payload) {
+      const pisoRaw = Math.floor(Number(payload.piso ?? 1));
+      patch.edificio_id = payload.edificio_id ? String(payload.edificio_id) : null;
+      patch.piso = Number.isFinite(pisoRaw) && pisoRaw >= 1 ? pisoRaw : 1;
+    }
     const { error } = await supabase
       .from("espacios")
-      .update({ descripcion })
+      .update(patch)
       .eq("id", String(payload.espacioId));
     if (error) throw new Error(error.message);
     return;

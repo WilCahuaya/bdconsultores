@@ -309,6 +309,9 @@ export function ResponsablesPanel({
                     {item.es_administrador && (
                       <StatusBadge variant="pending">Administrador</StatusBadge>
                     )}
+                    {item.desde_planilla && !item.es_administrador && (
+                      <StatusBadge variant="pending">Planilla</StatusBadge>
+                    )}
                   </span>
                 </PanelTableTd>
                 <PanelTableTd
@@ -348,13 +351,15 @@ export function ResponsablesPanel({
                   className={`overflow-visible ${panelTableNowrapCellClass}`}
                 >
                   <div className="flex flex-nowrap items-center justify-end gap-1">
-                    <PanelIconAction
-                      label="Editar"
-                      disabled={pending}
-                      onClick={() => setEditTarget(item)}
-                    >
-                      <EditIcon />
-                    </PanelIconAction>
+                    {(!item.desde_planilla || item.es_administrador) && (
+                      <PanelIconAction
+                        label="Editar"
+                        disabled={pending}
+                        onClick={() => setEditTarget(item)}
+                      >
+                        <EditIcon />
+                      </PanelIconAction>
+                    )}
                     {!item.es_administrador && (
                       <>
                         {!item.activo && (

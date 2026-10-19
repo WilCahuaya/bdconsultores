@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { Ambiente, Espacio, EspacioConOcupacion, Sede, SedeConConteo } from "@inventario/types";
-import { etiquetaNombreEspacio, resumenOcupacionEspacio } from "@inventario/types";
+import type { Ambiente, Edificio, Espacio, EspacioConOcupacion, Piso, Sede, SedeConConteo, UbicacionEspacioInput } from "@inventario/types";
+import { espacioRepetidoEnSucursal, etiquetaNombreEspacio, mensajeEspacioRepetido, nombreEspacioDesdeNumero, pisoEspacio, resumenOcupacionEspacio } from "@inventario/types";
 import { createClient } from "@/lib/supabase/server";
 import { loadSedesForEntidad } from "@/lib/sede-principal-direccion";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
@@ -110,8 +110,19 @@ export type AmbienteConSede = Ambiente & {
   sede_nombre: string;
   sede_es_principal: boolean;
   espacio_nombre?: string | null;
+  espacio_local?: string | null;
+  espacio_descripcion?: string | null;
+  piso?: number | null;
+  edificio_nombre?: string | null;
   activo_count: number;
 };
+
+function camposUbicacionEspacio(ubicacion?: UbicacionEspacioInput) {
+  return {
+    edificio_id: ubicacion?.edificioId || null,
+    piso: pisoEspacio(ubicacion?.piso),
+  };
+}
 
 async function activoCountByAmbienteIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -164,6 +175,10 @@ export async function listAmbientesPorEntidad(
       sede_nombre: sede?.nombre ?? "",
       sede_es_principal: sede?.es_principal ?? false,
       espacio_nombre: null as string | null,
+      espacio_local: null as string | null,
+      espacio_descripcion: null as string | null,
+      piso: null as number | null,
+      edificio_nombre: null as string | null,
       activo_count: 0,
     };
   });
@@ -178,18 +193,32 @@ export async function listAmbientesPorEntidad(
   if (espacioIds.length > 0) {
     const { data: espaciosRows } = await supabase
       .from("espacios")
-      .select("id, nombre, descripcion")
+      .select("id, nombre, descripcion, piso, edificio_id, edificios(nombre)")
       .in("id", espacioIds);
-    const nombreById = new Map(
-      (espaciosRows ?? []).map((e) => [
-        e.id as string,
-        etiquetaNombreEspacio(e.nombre as string, e.descripcion as string | null),
-      ]),
+    const porId = new Map(
+      (espaciosRows ?? []).map((e) => {
+        const edificio = e.edificios as { nombre: string } | { nombre: string }[] | null;
+        const edificioNombre = Array.isArray(edificio) ? edificio[0]?.nombre : edificio?.nombre;
+        return [
+          e.id as string,
+          {
+            espacio_nombre: etiquetaNombreEspacio(e.nombre as string, e.descripcion as string | null),
+            espacio_local: e.nombre as string,
+            espacio_descripcion: (e.descripcion as string | null)?.trim() || null,
+            piso: pisoEspacio(e.piso as number | null),
+            edificio_nombre: edificioNombre?.trim() || null,
+          },
+        ] as const;
+      }),
     );
     for (const amb of mapped) {
-      if (amb.espacio_id) {
-        amb.espacio_nombre = nombreById.get(amb.espacio_id) ?? null;
-      }
+      const meta = amb.espacio_id ? porId.get(amb.espacio_id) : undefined;
+      if (!meta) continue;
+      amb.espacio_nombre = meta.espacio_nombre;
+      amb.espacio_local = meta.espacio_local;
+      amb.espacio_descripcion = meta.espacio_descripcion;
+      amb.piso = meta.piso;
+      amb.edificio_nombre = meta.edificio_nombre;
     }
   }
 
@@ -529,6 +558,7 @@ export async function listEspacios(sedeId: string): Promise<EspacioConOcupacion[
     .select("*, ambientes(id, nombre, activo)")
     .eq("sede_id", sedeId)
     .eq("activo", true)
+    .order("piso")
     .order("nombre");
 
   if (error || !data) return [];
@@ -540,6 +570,8 @@ export async function listEspacios(sedeId: string): Promise<EspacioConOcupacion[
     return {
       ...base,
       descripcion: base.descripcion ?? "",
+      edificio_id: base.edificio_id ?? null,
+      piso: pisoEspacio(base.piso),
       ...resumenOcupacionEspacio(ambientes),
     };
   });
@@ -552,27 +584,40 @@ export async function listEspaciosPorEntidad(entidadId: string): Promise<Espacio
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("espacios")
-    .select("*, sedes!inner(entidad_id)")
+    .select("*, sedes!inner(entidad_id), edificios(nombre)")
     .eq("activo", true)
     .eq("sedes.entidad_id", entidadId)
+    .order("piso")
     .order("nombre");
 
   if (error || !data) return [];
   return data.map((row) => {
-    const { sedes: _, ...espacio } = row;
-    return espacio as Espacio;
+    const edificio = row.edificios as { nombre: string } | { nombre: string }[] | null;
+    const { sedes: _, edificios: __, ...espacio } = row;
+    return {
+      ...(espacio as Espacio),
+      edificio_id: (espacio.edificio_id as string | null) ?? null,
+      piso: pisoEspacio(espacio.piso as number | null),
+      edificio_nombre: (Array.isArray(edificio) ? edificio[0]?.nombre : edificio?.nombre)?.trim() || null,
+    };
   });
 }
 
-export async function createEspacio(sedeId: string, nombre: string, descripcion: string) {
+export async function createEspacio(
+  sedeId: string,
+  nombre: string,
+  descripcion: string,
+  ubicacion?: UbicacionEspacioInput,
+) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
   if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
     return { error: "No autorizado." };
   }
 
-  const trimmed = nombre.trim();
-  if (!trimmed) return { error: "Nombre de espacio obligatorio." };
+  const ingresado = nombre.trim();
+  if (!ingresado) return { error: "Nombre de espacio obligatorio." };
+  const trimmed = nombreEspacioDesdeNumero(ingresado) ?? ingresado;
   const desc = descripcionEspacio(descripcion);
 
   const supabase = await createClient();
@@ -594,25 +639,25 @@ export async function createEspacio(sedeId: string, nombre: string, descripcion:
     .eq("sede_id", sedeId)
     .eq("activo", true);
 
-  const nombreNorm = trimmed.toLowerCase();
-  if ((existentes ?? []).some((e) => e.nombre.trim().toLowerCase() === nombreNorm)) {
-    return {
-      error: "No puede haber dos espacios con el mismo nombre en la sucursal.",
-    };
+  if (espacioRepetidoEnSucursal(trimmed, existentes ?? [])) {
+    return { error: mensajeEspacioRepetido(trimmed) };
   }
 
   const { data, error } = await supabase
     .from("espacios")
-    .insert({ sede_id: sedeId, nombre: trimmed, descripcion: desc.descripcion })
+    .insert({
+      sede_id: sedeId,
+      nombre: trimmed,
+      descripcion: desc.descripcion,
+      ...camposUbicacionEspacio(ubicacion),
+    })
     .select()
     .single();
 
   if (error) {
     const msg = error.message.toLowerCase();
     if (msg.includes("idx_espacios_sede_nombre_activo") || msg.includes("duplicate key")) {
-      return {
-        error: "No puede haber dos espacios con el mismo nombre en la sucursal.",
-      };
+      return { error: mensajeEspacioRepetido(trimmed) };
     }
     return { error: error.message };
   }
@@ -627,6 +672,7 @@ export async function ensureEspaciosHasta(
   sedeId: string,
   cantidad: number,
   descripcion: string,
+  ubicacion?: UbicacionEspacioInput,
 ): Promise<{ success?: true; creados?: number; data?: EspacioConOcupacion[]; error?: string }> {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
@@ -654,11 +700,12 @@ export async function ensureEspaciosHasta(
   const existentes = await listEspacios(sedeId);
   const nombres = new Set(existentes.map((e) => e.nombre.trim().toLowerCase()));
   const desde = maxNumeroEspacioExistente(existentes) + 1;
-  const aCrear: { sede_id: string; nombre: string; descripcion: string }[] = [];
+  const ubicacionCampos = camposUbicacionEspacio(ubicacion);
+  const aCrear: { sede_id: string; nombre: string; descripcion: string; edificio_id: string | null; piso: number }[] = [];
   for (let i = 0; i < cantidad; i++) {
     const nombre = nombreEspacioNumerado(desde + i);
     if (!nombres.has(nombre.toLowerCase())) {
-      aCrear.push({ sede_id: sedeId, nombre, descripcion: desc.descripcion });
+      aCrear.push({ sede_id: sedeId, nombre, descripcion: desc.descripcion, ...ubicacionCampos });
     }
   }
 
@@ -722,7 +769,11 @@ export async function deleteEspacio(espacioId: string) {
   return { success: true };
 }
 
-export async function updateEspacio(espacioId: string, descripcion: string) {
+export async function updateEspacio(
+  espacioId: string,
+  descripcion: string,
+  ubicacion?: UbicacionEspacioInput,
+) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
   if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
@@ -754,7 +805,10 @@ export async function updateEspacio(espacioId: string, descripcion: string) {
 
   const { error } = await supabase
     .from("espacios")
-    .update({ descripcion: desc.descripcion })
+    .update({
+      descripcion: desc.descripcion,
+      ...(ubicacion ? camposUbicacionEspacio(ubicacion) : {}),
+    })
     .eq("id", espacioId);
 
   if (error) return { error: error.message };
@@ -766,4 +820,136 @@ export async function updateEspacio(espacioId: string, descripcion: string) {
     .single();
   if (sede?.entidad_id) revalidateEntidad(sede.entidad_id as string, existing.sede_id);
   return { success: true };
+}
+
+export async function listEdificios(sedeId: string): Promise<Edificio[]> {
+  const profile = await getProfile();
+  if (!profile) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("edificios")
+    .select("*")
+    .eq("sede_id", sedeId)
+    .eq("activo", true)
+    .order("orden")
+    .order("nombre");
+  if (error || !data) return [];
+  return data as Edificio[];
+}
+
+export async function listEdificiosPorEntidad(entidadId: string): Promise<Edificio[]> {
+  const profile = await getProfile();
+  if (!profile) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("edificios")
+    .select("*, sedes!inner(entidad_id)")
+    .eq("activo", true)
+    .eq("sedes.entidad_id", entidadId)
+    .order("nombre");
+  if (error || !data) return [];
+  return data.map((row) => {
+    const { sedes: _, ...edificio } = row;
+    return edificio as Edificio;
+  });
+}
+
+export async function createEdificio(sedeId: string, nombre: string) {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
+    return { error: "No autorizado." };
+  }
+  const trimmed = nombre.trim();
+  if (!trimmed) return { error: "Nombre de edificio obligatorio." };
+
+  const supabase = await createClient();
+  if (profile.rol === "ADMIN_ENTIDAD") {
+    const { data: sedeRow } = await supabase
+      .from("sedes")
+      .select("entidad_id")
+      .eq("id", sedeId)
+      .maybeSingle();
+    if (!sedeRow || sedeRow.entidad_id !== profile.entidad_id) {
+      return { error: "No autorizado." };
+    }
+  }
+
+  const { data: existentes } = await supabase
+    .from("edificios")
+    .select("nombre")
+    .eq("sede_id", sedeId)
+    .eq("activo", true);
+  if ((existentes ?? []).some((e) => e.nombre.trim().toLowerCase() === trimmed.toLowerCase())) {
+    return { error: "Ya existe un edificio con ese nombre en la sucursal." };
+  }
+
+  const { data, error } = await supabase
+    .from("edificios")
+    .insert({ sede_id: sedeId, nombre: trimmed })
+    .select()
+    .single();
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("duplicate") || msg.includes("idx_edificios_sede_nombre_activo")) {
+      return { error: "Ya existe un edificio con ese nombre en la sucursal." };
+    }
+    return { error: error.message };
+  }
+
+  const { data: sede } = await supabase.from("sedes").select("entidad_id").eq("id", sedeId).single();
+  if (sede?.entidad_id) revalidateEntidad(sede.entidad_id as string, sedeId);
+  return { success: true, data: data as Edificio };
+}
+
+export async function listPisos(sedeId: string): Promise<Piso[]> {
+  const profile = await getProfile();
+  if (!profile) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("pisos")
+    .select("*, edificios!inner(sede_id)")
+    .eq("edificios.sede_id", sedeId)
+    .order("numero");
+  if (error || !data) return [];
+  return data.map((row) => {
+    const { edificios: _, ...piso } = row;
+    return piso as Piso;
+  });
+}
+
+export async function createPiso(edificioId: string) {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
+    return { error: "No autorizado." };
+  }
+
+  const supabase = await createClient();
+  const { data: edificio } = await supabase
+    .from("edificios")
+    .select("id, sede_id, sedes(entidad_id)")
+    .eq("id", edificioId)
+    .eq("activo", true)
+    .maybeSingle();
+  if (!edificio) return { error: "El edificio no existe." };
+  const sede = edificio.sedes as { entidad_id: string } | { entidad_id: string }[] | null;
+  const entidadId = Array.isArray(sede) ? sede[0]?.entidad_id : sede?.entidad_id;
+  if (profile.rol === "ADMIN_ENTIDAD" && entidadId !== profile.entidad_id) {
+    return { error: "No autorizado." };
+  }
+
+  const { data: actuales } = await supabase
+    .from("pisos")
+    .select("numero")
+    .eq("edificio_id", edificioId);
+  const numeros = (actuales ?? []).map((p) => p.numero);
+  const siguiente = numeros.length === 0 ? 1 : Math.max(...numeros) + 1;
+  const { error } = await supabase.from("pisos").insert({ edificio_id: edificioId, numero: siguiente });
+  if (error) return { error: error.message };
+  if (entidadId) revalidateEntidad(entidadId, edificio.sede_id as string);
+  return { success: true as const, numero: siguiente };
 }

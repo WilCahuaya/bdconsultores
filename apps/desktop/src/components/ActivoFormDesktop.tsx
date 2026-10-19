@@ -33,6 +33,7 @@ import {
   vidaUtilMesesFromPorcentaje,
   entidadMuestraSelectorSede,
   isCatalogoPropio,
+  rutaUbicacionFisica,
   sedeIdSinSelector,
   type ActivoAtributoCampo,
   type UpdateActivosSimilaresInput,
@@ -66,7 +67,7 @@ import {
   updateActivo,
   updateActivosSimilares,
 } from "../lib/activos";
-import { createAmbiente, listAmbientes, listAmbientesPorEntidad, listSedes } from "../lib/ubicacion";
+import { createAmbiente, listAmbientesPorEntidad, listSedes, type AmbienteConSede } from "../lib/ubicacion";
 import {
   enqueueOfflineCreate,
   enqueueOfflineUpdate,
@@ -122,6 +123,26 @@ export interface ActivoFormDesktopProps {
   ejemplaresTotal?: number;
   onSuccess: (activo: ActivoConUbicacion) => void;
   onCancel: () => void;
+}
+
+function opcionesAmbienteBien(ambientes: AmbienteConSede[], variasSedes: boolean) {
+  const placeholder = { value: "", label: "Seleccione…" };
+  if (!variasSedes) {
+    return [placeholder, ...ambientes.map((a) => ({ value: a.id, label: a.nombre }))];
+  }
+  const grupos = new Map<string, AmbienteConSede[]>();
+  for (const amb of ambientes) {
+    const key = amb.sede_nombre?.trim() || "Sucursal";
+    const lista = grupos.get(key) ?? [];
+    lista.push(amb);
+    grupos.set(key, lista);
+  }
+  const options = [placeholder as { value: string; label: string; disabled?: boolean; kind?: "section-header" }];
+  for (const [sede, lista] of grupos) {
+    options.push({ value: `grupo:${sede}`, label: sede, kind: "section-header", disabled: true });
+    for (const amb of lista) options.push({ value: amb.id, label: amb.nombre });
+  }
+  return options;
 }
 
 export function ActivoFormDesktop({
@@ -241,7 +262,7 @@ export function ActivoFormDesktop({
         : "",
   });
   const [sedes, setSedes] = useState<{ id: string; nombre: string }[]>([]);
-  const [ambientes, setAmbientes] = useState<{ id: string; nombre: string }[]>([]);
+  const [ambientes, setAmbientes] = useState<AmbienteConSede[]>([]);
   const [sedeId, setSedeId] = useState(fixedSedeId ?? activo?.sede_id ?? "");
   const [ambienteId, setAmbienteId] = useState(fixedAmbienteId ?? activo?.ambiente_id ?? "");
   const [posibleSedeId, setPosibleSedeId] = useState(activo?.posible_sede_id ?? "");
@@ -264,6 +285,7 @@ export function ActivoFormDesktop({
   const [labelWarnText, setLabelWarnText] = useState("");
 
   const mostrarSelectorSede = entidadMuestraSelectorSede(sedes);
+  const ambienteElegido = ambientes.find((a) => a.id === ambienteId) ?? null;
 
   useEffect(() => {
     void listSedes(entidadId).then((data) => {
@@ -280,12 +302,23 @@ export function ActivoFormDesktop({
   }, [entidadId, fixedSedeId, isEdit]);
 
   useEffect(() => {
-    if (!sedeId) {
+    if (!entidadId) {
       setAmbientes([]);
       return;
     }
-    void listAmbientes(sedeId).then(setAmbientes);
-  }, [sedeId]);
+    let cancelled = false;
+    void listAmbientesPorEntidad(entidadId).then((data) => {
+      if (!cancelled) setAmbientes(data.filter((a) => !a.es_preregistro && !a.es_faltante));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [entidadId]);
+
+  useEffect(() => {
+    const amb = ambientes.find((a) => a.id === ambienteId);
+    if (amb?.sede_id) setSedeId(amb.sede_id);
+  }, [ambienteId, ambientes]);
 
   useEffect(() => {
     if (!mostrarPosibleAmbiente) {
@@ -630,14 +663,27 @@ export function ActivoFormDesktop({
   }
 
   async function handleCrearAmbiente() {
-    if (!sedeId || !nuevoAmbiente.trim()) return;
+    const sedeCrear = sedeId || sedes[0]?.id;
+    if (!sedeCrear || !nuevoAmbiente.trim()) return;
     setMessage(null);
-    const result = await createAmbiente({ sedeId, nombre: nuevoAmbiente });
+    const result = await createAmbiente({ sedeId: sedeCrear, nombre: nuevoAmbiente });
     if (result.error) {
       setMessage(result.error);
       return;
     }
-    setAmbientes((prev) => [...prev, result.data!]);
+    setAmbientes((prev) => [
+      ...prev,
+      {
+        ...result.data!,
+        sede_nombre: sedes.find((s) => s.id === result.data!.sede_id)?.nombre ?? "",
+        sede_es_principal: false,
+        espacio_nombre: null,
+        espacio_local: null,
+        piso: null,
+        edificio_nombre: null,
+        activo_count: 0,
+      },
+    ]);
     setAmbienteId(result.data!.id);
     setNuevoAmbiente("");
     setMessage(`Ambiente «${result.data!.nombre}» creado.`);
@@ -1962,36 +2008,30 @@ export function ActivoFormDesktop({
       {!hideUbicacion && (
       <fieldset className={fieldsetWide}>
         <legend className={panelLegendClass}>Ubicación</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {mostrarSelectorSede && (
-          <div className="space-y-2">
-            <Label htmlFor="sede">Sede</Label>
-            <Select
-              id="sede"
-              value={sedeId}
-              onChange={(nextSede) => {
-                setSedeId(nextSede);
-                setAmbienteId("");
-              }}
-              options={[
-                { value: "", label: "Seleccione…" },
-                ...sedes.map((s) => ({ value: s.id, label: s.nombre })),
-              ]}
-            />
-          </div>
-          )}
+        <div className="grid gap-4">
           <div className="space-y-2">
             <Label htmlFor="ambiente">Ambiente</Label>
             <Select
               id="ambiente"
               value={ambienteId}
               onChange={setAmbienteId}
-              disabled={!sedeId}
-              options={[
-                { value: "", label: "Seleccione…" },
-                ...ambientes.map((a) => ({ value: a.id, label: a.nombre })),
-              ]}
+              options={opcionesAmbienteBien(ambientes, mostrarSelectorSede)}
             />
+            {ambienteElegido ? (
+              <p className="text-sm text-muted-foreground">
+                {rutaUbicacionFisica({
+                  sedeNombre: ambienteElegido.sede_nombre,
+                  edificioNombre: ambienteElegido.edificio_nombre,
+                  piso: ambienteElegido.piso,
+                  espacioNombre: ambienteElegido.espacio_local,
+                  incluirSede: mostrarSelectorSede,
+                }) || "Sin espacio asignado"}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                La sucursal, el edificio y el piso salen del ambiente.
+              </p>
+            )}
             {sedeId && (
               <div className="flex flex-wrap gap-2 pt-1">
                 <Input

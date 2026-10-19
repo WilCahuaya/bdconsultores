@@ -3,6 +3,8 @@ export type MasterDomain =
   | "sedes"
   | "ambientes"
   | "espacios"
+  | "edificios"
+  | "pisos"
   | "responsables"
   | "visitas"
   | "visita_ambientes";

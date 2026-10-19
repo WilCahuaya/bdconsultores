@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Activo, Ambiente, CatalogoNacional, CategoriaBien, Entidad, Sede } from "@inventario/types";
+import { rutaUbicacionFisica } from "@inventario/types";
 import {
   ACTIVO_COMPROBANTE_ACCEPT,
   ACTIVO_FOTO_ACCEPT,
@@ -85,7 +86,7 @@ import {
   suggestCatalogoGrupo,
   upsertCuentaContable,
 } from "@/lib/actions/catalogo";
-import { createAmbiente, createSede, listAmbientes, listAmbientesPorEntidad, listSedes } from "@/lib/actions/ubicacion";
+import { createAmbiente, createSede, listAmbientesPorEntidad, listSedes, type AmbienteConSede } from "@/lib/actions/ubicacion";
 import { uploadActivoFile } from "@/lib/upload-activo-file";
 import { getSignedStorageUrl } from "@/lib/storage-url";
 import { FotoPreviewDialog } from "./ActivoMediaDialogs";
@@ -127,6 +128,26 @@ interface ActivoFormProps {
 function formatSoles(value: number | null) {
   if (value == null) return "—";
   return `S/ ${value.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function opcionesAmbienteBien(ambientes: AmbienteConSede[], variasSedes: boolean) {
+  const placeholder = { value: "", label: "Seleccione…" };
+  if (!variasSedes) {
+    return [placeholder, ...ambientes.map((a) => ({ value: a.id, label: a.nombre }))];
+  }
+  const grupos = new Map<string, AmbienteConSede[]>();
+  for (const amb of ambientes) {
+    const key = amb.sede_nombre?.trim() || "Sucursal";
+    const lista = grupos.get(key) ?? [];
+    lista.push(amb);
+    grupos.set(key, lista);
+  }
+  const options = [placeholder as { value: string; label: string; disabled?: boolean; kind?: "section-header" }];
+  for (const [sede, lista] of grupos) {
+    options.push({ value: `grupo:${sede}`, label: sede, kind: "section-header", disabled: true });
+    for (const amb of lista) options.push({ value: amb.id, label: amb.nombre });
+  }
+  return options;
 }
 
 export function ActivoForm({
@@ -237,7 +258,7 @@ export function ActivoForm({
   const [entidadId, setEntidadId] = useState(fixedEntidadId ?? "");
   const [codigoBarrasPreview, setCodigoBarrasPreview] = useState<string | null>(null);
   const [sedes, setSedes] = useState<Sede[]>([]);
-  const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
+  const [ambientes, setAmbientes] = useState<AmbienteConSede[]>([]);
   const [sedeId, setSedeId] = useState("");
   const [ambienteId, setAmbienteId] = useState("");
   const [posibleSedeId, setPosibleSedeId] = useState(() => {
@@ -464,6 +485,7 @@ export function ActivoForm({
   }, [entidadEfectiva, catalogo?.codigo, asignaCodigoInmediato]);
 
   const mostrarSelectorSede = entidadMuestraSelectorSede(sedes);
+  const ambienteElegido = ambientes.find((a) => a.id === ambienteId) ?? null;
 
   useEffect(() => {
     if (fixedSedeId && !soloUbicacionEdit) {
@@ -501,18 +523,24 @@ export function ActivoForm({
   }, [fixedAmbienteId, soloUbicacionEdit]);
 
   useEffect(() => {
-    if (!sedeId) {
+    if (!entidadEfectiva) {
       setAmbientes([]);
-      if (!soloUbicacionEdit) setAmbienteId("");
       return;
     }
-    void listAmbientes(sedeId).then((data) => {
-      setAmbientes(data);
-      if (soloUbicacionEdit && ambienteId && !data.some((a) => a.id === ambienteId)) {
-        setAmbienteId("");
-      }
+    let cancelled = false;
+    void listAmbientesPorEntidad(entidadEfectiva).then((data) => {
+      if (cancelled) return;
+      setAmbientes(data.filter((a) => !a.es_preregistro && !a.es_faltante));
     });
-  }, [sedeId, soloUbicacionEdit, ambienteId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [entidadEfectiva]);
+
+  useEffect(() => {
+    const amb = ambientes.find((a) => a.id === ambienteId);
+    if (amb?.sede_id) setSedeId(amb.sede_id);
+  }, [ambienteId, ambientes]);
 
   useEffect(() => {
     const entidadPosible = entidadEfectiva || activo?.entidad_id || "";
@@ -718,16 +746,29 @@ export function ActivoForm({
   }
 
   async function handleCrearAmbiente() {
-    if (!sedeId || !nuevoAmbiente.trim()) return;
+    const sedeCrear = sedeId || sedes[0]?.id;
+    if (!sedeCrear || !nuevoAmbiente.trim()) return;
     const result = await createAmbiente({
-      sedeId,
+      sedeId: sedeCrear,
       nombre: nuevoAmbiente,
     });
     if (result.error) {
       setMessage(result.error);
       return;
     }
-    setAmbientes((prev) => [...prev, result.data!]);
+    setAmbientes((prev) => [
+      ...prev,
+      {
+        ...result.data!,
+        sede_nombre: sedes.find((s) => s.id === result.data!.sede_id)?.nombre ?? "",
+        sede_es_principal: false,
+        espacio_nombre: null,
+        espacio_local: null,
+        piso: null,
+        edificio_nombre: null,
+        activo_count: 0,
+      },
+    ]);
     setAmbienteId(result.data!.id);
     setNuevoAmbiente("");
   }
@@ -2048,26 +2089,9 @@ export function ActivoForm({
               Crear sede
             </Button>
           </div>
-        ) : mostrarSelectorSede ? (
-          <div className="space-y-2">
-            <Label htmlFor="sede_id">Sede</Label>
-            <Select
-              id="sede_id"
-              required={soloUbicacionEdit}
-              value={sedeId}
-              onChange={(nextSede) => {
-                setSedeId(nextSede);
-                if (soloUbicacionEdit) setAmbienteId("");
-              }}
-              options={[
-                { value: "", label: "Seleccione…" },
-                ...sedes.map((s) => ({ value: s.id, label: s.nombre })),
-              ]}
-            />
-          </div>
         ) : null}
 
-        {sedeId && (
+        {sedes.length > 0 && (
           <div className="space-y-2">
             <Label htmlFor="ambiente_id">Ambiente</Label>
             <Select
@@ -2075,11 +2099,23 @@ export function ActivoForm({
               required={soloUbicacionEdit}
               value={ambienteId}
               onChange={setAmbienteId}
-              options={[
-                { value: "", label: "Seleccione…" },
-                ...ambientes.map((a) => ({ value: a.id, label: a.nombre })),
-              ]}
+              options={opcionesAmbienteBien(ambientes, mostrarSelectorSede)}
             />
+            {ambienteElegido ? (
+              <p className="text-sm text-muted-foreground">
+                {rutaUbicacionFisica({
+                  sedeNombre: ambienteElegido.sede_nombre,
+                  edificioNombre: ambienteElegido.edificio_nombre,
+                  piso: ambienteElegido.piso,
+                  espacioNombre: ambienteElegido.espacio_local,
+                  incluirSede: mostrarSelectorSede,
+                }) || "Sin espacio asignado"}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                La sucursal, el edificio y el piso salen del ambiente.
+              </p>
+            )}
             {!soloUbicacionEdit && (
               <div className="flex flex-wrap gap-2 pt-1">
                 <Input

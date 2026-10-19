@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from "react";
 import type { EspacioConOcupacion } from "@inventario/types";
+import {
+  espacioRepetidoEnSucursal,
+  mensajeEspacioRepetido,
+  nombreEspacioDesdeNumero,
+  numeroEspacioDesdeEtiqueta,
+} from "@inventario/types";
 import { Button, Dialog, Input, Label, Textarea } from "./components";
 
-function nombreDesdeNumero(raw: string): string | null {
-  const digits = raw.trim().replace(/\D/g, "");
-  if (!digits) return null;
-  const n = Number(digits);
-  if (!Number.isFinite(n) || n < 1 || n > 9999) return null;
-  return `Espacio ${String(n).padStart(2, "0")}`;
+function rellenarNumeroEspacio(raw: string): string {
+  const n = numeroEspacioDesdeEtiqueta(nombreEspacioDesdeNumero(raw));
+  return n == null ? raw : String(n).padStart(2, "0");
 }
 
 function textoOcupacion(espacio: EspacioConOcupacion): string {
@@ -33,7 +36,6 @@ export function EspaciosSedeDialog({
   error,
   onReload,
   onCreate,
-  onEnsureHasta,
   onUpdateDescripcion,
   onDelete,
 }: {
@@ -45,17 +47,11 @@ export function EspaciosSedeDialog({
   error?: string | null;
   onReload: () => void | Promise<void>;
   onCreate: (nombre: string, descripcion: string) => Promise<{ error?: string }>;
-  onEnsureHasta: (
-    cantidad: number,
-    descripcion: string,
-  ) => Promise<{ error?: string; creados?: number }>;
   onUpdateDescripcion: (espacioId: string, descripcion: string) => Promise<{ error?: string }>;
   onDelete: (espacioId: string) => Promise<{ error?: string }>;
 }) {
   const [numero, setNumero] = useState("");
   const [descripcionUno, setDescripcionUno] = useState("");
-  const [cantidad, setCantidad] = useState("");
-  const [descripcionVarios, setDescripcionVarios] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [editDesc, setEditDesc] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
@@ -65,8 +61,6 @@ export function EspaciosSedeDialog({
     if (open) {
       setNumero("");
       setDescripcionUno("");
-      setCantidad("");
-      setDescripcionVarios("");
       setEditId(null);
       setEditDesc("");
       setLocalError(null);
@@ -80,10 +74,14 @@ export function EspaciosSedeDialog({
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const nombre = nombreDesdeNumero(numero);
+    const nombre = nombreEspacioDesdeNumero(numero);
     const descripcion = descripcionUno.trim();
     if (!nombre) {
       setLocalError("Indique el número del espacio (ej. 01, 10, 25).");
+      return;
+    }
+    if (espacioRepetidoEnSucursal(nombre, espacios)) {
+      setLocalError(mensajeEspacioRepetido(nombre));
       return;
     }
     setLocalPending(true);
@@ -96,23 +94,6 @@ export function EspaciosSedeDialog({
     }
     setNumero("");
     setDescripcionUno("");
-    await onReload();
-  }
-
-  async function handleEnsure(e: React.FormEvent) {
-    e.preventDefault();
-    const n = Number(cantidad);
-    const descripcion = descripcionVarios.trim();
-    setLocalPending(true);
-    setLocalError(null);
-    const result = await onEnsureHasta(n, descripcion);
-    setLocalPending(false);
-    if (result.error) {
-      setLocalError(result.error);
-      return;
-    }
-    setCantidad("");
-    setDescripcionVarios("");
     await onReload();
   }
 
@@ -154,41 +135,10 @@ export function EspaciosSedeDialog({
       open={open}
       onClose={onClose}
       title={`Espacios — ${sedeNombre}`}
-      description="Locales físicos de la sucursal. Varios ambientes pueden ocupar el mismo espacio. La descripción es opcional."
+      description="Espacios del primer piso. El edificio y los demás pisos se arman en Ubicación física. Varios ambientes pueden ocupar el mismo espacio."
       className="max-w-xl"
     >
       <div className="space-y-4">
-        <form onSubmit={handleEnsure} className="space-y-2 rounded-md border border-border/60 p-3">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-[8rem] flex-1 space-y-1">
-              <Label htmlFor="espacios_cantidad">Cantidad a agregar</Label>
-              <Input
-                id="espacios_cantidad"
-                type="number"
-                min={1}
-                max={500}
-                placeholder="Ej. 5"
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" size="sm" disabled={busy}>
-              Agregar espacios
-            </Button>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="espacios_desc_varios">Descripción (opcional)</Label>
-            <Textarea
-              id="espacios_desc_varios"
-              rows={2}
-              placeholder="Opcional. Se aplica a cada espacio nuevo."
-              value={descripcionVarios}
-              onChange={(e) => setDescripcionVarios(e.target.value)}
-            />
-          </div>
-        </form>
-
         <form onSubmit={handleCreate} className="space-y-2 rounded-md border border-border/60 p-3">
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-[10rem] flex-1 space-y-1">
@@ -202,6 +152,7 @@ export function EspaciosSedeDialog({
                   placeholder="01"
                   value={numero}
                   onChange={(e) => setNumero(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  onBlur={() => setNumero((actual) => rellenarNumeroEspacio(actual))}
                   required
                   className="max-w-[6rem]"
                   aria-label="Número del espacio"
@@ -228,7 +179,7 @@ export function EspaciosSedeDialog({
 
         {espacios.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Aún no hay espacios. Indique cuántos crear (empezarán en Espacio 01).
+            Aún no hay espacios. Agregue el primero con su número.
           </p>
         ) : (
           <ul className="max-h-72 space-y-1 overflow-y-auto rounded-md border border-border/60 p-2 text-sm">

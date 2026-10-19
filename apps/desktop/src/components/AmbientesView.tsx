@@ -3,7 +3,6 @@ import type {
   CreateResponsableInput,
   Entidad,
   Espacio,
-  EspacioConOcupacion,
   ResponsableConConteo,
   SedeConConteo,
   VisitaCampoActiva,
@@ -12,7 +11,7 @@ import type {
 import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
 import { ESTRUCTURA_REFRESH_EVENT } from "@inventario/realtime";
 import { panelFieldsetClass } from "@inventario/ui/panel";
-import { Button, Dialog, EspaciosGestionPanel, EspaciosSedeDialog, ResponsablesPanel, Select } from "@inventario/ui";
+import { Button, Dialog, EspaciosGestionPanel, ResponsablesPanel, Select } from "@inventario/ui";
 import {
   DeleteIcon,
   EditIcon,
@@ -50,20 +49,23 @@ import {
   IniciarVisitaCampoButton,
   AmbientesDatosMenu,
 } from "@inventario/ui/panel";
-import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente } from "./AmbienteFormFields";
+import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente, EspacioOcupaCelda } from "./AmbienteFormFields";
 import { AmbientesImportDialog } from "./AmbientesImportDialog";
 import { InventarioImportDialog } from "./InventarioImportDialog";
 import { ConfirmDialog, CrearResponsableDialog, EliminarActivosPorCodigosDialog } from "@inventario/ui";
 import { GestionarSucursales } from "./GestionarSucursales";
 import {
   createAmbiente,
+  createEdificio,
   createEspacio,
+  createPiso,
   deleteAmbiente,
   deleteEspacio,
-  ensureEspaciosHasta,
   updateEspacio,
   listAmbientesPorEntidad,
+  listEdificios,
   listEspacios,
+  listPisos,
   listEspaciosPorEntidad,
   listSedesConConteo,
   updateAmbiente,
@@ -98,7 +100,7 @@ type EntityTab = "inventario" | "ambientes" | "espacios" | "responsables" | "suc
 const ENTITY_TABS: { id: EntityTab; label: string }[] = [
   { id: "inventario", label: "Inventario" },
   { id: "ambientes", label: "Ambientes" },
-  { id: "espacios", label: "Espacios" },
+  { id: "espacios", label: "Ubicación física" },
   { id: "responsables", label: "Responsables" },
   { id: "sucursales", label: "Sucursales" },
   { id: "visitas", label: "Visitas de campo" },
@@ -139,7 +141,7 @@ function AmbienteCard({
   onViewActivos: () => void;
 }) {
   const espacioLabel = ambiente.es_faltante
-    ? "No hallados"
+    ? "No aplica"
     : etiquetaEspacioAmbiente({
         esPreregistro: ambiente.es_preregistro,
         espacioNombre: ambiente.espacio_nombre,
@@ -252,10 +254,6 @@ export function AmbientesView({
   const [editEspacioId, setEditEspacioId] = useState("");
   const [editAmbiente, setEditAmbiente] = useState<AmbienteConVisita | null>(null);
   const [espacios, setEspacios] = useState<Espacio[]>([]);
-  const [manageEspaciosSedeId, setManageEspaciosSedeId] = useState<string | null>(null);
-  const [manageEspaciosList, setManageEspaciosList] = useState<EspacioConOcupacion[]>([]);
-  const [manageEspaciosPending, setManageEspaciosPending] = useState(false);
-  const [manageEspaciosError, setManageEspaciosError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AmbienteConVisita | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -376,18 +374,6 @@ export function AmbientesView({
   async function syncEspaciosEntidad() {
     const list = await listEspaciosPorEntidad(entidad.id);
     setEspacios(list);
-  }
-
-  async function reloadManageEspacios() {
-    if (!manageEspaciosSedeId) return;
-    setManageEspaciosPending(true);
-    setManageEspaciosError(null);
-    try {
-      const data = await listEspacios(manageEspaciosSedeId);
-      setManageEspaciosList(data);
-    } finally {
-      setManageEspaciosPending(false);
-    }
   }
 
   async function syncVisitaYAmbientes() {
@@ -680,23 +666,7 @@ export function AmbientesView({
       ) : null}
 
       {!sedeFocus && (
-        <PanelTabs
-          tabs={entityTabs}
-          value={tab}
-          onChange={setTab}
-          actions={
-            <IniciarVisitaCampoButton
-              visitas={visitasActivas}
-              sedes={sedes.map((s) => ({
-                id: s.id,
-                nombre: s.nombre,
-                es_principal: s.es_principal,
-              }))}
-              pending={visitaPending}
-              onClick={handleAbrirVisita}
-            />
-          }
-        />
+        <PanelTabs tabs={entityTabs} value={tab} onChange={setTab} />
       )}
 
       {!sedeFocus && tab === "inventario" ? (
@@ -718,6 +688,19 @@ export function AmbientesView({
       ) : (
         <>
           {!sedeFocus && tab === "visitas" ? (
+            <div className="space-y-3">
+            <div className="flex justify-end">
+              <IniciarVisitaCampoButton
+                visitas={visitasActivas}
+                sedes={sedes.map((s) => ({
+                  id: s.id,
+                  nombre: s.nombre,
+                  es_principal: s.es_principal,
+                }))}
+                pending={visitaPending}
+                onClick={handleAbrirVisita}
+              />
+            </div>
             <VisitasCampoHistorialPanel
               historial={visitasHistorial}
               loadingDetalle={detalleLoading}
@@ -732,6 +715,7 @@ export function AmbientesView({
               onTerminar={(id) => void handleCerrarVisita(id)}
               terminarPendingId={cerrarPendingId}
             />
+            </div>
           ) : !sedeFocus && tab === "responsables" ? (
             <ResponsablesPanel
               responsables={responsables}
@@ -780,20 +764,28 @@ export function AmbientesView({
             <EspaciosGestionPanel
               sedes={sedes}
               onList={listEspacios}
-              onCreate={async (sedeId, nombre, descripcion) => {
-                const result = await createEspacio(sedeId, nombre, descripcion);
+              onCreate={async (sedeId, nombre, descripcion, ubicacion) => {
+                const result = await createEspacio(sedeId, nombre, descripcion, ubicacion);
                 if (result.error) return { error: result.error };
                 void syncEspaciosEntidad();
                 return {};
               }}
-              onEnsureHasta={async (sedeId, cantidad, descripcion) => {
-                const result = await ensureEspaciosHasta(sedeId, cantidad, descripcion);
+              onUpdateDescripcion={async (espacioId, descripcion, ubicacion) => {
+                const result = await updateEspacio(espacioId, descripcion, ubicacion);
                 if (result.error) return { error: result.error };
                 void syncEspaciosEntidad();
-                return { creados: result.creados };
+                return {};
               }}
-              onUpdateDescripcion={async (espacioId, descripcion) => {
-                const result = await updateEspacio(espacioId, descripcion);
+              onListEdificios={listEdificios}
+              onCreateEdificio={async (sedeId, nombre) => {
+                const result = await createEdificio(sedeId, nombre);
+                if (result.error) return { error: result.error };
+                void syncEspaciosEntidad();
+                return {};
+              }}
+              onListPisos={listPisos}
+              onCreatePiso={async (edificioId) => {
+                const result = await createPiso(edificioId);
                 if (result.error) return { error: result.error };
                 void syncEspaciosEntidad();
                 return {};
@@ -956,22 +948,15 @@ export function AmbientesView({
                         <PanelTableTd className="font-medium text-primary" title={amb.nombre}>
                           {amb.nombre}
                         </PanelTableTd>
-                        <PanelTableTd
-                          className={panelTableNowrapCellClass}
-                          title={
-                            amb.es_preregistro
-                              ? "Ambiente de preregistros: no es un local físico"
-                              : amb.es_faltante
-                                ? "Bienes no hallados en visita"
-                                : amb.espacio_nombre ?? undefined
-                          }
-                        >
-                          {amb.es_faltante
-                            ? "No hallados"
-                            : etiquetaEspacioAmbiente({
-                                esPreregistro: amb.es_preregistro,
-                                espacioNombre: amb.espacio_nombre,
-                              })}
+                        <PanelTableTd className={panelTableNowrapCellClass}>
+                          <EspacioOcupaCelda
+                            esPreregistro={amb.es_preregistro}
+                            esFaltante={amb.es_faltante}
+                            espacioNombre={amb.espacio_local}
+                            piso={amb.piso}
+                            edificioNombre={amb.edificio_nombre}
+                            descripcion={amb.espacio_descripcion}
+                          />
                         </PanelTableTd>
                         <PanelTableTd title={amb.responsable ?? undefined}>
                           {amb.responsable ?? "—"}
@@ -1117,10 +1102,6 @@ export function AmbientesView({
             onRequestCreateResponsable={() => setCreateResponsableOpen(true)}
             espacioId={createEspacioId}
             onEspacioIdChange={setCreateEspacioId}
-            onRequestManageEspacios={(sedeId) => {
-              setManageEspaciosError(null);
-              setManageEspaciosSedeId(sedeId);
-            }}
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -1163,10 +1144,6 @@ export function AmbientesView({
               espacioId={editEspacioId}
               onEspacioIdChange={setEditEspacioId}
               esPreregistro={editAmbiente.es_preregistro}
-              onRequestManageEspacios={(sedeId) => {
-                setManageEspaciosError(null);
-                setManageEspaciosSedeId(sedeId);
-              }}
             />
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex justify-end gap-2">
@@ -1188,43 +1165,6 @@ export function AmbientesView({
         onCreated={(nuevo) => {
           setEditResponsableId(nuevo.id);
           setEditResponsableOpen(false);
-        }}
-      />
-
-      <EspaciosSedeDialog
-        open={!!manageEspaciosSedeId}
-        onClose={() => {
-          setManageEspaciosSedeId(null);
-          void syncEspaciosEntidad();
-        }}
-        sedeNombre={
-          sedes.find((s) => s.id === manageEspaciosSedeId)?.nombre ?? "Sucursal"
-        }
-        espacios={manageEspaciosList}
-        pending={manageEspaciosPending}
-        error={manageEspaciosError}
-        onReload={reloadManageEspacios}
-        onCreate={async (nombre, descripcion) => {
-          if (!manageEspaciosSedeId) return { error: "Sucursal no válida." };
-          const result = await createEspacio(manageEspaciosSedeId, nombre, descripcion);
-          if (result.error) return { error: result.error };
-          return {};
-        }}
-        onEnsureHasta={async (cantidad, descripcion) => {
-          if (!manageEspaciosSedeId) return { error: "Sucursal no válida." };
-          const result = await ensureEspaciosHasta(manageEspaciosSedeId, cantidad, descripcion);
-          if (result.error) return { error: result.error };
-          return { creados: result.creados };
-        }}
-        onUpdateDescripcion={async (espacioId, descripcion) => {
-          const result = await updateEspacio(espacioId, descripcion);
-          if (result.error) return { error: result.error };
-          return {};
-        }}
-        onDelete={async (espacioId) => {
-          const result = await deleteEspacio(espacioId);
-          if (result.error) return { error: result.error };
-          return {};
         }}
       />
 

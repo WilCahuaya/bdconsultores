@@ -1,13 +1,15 @@
 import type {
   Ambiente,
+  Edificio,
   EntidadConConteo,
   Espacio,
   EspacioConOcupacion,
+  Piso,
   Responsable,
   ResponsableConConteo,
   SedeConConteo,
 } from "@inventario/types";
-import { etiquetaNombreEspacio, resumenOcupacionEspacio } from "@inventario/types";
+import { etiquetaNombreEspacio, pisoEspacio, resumenOcupacionEspacio } from "@inventario/types";
 import { replaceMasterDomain } from "./master-cache";
 import { getSupabaseClient } from "./supabase";
 import { loadSedesForEntidad } from "./sede-principal-direccion";
@@ -91,6 +93,10 @@ async function fetchAmbientesRemote(entidadId: string) {
       sede_nombre: sede?.nombre ?? "",
       sede_es_principal: sede?.es_principal ?? false,
       espacio_nombre: null as string | null,
+      espacio_local: null as string | null,
+      espacio_descripcion: null as string | null,
+      piso: null as number | null,
+      edificio_nombre: null as string | null,
       activo_count: 0,
     };
   });
@@ -115,16 +121,32 @@ async function fetchAmbientesRemote(entidadId: string) {
   if (espacioIds.length > 0) {
     const { data: espaciosRows } = await supabase
       .from("espacios")
-      .select("id, nombre, descripcion")
+      .select("id, nombre, descripcion, piso, edificios(nombre)")
       .in("id", espacioIds);
-    const nombreById = new Map(
-      (espaciosRows ?? []).map((e) => [
-        e.id as string,
-        etiquetaNombreEspacio(e.nombre as string, e.descripcion as string | null),
-      ]),
+    const porId = new Map(
+      (espaciosRows ?? []).map((e) => {
+        const edificio = e.edificios as { nombre: string } | { nombre: string }[] | null;
+        const edificioNombre = Array.isArray(edificio) ? edificio[0]?.nombre : edificio?.nombre;
+        return [
+          e.id as string,
+          {
+            espacio_nombre: etiquetaNombreEspacio(e.nombre as string, e.descripcion as string | null),
+            espacio_local: e.nombre as string,
+            espacio_descripcion: (e.descripcion as string | null)?.trim() || null,
+            piso: pisoEspacio(e.piso as number | null),
+            edificio_nombre: edificioNombre?.trim() || null,
+          },
+        ] as const;
+      }),
     );
     for (const amb of mapped) {
-      if (amb.espacio_id) amb.espacio_nombre = nombreById.get(amb.espacio_id) ?? null;
+      const meta = amb.espacio_id ? porId.get(amb.espacio_id) : undefined;
+      if (!meta) continue;
+      amb.espacio_nombre = meta.espacio_nombre;
+      amb.espacio_local = meta.espacio_local;
+      amb.espacio_descripcion = meta.espacio_descripcion;
+      amb.piso = meta.piso;
+      amb.edificio_nombre = meta.edificio_nombre;
     }
   }
 
@@ -149,6 +171,8 @@ async function fetchEspaciosRemote(sedeId: string): Promise<EspacioConOcupacion[
     return {
       ...base,
       descripcion: base.descripcion ?? "",
+      edificio_id: base.edificio_id ?? null,
+      piso: pisoEspacio(base.piso),
       ...resumenOcupacionEspacio(ambientes),
     };
   });
@@ -215,6 +239,32 @@ export async function syncMasterDataForEntidad(entidadId: string): Promise<void>
     }
   }
   await replaceMasterDomain("espacios", entidadId, espacios);
+
+  const { data: edificiosRows, error: edificiosError } = await getSupabaseClient()
+    .from("edificios")
+    .select("*, sedes!inner(entidad_id)")
+    .eq("activo", true)
+    .eq("sedes.entidad_id", entidadId);
+  if (!edificiosError) {
+    const edificios = (edificiosRows ?? []).map((row) => {
+      const { sedes: _, ...edificio } = row;
+      return edificio as Edificio;
+    });
+    await replaceMasterDomain("edificios", entidadId, edificios);
+    const ids = edificios.map((e) => e.id);
+    if (ids.length === 0) {
+      await replaceMasterDomain("pisos", entidadId, []);
+    } else {
+      const { data: pisosRows, error: pisosError } = await getSupabaseClient()
+        .from("pisos")
+        .select("*")
+        .in("edificio_id", ids)
+        .order("numero");
+      if (!pisosError) {
+        await replaceMasterDomain("pisos", entidadId, (pisosRows ?? []) as Piso[]);
+      }
+    }
+  }
 
   try {
     await syncVisitasForEntidad(entidadId);

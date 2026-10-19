@@ -3,10 +3,13 @@ import type { Entidad, SedeConConteo } from "@inventario/types";
 import { EspaciosGestionPanel, Select } from "@inventario/ui";
 import { PanelBanner, panelFieldsetClass } from "@inventario/ui/panel";
 import {
+  createEdificio,
   createEspacio,
+  createPiso,
   deleteEspacio,
-  ensureEspaciosHasta,
+  listEdificios,
   listEspacios,
+  listPisos,
   listSedesConConteo,
   updateEspacio,
 } from "../lib/ubicacion";
@@ -64,16 +67,22 @@ export function EspaciosView({
           key={entidadId}
           sedes={sedes}
           onList={listEspacios}
-          onCreate={async (sedeId, nombre, descripcion) => {
-            const result = await createEspacio(sedeId, nombre, descripcion);
+          onCreate={async (sedeId, nombre, descripcion, ubicacion) => {
+            const result = await createEspacio(sedeId, nombre, descripcion, ubicacion);
             return result.error ? { error: result.error } : {};
           }}
-          onEnsureHasta={async (sedeId, cantidad, descripcion) => {
-            const result = await ensureEspaciosHasta(sedeId, cantidad, descripcion);
-            return result.error ? { error: result.error } : { creados: result.creados };
+          onListEdificios={listEdificios}
+          onCreateEdificio={async (sedeId, nombre) => {
+            const result = await createEdificio(sedeId, nombre);
+            return result.error ? { error: result.error } : {};
           }}
-          onUpdateDescripcion={async (espacioId, descripcion) => {
-            const result = await updateEspacio(espacioId, descripcion);
+          onListPisos={listPisos}
+          onCreatePiso={async (edificioId) => {
+            const result = await createPiso(edificioId);
+            return result.error ? { error: result.error } : {};
+          }}
+          onUpdateDescripcion={async (espacioId, descripcion, ubicacion) => {
+            const result = await updateEspacio(espacioId, descripcion, ubicacion);
             return result.error ? { error: result.error } : {};
           }}
           onDelete={async (espacioId) => {

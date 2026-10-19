@@ -533,7 +533,21 @@ export function Dialog({
               type="button"
               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Cerrar"
-              onClick={onClose}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                const tragarClic = (siguiente: Event) => {
+                  siguiente.preventDefault();
+                  siguiente.stopPropagation();
+                };
+                document.addEventListener("click", tragarClic, true);
+                onClose();
+                window.setTimeout(() => document.removeEventListener("click", tragarClic, true), 150);
+              }}
             >
               <DialogCloseIcon className="h-4 w-4" />
             </button>

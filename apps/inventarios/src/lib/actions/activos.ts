@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { Activo, CategoriaBien, EstadoBien, EstadoRegistro } from "@inventario/types";
+import { rutaUbicacionFisica } from "@inventario/types";
 import {
   MAX_ACTIVOS_SIMILARES_CANTIDAD,
   applyCuentaContableToPayloadIfProvided,
@@ -92,6 +93,7 @@ export interface ActivoListRow {
   entidad_nombre?: string;
   sede_nombre?: string;
   ambiente_nombre?: string;
+  ubicacion_detalle?: string;
   posible_ambiente_nombre?: string;
   /** Sede del posible ambiente (sugerencia de preregistro). */
   posible_sede_nombre?: string;
@@ -104,11 +106,14 @@ export interface ActivoListRow {
 
 const POSIBLE_AMBIENTE_SELECT = "posible_ambiente:posible_ambiente_id(nombre, sede_id)";
 
+const AMBIENTE_UBICACION_SELECT =
+  "ambientes:ambiente_id(nombre, espacios(nombre, piso, edificios(nombre)))";
+
 const ACTIVO_SELECT =
-  `*, entidades(nombre), sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}`;
+  `*, entidades(nombre), sedes:sede_id(nombre), ${AMBIENTE_UBICACION_SELECT}, ${POSIBLE_AMBIENTE_SELECT}`;
 
 const ACTIVO_SELECT_SIN_ENTIDAD =
-  `*, sedes:sede_id(nombre), ambientes:ambiente_id(nombre), ${POSIBLE_AMBIENTE_SELECT}`;
+  `*, sedes:sede_id(nombre), ${AMBIENTE_UBICACION_SELECT}, ${POSIBLE_AMBIENTE_SELECT}`;
 
 export async function previewCodigoBarras(entidadId: string, codigoCatalogo: string) {
   const profile = await getProfile();
@@ -844,11 +849,40 @@ export async function listActivosPorAmbiente(ambienteId: string) {
 
 export type ActivoConUbicacion = Activo & ActivoListRow;
 
+function rutaDesdeAmbiente(
+  ambiente: {
+    espacios?: {
+      nombre: string;
+      piso?: number | null;
+      edificios?: { nombre: string } | { nombre: string }[] | null;
+    } | null;
+  } | null,
+  sedeNombre?: string | null,
+) {
+  const espacio = ambiente?.espacios ?? null;
+  if (!espacio?.nombre) return "";
+  const edificio = espacio.edificios;
+  const edificioNombre = Array.isArray(edificio) ? edificio[0]?.nombre : edificio?.nombre;
+  return rutaUbicacionFisica({
+    sedeNombre,
+    edificioNombre,
+    piso: espacio.piso,
+    espacioNombre: espacio.nombre,
+  });
+}
+
 function mapActivoRows(data: Record<string, unknown>[] | null): ActivoConUbicacion[] {
   return (data ?? []).map((row) => {
     const entidades = row.entidades as { nombre: string } | null;
     const sedes = row.sedes as { nombre: string } | null;
-    const ambientes = row.ambientes as { nombre: string } | null;
+    const ambientes = row.ambientes as {
+      nombre: string;
+      espacios?: {
+        nombre: string;
+        piso?: number | null;
+        edificios?: { nombre: string } | { nombre: string }[] | null;
+      } | null;
+    } | null;
     const posibleAmbiente = row.posible_ambiente as {
       nombre: string;
       sede_id?: string;
@@ -877,6 +911,7 @@ function mapActivoRows(data: Record<string, unknown>[] | null): ActivoConUbicaci
       entidad_nombre: entidades?.nombre,
       sede_nombre: sedes?.nombre,
       ambiente_nombre: ambientes?.nombre,
+      ubicacion_detalle: rutaDesdeAmbiente(ambientes, sedes?.nombre),
       posible_ambiente_nombre: posibleAmbiente?.nombre,
       posible_sede_nombre: undefined,
       posible_sede_id: posibleAmbiente?.sede_id ?? null,

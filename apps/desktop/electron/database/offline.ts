@@ -218,6 +218,8 @@ export type MasterCacheDomain =
   | "sedes"
   | "ambientes"
   | "espacios"
+  | "edificios"
+  | "pisos"
   | "responsables"
   | "visitas"
   | "visita_ambientes";

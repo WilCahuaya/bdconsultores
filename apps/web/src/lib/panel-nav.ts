@@ -70,7 +70,7 @@ export function adminNavSections(
         },
         {
           href: "/admin/espacios",
-          label: "Espacios",
+          label: "Ubicación física",
           icon: "spaces",
         },
         { href: "/admin/reportes", label: "Reportes", icon: "reports" },
