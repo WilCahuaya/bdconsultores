@@ -308,14 +308,14 @@ export function UsuariosGestionPanel({
       ) : filtrados.length === 0 ? (
         <PanelEmptyState message="No hay usuarios que coincidan con la búsqueda." />
       ) : (
-        <PanelDataTable layout="auto">
+        <PanelDataTable layout="auto" scroll>
           <PanelTableColgroup cols={USUARIOS_TABLE_COLS} />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
               <PanelTableTh className={panelTableNameCellClass}>Nombre</PanelTableTh>
-              <PanelTableTh>Correo</PanelTableTh>
+              <PanelTableTh className="min-w-[12rem] max-w-[18rem]">Correo</PanelTableTh>
               <PanelTableTh className={panelTableNowrapCellClass}>Rol</PanelTableTh>
-              <PanelTableTh>Entidad</PanelTableTh>
+              <PanelTableTh className="min-w-[10rem] max-w-[16rem]">Entidad</PanelTableTh>
               {mostrarAcceso && (
                 <PanelTableTh className={panelTableNowrapCellClass}>Acceso</PanelTableTh>
               )}
@@ -333,17 +333,27 @@ export function UsuariosGestionPanel({
 
               return (
                 <tr key={usuario.id} className={panelTableBodyRowClass}>
-                  <PanelTableTd className={panelTableNameCellClass}>
-                    {usuario.nombre}
-                    {esYo && (
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">(usted)</span>
-                    )}
+                  <PanelTableTd className={panelTableNameCellClass} title={usuario.nombre}>
+                    <span className="block truncate">
+                      {usuario.nombre}
+                      {esYo && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">(usted)</span>
+                      )}
+                    </span>
                   </PanelTableTd>
-                  <PanelTableTd className={panelTableMutedClass}>{usuario.email}</PanelTableTd>
+                  <PanelTableTd
+                    className={`${panelTableMutedClass} min-w-[12rem] max-w-[18rem]`}
+                    title={usuario.email}
+                  >
+                    {usuario.email}
+                  </PanelTableTd>
                   <PanelTableTd className={panelTableNowrapCellClass}>
                     {rolLabel(usuario.rol)}
                   </PanelTableTd>
-                  <PanelTableTd className={panelTableMutedClass}>
+                  <PanelTableTd
+                    className={`${panelTableMutedClass} min-w-[10rem] max-w-[16rem]`}
+                    title={usuario.entidad_nombre ?? undefined}
+                  >
                     {usuario.entidad_nombre ?? "—"}
                   </PanelTableTd>
                   {mostrarAcceso && (

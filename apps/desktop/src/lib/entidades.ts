@@ -29,6 +29,7 @@ import {
   upsertMasterItem,
 } from "./master-cache";
 import type { AmbienteConSede } from "./ubicacion";
+import { fetchProfile } from "./profile";
 import { getSupabaseClient } from "./supabase";
 import { syncSedePrincipalDireccionFromEntidad } from "./sede-principal-direccion";
 import { syncAdminResponsableForEntidad } from "./responsables-admin-sync";
@@ -128,6 +129,71 @@ async function fetchEntidadesRemote(): Promise<EntidadConConteo[]> {
     ambiente_count: ambienteCountByEntidad.get(entidad.id) ?? 0,
     activo_count: activoCountByEntidad.get(entidad.id) ?? 0,
   }));
+}
+
+export type EntidadPlanillasPendiente = Pick<
+  Entidad,
+  "id" | "nombre" | "numero_interno" | "pe_codigo" | "ruc" | "direccion" | "admin_nombre"
+>;
+
+/** Empresas de Planillas que todavía no aparecen en Inventarios. Requiere conexión. */
+export async function listEntidadesSoloPlanillas(): Promise<{
+  error?: string;
+  data: EntidadPlanillasPendiente[];
+}> {
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede elegir una empresa de Planillas.", data: [] };
+  }
+  if (!isOnline()) {
+    return {
+      error: "Conéctese para ver las empresas de Planillas que aún no están en Inventarios.",
+      data: [],
+    };
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("entidades")
+    .select("id, nombre, numero_interno, pe_codigo, ruc, direccion, admin_nombre")
+    .eq("activo", true)
+    .eq("usa_planillas", true)
+    .eq("usa_inventarios", false)
+    .order("nombre");
+
+  if (error) return { error: error.message, data: [] };
+  return { data: sortEntidadesByNumero((data ?? []) as EntidadPlanillasPendiente[]) };
+}
+
+/** Activa Inventarios en una empresa que ya existe en Planillas, sin duplicarla. */
+export async function activarInventariosDesdePlanillas(
+  entidadId: string,
+): Promise<{ data?: Entidad; error?: string }> {
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede habilitar Inventarios." };
+  }
+  if (!isOnline()) {
+    return { error: "Conéctese para activar Inventarios en una empresa de Planillas." };
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("entidades")
+    .update({ usa_inventarios: true })
+    .eq("id", entidadId)
+    .eq("activo", true)
+    .eq("usa_planillas", true)
+    .eq("usa_inventarios", false)
+    .select()
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data) {
+    return { error: "Esa empresa ya usa Inventarios o ya no está disponible en Planillas." };
+  }
+
+  return { data: data as Entidad };
 }
 
 export async function listEntidades(): Promise<EntidadConConteo[]> {

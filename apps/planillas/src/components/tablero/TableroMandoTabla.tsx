@@ -113,7 +113,7 @@ export function TableroMandoTabla({ mes, filas }: { mes: string; filas: TableroF
       </div>
 
       <div className={panelCardClass}>
-        <div className="max-h-[calc(100dvh-13rem)] overflow-auto">
+        <div className="scrollbar-themed max-h-[calc(100dvh-13rem)] overflow-auto">
         <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-left text-sm">
           <thead className="text-muted-foreground">
             <tr>

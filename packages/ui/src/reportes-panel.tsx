@@ -3,8 +3,14 @@ import { entidadMuestraSelectorSede } from "@inventario/types";
 import { Button, Select } from "./components";
 import { FechaDdMmYyyyInput } from "./fecha-dd-mm-yyyy-input";
 import { PanelBanner, PanelCountLabel, StatusBadge, panelCardClass } from "./panel";
-import { PanelTableTd, PanelTableTh } from "./panel-table-layout";
-import { panelStickyToolbarClass, scrollbarThemedClass } from "./responsive-layout";
+import { PanelDataTable, panelTableBodyRowClass } from "./panel-list-table";
+import {
+  PanelTableTd,
+  PanelTableTh,
+  panelTableNameCellClass,
+  panelTableNowrapCellClass,
+} from "./panel-table-layout";
+import { panelStickyToolbarClass } from "./responsive-layout";
 
 export interface ReporteDefinicionUI {
   id: string;
@@ -410,30 +416,35 @@ export function ReportesPanelContent({
             </div>
           )}
 
-          <div className={`${scrollbarThemedClass} overflow-x-auto rounded-lg border border-border/60`}>
-            <table className="w-full min-w-[48rem] border-collapse text-left">
-              <thead className="border-b border-border/60 bg-muted/40">
-                <tr>
-                  {previewHeaders.map((header) => (
-                    <PanelTableTh key={header} className="whitespace-nowrap">
-                      {header}
-                    </PanelTableTh>
+          <PanelDataTable layout="auto" scroll>
+            <thead className="border-b border-border/60 bg-muted/40">
+              <tr>
+                {previewHeaders.map((header, index) => (
+                  <PanelTableTh
+                    key={header}
+                    className={index === 0 ? panelTableNameCellClass : panelTableNowrapCellClass}
+                  >
+                    {header}
+                  </PanelTableTh>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {previewRows.map((row, rowIndex) => (
+                <tr key={rowIndex} className={panelTableBodyRowClass}>
+                  {row.map((cell, cellIndex) => (
+                    <PanelTableTd
+                      key={cellIndex}
+                      title={cell}
+                      className={cellIndex === 0 ? panelTableNameCellClass : panelTableNowrapCellClass}
+                    >
+                      {cell}
+                    </PanelTableTd>
                   ))}
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border/40">
-                {previewRows.map((row, rowIndex) => (
-                  <tr key={rowIndex} className="hover:bg-muted/25">
-                    {row.map((cell, cellIndex) => (
-                      <PanelTableTd key={cellIndex} title={cell}>
-                        {cell}
-                      </PanelTableTd>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </PanelDataTable>
 
           {previewTruncado && (
             <p className="text-xs text-muted-foreground">

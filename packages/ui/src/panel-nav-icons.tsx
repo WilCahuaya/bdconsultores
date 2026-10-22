@@ -9,7 +9,8 @@ export type PanelNavIconKey =
   | "pending"
   | "users"
   | "reports"
-  | "spaces";
+  | "spaces"
+  | "download";
 
 export interface PanelNavItem {
   href: string;
@@ -110,6 +111,16 @@ export function IconUsers({ className = iconClass }: { className?: string }) {
   );
 }
 
+export function IconDownload({ className = iconClass }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>
+      <path d="M12 3v12" />
+      <path d="m7 11 5 5 5-5" />
+      <path d="M5 21h14" />
+    </svg>
+  );
+}
+
 export function IconSpaces({ className = iconClass }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>
@@ -176,6 +187,7 @@ const ICONS: Record<PanelNavIconKey, (props: { className?: string }) => ReactNod
   users: IconUsers,
   reports: IconReports,
   spaces: IconSpaces,
+  download: IconDownload,
 };
 
 export function PanelNavIcon({ name, className }: { name: PanelNavIconKey; className?: string }) {

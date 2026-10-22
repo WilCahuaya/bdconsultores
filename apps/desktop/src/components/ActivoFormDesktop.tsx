@@ -86,8 +86,7 @@ import {
   listCatalogoClases,
   listCatalogoGrupos,
   registerCatalogoOpcionPersonalizada,
-  searchCatalogoNacionalOficial,
-  searchCatalogoPropio,
+  searchCatalogo,
   searchCuentasContables,
   suggestCatalogoGrupo,
   upsertCuentaContable,
@@ -176,18 +175,8 @@ export function ActivoFormDesktop({
   );
 
   const searchCatalogoByCategoria = useCallback(
-    async (query: string, limit?: number) => {
-      if (categoria !== "CUENTA_ORDEN") {
-        return searchCatalogoNacionalOficial(query, limit);
-      }
-      const perSide = Math.max(Math.ceil((limit ?? 50) / 2), 15);
-      const [nacional, propio] = await Promise.all([
-        searchCatalogoNacionalOficial(query, perSide),
-        searchCatalogoPropio(query, perSide),
-      ]);
-      return [...nacional, ...propio];
-    },
-    [categoria],
+    (query: string, limit?: number) => searchCatalogo(query, limit),
+    [],
   );
 
   function handleCategoriaChange(next: CategoriaBien) {

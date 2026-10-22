@@ -278,7 +278,7 @@ export function TrabajadoresPendientesTabla({
       </div>
 
       <div className={panelCardClass}>
-        <div className="max-h-[calc(100dvh-16rem)] overflow-auto">
+        <div className="scrollbar-themed max-h-[calc(100dvh-16rem)] overflow-auto">
           <table className="w-full min-w-[1100px] border-separate border-spacing-0 text-left text-sm">
             <thead>
               <tr>

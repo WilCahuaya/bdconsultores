@@ -13,13 +13,13 @@ import { Button, Dialog, Select } from "./components";
 import {
   PanelDataTable,
   PanelEmptyState,
-  PanelTableColgroup,
   PanelTableTd,
   PanelTableTh,
   StatusBadge,
   VISITAS_HISTORIAL_TABLE_WIDTHS_PCT,
   panelTableBodyRowClass,
   panelTableHeadRowClass,
+  panelTableNameCellClass,
   panelTableNowrapCellClass,
   panelTableStickyHeadClass,
 } from "./panel";
@@ -462,12 +462,11 @@ export function VisitasCampoHistorialPanel({
 
   return (
     <>
-      <PanelDataTable layout="fixed">
-        <PanelTableColgroup widths={VISITAS_HISTORIAL_TABLE_WIDTHS_PCT} />
+      <PanelDataTable layout="auto" scroll>
         <thead className={panelTableStickyHeadClass}>
           <tr className={panelTableHeadRowClass}>
             <PanelTableTh className={panelTableNowrapCellClass}>#</PanelTableTh>
-            <PanelTableTh>Sucursal</PanelTableTh>
+            <PanelTableTh className={panelTableNameCellClass}>Sucursal</PanelTableTh>
             <PanelTableTh className={panelTableNowrapCellClass}>Apertura</PanelTableTh>
             <PanelTableTh className={panelTableNowrapCellClass}>Cierre</PanelTableTh>
             <PanelTableTh align="center" className={panelTableNowrapCellClass}>
@@ -491,7 +490,7 @@ export function VisitasCampoHistorialPanel({
                   <PanelTableTd className={`font-medium ${panelTableNowrapCellClass}`}>
                     {visita.numero}
                   </PanelTableTd>
-                  <PanelTableTd className="text-sm" title={visitaCampoSedeLabel(visita)}>
+                  <PanelTableTd className={panelTableNameCellClass} title={visitaCampoSedeLabel(visita)}>
                     <span className="block truncate">{visitaCampoSedeLabel(visita)}</span>
                   </PanelTableTd>
                   <PanelTableTd className={panelTableNowrapCellClass}>

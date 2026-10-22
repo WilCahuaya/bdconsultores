@@ -28,13 +28,12 @@ import {
   useTablePagination,
 } from "./panel";
 import {
+  PanelDataTable,
   panelTableBodyRowClass,
   panelTableHeadRowClass,
   panelTableStickyHeadClass,
 } from "./panel-list-table";
 import { PanelTableColgroup } from "./panel-table-layout";
-import { panelCardClass } from "./panel";
-import { scrollbarThemedClass } from "./responsive-layout";
 import {
   CATALOGO_ITEM_TABLE_COLS,
   CatalogoItemDetalle,
@@ -165,7 +164,7 @@ export function CatalogoNacionalConsulta({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="catalogo-tabla-panel space-y-4">
       <p className="text-sm text-muted-foreground">
         Consulta del catálogo oficial SBN. Los datos SBN (código, denominación, grupo, clase, etc.)
         son de solo lectura; puede completar o corregir la cuenta contable y la depreciación conforme los vaya identificando.
@@ -207,9 +206,33 @@ export function CatalogoNacionalConsulta({
       )}
 
       {!loading && filtrados.length > 0 && (
-        <div className={`${panelCardClass} min-w-0 max-w-full overflow-hidden`}>
-          <div className={`${scrollbarThemedClass} overflow-x-auto`}>
-            <table className="w-full min-w-[1080px] table-auto text-left text-sm">
+        <PanelDataTable
+          layout="auto"
+          scroll
+          className="catalogo-cols-full"
+          footer={
+            <TablePagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              unitLabel="resultados"
+              legend={
+                filtrados.length >= CATALOGO_CONSULTA_MAX_RESULTS ? (
+                  <span className="text-xs text-muted-foreground">
+                    Mostrando hasta {CATALOGO_CONSULTA_MAX_RESULTS} coincidencias. Afine la búsqueda
+                    para ver otros resultados.
+                  </span>
+                ) : undefined
+              }
+            />
+          }
+        >
               <PanelTableColgroup cols={CATALOGO_ITEM_TABLE_COLS} />
               <thead className={panelTableStickyHeadClass}>
                 <tr className={panelTableHeadRowClass}>
@@ -247,29 +270,7 @@ export function CatalogoNacionalConsulta({
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-          <TablePagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            pageSize={pageSize}
-            pageSizeOptions={pageSizeOptions}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            unitLabel="resultados"
-            legend={
-              filtrados.length >= CATALOGO_CONSULTA_MAX_RESULTS ? (
-                <span className="text-xs text-muted-foreground">
-                  Mostrando hasta {CATALOGO_CONSULTA_MAX_RESULTS} coincidencias. Afine la búsqueda
-                  para ver otros resultados.
-                </span>
-              ) : undefined
-            }
-          />
-        </div>
+        </PanelDataTable>
       )}
 
       {!loading && !searched && busqueda.trim().length === 0 && (

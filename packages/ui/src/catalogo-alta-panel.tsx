@@ -136,10 +136,15 @@ export function CatalogoAltaPanel({
       }
 
       setCreated(result.data);
+      const codigoAsignado = result.data.codigo.trim();
+      const codigoPrevisto = codigo.trim();
+      const tomoSiguiente = !esNacional && codigoPrevisto && codigoAsignado !== codigoPrevisto;
       setSuccess(
         esNacional
-          ? `Ítem ${result.data.codigo} agregado al catálogo nacional. Ya puede usarlo al registrar activos.${successSuffix ? ` ${successSuffix}` : ""}`
-          : `Ítem ${result.data.codigo} agregado. Ya puede usarlo al registrar activos de cuenta de orden.${successSuffix ? ` ${successSuffix}` : ""}`,
+          ? `Ítem ${codigoAsignado} agregado al catálogo nacional. Ya puede usarlo al registrar activos.${successSuffix ? ` ${successSuffix}` : ""}`
+          : tomoSiguiente
+            ? `El código ${codigoPrevisto} ya estaba usado. Se guardó como ${codigoAsignado}.${successSuffix ? ` ${successSuffix}` : ""}`
+            : `Ítem ${codigoAsignado} agregado. Ya puede usarlo al registrar activos de cuenta de orden.${successSuffix ? ` ${successSuffix}` : ""}`,
       );
       setFormKey((k) => k + 1);
       void refreshMeta();
@@ -161,7 +166,7 @@ export function CatalogoAltaPanel({
               <p className="mt-1 text-sm text-muted-foreground">
                 {esNacional
                   ? "Registre un bien del catálogo oficial SBN que no figure en la consulta. Indique el código de 8 dígitos y complete los datos contables."
-                  : "Registre artículos menores que no figuran en el catálogo oficial. El código se asigna automáticamente; complete cuenta contable y contabilidad según corresponda."}
+                  : "Registre artículos menores que no figuran en el catálogo oficial. El código se asigna automáticamente. Indique grupo y clase."}
               </p>
             </div>
             {onClose && (

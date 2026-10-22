@@ -18,18 +18,18 @@ import { FechaDdMmYyyyInput } from "./fecha-dd-mm-yyyy-input";
 import {
   PanelEmptyState,
   PanelCountLabel,
-  PanelTableColgroup,
   PanelTableTd,
   PanelTableTh,
   StatusBadge,
+  PanelDataTable,
   panelCardClass,
+  panelTableBodyRowClass,
   panelTableHeadRowClass,
   panelTableShrinkCellClass,
   panelTableNowrapCellClass,
   panelTableStickyHeadClass,
   panelTableNameCellClass,
 } from "./panel";
-import { scrollbarThemedClass } from "./responsive-layout";
 
 function dateToDDMMYYYY(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
@@ -76,10 +76,6 @@ export interface EntidadResumenPanelProps {
   /** Oculta el bloque superior con nombre/RUC (p. ej. dashboard con tabla de entidades arriba). */
   showEntidadHeader?: boolean;
 }
-
-const RESUMEN_TABLE_WIDTHS_PCT = [38, 22, 22, 18] as const;
-const DEPRECIACION_MENSUAL_WIDTHS_PCT = [40, 60] as const;
-const AMBIENTES_RESUMEN_TABLE_WIDTHS_PCT = [18, 14, 30, 10, 12] as const;
 
 /** Incluye registrados y preregistrados; excluye dados de baja. */
 function filtrarParaResumenDashboard<T extends { estado_registro?: string }>(
@@ -278,12 +274,10 @@ export function EntidadResumenPanel({
         {resumenFilas.length === 0 ? (
           <PanelEmptyState message="No hay activos registrados ni preregistrados para valorizar en esta entidad." />
         ) : (
-          <div className={`${scrollbarThemedClass} overflow-x-auto`}>
-            <table className="w-full min-w-[44rem] table-fixed text-left text-sm">
-              <PanelTableColgroup widths={RESUMEN_TABLE_WIDTHS_PCT} />
+          <PanelDataTable layout="auto" scroll>
               <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
                 <tr className={panelTableHeadRowClass}>
-                  <PanelTableTh>Cuenta contable</PanelTableTh>
+                  <PanelTableTh className={panelTableNameCellClass}>Cuenta contable</PanelTableTh>
                   <PanelTableTh align="right" className="whitespace-nowrap">
                     Suma de Importe
                   </PanelTableTh>
@@ -302,8 +296,10 @@ export function EntidadResumenPanel({
                       <PanelTableTd colSpan={4}>{seccion.label}</PanelTableTd>
                     </tr>
                     {seccion.filas.map((fila: ClasificacionResumen) => (
-                      <tr key={`${seccion.tipoBien}-${fila.cuenta}`}>
-                        <PanelTableTd className="font-medium">{fila.categoria}</PanelTableTd>
+                      <tr key={`${seccion.tipoBien}-${fila.cuenta}`} className={panelTableBodyRowClass}>
+                        <PanelTableTd className={`font-medium ${panelTableNameCellClass}`}>
+                          {fila.categoria}
+                        </PanelTableTd>
                         <PanelTableTd
                           align="right"
                           className="whitespace-nowrap font-mono text-xs tabular-nums"
@@ -325,7 +321,9 @@ export function EntidadResumenPanel({
                       </tr>
                     ))}
                     <tr className={RESUMEN_TABLA_SUBTOTAL_CLASS}>
-                      <PanelTableTd>Total {seccion.label}</PanelTableTd>
+                      <PanelTableTd className={panelTableNameCellClass}>
+                        Total {seccion.label}
+                      </PanelTableTd>
                       <PanelTableTd
                         align="right"
                         className="whitespace-nowrap font-mono text-xs tabular-nums"
@@ -348,7 +346,7 @@ export function EntidadResumenPanel({
                   </Fragment>
                 ))}
                 <tr className={RESUMEN_TABLA_TOTAL_CLASS}>
-                  <PanelTableTd>Total general</PanelTableTd>
+                  <PanelTableTd className={panelTableNameCellClass}>Total general</PanelTableTd>
                   <PanelTableTd
                     align="right"
                     className="whitespace-nowrap font-mono text-xs tabular-nums"
@@ -369,8 +367,7 @@ export function EntidadResumenPanel({
                   </PanelTableTd>
                 </tr>
               </tbody>
-            </table>
-          </div>
+          </PanelDataTable>
         )}
       </section>
 
@@ -384,12 +381,10 @@ export function EntidadResumenPanel({
               Del año {fechaCorte.getFullYear()}, de enero hasta el mes de la fecha de corte
             </p>
           </div>
-          <div className={`${scrollbarThemedClass} overflow-x-auto`}>
-            <table className="w-full min-w-[20rem] table-fixed text-left text-sm">
-              <PanelTableColgroup widths={DEPRECIACION_MENSUAL_WIDTHS_PCT} />
+          <PanelDataTable layout="auto" scroll>
               <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
                 <tr className={panelTableHeadRowClass}>
-                  <PanelTableTh>Mes</PanelTableTh>
+                  <PanelTableTh className={panelTableNameCellClass}>Mes</PanelTableTh>
                   <PanelTableTh align="right" className="whitespace-nowrap">
                     Depreciación acumulada
                   </PanelTableTh>
@@ -398,7 +393,9 @@ export function EntidadResumenPanel({
               <tbody>
                 {depreciacionMensual.map((fila) => (
                   <tr key={fila.mes}>
-                    <PanelTableTd className="font-medium">{fila.label}</PanelTableTd>
+                    <PanelTableTd className={`font-medium ${panelTableNameCellClass}`}>
+                      {fila.label}
+                    </PanelTableTd>
                     <PanelTableTd
                       align="right"
                       className="whitespace-nowrap font-mono text-xs tabular-nums"
@@ -408,8 +405,7 @@ export function EntidadResumenPanel({
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </PanelDataTable>
         </section>
       )}
 
@@ -437,14 +433,12 @@ export function EntidadResumenPanel({
                     </h4>
                   </div>
                 )}
-                <div className={`${scrollbarThemedClass} overflow-x-auto`}>
-                  <table className="w-full min-w-[48rem] table-fixed text-left text-sm">
-                    <PanelTableColgroup widths={AMBIENTES_RESUMEN_TABLE_WIDTHS_PCT} />
+                <PanelDataTable layout="auto" scroll>
                     <thead className={panelTableStickyHeadClass}>
                       <tr className={panelTableHeadRowClass}>
                         <PanelTableTh className={panelTableNameCellClass}>Ambiente</PanelTableTh>
-                        <PanelTableTh>Responsable</PanelTableTh>
-                        <PanelTableTh>Descripción</PanelTableTh>
+                        <PanelTableTh className="min-w-[11rem]">Responsable</PanelTableTh>
+                        <PanelTableTh className="min-w-[12rem]">Descripción</PanelTableTh>
                         <PanelTableTh align="center" className={panelTableShrinkCellClass}>
                           Activos
                         </PanelTableTh>
@@ -453,15 +447,15 @@ export function EntidadResumenPanel({
                     </thead>
                     <tbody>
                       {lista.map((amb) => (
-                        <tr key={amb.id} className="border-b border-border/40 last:border-b-0">
+                        <tr key={amb.id} className={panelTableBodyRowClass}>
                           <PanelTableTd className={panelTableNameCellClass} title={amb.nombre}>
                             {amb.nombre}
                           </PanelTableTd>
-                          <PanelTableTd title={amb.responsable ?? undefined}>
+                          <PanelTableTd className="min-w-[11rem]" title={amb.responsable ?? undefined}>
                             {amb.responsable ?? "—"}
                           </PanelTableTd>
                           <PanelTableTd
-                            className="text-muted-foreground"
+                            className="min-w-[12rem] text-muted-foreground"
                             title={amb.descripcion ?? undefined}
                           >
                             {amb.descripcion ?? "—"}
@@ -477,8 +471,7 @@ export function EntidadResumenPanel({
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                </PanelDataTable>
               </div>
             ))}
           </div>

@@ -33,6 +33,9 @@ export const RESPONSABLES_TABLE_COLS: PanelTableColSpec[] = [
 
 export const panelTableShrinkCellClass = "w-0 whitespace-nowrap";
 
+/** Muestra el texto entero. La columna crece con el contenido y con el espacio libre. */
+export const panelTableShowCellClass = "panel-table-show";
+
 /** Compacta al contenido sin colapsar la celda (p. ej. estado, acciones). */
 export const panelTableNowrapCellClass = "whitespace-nowrap";
 
@@ -135,26 +138,29 @@ export function PanelTableTh({
   align?: "left" | "center" | "right";
 }) {
   const nameCell = className?.includes("panel-name-cell");
-  const nowrap = !nameCell && className?.includes("whitespace-nowrap");
-  const sized = !nameCell && !nowrap && className?.includes("min-w-");
+  const show = className?.includes("panel-table-show");
+  const nowrap = !nameCell && !show && className?.includes("whitespace-nowrap");
+  const sized = !nameCell && !nowrap && !show && className?.includes("min-w-");
 
   return (
     <th
       className={cn(
         "px-2 py-2.5 text-xs font-semibold uppercase tracking-wide sm:px-3",
-        nameCell
+        show
           ? "whitespace-nowrap"
-          : nowrap
-            ? "w-0 overflow-hidden whitespace-nowrap"
-            : sized
-              ? "overflow-hidden"
-              : "max-w-0 overflow-hidden",
+          : nameCell
+            ? "whitespace-nowrap"
+            : nowrap
+              ? "w-0 overflow-hidden whitespace-nowrap"
+              : sized
+                ? "overflow-hidden"
+                : "max-w-0 overflow-hidden",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className,
       )}
     >
-      <span className={cn("block", (nameCell || !nowrap) && "truncate")}>{children}</span>
+      <span className={cn("block", !show && (nameCell || !nowrap) && "truncate")}>{children}</span>
     </th>
   );
 }
@@ -173,23 +179,26 @@ export function PanelTableTd({
   colSpan?: number;
 }) {
   const nameCell = className?.includes("panel-name-cell");
-  const nowrap = !nameCell && className?.includes("whitespace-nowrap");
-  const sized = !nameCell && !nowrap && !colSpan && className?.includes("min-w-");
+  const show = className?.includes("panel-table-show");
+  const nowrap = !nameCell && !show && className?.includes("whitespace-nowrap");
+  const sized = !nameCell && !nowrap && !show && !colSpan && className?.includes("min-w-");
 
   return (
     <td
       colSpan={colSpan}
       className={cn(
         "px-2 py-2.5 align-middle text-sm sm:px-3",
-        nameCell
-          ? "whitespace-nowrap font-medium text-primary"
-          : nowrap
-            ? "w-0 overflow-hidden whitespace-nowrap"
-            : colSpan
-              ? undefined
-              : sized
-                ? "overflow-hidden"
-                : "max-w-0 overflow-hidden",
+        show
+          ? "whitespace-nowrap"
+          : nameCell
+            ? "whitespace-nowrap font-medium text-primary"
+            : nowrap
+              ? "w-0 overflow-hidden whitespace-nowrap"
+              : colSpan
+                ? undefined
+                : sized
+                  ? "overflow-hidden"
+                  : "max-w-0 overflow-hidden",
         align === "right" && "text-right",
         align === "center" && "text-center",
         className,
@@ -197,7 +206,7 @@ export function PanelTableTd({
       title={title}
     >
       {typeof children === "string" || typeof children === "number" ? (
-        <span className={cn("block", (nameCell || (!nowrap && !colSpan)) && "truncate")}>
+        <span className={cn("block", !show && (nameCell || (!nowrap && !colSpan)) && "truncate")}>
           {children}
         </span>
       ) : (

@@ -186,12 +186,14 @@ export function CatalogoNacionalForm({
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
-        const err = validarCuentaContableParaCatalogo(cuentaCodigo, contabilidad, {
-          codigosEnMaestra: codigosCuentaMaestra,
-        });
-        if (err) {
-          setCuentaError(err);
-          return;
+        if (esNacional) {
+          const err = validarCuentaContableParaCatalogo(cuentaCodigo, contabilidad, {
+            codigosEnMaestra: codigosCuentaMaestra,
+          });
+          if (err) {
+            setCuentaError(err);
+            return;
+          }
         }
         setCuentaError(null);
         void onSubmit({
@@ -199,8 +201,8 @@ export function CatalogoNacionalForm({
           denominacion,
           grupo,
           clase,
-          cuenta_codigo: cuentaCodigo,
-          contabilidad,
+          cuenta_codigo: esNacional ? cuentaCodigo : undefined,
+          contabilidad: esNacional ? contabilidad : undefined,
           depreciacion: esNacional ? depreciacion : undefined,
           resolucion: esNacional ? resolucion : undefined,
           estado: esNacional ? "ACTIVO" : CATALOGO_CUENTA_ORDEN_ESTADO,
@@ -250,28 +252,32 @@ export function CatalogoNacionalForm({
         />
       </div>
 
-      <CuentaContableFields
-        codigo={cuentaCodigo}
-        nombre={contabilidad}
-        onCodigoChange={(value) => {
-          setCuentaCodigo(value);
-          setCuentaError(null);
-        }}
-        onNombreChange={(value) => {
-          setContabilidad(value);
-          setCuentaError(null);
-        }}
-        searchCuentas={searchCuentasContables}
-        disabled={camposDeshabilitados}
-        codigoId="catalogo_cuenta_codigo"
-        nombreId="catalogo_contabilidad"
-        allowCreateNew={Boolean(onCreateCuentaContable)}
-        onCreateCuenta={onCreateCuentaContable}
-        onCodigosMaestraLoaded={setCodigosCuentaMaestra}
-      />
-      {cuentaError && (
-        <p className="text-sm text-destructive sm:col-span-2">{cuentaError}</p>
-      )}
+      {esNacional ? (
+        <>
+          <CuentaContableFields
+            codigo={cuentaCodigo}
+            nombre={contabilidad}
+            onCodigoChange={(value) => {
+              setCuentaCodigo(value);
+              setCuentaError(null);
+            }}
+            onNombreChange={(value) => {
+              setContabilidad(value);
+              setCuentaError(null);
+            }}
+            searchCuentas={searchCuentasContables}
+            disabled={camposDeshabilitados}
+            codigoId="catalogo_cuenta_codigo"
+            nombreId="catalogo_contabilidad"
+            allowCreateNew={Boolean(onCreateCuentaContable)}
+            onCreateCuenta={onCreateCuentaContable}
+            onCodigosMaestraLoaded={setCodigosCuentaMaestra}
+          />
+          {cuentaError && (
+            <p className="text-sm text-destructive sm:col-span-2">{cuentaError}</p>
+          )}
+        </>
+      ) : null}
 
       {esNacional && (
         <div className="space-y-2">

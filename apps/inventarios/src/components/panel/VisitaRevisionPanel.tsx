@@ -28,7 +28,7 @@ function botonVisitaClass(activo: boolean, tono: "si" | "no"): string {
       ? "border-emerald-600 bg-emerald-600 text-white"
       : "border-rose-600 bg-rose-600 text-white";
   const libre = "border-input bg-background text-foreground hover:bg-accent";
-  return `inline-flex h-5 min-w-[1.35rem] items-center justify-center rounded border px-1 text-[10px] font-semibold leading-none disabled:opacity-50 ${activo ? marcado : libre}`;
+  return `inline-flex h-9 min-w-[2.5rem] items-center justify-center rounded border px-2 text-xs font-semibold leading-none disabled:opacity-50 lg:h-5 lg:min-w-[1.35rem] lg:px-1 lg:text-[10px] ${activo ? marcado : libre}`;
 }
 
 type AnclaMenu = { top: number; left: number; arriba: boolean };

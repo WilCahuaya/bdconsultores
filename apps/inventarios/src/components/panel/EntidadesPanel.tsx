@@ -32,6 +32,7 @@ import {
   panelTableHeadRowClass,
   panelTableStickyHeadClass,
   panelTableNameCellClass,
+  panelTableShowCellClass,
   useStoredViewMode,
 } from "@inventario/ui/panel";
 import {
@@ -740,7 +741,7 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
   }
 
   return (
-    <div className="space-y-4">
+    <div className="entidades-page space-y-4">
       <PanelPageHeader
         title="Gestión de entidades"
         subtitle="Administra las entidades y qué módulos usa cada una (Inventarios y/o Planillas)"
@@ -795,15 +796,15 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
           }
         />
       ) : viewMode === "list" ? (
-        <PanelDataTable layout="auto">
+        <PanelDataTable layout="auto" scroll>
           <PanelTableColgroup cols={ENTIDADES_TABLE_COLS} />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
               <PanelTableTh className={panelTableNameCellClass}>Razón social</PanelTableTh>
               <PanelTableTh className={panelTableShrinkCellClass}>RUC</PanelTableTh>
               <PanelTableTh className={panelTableNowrapCellClass}>Módulos</PanelTableTh>
-              <PanelTableTh>Administrador</PanelTableTh>
-              <PanelTableTh>Dirección</PanelTableTh>
+              <PanelTableTh className={panelTableShowCellClass}>Administrador</PanelTableTh>
+              <PanelTableTh className={panelTableShowCellClass}>Dirección</PanelTableTh>
               <PanelTableTh align="center" className={panelTableShrinkCellClass}>
                 Ambientes
               </PanelTableTh>
@@ -839,10 +840,13 @@ export function EntidadesPanel({ entidades: initial }: { entidades: EntidadConCo
                 <PanelTableTd className={panelTableNowrapCellClass}>
                   {modulosEntidadResumen(entidad)}
                 </PanelTableTd>
-                <PanelTableTd title={entidad.admin_nombre ?? undefined}>
+                <PanelTableTd className={panelTableShowCellClass} title={entidad.admin_nombre ?? undefined}>
                   {entidad.admin_nombre ?? "—"}
                 </PanelTableTd>
-                <PanelTableTd className="text-muted-foreground" title={entidad.direccion ?? undefined}>
+                <PanelTableTd
+                  className={`text-muted-foreground ${panelTableShowCellClass}`}
+                  title={entidad.direccion ?? undefined}
+                >
                   {entidad.direccion ?? "—"}
                 </PanelTableTd>
                 <PanelTableTd align="center" className={panelTableShrinkCellClass}>

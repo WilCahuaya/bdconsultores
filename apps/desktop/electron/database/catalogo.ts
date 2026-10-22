@@ -138,27 +138,37 @@ export function searchCatalog(query: string, limit = 20): CatalogoRow[] {
   const trimmed = query.trim();
   if (trimmed.length < minCatalogoQueryLength(trimmed)) return [];
 
-  const pattern = `%${trimmed}%`;
-  const prefix = `${trimmed}%`;
+  const up = trimmed.toUpperCase();
+  const origen = up.startsWith("BD") ? "PROPIO" : /^\d+$/.test(trimmed) ? "NACIONAL" : null;
+  const origenClause =
+    origen === "PROPIO"
+      ? "AND (origen = 'PROPIO' OR upper(trim(codigo)) LIKE 'BD%')"
+      : origen === "NACIONAL"
+        ? "AND COALESCE(origen, '') <> 'PROPIO' AND upper(trim(codigo)) NOT LIKE 'BD%'"
+        : "";
 
   return db
     .prepare(
       `
       SELECT *
       FROM catalogo_nacional
-      WHERE codigo LIKE @prefix OR denominacion LIKE @pattern
+      WHERE (
+        upper(trim(codigo)) LIKE @prefix
+        OR denominacion LIKE @pattern
+      )
+      ${origenClause}
       ORDER BY
-        CASE WHEN codigo = @exact THEN 0 ELSE 1 END,
-        CASE WHEN codigo LIKE @prefix THEN 0 ELSE 1 END,
+        CASE WHEN upper(trim(codigo)) = @exact THEN 0 ELSE 1 END,
+        CASE WHEN upper(trim(codigo)) LIKE @prefix THEN 0 ELSE 1 END,
         length(denominacion),
         denominacion
       LIMIT @limit
     `,
     )
     .all({
-      exact: trimmed,
-      prefix,
-      pattern,
+      exact: up,
+      prefix: `${up}%`,
+      pattern: `%${trimmed}%`,
       limit: Math.min(Math.max(limit, 1), 500),
     }) as CatalogoRow[];
 }

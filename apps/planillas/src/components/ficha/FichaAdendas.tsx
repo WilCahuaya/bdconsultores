@@ -258,7 +258,7 @@ export function FichaAdendas({
         </div>
       ) : null}
 
-      <div className={`${panelCardClass} overflow-x-auto`}>
+      <div className={`${panelCardClass} scrollbar-themed overflow-x-auto`}>
         <table className="w-full text-left text-sm">
           <thead className="border-b border-border text-muted-foreground">
             <tr>

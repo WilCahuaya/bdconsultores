@@ -145,6 +145,67 @@ export async function listCatalogoPropio(): Promise<CatalogoNacional[]> {
   return (data ?? []) as CatalogoNacional[];
 }
 
+const INTENTOS_CODIGO_PROPIO = 5;
+
+function codigoCatalogoDuplicado(
+  error: { code?: string; message?: string } | null | undefined,
+): boolean {
+  if (!error) return false;
+  if (error.code === "23505") return true;
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes("duplicate key") ||
+    message.includes("llave duplicada") ||
+    message.includes("unique")
+  );
+}
+
+async function leerSiguienteCodigoPropio(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ codigo?: string; error?: string }> {
+  const { data, error } = await supabase
+    .from("catalogo_nacional")
+    .select("codigo")
+    .like("codigo", "BD%")
+    .order("codigo", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  return { codigo: nextCodigoCatalogoPropioFromMax(data?.codigo ?? null) };
+}
+
+/** Inserta el ítem propio. Si el código ya lo guardó otro dispositivo, usa el siguiente. */
+async function insertarCatalogoPropio(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  payload: ReturnType<typeof buildCreateCatalogoCuentaOrdenPayload>,
+): Promise<{ data?: CatalogoNacional; error?: string }> {
+  let codigo = payload.codigo;
+
+  for (let intento = 0; intento < INTENTOS_CODIGO_PROPIO; intento++) {
+    const { data, error } = await supabase
+      .from("catalogo_nacional")
+      .insert({ ...payload, codigo })
+      .select()
+      .single();
+
+    if (!error && data) return { data: data as CatalogoNacional };
+    if (!codigoCatalogoDuplicado(error)) {
+      return { error: error?.message ?? "No se pudo crear el ítem del catálogo." };
+    }
+
+    const siguiente = await leerSiguienteCodigoPropio(supabase);
+    if (siguiente.error || !siguiente.codigo || siguiente.codigo === codigo) {
+      return {
+        error: "Ese código ya fue usado y no se pudo asignar el siguiente. Intente de nuevo.",
+      };
+    }
+    codigo = siguiente.codigo;
+  }
+
+  return { error: "No se pudo asignar un código de catálogo propio libre. Intente de nuevo." };
+}
+
 export async function getNextCodigoCatalogoPropio(): Promise<string> {
   await requireProfile("CONTADOR");
 
@@ -320,16 +381,6 @@ export async function createCatalogoNacional(
   const payload = buildCreateCatalogoCuentaOrdenPayload(input);
   const supabase = await createClient();
 
-  const { data: existing } = await supabase
-    .from("catalogo_nacional")
-    .select("codigo")
-    .eq("codigo", payload.codigo)
-    .maybeSingle();
-
-  if (existing) {
-    return { error: `El código ${payload.codigo} ya existe en el catálogo.` };
-  }
-
   const cuentaError = await ensureCuentaContableForCatalogo(
     supabase,
     payload.cuenta_codigo,
@@ -337,15 +388,13 @@ export async function createCatalogoNacional(
   );
   if (cuentaError.error) return { error: cuentaError.error };
 
-  const { data, error } = await supabase
-    .from("catalogo_nacional")
-    .insert(payload)
-    .select()
-    .single();
+  const inserted = await insertarCatalogoPropio(supabase, payload);
+  if (inserted.error || !inserted.data) {
+    return { error: inserted.error ?? "No se pudo crear el ítem del catálogo." };
+  }
 
-  if (error) return { error: error.message };
   await registrarOpcionesDesdeCatalogoInput(input);
-  return { data: data as CatalogoNacional };
+  return { data: inserted.data };
 }
 
 export async function createCatalogoNacionalExtension(

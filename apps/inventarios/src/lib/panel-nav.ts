@@ -31,6 +31,7 @@ export function contadorNavSections(preregistrados = 0): PanelNavSection[] {
       items: [
         { href: "/contador/catalogo", label: "Catálogo de bienes", icon: "assets" },
         { href: "/contador/usuarios", label: "Usuarios", icon: "users" },
+        { href: "/contador/escritorio", label: "Escritorio", icon: "download" },
       ],
     },
   ];
@@ -74,6 +75,7 @@ export function adminNavSections(
           icon: "spaces",
         },
         { href: "/admin/reportes", label: "Reportes", icon: "reports" },
+        { href: "/admin/escritorio", label: "Escritorio", icon: "download" },
       ],
     },
   ];

@@ -23,6 +23,7 @@ import {
   PanelToolbar,
   StatusBadge,
 } from "./panel";
+import { ViewIcon } from "./panel-action-buttons";
 import {
   PanelDataTable,
   panelTableBodyRowClass,
@@ -37,6 +38,7 @@ import {
   RESPONSABLES_TABLE_COLS,
   panelTableNameCellClass,
   panelTableNowrapCellClass,
+  panelTableShowCellClass,
   panelTableShrinkCellClass,
 } from "./panel-table-layout";
 
@@ -63,12 +65,42 @@ function formatOptional(value: string | null | undefined): string {
   return value?.trim() ? value.trim() : "—";
 }
 
-function formatAmbientes(item: ResponsableConConteo): string {
-  if (item.ambiente_nombres && item.ambiente_nombres.length > 0) {
-    return item.ambiente_nombres.join(", ");
+function nombresAmbiente(item: ResponsableConConteo): string[] {
+  return (item.ambiente_nombres ?? []).map((nombre) => nombre.trim()).filter(Boolean);
+}
+
+function AmbientesACargo({
+  item,
+  onVerMas,
+}: {
+  item: ResponsableConConteo;
+  onVerMas: () => void;
+}) {
+  const nombres = nombresAmbiente(item);
+  if (nombres.length === 0) {
+    return <span>{item.ambiente_count > 0 ? String(item.ambiente_count) : "—"}</span>;
   }
-  if (item.ambiente_count > 0) return `${item.ambiente_count}`;
-  return "—";
+
+  const primero = nombres[0];
+  const restantes = nombres.length - 1;
+
+  return (
+    <div className="flex items-center gap-1 whitespace-nowrap">
+      <span title={primero}>{primero}</span>
+      {restantes > 0 && (
+        <PanelIconAction
+          label={
+            restantes === 1
+              ? "Ver 1 ambiente más"
+              : `Ver ${restantes} ambientes más`
+          }
+          onClick={onVerMas}
+        >
+          <ViewIcon />
+        </PanelIconAction>
+      )}
+    </div>
+  );
 }
 
 type ResponsableConfirmAction =
@@ -94,6 +126,7 @@ export function ResponsablesPanel({
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ambientesTarget, setAmbientesTarget] = useState<ResponsableConConteo | null>(null);
 
   const filtrados = useMemo(() => {
     let list = responsables;
@@ -284,16 +317,16 @@ export function ResponsablesPanel({
           }
         />
       ) : (
-        <PanelDataTable layout="auto">
+        <PanelDataTable layout="auto" scroll>
           <PanelTableColgroup cols={RESPONSABLES_TABLE_COLS} />
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
               <PanelTableTh className={panelTableNameCellClass}>Nombre</PanelTableTh>
               <PanelTableTh className={panelTableShrinkCellClass}>DNI</PanelTableTh>
-              <PanelTableTh className={panelTableShrinkCellClass}>Cargo</PanelTableTh>
-              <PanelTableTh>Correo</PanelTableTh>
+              <PanelTableTh className={panelTableShowCellClass}>Cargo</PanelTableTh>
+              <PanelTableTh className={panelTableShowCellClass}>Correo</PanelTableTh>
               <PanelTableTh className={panelTableShrinkCellClass}>Teléfono</PanelTableTh>
-              <PanelTableTh>Ambientes a cargo</PanelTableTh>
+              <PanelTableTh className={panelTableShowCellClass}>Ambientes a cargo</PanelTableTh>
               <PanelTableTh className={panelTableNowrapCellClass}>Estado</PanelTableTh>
               <PanelTableTh align="right" className={panelTableNowrapCellClass}>
                 Acciones
@@ -321,13 +354,13 @@ export function ResponsablesPanel({
                   {formatOptional(item.dni)}
                 </PanelTableTd>
                 <PanelTableTd
-                  className={`${panelTableMutedClass} ${panelTableShrinkCellClass}`}
+                  className={`${panelTableMutedClass} ${panelTableShowCellClass}`}
                   title={item.cargo ?? undefined}
                 >
                   {item.cargo ?? "—"}
                 </PanelTableTd>
                 <PanelTableTd
-                  className={panelTableMutedClass}
+                  className={`${panelTableMutedClass} ${panelTableShowCellClass}`}
                   title={item.email ?? undefined}
                 >
                   {formatOptional(item.email)}
@@ -338,8 +371,11 @@ export function ResponsablesPanel({
                 >
                   {formatOptional(item.telefono)}
                 </PanelTableTd>
-                <PanelTableTd className={panelTableMutedClass} title={formatAmbientes(item)}>
-                  {formatAmbientes(item)}
+                <PanelTableTd className={`overflow-visible ${panelTableMutedClass} ${panelTableShowCellClass}`}>
+                  <AmbientesACargo
+                    item={item}
+                    onVerMas={() => setAmbientesTarget(item)}
+                  />
                 </PanelTableTd>
                 <PanelTableTd className={panelTableNowrapCellClass}>
                   <StatusBadge variant={item.activo ? "active" : "default"}>
@@ -395,6 +431,26 @@ export function ResponsablesPanel({
           </tbody>
         </PanelDataTable>
       )}
+
+      <Dialog
+        open={Boolean(ambientesTarget)}
+        onClose={() => setAmbientesTarget(null)}
+        title="Ambientes a cargo"
+        description={ambientesTarget?.nombre}
+      >
+        {ambientesTarget && (
+          <ul className="space-y-1.5">
+            {nombresAmbiente(ambientesTarget).map((nombre, index) => (
+              <li
+                key={`${nombre}-${index}`}
+                className="rounded-md border border-border/60 px-3 py-2 text-sm"
+              >
+                {nombre}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Dialog>
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} title="Nuevo responsable">
         <ResponsableAltaForm

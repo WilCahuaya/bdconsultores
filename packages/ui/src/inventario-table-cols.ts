@@ -415,6 +415,49 @@ export function inventarioStickyLeftOffsets(
   return offsets;
 }
 
+/**
+ * Piso de lectura. El ancho preferido se reparte si sobra cuerpo;
+ * estas columnas pueden achicarse para que no haya scroll de más.
+ * Acciones (última columna, 112) no entra: se queda fija.
+ */
+function inventarioColFloorPx(width: number, index: number, count: number): number {
+  if (index === count - 1) return width;
+  switch (width) {
+    case 180:
+      return 120; // Nombre
+    case 112:
+      return 56; // Marca
+    case 128:
+      return 64; // Modelo
+    case 140:
+      return 64; // Serie
+    case 148:
+      return 88; // Cuenta contable
+    case 120:
+      return 64; // Observación
+    case 130:
+      return 88; // Comprobante
+    case 160:
+      return 96; // Ubicación o posible ambiente
+    case 168:
+      return 96; // Viene de
+    default:
+      return width;
+  }
+}
+
+export function inventarioTableFloorValuesPx(options?: {
+  modoPreregistro?: boolean;
+  modoAdmin?: boolean;
+  mostrarUbicacion?: boolean;
+  withSelection?: boolean;
+  columnaVisita?: boolean;
+  columnaProcedencia?: boolean;
+}): number[] {
+  const preferred = inventarioTableWidthValuesPx(options);
+  return preferred.map((width, index) => inventarioColFloorPx(width, index, preferred.length));
+}
+
 export function inventarioTableMinWidthPx(options?: {
   modoPreregistro?: boolean;
   modoAdmin?: boolean;
@@ -423,5 +466,5 @@ export function inventarioTableMinWidthPx(options?: {
   columnaVisita?: boolean;
   columnaProcedencia?: boolean;
 }): number {
-  return sumWidths(inventarioTableWidthValuesPx(options));
+  return sumWidths(inventarioTableFloorValuesPx(options));
 }

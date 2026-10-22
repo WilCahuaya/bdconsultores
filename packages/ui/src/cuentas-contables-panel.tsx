@@ -7,9 +7,19 @@ import { Button, Dialog, Input, Label } from "./components";
 import { ConfirmDialog } from "./confirm-dialog";
 import { EditIcon, PanelCountLabel, PanelEmptyState, PanelFlashMessage, PanelSearchInput, PanelToolbar } from "./panel";
 import { DeleteIcon, PanelIconAction } from "./panel-action-buttons";
-import { panelCardClass } from "./panel";
-import { scrollbarThemedClass } from "./responsive-layout";
-import { panelTableBodyRowClass, panelTableHeadRowClass, panelTableStickyHeadClass } from "./panel-list-table";
+import {
+  PanelDataTable,
+  panelTableBodyRowClass,
+  panelTableHeadRowClass,
+  panelTableStickyHeadClass,
+} from "./panel-list-table";
+import {
+  PanelTableTd,
+  PanelTableTh,
+  panelTableNameCellClass,
+  panelTableNowrapCellClass,
+  panelTableShrinkCellClass,
+} from "./panel-table-layout";
 
 export interface CuentasContablesPanelProps {
   listCuentas: (query?: string) => Promise<CuentaContable[]>;
@@ -193,21 +203,26 @@ export function CuentasContablesPanel({
           }
         />
       ) : (
-        <div className={`${panelCardClass} ${scrollbarThemedClass} min-w-0 max-w-full overflow-x-auto`}>
-          <table className="w-full min-w-[480px] table-auto text-left text-sm">
+        <PanelDataTable layout="auto" scroll>
             <thead className={panelTableStickyHeadClass}>
               <tr className={panelTableHeadRowClass}>
-                <th className="px-3 py-2 font-medium">Código cuenta contable</th>
-                <th className="px-3 py-2 font-medium">Nombre cuenta contable</th>
-                <th className="px-3 py-2 text-right font-medium">{readOnly ? "Ver" : "Acciones"}</th>
+                <PanelTableTh className={panelTableShrinkCellClass}>Código cuenta contable</PanelTableTh>
+                <PanelTableTh className={panelTableNameCellClass}>Nombre cuenta contable</PanelTableTh>
+                <PanelTableTh align="right" className={panelTableNowrapCellClass}>
+                  {readOnly ? "Ver" : "Acciones"}
+                </PanelTableTh>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((item) => (
                 <tr key={item.codigo} className={panelTableBodyRowClass}>
-                  <td className="px-3 py-2 font-mono">{item.codigo}</td>
-                  <td className="px-3 py-2">{item.nombre ?? "—"}</td>
-                  <td className="px-3 py-2">
+                  <PanelTableTd className={`${panelTableShrinkCellClass} font-mono`}>
+                    {item.codigo}
+                  </PanelTableTd>
+                  <PanelTableTd className={panelTableNameCellClass} title={item.nombre ?? undefined}>
+                    {item.nombre ?? "—"}
+                  </PanelTableTd>
+                  <PanelTableTd align="right" className={`overflow-visible ${panelTableNowrapCellClass}`}>
                     <div className="flex justify-end gap-1">
                       {!readOnly ? (
                         <>
@@ -231,12 +246,11 @@ export function CuentasContablesPanel({
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </div>
-                  </td>
+                  </PanelTableTd>
                 </tr>
               ))}
             </tbody>
-          </table>
-        </div>
+        </PanelDataTable>
       )}
 
       <Dialog

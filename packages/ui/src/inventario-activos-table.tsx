@@ -19,6 +19,7 @@ import {
   INVENTARIO_TABLE_ENTITY_UBICACION_COL_COUNT,
   INVENTARIO_TABLE_FULL_PREREGISTRO_COL_COUNT,
   inventarioStickyLeftOffsets,
+  inventarioTableFloorValuesPx,
   inventarioTableMinWidthPx,
   inventarioTableWidthValuesPx,
 } from "./inventario-table-cols";
@@ -57,20 +58,30 @@ const tdTotalAccent =
 
 function Colgroup({
   widthsPx,
+  floorsPx,
   nameColIndex,
 }: {
   widthsPx: readonly number[];
+  floorsPx: readonly number[];
   nameColIndex: number;
 }) {
   return (
     <colgroup>
-      {widthsPx.map((w, i) => (
-        <col
-          key={i}
-          className={i === nameColIndex ? "inventario-name-col" : undefined}
-          style={{ width: w, minWidth: w }}
-        />
-      ))}
+      {widthsPx.map((w, i) => {
+        const min = floorsPx[i] ?? w;
+        const flex = min < w || i === nameColIndex;
+        return (
+          <col
+            key={i}
+            className={i === nameColIndex ? "inventario-name-col" : undefined}
+            style={
+              flex
+                ? { width: w, minWidth: min }
+                : { width: w, minWidth: w, maxWidth: w }
+            }
+          />
+        );
+      })}
     </colgroup>
   );
 }
@@ -80,6 +91,7 @@ function stickyCellProps(
   index: number,
   widthsPx?: readonly number[],
   baseZ = 12,
+  lockWidth = true,
 ): { className: string; style: CSSProperties } | undefined {
   if (index < 0 || index >= offsets.length) return undefined;
   const isLast = index === offsets.length - 1;
@@ -90,7 +102,9 @@ function stickyCellProps(
       left: offsets[index],
       zIndex: baseZ + index,
       ...(width != null
-        ? { width, minWidth: width, maxWidth: width }
+        ? lockWidth
+          ? { width, minWidth: width, maxWidth: width }
+          : { maxWidth: "none" }
         : null),
     },
   };
@@ -411,7 +425,7 @@ function FullTableBody<T extends Activo>({
         const stickyVisita = columnaVisita
           ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths)
           : undefined;
-        const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths);
+        const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths, 12, false);
 
         return (
           <tr key={activo.id} className={rowClassName(activo, rowIndex)}>
@@ -563,22 +577,17 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     (columnaVisita ? 1 : 0) +
     (columnaProcedencia ? 1 : 0);
   const tableClass = `${inventarioActivosTableClass}${modoPreregistro ? " inventario-activos-table--preregistro" : ""}${modoAdmin ? " inventario-activos-table--admin" : ""}${mostrarUbicacion ? " inventario-activos-table--ubicacion" : ""}`;
-  const tableMinWidth = inventarioTableMinWidthPx({
+  const widthOptions = {
     modoPreregistro,
     modoAdmin,
     mostrarUbicacion,
     withSelection,
     columnaVisita,
     columnaProcedencia,
-  });
-  const widthValues = inventarioTableWidthValuesPx({
-    modoPreregistro,
-    modoAdmin,
-    mostrarUbicacion,
-    withSelection,
-    columnaVisita,
-    columnaProcedencia,
-  });
+  };
+  const widthValues = inventarioTableWidthValuesPx(widthOptions);
+  const floorValues = inventarioTableFloorValuesPx(widthOptions);
+  const tableMinWidth = inventarioTableMinWidthPx(widthOptions);
   const stickyCount = (withSelection ? 1 : 0) + INVENTARIO_STICKY_DATA_COL_COUNT + (columnaVisita ? 1 : 0);
   const stickyOffsets = inventarioStickyLeftOffsets(widthValues, stickyCount);
   const stickyWidths = widthValues.slice(0, stickyCount);
@@ -591,7 +600,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
   const stickyVisita = columnaVisita
     ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths, 40)
     : undefined;
-  const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths, 40);
+  const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths, 40, false);
   const tableWrapClass = [
     embeddedInParentScroll
       ? `${panelDataTableWrapClass} ${panelDataTableWrapEmbeddedClass}`
@@ -614,7 +623,11 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
           className={`${tableClass} w-full table-fixed border-separate border-spacing-0`}
           style={{ minWidth: tableMinWidth }}
         >
-          <Colgroup widthsPx={widthValues} nameColIndex={nombreStickyAt} />
+          <Colgroup
+            widthsPx={widthValues}
+            floorsPx={floorValues}
+            nameColIndex={nombreStickyAt}
+          />
           <thead>
             <tr>
               {withSelection && selection && (

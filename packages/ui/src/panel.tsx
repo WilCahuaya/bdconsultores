@@ -317,6 +317,7 @@ export * from "./panel-table-layout";
 export * from "./panel-action-buttons";
 export * from "./panel-view-toggle";
 export * from "./panel-list-table";
+export { DesktopInstallerCard, type DesktopInstallerCardProps } from "./desktop-installer-card";
 export * from "./panel-nav-icons";
 export * from "./panel-sidebar";
 export * from "./reportes-panel";

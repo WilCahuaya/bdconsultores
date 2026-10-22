@@ -153,25 +153,32 @@ export async function searchCatalogo(query: string, limit = 20): Promise<Catalog
   const trimmed = query.trim();
   if (trimmed.length < minCatalogoQueryLength(trimmed)) return [];
 
-  if (window.electronAPI?.searchCatalogLocal) {
-    const rows = await window.electronAPI.searchCatalogLocal(trimmed, limit);
-    if (rows.length > 0) {
+  if (window.electronAPI?.searchCatalogLocal && window.electronAPI.getCatalogMeta) {
+    const meta = await window.electronAPI.getCatalogMeta();
+    if (meta.count > 0) {
+      const rows = await window.electronAPI.searchCatalogLocal(trimmed, limit);
       return rows.map((row) => mapLocalRow(row));
     }
   }
 
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.rpc("search_catalogo_nacional", {
+  const { data, error } = await supabase.rpc("search_catalogo_bien", {
+    p_query: trimmed,
+    p_limit: Math.min(Math.max(limit, 1), 50),
+  });
+
+  if (!error) return (data ?? []) as CatalogoNacional[];
+
+  console.error("search_catalogo_bien:", error.message);
+  const fallback = await supabase.rpc("search_catalogo_nacional", {
     p_query: trimmed,
     p_limit: limit,
   });
-
-  if (error) {
-    console.error("search_catalogo_nacional:", error.message);
+  if (fallback.error) {
+    console.error("search_catalogo_nacional:", fallback.error.message);
     return [];
   }
-
-  return (data ?? []) as CatalogoNacional[];
+  return (fallback.data ?? []) as CatalogoNacional[];
 }
 
 export async function searchCatalogoNacionalOficial(
@@ -407,29 +414,41 @@ export async function createCatalogoNacional(
   const payload = buildCreateCatalogoCuentaOrdenPayload(input);
 
   if (!isOnline()) {
-    const existing = await getCatalogoByCodigo(payload.codigo);
-    if (existing) {
-      return { error: `El código ${payload.codigo} ya existe en el catálogo.` };
-    }
+    let codigo = payload.codigo;
+    for (let intento = 0; intento < 5; intento++) {
+      const existing = await getCatalogoByCodigo(codigo);
+      if (!existing) {
+        const row: CatalogoNacional = {
+          ...payload,
+          codigo,
+          created_at: new Date().toISOString(),
+        };
+        syncLocalRow(row);
+        await enqueueCuentaContableIfNeeded(payload.cuenta_codigo, payload.contabilidad);
+        await enqueueOfflineOp("catalogo:create", CATALOGO_SYNC_ENTIDAD, {
+          payload: { ...payload, codigo },
+        });
+        return { data: row };
+      }
 
-    const row: CatalogoNacional = { ...payload, created_at: new Date().toISOString() };
-    syncLocalRow(row);
-    await enqueueCuentaContableIfNeeded(payload.cuenta_codigo, payload.contabilidad);
-    await enqueueOfflineOp("catalogo:create", CATALOGO_SYNC_ENTIDAD, { payload });
-    return { data: row };
+      const locales = window.electronAPI?.listCatalogoPropioLocal
+        ? await window.electronAPI.listCatalogoPropioLocal()
+        : [];
+      const maximo = locales
+        .map((item) => item.codigo)
+        .sort((a, b) => b.localeCompare(a))[0];
+      const siguiente = nextCodigoCatalogoPropioFromMax(maximo ?? null);
+      if (siguiente === codigo) {
+        return {
+          error: "Ese código ya fue usado y no se pudo asignar el siguiente. Intente de nuevo.",
+        };
+      }
+      codigo = siguiente;
+    }
+    return { error: "No se pudo asignar un código de catálogo propio libre. Intente de nuevo." };
   }
 
   const supabase = getSupabaseClient();
-
-  const { data: existing } = await supabase
-    .from("catalogo_nacional")
-    .select("codigo")
-    .eq("codigo", payload.codigo)
-    .maybeSingle();
-
-  if (existing) {
-    return { error: `El código ${payload.codigo} ya existe en el catálogo.` };
-  }
 
   const cuentaError = await ensureCuentaContableForCatalogo(
     supabase,
@@ -438,15 +457,50 @@ export async function createCatalogoNacional(
   );
   if (cuentaError.error) return { error: cuentaError.error };
 
-  const { data, error } = await supabase
-    .from("catalogo_nacional")
-    .insert(payload)
-    .select()
-    .single();
+  let codigo = payload.codigo;
+  let row: CatalogoNacional | null = null;
+  for (let intento = 0; intento < 5; intento++) {
+    const { data, error } = await supabase
+      .from("catalogo_nacional")
+      .insert({ ...payload, codigo })
+      .select()
+      .single();
 
-  if (error) return { error: error.message };
+    if (!error && data) {
+      row = data as CatalogoNacional;
+      break;
+    }
 
-  const row = data as CatalogoNacional;
+    const message = (error?.message ?? "").toLowerCase();
+    const duplicado =
+      error?.code === "23505" ||
+      message.includes("duplicate") ||
+      message.includes("llave duplicada") ||
+      message.includes("unique");
+    if (!duplicado) return { error: error?.message ?? "No se pudo crear el ítem del catálogo." };
+
+    const { data: maxRow, error: maxError } = await supabase
+      .from("catalogo_nacional")
+      .select("codigo")
+      .like("codigo", "BD%")
+      .order("codigo", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (maxError) return { error: maxError.message };
+
+    const siguiente = nextCodigoCatalogoPropioFromMax(maxRow?.codigo ?? null);
+    if (siguiente === codigo) {
+      return {
+        error: "Ese código ya fue usado y no se pudo asignar el siguiente. Intente de nuevo.",
+      };
+    }
+    codigo = siguiente;
+  }
+
+  if (!row) {
+    return { error: "No se pudo asignar un código de catálogo propio libre. Intente de nuevo." };
+  }
+
   syncLocalRow(row);
   await registrarOpcionesDesdeCatalogoInput(input);
   return { data: row };

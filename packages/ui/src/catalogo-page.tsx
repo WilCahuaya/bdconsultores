@@ -184,7 +184,7 @@ export function CatalogoPage({
       <PanelTabs tabs={CATALOGO_TABS} value={tab} onChange={setTab} />
 
       {tab === "propio" ? (
-        <div className="overflow-visible rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
+        <div className="catalogo-tabla-card overflow-visible rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-semibold">Catálogo propio</h3>
@@ -224,7 +224,6 @@ export function CatalogoPage({
             listItems={listPropio}
             loadGrupos={loadGrupos}
             loadClases={loadClases}
-            searchCuentasContables={searchCuentasContables}
             onRegisterOpcionPersonalizada={onRegisterOpcionPersonalizada}
             onDeleteOpcionPersonalizada={onDeleteOpcionPersonalizada}
             onUpdate={onUpdatePropio}
@@ -232,7 +231,6 @@ export function CatalogoPage({
             reloadKey={propioReloadKey}
             readOnly={readOnlyPropio}
             onAddNew={readOnlyPropio || showAltaForm ? undefined : () => openAltaPropio()}
-            onCreateCuentaContable={onUpsertCuentaContable ? handleUpsertCuenta : undefined}
           />
         </div>
       ) : tab === "cuentas" ? (
@@ -253,7 +251,7 @@ export function CatalogoPage({
           />
         </div>
       ) : (
-        <div className="overflow-visible rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
+        <div className="catalogo-tabla-card overflow-visible rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="font-semibold">Consulta catálogo nacional</h3>

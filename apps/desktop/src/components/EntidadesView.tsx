@@ -9,7 +9,7 @@ import {
   sortEntidadesByNumero,
   suggestNombreEtiqueta,
 } from "@inventario/types";
-import { Button, ConfirmDialog, Dialog, Input, Label } from "@inventario/ui";
+import { Button, ConfirmDialog, Dialog, Input, Label, Select } from "@inventario/ui";
 import {
   ActivateIcon,
   DeleteIcon,
@@ -36,13 +36,19 @@ import {
   useStoredViewMode,
 } from "@inventario/ui/panel";
 import {
+  activarInventariosDesdePlanillas,
   createEntidad,
   deleteEntidad,
   inviteEntidadAdminInBackground,
+  listEntidades,
+  listEntidadesSoloPlanillas,
   setEntidadActivo,
   updateEntidad,
   type CreateEntidadInput,
+  type EntidadPlanillasPendiente,
 } from "../lib/entidades";
+
+type OrigenAltaEntidad = "nueva" | "planillas";
 
 function sortEntidades(items: EntidadConConteo[]) {
   return sortEntidadesByNumero(items);
@@ -254,6 +260,35 @@ export function EntidadesView({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [viewMode, setViewMode] = useStoredViewMode("inventario-view-entidades", "list");
+  const [origenAlta, setOrigenAlta] = useState<OrigenAltaEntidad>("nueva");
+  const [planillasOpciones, setPlanillasOpciones] = useState<EntidadPlanillasPendiente[]>([]);
+  const [planillasId, setPlanillasId] = useState("");
+  const [cargandoPlanillas, setCargandoPlanillas] = useState(false);
+  const [planillasError, setPlanillasError] = useState<string | null>(null);
+
+  const planillasElegida = useMemo(
+    () => planillasOpciones.find((entidad) => entidad.id === planillasId) ?? null,
+    [planillasOpciones, planillasId],
+  );
+
+  useEffect(() => {
+    if (!createOpen || origenAlta !== "planillas") return;
+    let cancelado = false;
+    setCargandoPlanillas(true);
+    setPlanillasError(null);
+    void listEntidadesSoloPlanillas().then((result) => {
+      if (cancelado) return;
+      setPlanillasOpciones(result.data);
+      setPlanillasError(result.error ?? null);
+      setPlanillasId((actual) =>
+        result.data.some((entidad) => entidad.id === actual) ? actual : (result.data[0]?.id ?? ""),
+      );
+      setCargandoPlanillas(false);
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [createOpen, origenAlta]);
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -295,6 +330,40 @@ export function EntidadesView({
       if (!result.invitePendingOffline) {
         inviteEntidadAdminInBackground(result.data!.id, input, setSuccess);
       }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleActivarPlanillas(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!planillasId) {
+      setError("Seleccione una empresa de Planillas.");
+      return;
+    }
+    setPending(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const result = await activarInventariosDesdePlanillas(planillasId);
+      if (result.error || !result.data) {
+        setError(result.error ?? "No se pudo activar Inventarios.");
+        return;
+      }
+      try {
+        const lista = await listEntidades();
+        onEntidadesChange(sortEntidades(lista));
+      } catch {
+        onEntidadesChange(
+          sortEntidades([
+            ...entidades.filter((item) => item.id !== result.data.id),
+            { ...result.data, ambiente_count: 1, activo_count: 0 },
+          ]),
+        );
+      }
+      setCreateOpen(false);
+      setOrigenAlta("nueva");
+      setSuccess(`${result.data.nombre} ya está en Inventarios.`);
     } finally {
       setPending(false);
     }
@@ -644,21 +713,114 @@ export function EntidadesView({
           setError(null);
         }}
         title="Nueva entidad"
-        description="Se creará la sucursal Principal automáticamente."
+        description={
+          origenAlta === "planillas"
+            ? "Activa Inventarios en una empresa que ya existe en Planillas."
+            : "Se creará la sucursal Principal automáticamente."
+        }
         className="max-w-lg"
       >
-        <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
-          <EntidadFields requireAdmin />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Guardando…" : "Crear entidad"}
-            </Button>
-          </div>
-        </form>
+        <fieldset className="mb-4 space-y-2">
+          <legend className="text-sm font-medium text-muted-foreground">Origen</legend>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="origen_entidad"
+              checked={origenAlta === "nueva"}
+              onChange={() => {
+                setOrigenAlta("nueva");
+                setError(null);
+              }}
+            />
+            Crear nueva
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="origen_entidad"
+              checked={origenAlta === "planillas"}
+              onChange={() => {
+                setOrigenAlta("planillas");
+                setError(null);
+              }}
+            />
+            Elegir una de Planillas
+          </label>
+        </fieldset>
+        {origenAlta === "nueva" ? (
+          <form onSubmit={(e) => void handleCreate(e)} className="space-y-4">
+            <EntidadFields requireAdmin />
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending ? "Guardando…" : "Crear entidad"}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <form onSubmit={(e) => void handleActivarPlanillas(e)} className="space-y-4">
+            {cargandoPlanillas ? (
+              <p className="text-sm text-muted-foreground">Cargando empresas de Planillas…</p>
+            ) : planillasError && planillasOpciones.length === 0 ? (
+              <p className="text-sm text-destructive">{planillasError}</p>
+            ) : planillasOpciones.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No hay empresas de Planillas pendientes de Inventarios.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="entidad_planillas">Empresa</Label>
+                  <Select
+                    id="entidad_planillas"
+                    aria-label="Empresa de Planillas"
+                    value={planillasId}
+                    onChange={setPlanillasId}
+                    options={planillasOpciones.map((entidad) => ({
+                      value: entidad.id,
+                      label: entidadEtiqueta(entidad),
+                    }))}
+                  />
+                </div>
+                {planillasElegida ? (
+                  <div className="space-y-1 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                    <p className="font-medium">{planillasElegida.nombre}</p>
+                    <p className="text-muted-foreground">
+                      RUC: {planillasElegida.ruc?.trim() || "—"}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Administrador: {planillasElegida.admin_nombre?.trim() || "—"}
+                    </p>
+                    {planillasElegida.direccion?.trim() ? (
+                      <p className="text-muted-foreground">{planillasElegida.direccion}</p>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">
+                      Se activa Inventarios en esta misma empresa. Trabajadores, RUC y la sede
+                      Principal se mantienen. No se envía otra invitación.
+                    </p>
+                  </div>
+                ) : null}
+              </>
+            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  pending || cargandoPlanillas || planillasOpciones.length === 0 || !planillasId
+                }
+              >
+                {pending ? "Guardando…" : "Usar en Inventarios"}
+              </Button>
+            </div>
+          </form>
+        )}
       </Dialog>
 
       <Dialog

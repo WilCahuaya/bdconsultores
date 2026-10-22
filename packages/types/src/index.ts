@@ -2108,7 +2108,7 @@ export function validarCreateCatalogoCuentaOrdenInput(
   return validarCuentaContableParaCatalogo(input.cuenta_codigo, input.contabilidad);
 }
 
-/** Cuenta contable del ítem propio: vacío → 2524 (cuenta de orden). */
+/** Cuenta contable del ítem propio. Si no se indica, queda vacía. */
 export function resolveCatalogoPropioCuenta(
   cuentaCodigo?: string | null,
   nombre?: string | null,
@@ -2117,7 +2117,7 @@ export function resolveCatalogoPropioCuenta(
   const nombreRaw = nombre?.trim() ?? "";
   if (!codigoRaw && !nombreRaw) {
     return {
-      cuenta_codigo: CATALOGO_CUENTA_ORDEN_CONTABILIDAD,
+      cuenta_codigo: null,
       contabilidad: null,
     };
   }

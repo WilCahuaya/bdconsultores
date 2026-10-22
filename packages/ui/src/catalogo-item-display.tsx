@@ -23,14 +23,27 @@ export const CATALOGO_ITEM_TABLE_COLS: PanelTableColSpec[] = [
   { type: "shrink" },
 ];
 
+/** Catálogo propio: sin cuenta contable ni resolución. */
+export const CATALOGO_PROPIO_TABLE_COLS: PanelTableColSpec[] = [
+  { type: "shrink" },
+  { type: "grow" },
+  { type: "grow" },
+  { type: "grow" },
+  { type: "shrink" },
+  { type: "shrink" },
+  { type: "shrink" },
+];
+
 export function catalogoCampoTexto(value: string | null | undefined): string {
   return value?.trim() || "—";
 }
 
 export function CatalogoItemTableHead({
   actionsLabel,
+  propio = false,
 }: {
   actionsLabel: string;
+  propio?: boolean;
 }) {
   return (
     <>
@@ -38,10 +51,14 @@ export function CatalogoItemTableHead({
       <PanelTableTh className={panelTableNameCellClass}>Denominación</PanelTableTh>
       <PanelTableTh>Grupo</PanelTableTh>
       <PanelTableTh>Clase</PanelTableTh>
-      <PanelTableTh className={panelTableNowrapCellClass}>Código cuenta contable</PanelTableTh>
-      <PanelTableTh>Nombre cuenta contable</PanelTableTh>
+      {propio ? null : (
+        <>
+          <PanelTableTh className={panelTableNowrapCellClass}>Código cuenta contable</PanelTableTh>
+          <PanelTableTh>Nombre cuenta contable</PanelTableTh>
+        </>
+      )}
       <PanelTableTh className={panelTableNowrapCellClass}>Depreciación</PanelTableTh>
-      <PanelTableTh>Resolución</PanelTableTh>
+      {propio ? null : <PanelTableTh>Resolución</PanelTableTh>}
       <PanelTableTh className={panelTableNowrapCellClass}>Estado</PanelTableTh>
       <PanelTableTh align="right" className={panelTableNowrapCellClass}>
         {actionsLabel}
@@ -54,10 +71,12 @@ export function CatalogoItemTableCells({
   item,
   estadoBadge,
   actions,
+  propio = false,
 }: {
   item: CatalogoNacional;
   estadoBadge: ReactNode;
   actions: ReactNode;
+  propio?: boolean;
 }) {
   return (
     <>
@@ -73,21 +92,27 @@ export function CatalogoItemTableCells({
       <PanelTableTd className={panelTableMutedClass} title={item.clase ?? undefined}>
         {catalogoCampoTexto(item.clase)}
       </PanelTableTd>
-      <PanelTableTd className={panelTableNowrapCellClass} title={item.cuenta_codigo ?? undefined}>
-        {catalogoCampoTexto(item.cuenta_codigo)}
-      </PanelTableTd>
-      <PanelTableTd
-        className={panelTableMutedClass}
-        title={formatCuentaContableDisplay(item.cuenta_codigo, item.contabilidad)}
-      >
-        {catalogoCampoTexto(item.contabilidad)}
-      </PanelTableTd>
+      {propio ? null : (
+        <>
+          <PanelTableTd className={panelTableNowrapCellClass} title={item.cuenta_codigo ?? undefined}>
+            {catalogoCampoTexto(item.cuenta_codigo)}
+          </PanelTableTd>
+          <PanelTableTd
+            className={panelTableMutedClass}
+            title={formatCuentaContableDisplay(item.cuenta_codigo, item.contabilidad)}
+          >
+            {catalogoCampoTexto(item.contabilidad)}
+          </PanelTableTd>
+        </>
+      )}
       <PanelTableTd className={panelTableNowrapCellClass}>
-        {catalogoCampoTexto(item.depreciacion)}
+        {propio ? item.depreciacion?.trim() || "0" : catalogoCampoTexto(item.depreciacion)}
       </PanelTableTd>
-      <PanelTableTd className={panelTableMutedClass} title={item.resolucion ?? undefined}>
-        {catalogoCampoTexto(item.resolucion)}
-      </PanelTableTd>
+      {propio ? null : (
+        <PanelTableTd className={panelTableMutedClass} title={item.resolucion ?? undefined}>
+          {catalogoCampoTexto(item.resolucion)}
+        </PanelTableTd>
+      )}
       <PanelTableTd className={panelTableNowrapCellClass}>{estadoBadge}</PanelTableTd>
       <PanelTableTd align="right" className={panelTableNowrapCellClass}>
         {actions}
@@ -99,19 +124,25 @@ export function CatalogoItemTableCells({
 export function CatalogoItemDetalle({
   item,
   origenLabel,
+  propio = false,
 }: {
   item: CatalogoNacional;
   origenLabel: string;
+  propio?: boolean;
 }) {
   const rows: Array<{ label: string; value: string | null | undefined }> = [
     { label: "Código", value: item.codigo },
     { label: "Denominación", value: item.denominacion },
     { label: "Grupo", value: item.grupo },
     { label: "Clase", value: item.clase },
-    { label: "Código cuenta contable", value: item.cuenta_codigo },
-    { label: "Nombre cuenta contable", value: item.contabilidad },
-    { label: "Depreciación", value: item.depreciacion },
-    { label: "Resolución", value: item.resolucion },
+    ...(propio
+      ? []
+      : [
+          { label: "Código cuenta contable", value: item.cuenta_codigo },
+          { label: "Nombre cuenta contable", value: item.contabilidad },
+        ]),
+    { label: "Depreciación", value: propio ? item.depreciacion?.trim() || "0" : item.depreciacion },
+    ...(propio ? [] : [{ label: "Resolución", value: item.resolucion }]),
     { label: "Estado", value: item.estado },
     { label: "Origen", value: origenLabel },
   ];

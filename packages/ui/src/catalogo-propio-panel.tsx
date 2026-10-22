@@ -1,15 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { CatalogoNacional, CatalogoCampoOpciones, CatalogoOpcionTipo, CuentaContable, UpdateCatalogoPropioInput, UpsertCuentaContableInput } from "@inventario/types";
-import {
-  CATALOGO_CUENTA_ORDEN_CONTABILIDAD,
-  CATALOGO_ORIGEN_LABELS,
-  validarCuentaContableParaCatalogo,
-} from "@inventario/types";
+import type { CatalogoNacional, CatalogoCampoOpciones, CatalogoOpcionTipo, UpdateCatalogoPropioInput } from "@inventario/types";
+import { CATALOGO_ORIGEN_LABELS } from "@inventario/types";
 import { Button, Dialog, Input, Label } from "./components";
 import { ClaseCatalogoCombobox } from "./clase-catalogo-combobox";
-import { CuentaContableFields } from "./cuenta-contable-fields";
 import { GrupoCatalogoCombobox } from "./grupo-catalogo-combobox";
 import { ConfirmDialog } from "./confirm-dialog";
 import {
@@ -29,19 +24,17 @@ import {
   useTablePagination,
 } from "./panel";
 import {
+  PanelDataTable,
   panelTableBodyRowClass,
   panelTableHeadRowClass,
   panelTableStickyHeadClass,
 } from "./panel-list-table";
 import {
-  CATALOGO_ITEM_TABLE_COLS,
+  CATALOGO_PROPIO_TABLE_COLS,
   CatalogoItemDetalle,
   CatalogoItemTableCells,
   CatalogoItemTableHead,
 } from "./catalogo-item-display";
-import { panelCardClass } from "./panel";
-import { scrollbarThemedClass } from "./responsive-layout";
-
 import { PanelTableColgroup } from "./panel-table-layout";
 
 const OPCIONES_VACIAS: CatalogoCampoOpciones = { opciones: [], personalizadas: [] };
@@ -50,7 +43,6 @@ export interface CatalogoPropioPanelProps {
   listItems: () => Promise<CatalogoNacional[]>;
   loadGrupos: () => Promise<CatalogoCampoOpciones>;
   loadClases: () => Promise<CatalogoCampoOpciones>;
-  searchCuentasContables: (query: string) => Promise<CuentaContable[]>;
   onRegisterOpcionPersonalizada?: (
     tipo: CatalogoOpcionTipo,
     valor: string,
@@ -67,16 +59,12 @@ export interface CatalogoPropioPanelProps {
   reloadKey?: number;
   readOnly?: boolean;
   onAddNew?: () => void;
-  onCreateCuentaContable?: (
-    input: UpsertCuentaContableInput,
-  ) => Promise<{ data?: CuentaContable; error?: string }>;
 }
 
 export function CatalogoPropioPanel({
   listItems,
   loadGrupos,
   loadClases,
-  searchCuentasContables,
   onRegisterOpcionPersonalizada,
   onDeleteOpcionPersonalizada,
   onUpdate,
@@ -84,7 +72,6 @@ export function CatalogoPropioPanel({
   reloadKey = 0,
   readOnly = false,
   onAddNew,
-  onCreateCuentaContable,
 }: CatalogoPropioPanelProps) {
   const [items, setItems] = useState<CatalogoNacional[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,9 +86,6 @@ export function CatalogoPropioPanel({
   const [editDenominacion, setEditDenominacion] = useState("");
   const [editGrupo, setEditGrupo] = useState("");
   const [editClase, setEditClase] = useState("");
-  const [editCuentaCodigo, setEditCuentaCodigo] = useState("");
-  const [editContabilidad, setEditContabilidad] = useState("");
-  const [codigosCuentaMaestra, setCodigosCuentaMaestra] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
@@ -186,21 +170,12 @@ export function CatalogoPropioPanel({
     setEditDenominacion(item.denominacion);
     setEditGrupo(item.grupo ?? "");
     setEditClase(item.clase ?? "");
-    setEditCuentaCodigo(item.cuenta_codigo ?? CATALOGO_CUENTA_ORDEN_CONTABILIDAD);
-    setEditContabilidad(item.contabilidad ?? "");
     setError(null);
   }
 
   async function handleEditSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!editTarget) return;
-    const cuentaError = validarCuentaContableParaCatalogo(editCuentaCodigo, editContabilidad, {
-      codigosEnMaestra: codigosCuentaMaestra,
-    });
-    if (cuentaError) {
-      setError(cuentaError);
-      return;
-    }
     setPending(true);
     setError(null);
     setMessage(null);
@@ -209,8 +184,8 @@ export function CatalogoPropioPanel({
         denominacion: editDenominacion,
         grupo: editGrupo,
         clase: editClase,
-        cuenta_codigo: editCuentaCodigo,
-        contabilidad: editContabilidad,
+        cuenta_codigo: editTarget.cuenta_codigo,
+        contabilidad: editTarget.contabilidad,
       });
       if (result.error) {
         setError(result.error);
@@ -243,7 +218,7 @@ export function CatalogoPropioPanel({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="catalogo-tabla-panel space-y-4">
       <PanelToolbar
         left={
           <PanelCountLabel
@@ -286,19 +261,36 @@ export function CatalogoPropioPanel({
           }
         />
       ) : (
-        <div className={`${panelCardClass} min-w-0 max-w-full overflow-hidden`}>
-          <div className={`${scrollbarThemedClass} overflow-x-auto`}>
-            <table className="w-full min-w-[1080px] table-auto text-left text-sm">
-              <PanelTableColgroup cols={CATALOGO_ITEM_TABLE_COLS} />
+        <PanelDataTable
+          layout="auto"
+          scroll
+          className="catalogo-cols-full"
+          footer={
+            <TablePagination
+              page={page}
+              totalPages={totalPages}
+              total={total}
+              rangeStart={rangeStart}
+              rangeEnd={rangeEnd}
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              onPageChange={setPage}
+              onPageSizeChange={setPageSize}
+              unitLabel="ítems"
+            />
+          }
+        >
+              <PanelTableColgroup cols={CATALOGO_PROPIO_TABLE_COLS} />
               <thead className={panelTableStickyHeadClass}>
                 <tr className={panelTableHeadRowClass}>
-                  <CatalogoItemTableHead actionsLabel={readOnly ? "Ver" : "Acciones"} />
+                  <CatalogoItemTableHead propio actionsLabel={readOnly ? "Ver" : "Acciones"} />
                 </tr>
               </thead>
               <tbody>
                 {paginated.map((item) => (
                   <tr key={item.codigo} className={panelTableBodyRowClass}>
                     <CatalogoItemTableCells
+                      propio
                       item={item}
                       estadoBadge={
                         <StatusBadge variant="default">{item.estado ?? "EXCLUIDO"}</StatusBadge>
@@ -331,21 +323,7 @@ export function CatalogoPropioPanel({
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
-          <TablePagination
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            rangeStart={rangeStart}
-            rangeEnd={rangeEnd}
-            pageSize={pageSize}
-            pageSizeOptions={pageSizeOptions}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-            unitLabel="ítems"
-          />
-        </div>
+        </PanelDataTable>
       )}
 
       <Dialog
@@ -354,7 +332,7 @@ export function CatalogoPropioPanel({
         title="Detalle del ítem propio"
       >
         {viewTarget && (
-          <CatalogoItemDetalle item={viewTarget} origenLabel={CATALOGO_ORIGEN_LABELS.PROPIO} />
+          <CatalogoItemDetalle propio item={viewTarget} origenLabel={CATALOGO_ORIGEN_LABELS.PROPIO} />
         )}
       </Dialog>
 
@@ -398,19 +376,6 @@ export function CatalogoPropioPanel({
               onChange={setEditClase}
               onRegisterPersonalizada={(valor) => handleRegister("clase", valor)}
               onDeletePersonalizada={(valor) => handleDeleteOpcion("clase", valor)}
-            />
-            <CuentaContableFields
-              codigo={editCuentaCodigo}
-              nombre={editContabilidad}
-              onCodigoChange={setEditCuentaCodigo}
-              onNombreChange={setEditContabilidad}
-              searchCuentas={searchCuentasContables}
-              disabled={pending}
-              codigoId="edit_cuenta_codigo"
-              nombreId="edit_contabilidad"
-              allowCreateNew={Boolean(onCreateCuentaContable)}
-              onCreateCuenta={onCreateCuentaContable}
-              onCodigosMaestraLoaded={setCodigosCuentaMaestra}
             />
             {error && <PanelFlashMessage variant="error">{error}</PanelFlashMessage>}
             <div className="flex justify-end gap-2">
