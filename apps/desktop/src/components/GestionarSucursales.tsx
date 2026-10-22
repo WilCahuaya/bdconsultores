@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { EspacioConOcupacion, SedeConConteo } from "@inventario/types";
-import { Button, Dialog, EspaciosSedeDialog, Input, Label } from "@inventario/ui";
+import type { SedeConConteo } from "@inventario/types";
+import { Button, Dialog, Input, Label } from "@inventario/ui";
 import {
   AmbientesIcon,
   DeleteIcon,
@@ -23,22 +23,13 @@ import {
   panelTableShrinkCellClass,
   panelTableStickyHeadClass,
 } from "@inventario/ui/panel";
-import {
-  createEspacio,
-  createSede,
-  deleteEspacio,
-  deleteSede,
-  updateEspacio,
-  listEspacios,
-  updateSede,
-} from "../lib/ubicacion";
+import { createSede, deleteSede, updateSede } from "../lib/ubicacion";
 
 interface GestionarSucursalesProps {
   entidadId: string;
   sedes: SedeConConteo[];
   onSedesChange?: (sedes: SedeConConteo[]) => void;
   onViewAmbientes?: (sedeId: string) => void;
-  onEspaciosChange?: () => void;
 }
 
 export function GestionarSucursales({
@@ -46,15 +37,10 @@ export function GestionarSucursales({
   sedes: initial,
   onSedesChange,
   onViewAmbientes,
-  onEspaciosChange,
 }: GestionarSucursalesProps) {
   const [sedes, setSedes] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
   const [editSede, setEditSede] = useState<SedeConConteo | null>(null);
-  const [espaciosSede, setEspaciosSede] = useState<SedeConConteo | null>(null);
-  const [espacios, setEspacios] = useState<EspacioConOcupacion[]>([]);
-  const [espaciosPending, setEspaciosPending] = useState(false);
-  const [espaciosError, setEspaciosError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -123,18 +109,6 @@ export function GestionarSucursales({
       return;
     }
     updateSedes(sedes.filter((s) => s.id !== sede.id));
-  }
-
-  async function reloadEspacios() {
-    if (!espaciosSede) return;
-    setEspaciosPending(true);
-    setEspaciosError(null);
-    try {
-      const data = await listEspacios(espaciosSede.id);
-      setEspacios(data);
-    } finally {
-      setEspaciosPending(false);
-    }
   }
 
   return (
@@ -223,15 +197,6 @@ export function GestionarSucursales({
                 </PanelTableTd>
                 <PanelTableTd align="right" className={`overflow-visible ${panelTableNowrapCellClass}`}>
                   <div className="flex flex-nowrap items-center justify-end gap-1">
-                    <PanelIconAction
-                      label="Espacios"
-                      onClick={() => {
-                        setEspaciosError(null);
-                        setEspaciosSede(sede);
-                      }}
-                    >
-                      <span className="text-xs font-semibold">Esp</span>
-                    </PanelIconAction>
                     {onViewAmbientes && (
                       <PanelIconAction
                         label="Ambientes"
@@ -314,35 +279,6 @@ export function GestionarSucursales({
           </form>
         )}
       </Dialog>
-
-      <EspaciosSedeDialog
-        open={!!espaciosSede}
-        onClose={() => {
-          setEspaciosSede(null);
-          onEspaciosChange?.();
-        }}
-        sedeNombre={espaciosSede?.nombre ?? ""}
-        espacios={espacios}
-        pending={espaciosPending}
-        error={espaciosError}
-        onReload={reloadEspacios}
-        onCreate={async (nombre, descripcion) => {
-          if (!espaciosSede) return { error: "Sucursal no válida." };
-          const result = await createEspacio(espaciosSede.id, nombre, descripcion);
-          if (result.error) return { error: result.error };
-          return {};
-        }}
-        onUpdateDescripcion={async (espacioId, descripcion) => {
-          const result = await updateEspacio(espacioId, descripcion);
-          if (result.error) return { error: result.error };
-          return {};
-        }}
-        onDelete={async (espacioId) => {
-          const result = await deleteEspacio(espacioId);
-          if (result.error) return { error: result.error };
-          return {};
-        }}
-      />
     </div>
   );
 }

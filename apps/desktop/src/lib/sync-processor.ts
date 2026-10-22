@@ -551,6 +551,15 @@ async function processMasterOp(
     return;
   }
 
+  if (op === "activos:patchSerie") {
+    const activoId = String(payload.activoId);
+    const raw = payload.serie;
+    const serie = typeof raw === "string" && raw.trim() ? raw.trim() : null;
+    const { error } = await supabase.from("activos").update({ serie }).eq("id", activoId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+
   if (op === "activos:updateSimilares") {
     const activoId = String(payload.activoId);
     const patch = payload.patch as Record<string, unknown>;

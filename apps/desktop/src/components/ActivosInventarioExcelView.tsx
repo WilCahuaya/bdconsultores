@@ -318,6 +318,10 @@ interface ActivosInventarioExcelViewProps {
   leyendaVisita?: ReactNode;
   renderVisita?: (activo: ActivoConUbicacion) => ReactNode;
   procedenciaPorActivo?: Record<string, string>;
+  onCommitSerie?: (
+    activo: ActivoConUbicacion,
+    serie: string,
+  ) => Promise<{ error?: string } | void>;
 }
 
 export function ActivosInventarioExcelView({
@@ -347,6 +351,7 @@ export function ActivosInventarioExcelView({
   leyendaVisita,
   renderVisita,
   procedenciaPorActivo,
+  onCommitSerie,
 }: ActivosInventarioExcelViewProps) {
   const preregistrados = useMemo(() => activos.filter(esActivoPreregistrado), [activos]);
   const gestionEnabled = Boolean(gestionPreregistros && preregistrados.length > 0);
@@ -582,6 +587,7 @@ export function ActivosInventarioExcelView({
       }
       renderVisita={renderVisita}
       procedenciaPorActivo={procedenciaPorActivo}
+      onCommitSerie={onCommitSerie}
       renderComprobante={(activo) => <ComprobanteCell activo={activo} />}
       renderAcciones={(activo) => (
         <ActivosCampoAcciones

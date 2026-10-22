@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Activo, InventarioColumnFilterOptions, InventarioColumnFilters } from "@inventario/types";
 import {
   buildValorizacionTotales,
@@ -178,6 +178,10 @@ export interface ActivosInventarioTableProps<T extends Activo> {
   procedenciaPorActivo?: Record<string, string>;
   renderComprobante: (activo: T, meta?: { columnFiltered?: boolean }) => ReactNode;
   renderAcciones: (activo: T) => ReactNode;
+  /** Guarda la serie del bien desde la celda. Sin esto, la celda sigue en solo lectura. */
+  onCommitSerie?: (activo: T, serie: string) => Promise<{ error?: string } | void>;
+  /** Por defecto se puede editar todo bien que no esté dado de baja. */
+  puedeEditarSerie?: (activo: T) => boolean;
   tableScrollRef?: (node: HTMLDivElement | null) => void;
   embeddedInParentScroll?: boolean;
   wrapClassName?: string;
@@ -276,6 +280,69 @@ function CuentaContableCell<T extends Activo>({
     <InventarioTextCell title={texto} lineClamp2 className={className}>
       {texto !== "—" ? texto : ""}
     </InventarioTextCell>
+  );
+}
+
+function SerieInlineCell<T extends Activo>({
+  activo,
+  onCommit,
+}: {
+  activo: T;
+  onCommit: (activo: T, serie: string) => Promise<{ error?: string } | void>;
+}) {
+  const guardada = activo.serie ?? "";
+  const [value, setValue] = useState(guardada);
+  const [pending, setPending] = useState(false);
+  const skipCommit = useRef(false);
+
+  useEffect(() => {
+    setValue(guardada);
+  }, [activo.id, guardada]);
+
+  async function commit(nextRaw: string) {
+    const next = nextRaw.trim();
+    if (next === guardada.trim()) {
+      setValue(guardada);
+      return;
+    }
+    setPending(true);
+    const result = await onCommit(activo, next);
+    setPending(false);
+    if (result?.error) setValue(guardada);
+  }
+
+  return (
+    <td className={tdBase} title={value.trim() || "Serie"}>
+      <input
+        value={value}
+        disabled={pending}
+        aria-label={`Serie de ${activo.nombre}`}
+        maxLength={120}
+        autoComplete="off"
+        className="h-6 w-full min-w-0 rounded-sm border border-transparent bg-transparent px-1 text-xs leading-snug outline-none hover:border-border focus:border-ring focus:bg-background focus:ring-1 focus:ring-ring disabled:opacity-60"
+        onChange={(event) => setValue(event.target.value)}
+        onClick={(event) => event.stopPropagation()}
+        onBlur={() => {
+          if (skipCommit.current) {
+            skipCommit.current = false;
+            return;
+          }
+          void commit(value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+          if (event.key === "Escape") {
+            event.preventDefault();
+            skipCommit.current = true;
+            setValue(guardada);
+            event.currentTarget.blur();
+          }
+        }}
+      />
+    </td>
   );
 }
 
@@ -382,6 +449,8 @@ function FullTableBody<T extends Activo>({
   renderAcciones,
   renderVisita,
   procedenciaPorActivo,
+  onCommitSerie,
+  puedeEditarSerie,
   stickyOffsets,
   stickyWidths,
   fechaCorte,
@@ -490,9 +559,14 @@ function FullTableBody<T extends Activo>({
             <InventarioTextCell title={activo.modelo ?? ""}>
               {activo.modelo?.trim() || ""}
             </InventarioTextCell>
-            <InventarioTextCell title={activo.serie ?? ""}>
-              {activo.serie?.trim() || ""}
-            </InventarioTextCell>
+            {onCommitSerie &&
+            (puedeEditarSerie?.(activo) ?? activo.estado_registro !== "DADO_DE_BAJA") ? (
+              <SerieInlineCell activo={activo} onCommit={onCommitSerie} />
+            ) : (
+              <InventarioTextCell title={activo.serie ?? ""}>
+                {activo.serie?.trim() || ""}
+              </InventarioTextCell>
+            )}
             <InventarioFechaCell
               fecha={activo.fecha_adquisicion}
               valorEsMercado={activo.valor_es_mercado}

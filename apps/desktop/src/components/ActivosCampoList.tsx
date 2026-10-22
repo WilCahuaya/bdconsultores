@@ -21,7 +21,7 @@ import {
   usePanelInventarioUnifiedScroll,
 } from "@inventario/ui/panel";
 import type { ActivoConUbicacion } from "../lib/activos";
-import { deleteActivosPreregistrados } from "../lib/activos";
+import { deleteActivosPreregistrados, updateActivoSerie } from "../lib/activos";
 import type { InventarioExportMeta } from "../lib/inventario-export";
 import type { AmbienteDestinoNavigation } from "./AgregarBienesSimilaresDialog";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
@@ -145,6 +145,18 @@ export function ActivosCampoList({
       onActivoUpdated(updated);
     },
     [esAmbientePreregistro, fixedAmbienteId, isAmbiente, onActivoUpdated],
+  );
+
+  const guardarSerie = useCallback(
+    async (activo: ActivoConUbicacion, serie: string) => {
+      const result = await updateActivoSerie(activo.id, serie);
+      if (result.error) {
+        pushToast(result.error);
+        return result;
+      }
+      handleActivoUpdatedLocal({ ...activo, serie: serie.trim() || null });
+    },
+    [handleActivoUpdatedLocal, pushToast],
   );
   const hideUbicacionFilters = isAmbiente;
   const [filter, setFilter] = useState("");
@@ -759,6 +771,7 @@ export function ActivosCampoList({
           leyendaVisita={leyendaVisita}
           renderVisita={renderVisita}
           procedenciaPorActivo={procedenciaPorActivo}
+          onCommitSerie={guardarSerie}
         />
       ) : (
         <>

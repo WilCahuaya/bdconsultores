@@ -442,9 +442,6 @@ export function AdminAmbientesPanel({
             setSedeFilterId(sedeId);
             handleTabChange("ambientes");
           }}
-          onEspaciosChange={() => {
-            void syncEspaciosEntidad();
-          }}
           onSedesChange={(next) => {
             setSedes(next);
             void syncAmbientesYResponsables();

@@ -712,9 +712,6 @@ export function AmbientesPanel({
           entidadId={entidad.id}
           sedes={sedes}
           onViewAmbientes={verAmbientesDeSede}
-          onEspaciosChange={() => {
-            void syncEspaciosEntidad();
-          }}
           onSedesChange={(next) => {
             setSedes(next);
             void syncAmbientesYResponsables();

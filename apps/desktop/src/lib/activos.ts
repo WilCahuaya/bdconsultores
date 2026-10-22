@@ -547,6 +547,65 @@ export async function updateActivo(
   return { data: data as Activo };
 }
 
+export async function updateActivoSerie(
+  activoId: string,
+  serie: string,
+): Promise<{ error?: string }> {
+  const value = serie.trim() || null;
+
+  if (!isOnline()) {
+    const found = await findCachedActivoAcrossEntidades(activoId);
+    if (!found) return { error: "Activo no encontrado en la caché local." };
+    if (found.activo.estado_registro === "DADO_DE_BAJA") {
+      return { error: "El bien está dado de baja." };
+    }
+    const { upsertCachedActivo } = await import("./offline");
+    await upsertCachedActivo(found.entidadId, {
+      ...found.activo,
+      serie: value,
+      updated_at: new Date().toISOString(),
+    });
+    await enqueueOfflineOp(
+      "activos:patchSerie",
+      found.entidadId,
+      { activoId, serie: value },
+      activoId,
+    );
+    return {};
+  }
+
+  const profile = await fetchProfile();
+  if (!profile) return { error: "Sesión no válida." };
+
+  const supabase = getSupabaseClient();
+  const { data: existing, error: fetchError } = await supabase
+    .from("activos")
+    .select("estado_registro")
+    .eq("id", activoId)
+    .maybeSingle();
+
+  if (fetchError || !existing) {
+    return { error: fetchError?.message ?? "Activo no encontrado." };
+  }
+  if (existing.estado_registro === "DADO_DE_BAJA") {
+    return { error: "El bien está dado de baja." };
+  }
+
+  const { error } = await supabase
+    .from("activos")
+    .update({ serie: value, updated_by: profile.id })
+    .eq("id", activoId);
+
+  if (error) return { error: error.message };
+
+  const found = await findCachedActivoAcrossEntidades(activoId);
+  if (found) {
+    const { upsertCachedActivo } = await import("./offline");
+    await upsertCachedActivo(found.entidadId, { ...found.activo, serie: value });
+  }
+  return {};
+}
+
 export async function cambiarUbicacionActivo(
   activoId: string,
   sedeId: string,

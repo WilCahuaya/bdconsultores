@@ -1040,6 +1040,46 @@ export async function registrarActivo(
   return { success: true };
 }
 
+export async function updateActivoSerie(activoId: string, serie: string) {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+
+  const supabase = await createClient();
+  const { data: existing, error: fetchError } = await supabase
+    .from("activos")
+    .select("entidad_id, ambiente_id, estado_registro")
+    .eq("id", activoId)
+    .maybeSingle();
+
+  if (fetchError || !existing) {
+    return { error: fetchError?.message ?? "Activo no encontrado." };
+  }
+
+  if (existing.estado_registro === "DADO_DE_BAJA") {
+    return { error: "El bien está dado de baja." };
+  }
+
+  if (profile.rol === "ADMIN_ENTIDAD") {
+    if (existing.entidad_id !== profile.entidad_id) {
+      return { error: "No autorizado." };
+    }
+    if (existing.estado_registro !== "PREREGISTRADO") {
+      return { error: "Solo puede editar la serie de bienes en preregistro." };
+    }
+  }
+
+  const value = serie.trim() || null;
+  const { error } = await supabase
+    .from("activos")
+    .update({ serie: value, updated_by: profile.id })
+    .eq("id", activoId);
+
+  if (error) return { error: error.message };
+
+  revalidateActivoPaths(existing.entidad_id, existing.ambiente_id);
+  return { success: true as const };
+}
+
 export async function updateActivoPaths(
   activoId: string,
   paths: {

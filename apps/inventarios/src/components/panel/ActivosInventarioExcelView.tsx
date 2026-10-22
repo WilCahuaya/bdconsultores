@@ -80,6 +80,8 @@ interface ActivosInventarioExcelViewProps {
   onCopiarStateChange?: (state: CopiarToolbarState | null) => void;
   /** Ids marcados, para imprimir solo esos en orden de código. */
   onSeleccionChange?: (ids: string[]) => void;
+  onCommitSerie?: (activo: Activo, serie: string) => Promise<{ error?: string } | void>;
+  puedeEditarSerie?: (activo: Activo) => boolean;
 }
 
 function puedeCopiarBien(activo: Activo): boolean {
@@ -124,6 +126,8 @@ export function ActivosInventarioExcelView({
   procedenciaPorActivo,
   onCopiarStateChange,
   onSeleccionChange,
+  onCommitSerie,
+  puedeEditarSerie,
 }: ActivosInventarioExcelViewProps) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -267,6 +271,8 @@ export function ActivosInventarioExcelView({
       fechaCorte={fechaCorte}
       renderVisita={renderVisita}
       procedenciaPorActivo={procedenciaPorActivo}
+      onCommitSerie={onCommitSerie}
+      puedeEditarSerie={puedeEditarSerie}
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       wrapClassName={viewMode === "cards" ? "is-hidden" : undefined}

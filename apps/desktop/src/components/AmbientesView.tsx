@@ -741,9 +741,6 @@ export function AmbientesView({
               entidadId={entidad.id}
               sedes={sedes}
               onViewAmbientes={verAmbientesDeSede}
-              onEspaciosChange={() => {
-                void syncEspaciosEntidad();
-              }}
               onSedesChange={(next) => {
                 setSedes(next);
                 setAmbientes((prev) =>
