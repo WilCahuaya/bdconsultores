@@ -96,6 +96,73 @@ export async function searchCatalogo(query: string, limit = 20): Promise<Catalog
   return (data ?? []) as CatalogoNacional[];
 }
 
+export type CatalogoBusquedaItem = {
+  codigo: string;
+  denominacion: string;
+};
+
+/** Lista liviana para buscar el catálogo en el navegador (código y denominación). */
+export async function listCatalogoBusqueda(): Promise<{
+  error?: string;
+  data: CatalogoBusquedaItem[];
+}> {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida.", data: [] };
+
+  const supabase = await createClient();
+  const pageSize = 1000;
+  const data: CatalogoBusquedaItem[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data: page, error } = await supabase
+      .from("catalogo_nacional")
+      .select("codigo, denominacion")
+      .order("codigo")
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error("listCatalogoBusqueda:", error.message);
+      return { error: error.message, data: [] };
+    }
+
+    for (const row of page ?? []) {
+      const codigo = String(row.codigo ?? "").trim();
+      const denominacion = String(row.denominacion ?? "").trim();
+      if (!codigo || !denominacion) continue;
+      data.push({ codigo, denominacion });
+    }
+
+    if ((page ?? []).length < pageSize) break;
+  }
+
+  return { data };
+}
+
+/** Alta de bienes: una consulta, origen según lo escrito (BD, código o denominación). */
+export async function searchCatalogoBien(
+  query: string,
+  limit = CATALOGO_SEARCH_MAX_RESULTS,
+): Promise<CatalogoNacional[]> {
+  const profile = await getProfile();
+  if (!profile) return [];
+
+  const trimmed = query.trim();
+  if (trimmed.length < minCatalogoQueryLength(trimmed)) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("search_catalogo_bien", {
+    p_query: trimmed,
+    p_limit: Math.min(limit, CATALOGO_SEARCH_MAX_RESULTS),
+  });
+
+  if (error) {
+    console.error("search_catalogo_bien:", error.message);
+    return [];
+  }
+
+  return (data ?? []) as CatalogoNacional[];
+}
+
 export async function searchCatalogoNacionalOficial(
   query: string,
   limit = CATALOGO_CONSULTA_MAX_RESULTS,

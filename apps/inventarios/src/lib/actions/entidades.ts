@@ -192,6 +192,62 @@ export async function createEntidad(input: CreateEntidadInput) {
   };
 }
 
+export type EntidadPlanillasPendiente = Pick<
+  Entidad,
+  "id" | "nombre" | "numero_interno" | "pe_codigo" | "ruc" | "direccion" | "admin_nombre"
+>;
+
+/** Empresas de Planillas que todavía no aparecen en Inventarios. */
+export async function listEntidadesSoloPlanillas(): Promise<{
+  error?: string;
+  data: EntidadPlanillasPendiente[];
+}> {
+  const profile = await getProfile();
+  if (!profile || profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede elegir una empresa de Planillas.", data: [] };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("entidades")
+    .select("id, nombre, numero_interno, pe_codigo, ruc, direccion, admin_nombre")
+    .eq("activo", true)
+    .eq("usa_planillas", true)
+    .eq("usa_inventarios", false)
+    .order("nombre");
+
+  if (error) return { error: error.message, data: [] };
+  return { data: sortEntidadesByNumero((data ?? []) as EntidadPlanillasPendiente[]) };
+}
+
+/** Activa Inventarios en una empresa que ya existe en Planillas, sin duplicarla. */
+export async function activarInventariosDesdePlanillas(entidadId: string) {
+  const profile = await getProfile();
+  if (!profile || profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede habilitar Inventarios." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("entidades")
+    .update({ usa_inventarios: true })
+    .eq("id", entidadId)
+    .eq("activo", true)
+    .eq("usa_planillas", true)
+    .eq("usa_inventarios", false)
+    .select()
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  if (!data) {
+    return { error: "Esa empresa ya usa Inventarios o ya no está disponible en Planillas." };
+  }
+
+  revalidatePath("/contador/entidades");
+  revalidatePath(`/contador/entidades/${entidadId}`);
+  return { success: true, data: data as Entidad };
+}
+
 /** Devuelve la entidad aunque esté inactiva (útil para gestión y bloqueo de admin). */
 export async function getEntidad(entidadId: string): Promise<Entidad | null> {
   const profile = await getProfile();

@@ -48,6 +48,13 @@ export interface CatalogoPickerProps {
   searchCatalogo: (query: string, limit?: number) => Promise<CatalogoNacional[]>;
   resolveCodigo?: (codigo: string) => Promise<CatalogoNacional | null>;
   renderAddMissing?: (query: string) => ReactNode;
+  /** Vuelve a pedir la lista local del catálogo. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  /** Cambia cuando la lista local se reemplaza, para repetir la búsqueda en curso. */
+  searchEpoch?: number;
+  /** 0 busca en cada tecla (lista local). Por defecto espera 250 ms. */
+  debounceMs?: number;
 }
 
 function looksLikeCatalogoCodigo(trimmed: string, variant: CatalogoPickerVariant): boolean {
@@ -123,6 +130,10 @@ export function CatalogoPicker({
   searchCatalogo,
   resolveCodigo,
   renderAddMissing,
+  onRefresh,
+  refreshing = false,
+  searchEpoch = 0,
+  debounceMs = 250,
 }: CatalogoPickerProps) {
   const copy = CATALOGO_PICKER_COPY[variant];
   const [query, setQuery] = useState("");
@@ -139,6 +150,7 @@ export function CatalogoPicker({
   const searchCatalogoRef = useRef(searchCatalogo);
   const resolveCodigoRef = useRef(resolveCodigo);
   const pickingRef = useRef(false);
+  const requestIdRef = useRef(0);
 
   onSelectRef.current = onSelect;
   searchCatalogoRef.current = searchCatalogo;
@@ -198,19 +210,21 @@ export function CatalogoPicker({
       return;
     }
 
+    const requestId = ++requestIdRef.current;
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
         const items = await searchCatalogoRef.current(trimmed, CATALOGO_SEARCH_MAX_RESULTS);
+        if (requestId !== requestIdRef.current) return;
         setResults(items);
         setOpen(true);
       } finally {
-        setLoading(false);
+        if (requestId === requestIdRef.current) setLoading(false);
       }
-    }, 250);
+    }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, searchEpoch, debounceMs]);
 
   function handleSelect(item: CatalogoNacional) {
     pickingRef.current = false;
@@ -379,6 +393,8 @@ export function CatalogoPicker({
           placeholder={copy.placeholder}
           value={query}
           disabled={disabled}
+          className={onRefresh ? "[&::-webkit-search-cancel-button]:hidden" : undefined}
+          style={onRefresh ? { paddingRight: "2.5rem" } : undefined}
           onChange={(event) => {
             setQuery(event.target.value);
             setActiveIndex(-1);
@@ -434,6 +450,19 @@ export function CatalogoPicker({
             if (highlighted) handleSelect(highlighted);
           }}
         />
+        {onRefresh ? (
+          <button
+            type="button"
+            className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-50"
+            aria-label="Actualizar catálogo"
+            title="Actualizar catálogo"
+            disabled={refreshing || disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onRefresh()}
+          >
+            <RefreshIcon className={refreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+          </button>
+        ) : null}
       </div>
 
       {typeof document !== "undefined" && listbox ? createPortal(listbox, document.body) : null}
@@ -451,5 +480,16 @@ export function CatalogoPicker({
         </div>
       )}
     </div>
+  );
+}
+
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className={className} aria-hidden>
+      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 3v5h5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 16h5v5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

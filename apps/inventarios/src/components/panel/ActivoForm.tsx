@@ -73,6 +73,7 @@ import {
   type UpdateActivoInput,
 } from "@/lib/actions/activos";
 import { suggestActivoAtributo } from "@/lib/actions/atributo-vocab";
+import { buscarCatalogoLocal, ensureCatalogoBusqueda } from "@/lib/catalogo-local";
 import {
   createCatalogoNacional,
   createCatalogoNacionalExtension,
@@ -82,8 +83,6 @@ import {
   listCatalogoClases,
   listCatalogoGrupos,
   registerCatalogoOpcionPersonalizada,
-  searchCatalogoNacionalOficial,
-  searchCatalogoPropio,
   searchCuentasContables,
   suggestCatalogoGrupo,
   upsertCuentaContable,
@@ -206,20 +205,48 @@ export function ActivoForm({
   const mostrarCuentaContableBulk = esBulkContador;
   const mostrarDepreciacionBulk = esBulkContador && categoria !== "CUENTA_ORDEN";
 
+  const [catalogoEpoch, setCatalogoEpoch] = useState(0);
+  const [catalogoCargando, setCatalogoCargando] = useState(false);
+  const [catalogoError, setCatalogoError] = useState<string | null>(null);
+  const catalogoSelectSeq = useRef(0);
+
+  const cargarCatalogoLocal = useCallback(async (force = false) => {
+    setCatalogoCargando(true);
+    setCatalogoError(null);
+    try {
+      await ensureCatalogoBusqueda(force);
+      setCatalogoEpoch((value) => value + 1);
+    } catch (error) {
+      setCatalogoError(
+        error instanceof Error ? error.message : "No se pudo actualizar el catálogo.",
+      );
+    } finally {
+      setCatalogoCargando(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void cargarCatalogoLocal(false);
+  }, [cargarCatalogoLocal]);
+
   const searchCatalogoByCategoria = useCallback(
-    async (query: string, limit?: number) => {
-      if (categoria !== "CUENTA_ORDEN") {
-        return searchCatalogoNacionalOficial(query, limit);
-      }
-      const perSide = Math.max(Math.ceil((limit ?? 50) / 2), 15);
-      const [nacional, propio] = await Promise.all([
-        searchCatalogoNacionalOficial(query, perSide),
-        searchCatalogoPropio(query, perSide),
-      ]);
-      return [...nacional, ...propio];
-    },
-    [categoria],
+    (query: string, limit?: number) => Promise.resolve(buscarCatalogoLocal(query, limit)),
+    [catalogoEpoch],
   );
+
+  async function handleCatalogoSelect(item: CatalogoNacional) {
+    const seq = ++catalogoSelectSeq.current;
+    setCatalogoAlta(null);
+    const full = item.created_at ? item : await getCatalogoByCodigo(item.codigo);
+    if (seq !== catalogoSelectSeq.current) return;
+    const chosen = full ?? item;
+    if (isCatalogoPropio(chosen)) {
+      setCategoria("CUENTA_ORDEN");
+    } else if (categoria !== "CUENTA_ORDEN") {
+      setCategoria("ACTIVO");
+    }
+    setCatalogo(chosen);
+  }
 
   function handleCategoriaChange(next: CategoriaBien) {
     setCategoria(next);
@@ -1646,22 +1673,22 @@ export function ActivoForm({
           headerClassName={isGridForm ? "sm:col-span-2" : ""}
         />
 
+        {catalogoCargando && catalogoEpoch === 0 ? (
+          <p className="text-xs text-muted-foreground">Cargando catálogo…</p>
+        ) : null}
+        {catalogoError ? <p className="text-xs text-destructive">{catalogoError}</p> : null}
         <CatalogoPicker
           variant={categoria === "CUENTA_ORDEN" ? "ambos" : "nacional"}
           searchCatalogo={searchCatalogoByCategoria}
+          searchEpoch={catalogoEpoch}
+          debounceMs={0}
           resolveCodigo={getCatalogoByCodigo}
           selectedCodigo={catalogo?.codigo}
           selectedDenominacion={catalogo?.denominacion}
           disabled={pending || esEdicionMasiva || Boolean(catalogoAlta)}
-          onSelect={(item) => {
-            setCatalogoAlta(null);
-            if (isCatalogoPropio(item)) {
-              setCategoria("CUENTA_ORDEN");
-            } else if (categoria !== "CUENTA_ORDEN") {
-              setCategoria("ACTIVO");
-            }
-            setCatalogo(item);
-          }}
+          refreshing={catalogoCargando}
+          onRefresh={() => void cargarCatalogoLocal(true)}
+          onSelect={(item) => void handleCatalogoSelect(item)}
           onClear={() => {
             if (esEdicionMasiva) return;
             setCatalogo(null);
