@@ -22,6 +22,11 @@ import {
 } from "@inventario/ui/panel";
 import type { ActivoConUbicacion } from "../lib/activos";
 import { deleteActivosPreregistrados, updateActivoSerie } from "../lib/activos";
+import {
+  ORDEN_INVENTARIO_OPCIONES,
+  ordenarActivosInventario,
+  type OrdenInventario,
+} from "../lib/inventario-orden";
 import type { InventarioExportMeta } from "../lib/inventario-export";
 import type { AmbienteDestinoNavigation } from "./AgregarBienesSimilaresDialog";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
@@ -169,6 +174,7 @@ export function ActivosCampoList({
   const [ambienteId, setAmbienteId] = useState(fixedAmbienteId ?? ambienteFilter?.id ?? "");
   const [anioAdquisicion, setAnioAdquisicion] = useState("");
   const [serieComprobanteFiltro, setSerieComprobanteFiltro] = useState("");
+  const [orden, setOrden] = useState<OrdenInventario>("codigo");
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [ambientes, setAmbientes] = useState<Ambiente[]>([]);
   const [selectedActivos, setSelectedActivos] = useState<ActivoConUbicacion[]>([]);
@@ -327,7 +333,7 @@ export function ActivosCampoList({
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    return activosLocal.filter((a) => {
+    const rows = activosLocal.filter((a) => {
       if (isGlobal && filterEntidadId && a.entidad_id !== filterEntidadId) return false;
       if (!isGlobal && !isAmbiente && entidadId && a.entidad_id !== entidadId) return false;
       const sedeFiltro = fixedSedeId ?? sedeId;
@@ -364,6 +370,7 @@ export function ActivosCampoList({
         .toLowerCase();
       return haystack.includes(q);
     });
+    return ordenarActivosInventario(rows, orden);
   }, [
     activosLocal,
     sedeId,
@@ -381,6 +388,7 @@ export function ActivosCampoList({
     mostrarFiltrosAdquisicion,
     anioAdquisicion,
     serieComprobanteFiltro,
+    orden,
   ]);
 
   const emptyMessage = isAmbiente
@@ -523,6 +531,15 @@ export function ActivosCampoList({
           />
         </div>
 
+        <Select
+          aria-label="Orden de la lista"
+          size="compact"
+          value={orden}
+          onChange={(value) => setOrden(value as OrdenInventario)}
+          options={ORDEN_INVENTARIO_OPCIONES}
+          className="w-[7.25rem] shrink-0"
+        />
+
         <div className={`${panelToolbarActionsClass} ml-auto`}>
           {preregistroHeaderToolbar && (
             <PreregistroGestionToolbar {...preregistroHeaderToolbar} />
@@ -646,6 +663,15 @@ export function ActivosCampoList({
                         }
                       />
                     </div>
+
+                    <Select
+                      aria-label="Orden de la lista"
+                      size="compact"
+                      value={orden}
+                      onChange={(value) => setOrden(value as OrdenInventario)}
+                      options={ORDEN_INVENTARIO_OPCIONES}
+                      className="w-[7.25rem] shrink-0"
+                    />
 
                     {isGlobal && (
                       <Select
@@ -875,15 +901,27 @@ export function ActivosCampoList({
         </div>
       )}
 
-      <PanelSearchInput
-        value={filter}
-        onChange={setFilter}
-        placeholder={
-          isGlobal
-            ? "Buscar por código, nombre, entidad, sede o ambiente…"
-            : "Buscar por código, nombre, sede o ambiente…"
-        }
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-[12rem] flex-1">
+          <PanelSearchInput
+            value={filter}
+            onChange={setFilter}
+            placeholder={
+              isGlobal
+                ? "Buscar por código, nombre, entidad, sede o ambiente…"
+                : "Buscar por código, nombre, sede o ambiente…"
+            }
+          />
+        </div>
+        <Select
+          aria-label="Orden de la lista"
+          size="compact"
+          value={orden}
+          onChange={(value) => setOrden(value as OrdenInventario)}
+          options={ORDEN_INVENTARIO_OPCIONES}
+          className="w-[7.25rem] shrink-0"
+        />
+      </div>
         </>
       )}
 
