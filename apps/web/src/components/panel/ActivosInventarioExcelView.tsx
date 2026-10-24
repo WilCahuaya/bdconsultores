@@ -69,6 +69,8 @@ interface ActivosInventarioExcelViewProps {
   leyendaVisita?: ReactNode;
   renderVisita?: (activo: Activo) => ReactNode;
   procedenciaPorActivo?: Record<string, string>;
+  onCommitSerie?: (activo: Activo, serie: string) => Promise<{ error?: string } | void>;
+  puedeEditarSerie?: (activo: Activo) => boolean;
 }
 
 function puedeCopiarBien(activo: Activo): boolean {
@@ -110,6 +112,8 @@ export function ActivosInventarioExcelView({
   leyendaVisita,
   renderVisita,
   procedenciaPorActivo,
+  onCommitSerie,
+  puedeEditarSerie,
 }: ActivosInventarioExcelViewProps) {
   const router = useRouter();
   const { pushToast } = useToast();
@@ -250,6 +254,8 @@ export function ActivosInventarioExcelView({
       fechaCorte={fechaCorte}
       renderVisita={renderVisita}
       procedenciaPorActivo={procedenciaPorActivo}
+      onCommitSerie={onCommitSerie}
+      puedeEditarSerie={puedeEditarSerie}
       embeddedInParentScroll={layout === "global-panel" || embeddedInParentScroll}
       tableScrollRef={layout === "global-panel" ? undefined : tableScrollRef}
       selection={

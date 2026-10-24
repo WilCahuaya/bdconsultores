@@ -24,7 +24,7 @@ import {
   PreregistroGestionToolbar,
   type PreregistroGestionToolbarState,
 } from "@inventario/ui";
-import { deleteActivosPreregistrados } from "@/lib/actions/activos";
+import { deleteActivosPreregistrados, updateActivoSerie } from "@/lib/actions/activos";
 import { ActivoForm } from "./ActivoForm";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { useEjemplaresResumen } from "@/hooks/useEjemplaresResumen";
@@ -140,6 +140,28 @@ export function InventarioGlobalPanel({
     const idSet = new Set(ids);
     setActivosList((prev) => prev.filter((a) => !idSet.has(a.id)));
   }, []);
+
+  const guardarSerie = useCallback(
+    async (activo: InventarioItem, serie: string) => {
+      const result = await updateActivoSerie(activo.id, serie);
+      if (result.error) {
+        pushToast(result.error);
+        return result;
+      }
+      const value = serie.trim() || null;
+      setActivosList((prev) =>
+        prev.map((item) => (item.id === activo.id ? { ...item, serie: value } : item)),
+      );
+    },
+    [pushToast],
+  );
+
+  const puedeEditarSerie = useCallback(
+    (activo: InventarioItem) =>
+      activo.estado_registro !== "DADO_DE_BAJA" &&
+      (!isAdmin || activo.estado_registro === "PREREGISTRADO"),
+    [isAdmin],
+  );
 
   const eliminarPreregistradosActivos = useCallback(
     async (list: InventarioItem[]) => {
@@ -511,6 +533,8 @@ export function InventarioGlobalPanel({
           columnFilterOptions={columnFilterOptions}
           fechaCorte={fechaCorte}
           editarLabel={isAdmin ? undefined : "Editar activo"}
+          onCommitSerie={guardarSerie}
+          puedeEditarSerie={puedeEditarSerie}
         />
       </div>
     </>

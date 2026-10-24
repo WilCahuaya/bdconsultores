@@ -30,7 +30,7 @@ import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
 import type { FichaAsignacionExportMeta } from "@/lib/actions/ficha-asignacion-meta";
 import { fetchAmbientesPorSedeWeb } from "@/lib/ambiente-nav";
-import { deleteActivosPreregistrados } from "@/lib/actions/activos";
+import { deleteActivosPreregistrados, updateActivoSerie } from "@/lib/actions/activos";
 import { useEjemplaresResumen } from "@/hooks/useEjemplaresResumen";
 import {
   PanelPageHeader,
@@ -123,6 +123,28 @@ export function ActivosAmbientePanel({
     const idSet = new Set(ids);
     setActivosList((prev) => prev.filter((a) => !idSet.has(a.id)));
   }, []);
+
+  const guardarSerie = useCallback(
+    async (activo: Activo, serie: string) => {
+      const result = await updateActivoSerie(activo.id, serie);
+      if (result.error) {
+        pushToast(result.error);
+        return result;
+      }
+      const value = serie.trim() || null;
+      setActivosList((prev) =>
+        prev.map((item) => (item.id === activo.id ? { ...item, serie: value } : item)),
+      );
+    },
+    [pushToast],
+  );
+
+  const puedeEditarSerie = useCallback(
+    (activo: Activo) =>
+      activo.estado_registro !== "DADO_DE_BAJA" &&
+      (!isAdmin || activo.estado_registro === "PREREGISTRADO"),
+    [isAdmin],
+  );
 
   useEffect(() => {
     setEditScope("single");
@@ -549,6 +571,8 @@ export function ActivosAmbientePanel({
           leyendaVisita={visita.activa ? visita.leyenda : null}
           renderVisita={visita.activa ? visita.renderCelda : undefined}
           procedenciaPorActivo={esAmbienteFaltante ? procedenciaPorActivo : undefined}
+          onCommitSerie={guardarSerie}
+          puedeEditarSerie={puedeEditarSerie}
         />
     </div>
   );
