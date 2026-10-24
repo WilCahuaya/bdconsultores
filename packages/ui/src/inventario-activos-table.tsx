@@ -406,6 +406,8 @@ function TotalsFooter({
         <td className={tdTotalBase} />
         <td className={tdTotalBase} />
         <td className={tdTotalBase} />
+        <td className={tdTotalBase} />
+        <td className={tdTotalBase} />
         {!modoAdmin && <td className={tdTotalBase} />}
         <td className={tdTotalBase} />
         <td className={`${tdTotalAccent} inventario-totales-monto`} title={`Importe: ${importe}`}>
@@ -567,6 +569,12 @@ function FullTableBody<T extends Activo>({
                 {activo.serie?.trim() || ""}
               </InventarioTextCell>
             )}
+            <InventarioTextCell title={activo.medidas ?? ""}>
+              {activo.medidas?.trim() || ""}
+            </InventarioTextCell>
+            <InventarioTextCell title={activo.caracteristicas ?? ""} lineClamp2>
+              {activo.caracteristicas?.trim() || ""}
+            </InventarioTextCell>
             <InventarioFechaCell
               fecha={activo.fecha_adquisicion}
               valorEsMercado={activo.valor_es_mercado}
@@ -789,6 +797,8 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
               <Th className={`${inventarioThStd} normal-case`}>Marca</Th>
               <Th className={`${inventarioThStd} normal-case`}>Modelo</Th>
               <Th className={`${inventarioThStd} normal-case`}>Serie</Th>
+              <Th className={`${inventarioThStd} normal-case`}>Medida</Th>
+              <Th className={`${inventarioThStd} normal-case`}>Característica</Th>
               {showColumnFilters && columnFilters ? (
                 <ColumnHeaderFilter
                   label="Fecha adq."
