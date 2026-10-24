@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Debe iniciar sesión." }, { status: 401 });
   }
 
-  const installer = findDesktopInstaller();
+  const installer = await findDesktopInstaller();
   if (!installer) {
     return NextResponse.json({ error: "No hay instalador publicado." }, { status: 404 });
   }

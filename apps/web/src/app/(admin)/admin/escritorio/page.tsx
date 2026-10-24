@@ -8,6 +8,8 @@ import {
 import { PanelPageHeader } from "@/components/panel/panel-ui";
 import { requireProfile } from "@/lib/auth/profile";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminEscritorioPage() {
   try {
     await requireProfile("ADMIN_ENTIDAD");
@@ -15,7 +17,7 @@ export default async function AdminEscritorioPage() {
     redirect("/login");
   }
 
-  const installer = findDesktopInstaller();
+  const installer = await findDesktopInstaller();
 
   return (
     <div className="space-y-6">
@@ -28,7 +30,9 @@ export default async function AdminEscritorioPage() {
         version={installer?.version ?? "0.1.0"}
         fileName={installer?.fileName ?? null}
         sizeLabel={installer ? formatInstallerSize(installer.sizeBytes) : null}
-        updatedLabel={installer ? formatInstallerDate(installer.updatedAt) : null}
+        updatedLabel={
+          installer.updatedAt.getTime() > 0 ? formatInstallerDate(installer.updatedAt) : null
+        }
         downloadHref={installer ? installer.externalUrl ?? "/api/desktop-installer" : null}
       />
     </div>

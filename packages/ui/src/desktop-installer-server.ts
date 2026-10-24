@@ -40,6 +40,18 @@ function desktopVersion(root: string | null): string {
   }
 }
 
+const PUBLISHED_INSTALLER = {
+  repo: "WilCahuaya/bdconsultores",
+  tag: "desktop-installer",
+  assetName: "BD-Consultores-Inventario-Setup.exe",
+  url: "https://github.com/WilCahuaya/bdconsultores/releases/download/desktop-installer/BD-Consultores-Inventario-Setup.exe",
+};
+
+function isInstallerExe(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".exe") && !lower.includes("unpacked") && !lower.includes("uninstaller");
+}
+
 function newestExe(dir: string): { filePath: string; updatedAt: Date; sizeBytes: number } | null {
   let names: string[];
   try {
@@ -49,8 +61,7 @@ function newestExe(dir: string): { filePath: string; updatedAt: Date; sizeBytes:
   }
   let best: { filePath: string; updatedAt: Date; sizeBytes: number } | null = null;
   for (const name of names) {
-    if (!name.toLowerCase().endsWith(".exe")) continue;
-    if (name.toLowerCase().includes("unpacked")) continue;
+    if (!isInstallerExe(name)) continue;
     const filePath = path.join(dir, name);
     let st;
     try {
@@ -66,21 +77,8 @@ function newestExe(dir: string): { filePath: string; updatedAt: Date; sizeBytes:
   return best;
 }
 
-export function findDesktopInstaller(cwd = process.cwd()): DesktopInstallerFile | null {
+function findLocalInstaller(cwd: string, version: string): DesktopInstallerFile | null {
   const root = repoRootFrom(cwd);
-  const version = desktopVersion(root);
-  const externalUrl = process.env.DESKTOP_INSTALLER_URL?.trim() || null;
-  if (externalUrl) {
-    return {
-      version,
-      fileName: process.env.DESKTOP_INSTALLER_FILENAME?.trim() || `B&D Consultores Inventario Setup ${version}.exe`,
-      sizeBytes: Number(process.env.DESKTOP_INSTALLER_SIZE_BYTES || 0) || 0,
-      updatedAt: new Date(),
-      filePath: "",
-      externalUrl,
-    };
-  }
-
   const explicit = process.env.DESKTOP_INSTALLER_FILE?.trim();
   const dirs = [
     explicit ? path.dirname(explicit) : null,
@@ -93,7 +91,7 @@ export function findDesktopInstaller(cwd = process.cwd()): DesktopInstallerFile 
   if (explicit) {
     try {
       const st = statSync(explicit);
-      if (st.isFile()) {
+      if (st.isFile() && isInstallerExe(path.basename(explicit))) {
         return {
           version,
           fileName: path.basename(explicit),
@@ -123,6 +121,61 @@ export function findDesktopInstaller(cwd = process.cwd()): DesktopInstallerFile 
     };
   }
   return best;
+}
+
+async function findPublishedInstaller(version: string): Promise<DesktopInstallerFile> {
+  const fallback: DesktopInstallerFile = {
+    version,
+    fileName: process.env.DESKTOP_INSTALLER_FILENAME?.trim() || PUBLISHED_INSTALLER.assetName,
+    sizeBytes: Number(process.env.DESKTOP_INSTALLER_SIZE_BYTES || 0) || 0,
+    updatedAt: new Date(0),
+    filePath: "",
+    externalUrl: process.env.DESKTOP_INSTALLER_URL?.trim() || PUBLISHED_INSTALLER.url,
+  };
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${PUBLISHED_INSTALLER.repo}/releases/tags/${PUBLISHED_INSTALLER.tag}`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "User-Agent": "bdconsultores",
+        },
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) return fallback;
+    const body = (await response.json()) as {
+      assets?: { name?: string; size?: number; updated_at?: string; created_at?: string; browser_download_url?: string }[];
+    };
+    const assets = body.assets ?? [];
+    const asset =
+      assets.find((item) => item.name === PUBLISHED_INSTALLER.assetName) ??
+      assets.find((item) => item.name?.toLowerCase().endsWith(".exe"));
+    if (!asset?.browser_download_url) return fallback;
+    const updatedAt = new Date(asset.updated_at || asset.created_at || 0);
+    return {
+      version,
+      fileName: asset.name || fallback.fileName,
+      sizeBytes: Number(asset.size) || fallback.sizeBytes,
+      updatedAt: Number.isNaN(updatedAt.getTime()) ? fallback.updatedAt : updatedAt,
+      filePath: "",
+      externalUrl: asset.browser_download_url,
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+/** El instalador más reciente: el compilado en esta máquina, o el último publicado. */
+export async function findDesktopInstaller(cwd = process.cwd()): Promise<DesktopInstallerFile> {
+  const version = desktopVersion(repoRootFrom(cwd));
+  const [local, published] = await Promise.all([
+    Promise.resolve(findLocalInstaller(cwd, version)),
+    findPublishedInstaller(version),
+  ]);
+  if (local && local.updatedAt.getTime() > published.updatedAt.getTime()) return local;
+  return published;
 }
 
 export function formatInstallerSize(sizeBytes: number): string | null {
