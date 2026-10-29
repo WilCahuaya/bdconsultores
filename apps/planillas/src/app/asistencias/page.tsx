@@ -12,6 +12,7 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listarFeriadosMes, listDocumentosAsistenciaAnio } from "@/lib/actions/asistencias";
 import { esMesAsistencia, etiquetaMesAsistencia, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import { DIAS_SEMANA } from "@/lib/horario-laboral";
 import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function mesesDelAnio(anio: number): string[] {
@@ -84,12 +85,11 @@ export default async function AsistenciasPage({
     }
   }
   const columnas = 23;
-  const entidadNombre = entidades.find((entidad) => entidad.id === selectedId)?.nombre ?? "";
   const etiquetaMes = etiquetaMesAsistencia(mes);
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
-      <div className="space-y-6">
+      <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-bold text-primary sm:text-2xl">Asistencias</h1>
           {entidades.length > 0 ? (
@@ -132,14 +132,8 @@ export default async function AsistenciasPage({
               />
             ) : null}
 
-            <section className="space-y-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-medium text-foreground">{anio}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {corresponden > 0 ? `Subidos: ${subidos} de ${corresponden}` : "Aún no hay meses que correspondan."}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+            <section className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
                   <AsistenciaMesEstado estado="subido" etiqueta="" decorativo />
                   Subido
@@ -153,43 +147,47 @@ export default async function AsistenciasPage({
                   No aplica
                 </span>
                 <span>La X es un día que no trabaja. Las horas son del horario vigente.</span>
+                <span className="sm:ml-auto">
+                  {corresponden > 0 ? `Subidos: ${subidos} de ${corresponden}` : "Aún no hay meses que correspondan."}
+                </span>
               </div>
               <div className={`${panelCardClass} panel-scroll-table overflow-x-auto p-0`}>
-                <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
+                <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-sm">
+                  <colgroup>
+                    <col className="w-14" />
+                    <col className="w-28" />
+                    <col />
+                    {DIAS_SEMANA.map((dia) => (
+                      <col key={dia} style={{ width: "3rem" }} />
+                    ))}
+                    {meses.map((item) => (
+                      <col key={item} className="w-9" />
+                    ))}
+                    <col className="w-28" />
+                  </colgroup>
                   <thead>
-                    <tr className="bg-amber-200 dark:bg-amber-900/50">
-                      <th
-                        colSpan={3}
-                        className="border border-amber-300 px-3 py-2 text-center text-base font-bold uppercase text-red-600 dark:border-amber-800 dark:text-red-300"
-                      >
-                        {entidadNombre}
-                      </th>
-                      <AsistenciaDiaEncabezados rowSpan={2} />
-                      <th
-                        colSpan={12}
-                        className="border border-amber-300 px-2 py-2 text-center font-medium text-foreground dark:border-amber-800"
-                      >
-                        {anio}
-                      </th>
-                      <th
-                        rowSpan={2}
-                        className="border border-border bg-muted/40 px-2 py-2 text-center align-middle text-xs font-medium text-muted-foreground"
-                      >
-                        Acciones
-                      </th>
-                    </tr>
                     <tr className="border-b bg-muted/40 text-muted-foreground">
-                      <th className="px-3 py-2 font-medium">Nº</th>
-                      <th className="px-3 py-2 font-medium">DNI</th>
-                      <th className="px-3 py-2 font-medium">Nombre</th>
+                      <th className="border border-border px-2 py-1.5 align-middle text-sm font-medium">
+                        Nº
+                      </th>
+                      <th className="border border-border px-2 py-1.5 align-middle text-sm font-medium">
+                        DNI
+                      </th>
+                      <th className="border border-border px-2 py-1.5 align-middle text-sm font-medium">
+                        Nombre
+                      </th>
+                      <AsistenciaDiaEncabezados />
                       {meses.map((item) => (
                         <th
                           key={item}
-                          className={`px-1 py-2 text-center text-[11px] font-medium ${item === mes ? "bg-primary/10 text-foreground" : ""}`}
+                          className={`border border-border px-1 py-1.5 text-center text-[11px] font-medium ${item === mes ? "bg-primary/10 text-foreground" : ""}`}
                         >
                           {MES_ABREV[Number(item.slice(5, 7)) - 1]}
                         </th>
                       ))}
+                      <th className="border border-border px-2 py-1.5 text-center align-middle text-xs font-medium">
+                        Acciones
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

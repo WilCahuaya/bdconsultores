@@ -23,7 +23,7 @@ function celdasHoras(horario: string | null) {
     return (
       <td
         key={dia}
-        className="border border-border px-2 py-2 text-center"
+        className="w-12 border border-border px-1 py-2 text-center"
         title={noTrabaja ? `${DIA_LABEL[dia]}: no trabaja` : `${DIA_LABEL[dia]}: ${formatoHorasDia(minutos)} h`}
       >
         {noTrabaja ? (
@@ -38,24 +38,16 @@ function celdasHoras(horario: string | null) {
   });
 }
 
-function letraDia(dia: (typeof DIAS_SEMANA)[number]) {
-  return (
-    <>
-      <span className="sr-only">{DIA_LABEL[dia]}</span>
-      <span aria-hidden>{DIA_LETRA[dia]}</span>
-    </>
-  );
-}
-
 export function AsistenciaDiaEncabezados({ rowSpan }: { rowSpan?: number }) {
   return DIAS_SEMANA.map((dia) => (
     <th
       key={dia}
       scope="col"
       rowSpan={rowSpan}
-      className="w-12 border border-amber-300 bg-amber-200 px-1 py-2 text-center text-sm font-bold text-foreground align-middle dark:border-amber-800 dark:bg-amber-900/50"
+      aria-label={DIA_LABEL[dia]}
+      className="w-12 max-w-12 border border-amber-300 bg-amber-200 px-0.5 py-2 text-center text-sm font-bold text-foreground align-middle dark:border-amber-800 dark:bg-amber-900/50"
     >
-      {letraDia(dia)}
+      {DIA_LETRA[dia]}
     </th>
   ));
 }
@@ -77,7 +69,7 @@ export function AsistenciaHorasCeldas({
 }) {
   if (!activo) {
     return DIAS_SEMANA.map((dia) => (
-      <td key={dia} className="border border-border px-1 py-2 text-center text-muted-foreground">
+      <td key={dia} className="w-12 border border-border px-1 py-2 text-center text-muted-foreground">
         —
       </td>
     ));

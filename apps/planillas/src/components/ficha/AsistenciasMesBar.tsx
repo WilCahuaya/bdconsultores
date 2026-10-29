@@ -40,19 +40,19 @@ export function AsistenciasMesBar({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="block space-y-1.5">
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="inline-flex items-center gap-2">
           <span className="text-sm font-medium">Mes</span>
           <input
             type="month"
             value={mes}
             onChange={(event) => irAlMes(event.target.value)}
-            className="flex h-10 rounded-md border border-input bg-background px-3 text-sm shadow-sm"
+            className="flex h-8 rounded-md border border-input bg-background px-2 text-sm shadow-sm"
           />
         </label>
         {canWrite ? (
-          <Button type="button" disabled={pending} onClick={() => void onDescargarEmpresa()}>
+          <Button type="button" size="sm" className="h-8" disabled={pending} onClick={() => void onDescargarEmpresa()}>
             {pending ? "Preparando…" : "Descargar Excel de la empresa"}
           </Button>
         ) : null}
@@ -62,6 +62,7 @@ export function AsistenciasMesBar({
         mes={mes}
         fechasIniciales={feriadosIniciales}
         canWrite={canWrite}
+        compact
       />
     </div>
   );

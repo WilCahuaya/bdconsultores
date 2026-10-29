@@ -21,12 +21,14 @@ export function FeriadosMesPicker({
   mes,
   fechasIniciales,
   canWrite,
+  compact = false,
   onChange,
 }: {
   entidadId: string;
   mes: string;
   fechasIniciales?: string[];
   canWrite: boolean;
+  compact?: boolean;
   onChange?: (fechas: string[]) => void;
 }) {
   const { pushToast } = useToast();
@@ -84,15 +86,27 @@ export function FeriadosMesPicker({
     .sort((a, b) => a - b)
     .join(", ");
 
+  const resumen = guardando ? "Guardando…" : marcados ? `Días feriados: ${marcados}` : "Ningún feriado marcado.";
+
   return (
-    <div className="space-y-2">
-      <div>
-        <p className="text-sm font-medium">Feriados</p>
-        <p className="text-sm text-muted-foreground">
-          Elija uno o más días del mes. En el Excel se escribe Feriado y esas horas no se acumulan.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-1.5" role="group" aria-label="Días feriados del mes">
+    <div className={compact ? "space-y-1" : "space-y-2"}>
+      {compact ? (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+          <p className="text-sm font-medium">Feriados</p>
+          <p className="text-xs text-muted-foreground">
+            En el Excel se escribe Feriado y esas horas no se acumulan.
+          </p>
+          <p className="text-xs text-muted-foreground">{resumen}</p>
+        </div>
+      ) : (
+        <div>
+          <p className="text-sm font-medium">Feriados</p>
+          <p className="text-sm text-muted-foreground">
+            Elija uno o más días del mes. En el Excel se escribe Feriado y esas horas no se acumulan.
+          </p>
+        </div>
+      )}
+      <div className={compact ? "flex flex-wrap gap-1" : "flex flex-wrap gap-1.5"} role="group" aria-label="Días feriados del mes">
         {dias.map((iso) => {
           const activo = seleccion.includes(iso);
           const numero = Number(iso.slice(8, 10));
@@ -105,21 +119,21 @@ export function FeriadosMesPicker({
               aria-pressed={activo}
               title={`${etiquetaDia(dia)} ${numero}${activo ? ", feriado" : ""}`}
               onClick={() => toggle(iso)}
-              className={`flex h-10 w-9 flex-col items-center justify-center rounded-md border text-xs ${
+              className={`flex flex-col items-center justify-center rounded-md border text-xs ${
+                compact ? "h-7 w-7" : "h-10 w-9"
+              } ${
                 activo
                   ? "border-primary bg-primary font-medium text-primary-foreground"
                   : "border-input bg-background hover:bg-muted"
               } disabled:cursor-default disabled:opacity-60`}
             >
-              <span className="text-[10px] leading-none opacity-80">{DIA_CORTO[dia]}</span>
+              <span className="text-[9px] leading-none opacity-80">{DIA_CORTO[dia]}</span>
               <span className="leading-none">{numero}</span>
             </button>
           );
         })}
       </div>
-      <p className="text-sm text-muted-foreground">
-        {guardando ? "Guardando…" : marcados ? `Días feriados: ${marcados}` : "Ningún feriado marcado."}
-      </p>
+      {compact ? null : <p className="text-sm text-muted-foreground">{resumen}</p>}
     </div>
   );
 }
