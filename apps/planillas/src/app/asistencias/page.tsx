@@ -5,13 +5,13 @@ import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { AsistenciasMesBar, DescargarAsistenciaTrabajador } from "@/components/ficha/AsistenciasMesBar";
 import { AsistenciaMesEstado, type EstadoAsistenciaMes } from "@/components/ficha/AsistenciaMesEstado";
-import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
-import { AsistenciaSemanaTabla } from "@/components/ficha/AsistenciaSemana";
+import { AsistenciaNotaIcono } from "@/components/ficha/AsistenciaNotaField";
+import { AsistenciaDiaEncabezados, AsistenciaHorasCeldas } from "@/components/ficha/AsistenciaSemana";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEditarFichaLaboral } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listarFeriadosMes, listDocumentosAsistenciaAnio } from "@/lib/actions/asistencias";
-import { esMesAsistencia, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import { esMesAsistencia, etiquetaMesAsistencia, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function mesesDelAnio(anio: number): string[] {
@@ -83,11 +83,9 @@ export default async function AsistenciasPage({
       if (estado === "subido") subidos += 1;
     }
   }
-  const columnas = 16 + (canWrite ? 1 : 0);
+  const columnas = 23;
   const entidadNombre = entidades.find((entidad) => entidad.id === selectedId)?.nombre ?? "";
-  const delMes = activos.filter((trabajador) =>
-    trabajadorActivoEnMes(mes, trabajador.fecha_ingreso, trabajador.fecha_cese),
-  );
+  const etiquetaMes = etiquetaMesAsistencia(mes);
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -134,26 +132,6 @@ export default async function AsistenciasPage({
               />
             ) : null}
 
-            <section className="space-y-2">
-              <div>
-                <h2 className="text-sm font-medium">Días y horas</h2>
-                <p className="text-sm text-muted-foreground">
-                  Horas de cada día según el horario vigente. La X es un día que no trabaja.
-                </p>
-              </div>
-              <div className={`${panelCardClass} overflow-hidden p-0`}>
-                <AsistenciaSemanaTabla
-                  titulo={entidadNombre}
-                  filas={delMes.map((trabajador) => ({
-                    id: trabajador.id,
-                    nombre: nombreCompleto(trabajador.persona),
-                    href: `/trabajadores/${trabajador.id}?tab=asistencia&mes=${mes}`,
-                    horario: trabajador.horario,
-                  }))}
-                />
-              </div>
-            </section>
-
             <section className="space-y-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-sm font-medium text-foreground">{anio}</h2>
@@ -174,11 +152,33 @@ export default async function AsistenciasPage({
                   <AsistenciaMesEstado estado="no-aplica" etiqueta="" decorativo />
                   No aplica
                 </span>
+                <span>La X es un día que no trabaja. Las horas son del horario vigente.</span>
               </div>
               <div className={`${panelCardClass} panel-scroll-table overflow-x-auto p-0`}>
-                <table className="w-full min-w-[1100px] text-left text-sm">
-                  <thead className="border-b bg-muted/40 text-muted-foreground">
-                    <tr>
+                <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
+                  <thead>
+                    <tr className="bg-amber-200 dark:bg-amber-900/50">
+                      <th
+                        colSpan={3}
+                        className="border border-amber-300 px-3 py-2 text-center text-base font-bold uppercase text-red-600 dark:border-amber-800 dark:text-red-300"
+                      >
+                        {entidadNombre}
+                      </th>
+                      <AsistenciaDiaEncabezados rowSpan={2} />
+                      <th
+                        colSpan={12}
+                        className="border border-amber-300 px-2 py-2 text-center font-medium text-foreground dark:border-amber-800"
+                      >
+                        {anio}
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className="border border-border bg-muted/40 px-2 py-2 text-center align-middle text-xs font-medium text-muted-foreground"
+                      >
+                        Acciones
+                      </th>
+                    </tr>
+                    <tr className="border-b bg-muted/40 text-muted-foreground">
                       <th className="px-3 py-2 font-medium">Nº</th>
                       <th className="px-3 py-2 font-medium">DNI</th>
                       <th className="px-3 py-2 font-medium">Nombre</th>
@@ -190,8 +190,6 @@ export default async function AsistenciasPage({
                           {MES_ABREV[Number(item.slice(5, 7)) - 1]}
                         </th>
                       ))}
-                      <th className="px-3 py-2 font-medium">Observación</th>
-                      {canWrite ? <th className="px-3 py-2 font-medium">Excel</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -204,6 +202,8 @@ export default async function AsistenciasPage({
                     ) : (
                       activos.map((trabajador) => {
                         const mesesSubidos = subidoPorRelacion.get(trabajador.id);
+                        const nombre = nombreCompleto(trabajador.persona);
+                        const activoMes = trabajadorActivoEnMes(mes, trabajador.fecha_ingreso, trabajador.fecha_cese);
                         return (
                           <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
                             <td className="px-3 py-2 font-mono align-middle">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
@@ -213,9 +213,10 @@ export default async function AsistenciasPage({
                                 href={`/trabajadores/${trabajador.id}?tab=asistencia&mes=${mes}`}
                                 className="font-medium text-primary hover:underline"
                               >
-                                {nombreCompleto(trabajador.persona)}
+                                {nombre}
                               </Link>
                             </td>
+                            <AsistenciaHorasCeldas horario={trabajador.horario} activo={activoMes} />
                             {meses.map((item) => {
                               const estado = estadoAsistenciaMes(
                                 item,
@@ -239,20 +240,19 @@ export default async function AsistenciasPage({
                                 </td>
                               );
                             })}
-                            <td className="px-3 py-2 align-middle">
-                              <AsistenciaNotaField
-                                relacionId={trabajador.id}
-                                mes={mes}
-                                nota={notaPorRelacion.get(trabajador.id) ?? null}
-                                canWrite={canWrite && trabajador.estado !== "CESADA"}
-                                compact
-                              />
+                            <td className="px-2 py-2 align-middle">
+                              <div className="flex items-center justify-center gap-0.5">
+                                <AsistenciaNotaIcono
+                                  relacionId={trabajador.id}
+                                  mes={mes}
+                                  nota={notaPorRelacion.get(trabajador.id) ?? null}
+                                  canWrite={canWrite && trabajador.estado !== "CESADA"}
+                                  nombre={nombre}
+                                  etiquetaMes={etiquetaMes}
+                                />
+                                {canWrite ? <DescargarAsistenciaTrabajador relacionId={trabajador.id} mes={mes} /> : null}
+                              </div>
                             </td>
-                            {canWrite ? (
-                              <td className="px-3 py-2 align-middle">
-                                <DescargarAsistenciaTrabajador relacionId={trabajador.id} mes={mes} />
-                              </td>
-                            ) : null}
                           </tr>
                         );
                       })

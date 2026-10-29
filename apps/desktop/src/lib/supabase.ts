@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { AUTH_STORAGE_KEY, persistentAuthStorage } from "./local-auth-session";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -19,7 +20,8 @@ export function getSupabaseClient(): SupabaseClient {
         autoRefreshToken: true,
         detectSessionInUrl: false,
         flowType: "pkce",
-        storageKey: "inventario.desktop.auth",
+        storageKey: AUTH_STORAGE_KEY,
+        storage: persistentAuthStorage,
       },
     });
   }

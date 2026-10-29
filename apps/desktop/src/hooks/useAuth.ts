@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { extractOAuthRedirectTo, forceOAuthRedirectUrl } from "@shared/auth/oauth-url";
 import { getAuthCallbackUrl } from "../lib/auth-config";
+import {
+  allowNextSignIn,
+  beginExplicitSignOut,
+  isExplicitSignOut,
+  onLocalSignOut,
+  readKeptSessionUser,
+} from "../lib/local-auth-session";
 import { clearCachedProfile } from "../lib/profile";
 import { getSupabaseClient, isSupabaseConfigured } from "../lib/supabase";
 
@@ -57,18 +64,38 @@ export function useAuth() {
 
     const supabase = getSupabaseClient();
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    function userToKeep(sessionUser: User | null | undefined): User | null {
+      if (isExplicitSignOut()) return null;
+      return sessionUser ?? readKeptSessionUser();
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setUser(userToKeep(session?.user));
+        setLoading(false);
+      })
+      .catch(() => {
+        setUser(userToKeep(null));
+        setLoading(false);
+      });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
+      if (event === "SIGNED_OUT" || isExplicitSignOut()) {
+        setUser(isExplicitSignOut() ? null : readKeptSessionUser());
+        return;
+      }
+      setUser(userToKeep(session?.user));
     });
 
-    return () => subscription.unsubscribe();
+    const stopLocalSignOut = onLocalSignOut(() => setUser(null));
+
+    return () => {
+      stopLocalSignOut();
+      subscription.unsubscribe();
+    };
   }, [configured]);
 
   useEffect(() => {
@@ -165,6 +192,8 @@ export async function signInWithGoogle(
     serverOk: null,
     status: null,
   };
+
+  allowNextSignIn();
 
   if (isDesktop && desktopApi?.getAuthDiagnostics) {
     const diag = await desktopApi.getAuthDiagnostics();
@@ -270,7 +299,8 @@ export async function signInWithGoogle(
 }
 
 export async function signOut() {
+  beginExplicitSignOut();
   clearCachedProfile();
   const supabase = getSupabaseClient();
-  return supabase.auth.signOut();
+  return supabase.auth.signOut({ scope: "local" });
 }

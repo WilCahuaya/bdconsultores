@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, useToast } from "@inventario/ui";
+import { Button, Dialog, useToast } from "@inventario/ui";
 import { guardarNotaAsistenciaMes } from "@/lib/actions/asistencias";
 
 export function AsistenciaNotaField({
@@ -64,5 +64,52 @@ export function AsistenciaNotaField({
         </Button>
       ) : null}
     </div>
+  );
+}
+
+export function AsistenciaNotaIcono({
+  relacionId,
+  mes,
+  nota,
+  canWrite,
+  nombre,
+  etiquetaMes,
+}: {
+  relacionId: string;
+  mes: string;
+  nota: string | null;
+  canWrite: boolean;
+  nombre: string;
+  etiquetaMes: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const tiene = Boolean(nota?.trim());
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Ver observación"
+        title={tiene ? nota?.trim() : "Ver observación"}
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent ${
+          tiene ? "text-primary" : "text-muted-foreground"
+        }`}
+        onClick={() => setOpen(true)}
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden>
+          <path d="M7 3h8l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+          <path d="M15 3v6h6" />
+          <path d="M9 13h6" />
+          <path d="M9 17h4" />
+        </svg>
+      </button>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Observación"
+        description={`${nombre} · ${etiquetaMes}`}
+      >
+        <AsistenciaNotaField relacionId={relacionId} mes={mes} nota={nota} canWrite={canWrite} />
+      </Dialog>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import type { Profile } from "@inventario/types";
+import { readKeptSessionUser } from "./local-auth-session";
 import { isOnline } from "./master-cache";
 import { getSupabaseClient } from "./supabase";
 
@@ -37,17 +38,28 @@ async function resolveAuthUserId(): Promise<string | null> {
   const supabase = getSupabaseClient();
 
   // Sesión local primero: funciona sin red (getUser() valida contra el servidor).
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (session?.user?.id) return session.user.id;
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.user?.id) return session.user.id;
+  } catch {
+    // Token vencido o sin red: se usa la sesión guardada en el equipo.
+  }
+
+  const kept = readKeptSessionUser();
+  if (kept?.id) return kept.id;
 
   if (!isOnline()) return null;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user?.id ?? null;
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchProfile(): Promise<Profile | null> {

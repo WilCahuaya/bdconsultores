@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { DIAS_SEMANA, DIA_LABEL } from "@/lib/horario-laboral";
 import { DIA_LETRA, formatoHorasDia, semanaHorasDeHorario } from "@/lib/horario-asistencia";
 
@@ -48,78 +47,42 @@ function letraDia(dia: (typeof DIAS_SEMANA)[number]) {
   );
 }
 
+export function AsistenciaDiaEncabezados({ rowSpan }: { rowSpan?: number }) {
+  return DIAS_SEMANA.map((dia) => (
+    <th
+      key={dia}
+      scope="col"
+      rowSpan={rowSpan}
+      className="w-12 border border-amber-300 bg-amber-200 px-1 py-2 text-center text-sm font-bold text-foreground align-middle dark:border-amber-800 dark:bg-amber-900/50"
+    >
+      {letraDia(dia)}
+    </th>
+  ));
+}
+
 function encabezadoDias() {
   return (
     <tr className="bg-amber-200 dark:bg-amber-900/50">
-      {DIAS_SEMANA.map((dia) => (
-        <th
-          key={dia}
-          scope="col"
-          className="w-14 border border-amber-300 px-1 py-2 text-center text-sm font-bold text-foreground dark:border-amber-800"
-        >
-          {letraDia(dia)}
-        </th>
-      ))}
+      <AsistenciaDiaEncabezados />
     </tr>
   );
 }
 
-export function AsistenciaSemanaTabla({
-  titulo,
-  filas,
+export function AsistenciaHorasCeldas({
+  horario,
+  activo = true,
 }: {
-  titulo: string;
-  filas: { id: string; nombre: string; href?: string; horario: string | null }[];
+  horario: string | null;
+  activo?: boolean;
 }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[40rem] border-collapse text-sm">
-        <thead>
-          <tr className="bg-amber-200 dark:bg-amber-900/50">
-            <th
-              scope="col"
-              className="border border-amber-300 px-3 py-2 text-center text-base font-bold uppercase text-red-600 dark:border-amber-800 dark:text-red-300"
-            >
-              {titulo}
-            </th>
-            {DIAS_SEMANA.map((dia) => (
-              <th
-                key={dia}
-                scope="col"
-                className="w-14 border border-amber-300 px-1 py-2 text-center font-bold text-foreground dark:border-amber-800"
-              >
-                {letraDia(dia)}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {filas.length === 0 ? (
-            <tr>
-              <td colSpan={8} className="border border-border px-4 py-8 text-muted-foreground">
-                No hay trabajadores activos en este mes.
-              </td>
-            </tr>
-          ) : (
-            filas.map((fila) => (
-              <tr key={fila.id} className="bg-background">
-                <th scope="row" className="border border-border px-3 py-2 text-left font-medium uppercase">
-                  {fila.href ? (
-                    <Link href={fila.href} className="text-primary hover:underline">
-                      {fila.nombre}
-                    </Link>
-                  ) : (
-                    fila.nombre
-                  )}
-                </th>
-                {celdasHoras(fila.horario)}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
+  if (!activo) {
+    return DIAS_SEMANA.map((dia) => (
+      <td key={dia} className="border border-border px-1 py-2 text-center text-muted-foreground">
+        —
+      </td>
+    ));
+  }
+  return celdasHoras(horario);
 }
 
 export function AsistenciaDiasHoras({
