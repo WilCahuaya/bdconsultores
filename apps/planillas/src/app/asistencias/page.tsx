@@ -6,6 +6,7 @@ import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { AsistenciasMesBar, DescargarAsistenciaTrabajador } from "@/components/ficha/AsistenciasMesBar";
 import { AsistenciaMesEstado, type EstadoAsistenciaMes } from "@/components/ficha/AsistenciaMesEstado";
 import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
+import { AsistenciaSemanaTabla } from "@/components/ficha/AsistenciaSemana";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEditarFichaLaboral } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
@@ -83,6 +84,10 @@ export default async function AsistenciasPage({
     }
   }
   const columnas = 16 + (canWrite ? 1 : 0);
+  const entidadNombre = entidades.find((entidad) => entidad.id === selectedId)?.nombre ?? "";
+  const delMes = activos.filter((trabajador) =>
+    trabajadorActivoEnMes(mes, trabajador.fecha_ingreso, trabajador.fecha_cese),
+  );
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -128,6 +133,26 @@ export default async function AsistenciasPage({
                 canWrite={canWrite}
               />
             ) : null}
+
+            <section className="space-y-2">
+              <div>
+                <h2 className="text-sm font-medium">Días y horas</h2>
+                <p className="text-sm text-muted-foreground">
+                  Horas de cada día según el horario vigente. La X es un día que no trabaja.
+                </p>
+              </div>
+              <div className={`${panelCardClass} overflow-hidden p-0`}>
+                <AsistenciaSemanaTabla
+                  titulo={entidadNombre}
+                  filas={delMes.map((trabajador) => ({
+                    id: trabajador.id,
+                    nombre: nombreCompleto(trabajador.persona),
+                    href: `/trabajadores/${trabajador.id}?tab=asistencia&mes=${mes}`,
+                    horario: trabajador.horario,
+                  }))}
+                />
+              </div>
+            </section>
 
             <section className="space-y-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">

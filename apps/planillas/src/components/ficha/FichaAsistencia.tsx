@@ -13,6 +13,7 @@ import {
   diasVacacionesEnMes,
   esMesAsistencia,
   etiquetaMesAsistencia,
+  firmaSemanaHoras,
   formatoHorasTotales,
   horarioContratoEnFecha,
   MES_ABREV,
@@ -28,6 +29,7 @@ import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarA
 import { AsistenciaNotaField } from "@/components/ficha/AsistenciaNotaField";
 import { FeriadosMesPicker } from "@/components/ficha/FeriadosMesPicker";
 import { HorarioContratoVista } from "@/components/ficha/HorarioContratoVista";
+import { AsistenciaDiasHoras } from "@/components/ficha/AsistenciaSemana";
 import { useDescargaTrabajador } from "@/components/ficha/DescargaTrabajador";
 import { contarPaginasPdf, pdfSoloPaginas } from "@/lib/convertir-a-pdf";
 import { nombreBaseAsistencia } from "@/lib/nombre-archivo";
@@ -228,6 +230,30 @@ export function FichaAsistencia({
       })
     : null;
   const diasVacaciones = diasVacacionesEnMes(mes, vacaciones);
+  const horariosDistintos = (() => {
+    const vistos = new Set<string>();
+    const distintos: ContratoHorarioMes[] = [];
+    for (const contrato of contratosMes) {
+      const firma = firmaSemanaHoras(contrato.horario);
+      if (vistos.has(firma)) continue;
+      vistos.add(firma);
+      distintos.push(contrato);
+    }
+    return distintos;
+  })();
+  const filasDias = horariosDistintos.map((contrato) => {
+    const desde = contrato.inicio ? formatFechaPlanilla(contrato.inicio) : "";
+    const hasta = contrato.fin ? formatFechaPlanilla(contrato.fin) : "";
+    const vigencia = [desde, hasta].filter(Boolean).join(" – ");
+    return {
+      id: String(contrato.version),
+      etiqueta:
+        horariosDistintos.length > 1
+          ? `Versión ${contrato.version}${vigencia ? ` · ${vigencia}` : ""}`
+          : undefined,
+      horario: contrato.horario,
+    };
+  });
 
   return (
     <div className="space-y-4">
@@ -293,11 +319,14 @@ export function FichaAsistencia({
             El mes elegido va en color principal. El verde indica que ya hay horario firmado.
           </p>
         </div>
-        <div className="space-y-1 text-sm">
+        <div className="space-y-3 text-sm">
           <p className="font-medium">Horario del contrato en este mes</p>
           {contratosMes.length === 0 ? (
             <p className="text-muted-foreground">Sin contrato confirmado en este mes.</p>
           ) : (
+            <AsistenciaDiasHoras filas={filasDias} />
+          )}
+          {contratosMes.length === 0 ? null : (
             contratosMes.map((contrato) => {
               const abierto = horarioAbierto === contrato.version;
               const desde = contrato.inicio ? formatFechaPlanilla(contrato.inicio) : "";
@@ -314,7 +343,7 @@ export function FichaAsistencia({
                     className="text-primary hover:underline"
                     onClick={() => setHorarioAbierto(abierto ? null : contrato.version)}
                   >
-                    {abierto ? "Ocultar" : "Mostrar"}
+                    {abierto ? "Ocultar detalle" : "Ver detalle del horario"}
                     {detalle}
                   </button>
                   {abierto && contrato.horario ? (

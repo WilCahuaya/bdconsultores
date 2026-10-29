@@ -204,6 +204,48 @@ export function etiquetaDia(dia: DiaSemana): string {
   return DIA_LABEL[dia];
 }
 
+/** Letra de la grilla semanal: L M M J V S D. Martes y miércoles comparten M. */
+export const DIA_LETRA: Record<DiaSemana, string> = {
+  LUNES: "L",
+  MARTES: "M",
+  MIERCOLES: "M",
+  JUEVES: "J",
+  VIERNES: "V",
+  SABADO: "S",
+  DOMINGO: "D",
+};
+
+export type MinutosSemana = Record<DiaSemana, number | null>;
+
+export type SemanaHoras =
+  | { estado: "vacio" }
+  | { estado: "texto" }
+  | { estado: "dias"; minutos: MinutosSemana };
+
+/** Horas efectivas de cada día de la semana. null en un día = no trabaja. */
+export function semanaHorasDeHorario(horarioRaw: string | null | undefined): SemanaHoras {
+  if (!horarioRaw?.trim()) return { estado: "vacio" };
+  const minutos = {} as MinutosSemana;
+  for (const dia of DIAS_SEMANA) {
+    const tramos = tramosDelDia(horarioRaw, dia);
+    if (tramos === null) return { estado: "texto" };
+    const total = tramos.reduce((suma, tramo) => suma + tramo.minutos, 0);
+    minutos[dia] = total > 0 ? total : null;
+  }
+  return { estado: "dias", minutos };
+}
+
+/** 7 h 40 min → "7.67". */
+export function formatoHorasDia(minutos: number): string {
+  return (minutos / 60).toFixed(2);
+}
+
+export function firmaSemanaHoras(horarioRaw: string | null | undefined): string {
+  const semana = semanaHorasDeHorario(horarioRaw);
+  if (semana.estado !== "dias") return semana.estado;
+  return DIAS_SEMANA.map((dia) => (semana.minutos[dia] == null ? "x" : String(semana.minutos[dia]))).join("|");
+}
+
 export type RangoFecha = { inicio: string; fin: string };
 
 /** Días del mes que caen dentro de algún rango de vacaciones. */
