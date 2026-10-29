@@ -12,7 +12,6 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
 import { listarFeriadosMes, listDocumentosAsistenciaAnio } from "@/lib/actions/asistencias";
 import { esMesAsistencia, etiquetaMesAsistencia, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
-import { DIAS_SEMANA } from "@/lib/horario-laboral";
 import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function mesesDelAnio(anio: number): string[] {
@@ -66,7 +65,11 @@ export default async function AsistenciasPage({
     if (documento.mes === mes) notaPorRelacion.set(documento.relacion_id, documento.nota);
   }
   const activos = trabajadores
-    .filter((t) => meses.some((item) => trabajadorActivoEnMes(item, t.fecha_ingreso, t.fecha_cese)))
+    .filter(
+      (t) =>
+        t.estado !== "CESADA" &&
+        meses.some((item) => trabajadorActivoEnMes(item, t.fecha_ingreso, t.fecha_cese)),
+    )
     .sort(compareTrabajadoresPorNumero);
   let subidos = 0;
   let corresponden = 0;
@@ -151,20 +154,9 @@ export default async function AsistenciasPage({
                   {corresponden > 0 ? `Subidos: ${subidos} de ${corresponden}` : "Aún no hay meses que correspondan."}
                 </span>
               </div>
-              <div className={`${panelCardClass} panel-scroll-table overflow-x-auto p-0`}>
-                <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-sm">
-                  <colgroup>
-                    <col className="w-14" />
-                    <col className="w-28" />
-                    <col />
-                    {DIAS_SEMANA.map((dia) => (
-                      <col key={dia} style={{ width: "3rem" }} />
-                    ))}
-                    {meses.map((item) => (
-                      <col key={item} className="w-9" />
-                    ))}
-                    <col className="w-28" />
-                  </colgroup>
+              <div className={`${panelCardClass} p-0`}>
+                <div className="overflow-x-auto">
+                <table className="w-max min-w-full whitespace-nowrap border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40 text-muted-foreground">
                       <th className="border border-border px-2 py-1.5 align-middle text-sm font-medium">
@@ -206,10 +198,10 @@ export default async function AsistenciasPage({
                           <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
                             <td className="px-3 py-2 font-mono align-middle">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
                             <td className="px-3 py-2 font-mono align-middle">{trabajador.persona.dni}</td>
-                            <td className="px-3 py-2 align-middle">
+                            <td className="whitespace-nowrap px-3 py-2 align-middle">
                               <Link
                                 href={`/trabajadores/${trabajador.id}?tab=asistencia&mes=${mes}`}
-                                className="font-medium text-primary hover:underline"
+                                className="whitespace-nowrap font-medium text-primary hover:underline"
                               >
                                 {nombre}
                               </Link>
@@ -238,8 +230,8 @@ export default async function AsistenciasPage({
                                 </td>
                               );
                             })}
-                            <td className="px-2 py-2 align-middle">
-                              <div className="flex items-center justify-center gap-0.5">
+                            <td className="whitespace-nowrap px-2 py-2 align-middle">
+                              <div className="flex flex-nowrap items-center justify-center gap-0.5">
                                 <AsistenciaNotaIcono
                                   relacionId={trabajador.id}
                                   mes={mes}
@@ -257,6 +249,7 @@ export default async function AsistenciasPage({
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </section>
           </>
