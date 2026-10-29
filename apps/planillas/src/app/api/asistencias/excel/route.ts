@@ -49,11 +49,7 @@ export async function GET(request: Request) {
       relacionIds: datos.trabajadores.map((t) => t.relacionId).filter((id): id is string => Boolean(id)),
     }).catch(() => undefined);
     const buffer = await bufferAsistenciaExcel(datos.empresa, datos.trabajadores, mes, datos.feriados ?? []);
-    const filename = nombreArchivoAsistenciaEmpresa(
-      mes,
-      datos.empresa.nombre,
-      datos.trabajadores.map((trabajador) => trabajador.numero),
-    );
+    const filename = nombreArchivoAsistenciaEmpresa(mes, datos.empresa.nombre);
     return excelResponse(buffer, filename);
   }
 

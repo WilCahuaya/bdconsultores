@@ -6,7 +6,14 @@ import { getEntidadPlanillas } from "@/lib/actions/entidades";
 import { getTrabajador, listTrabajadores, type TrabajadorListItem } from "@/lib/actions/trabajadores";
 import { puedeEditarFichaLaboral, requirePlanillasProfile } from "@/lib/auth/access";
 import { nombreCompleto } from "@/lib/planillas-labels";
-import { esMesAsistencia, feriadosValidosDelMes, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import {
+  diasIsoDelMes,
+  esMesAsistencia,
+  feriadosValidosDelMes,
+  trabajadorActivoEnMes,
+  type ContratoHorarioMes,
+  type RangoFecha,
+} from "@/lib/horario-asistencia";
 import type { AsistenciaExcelEmpresa, AsistenciaExcelTrabajador } from "@/lib/asistencia-excel";
 import { planillasDb } from "@/lib/supabase/planillas";
 
@@ -49,6 +56,53 @@ async function leerFeriadosMes(entidadId: string, mes: string): Promise<string[]
     .maybeSingle();
   if (error) throw new Error(error.message);
   return feriadosValidosDelMes(mes, (data?.fechas ?? []) as string[]);
+}
+
+export async function listInsumosHorasAsistencia(
+  entidadId: string,
+  mes: string,
+): Promise<{
+  contratos: (ContratoHorarioMes & { relacionId: string })[];
+  vacaciones: (RangoFecha & { relacionId: string })[];
+}> {
+  await requirePlanillasProfile();
+  const dias = diasIsoDelMes(mes);
+  const inicio = dias[0];
+  const fin = dias[dias.length - 1];
+  if (!esMesAsistencia(mes) || !inicio || !fin) return { contratos: [], vacaciones: [] };
+  const empresa = await getEntidadPlanillas(entidadId);
+  if (!empresa) return { contratos: [], vacaciones: [] };
+  const db = await planillasDb();
+  const [contratosRes, vacacionesRes] = await Promise.all([
+    db
+      .from("contratos")
+      .select("relacion_id, horario, fecha_inicio, fecha_fin, version, datos_confirmados")
+      .eq("entidad_id", entidadId)
+      .neq("estado", "BAJA"),
+    db
+      .from("vacaciones")
+      .select("relacion_id, fecha_inicio, fecha_fin")
+      .eq("entidad_id", entidadId)
+      .lte("fecha_inicio", fin)
+      .gte("fecha_fin", inicio),
+  ]);
+  if (contratosRes.error) throw new Error(contratosRes.error.message);
+  if (vacacionesRes.error) throw new Error(vacacionesRes.error.message);
+  return {
+    contratos: (contratosRes.data ?? []).map((row) => ({
+      relacionId: String(row.relacion_id),
+      horario: (row.horario as string | null) ?? null,
+      inicio: (row.fecha_inicio as string | null) ?? null,
+      fin: (row.fecha_fin as string | null) ?? null,
+      version: Number(row.version) || 0,
+      confirmado: Boolean(row.datos_confirmados),
+    })),
+    vacaciones: (vacacionesRes.data ?? []).map((row) => ({
+      relacionId: String(row.relacion_id),
+      inicio: String(row.fecha_inicio),
+      fin: String(row.fecha_fin),
+    })),
+  };
 }
 
 export async function listarFeriadosMes(entidadId: string, mes: string): Promise<string[]> {

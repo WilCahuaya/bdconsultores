@@ -255,79 +255,89 @@ export function FichaAsistencia({
     };
   });
 
+  const textoVacaciones =
+    diasVacaciones.length === 0
+      ? "Sin vacaciones"
+      : `Vacaciones (${diasVacaciones.length} ${diasVacaciones.length === 1 ? "día" : "días"}): ${diasVacaciones.map((iso) => formatFechaPlanilla(iso)).join(", ")}`;
+
   return (
-    <div className="space-y-4">
-      <section className={`${panelCardClass} space-y-4 p-5`}>
-        <div>
+    <div className="space-y-3">
+      <section className={`${panelCardClass} space-y-2 p-3`}>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <p className="text-sm font-medium">Asistencia del mes</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground">
             {canWrite
-              ? "Descargue el Excel con las horas del contrato. Cuando lo devuelvan firmado, súbalo aquí."
+              ? "Descargue el Excel y, cuando lo devuelvan firmado, súbalo abajo."
               : "Consulta del horario y del PDF firmado de este mes."}
           </p>
+          <Button type="button" size="sm" className="h-8 sm:ml-auto" disabled={pending} onClick={() => void onDescargar()}>
+            {pending ? "Preparando…" : `Descargar Excel · ${etiquetaMesAsistencia(mes)}`}
+          </Button>
         </div>
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input text-sm hover:bg-accent"
-              aria-label="Año anterior"
-              onClick={() => cambiarAnio(-1)}
-            >
-              ‹
-            </button>
-            <span className="min-w-12 text-center text-sm font-medium">{anio}</span>
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-input text-sm hover:bg-accent"
-              aria-label="Año siguiente"
-              onClick={() => cambiarAnio(1)}
-            >
-              ›
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Mes">
-            {MES_ABREV.map((abrev, index) => {
-              const item = `${anio}-${String(index + 1).padStart(2, "0")}`;
-              const seleccionado = item === mes;
-              const conDocumento = mesesConDocumento.has(item);
-              return (
-                <button
-                  key={item}
-                  type="button"
-                  aria-pressed={seleccionado}
-                  title={
-                    conDocumento
-                      ? `${etiquetaMesAsistencia(item)} · con documento`
-                      : etiquetaMesAsistencia(item)
-                  }
-                  onClick={() => elegirMes(item)}
-                  className={`inline-flex h-9 min-w-12 items-center justify-center rounded-md px-3 text-sm font-medium ${
-                    seleccionado
-                      ? `bg-primary text-primary-foreground${conDocumento ? " ring-2 ring-emerald-500 ring-offset-2" : ""}`
-                      : conDocumento
-                        ? "bg-emerald-100 text-emerald-900"
-                        : "border border-input bg-background hover:bg-accent"
-                  }`}
-                >
-                  {abrev}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            El mes elegido va en color principal. El verde indica que ya hay horario firmado.
-          </p>
+        <div
+          className="flex flex-wrap items-center gap-1"
+          role="group"
+          aria-label="Mes"
+          title="El mes elegido va en color principal. El verde indica que ya hay horario firmado."
+        >
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input text-sm hover:bg-accent"
+            aria-label="Año anterior"
+            onClick={() => cambiarAnio(-1)}
+          >
+            ‹
+          </button>
+          <span className="min-w-10 text-center text-sm font-medium">{anio}</span>
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-input text-sm hover:bg-accent"
+            aria-label="Año siguiente"
+            onClick={() => cambiarAnio(1)}
+          >
+            ›
+          </button>
+          {MES_ABREV.map((abrev, index) => {
+            const item = `${anio}-${String(index + 1).padStart(2, "0")}`;
+            const seleccionado = item === mes;
+            const conDocumento = mesesConDocumento.has(item);
+            return (
+              <button
+                key={item}
+                type="button"
+                aria-pressed={seleccionado}
+                title={
+                  conDocumento
+                    ? `${etiquetaMesAsistencia(item)} · con documento`
+                    : etiquetaMesAsistencia(item)
+                }
+                onClick={() => elegirMes(item)}
+                className={`inline-flex h-7 min-w-9 items-center justify-center rounded-md px-2 text-xs font-medium ${
+                  seleccionado
+                    ? `bg-primary text-primary-foreground${conDocumento ? " ring-2 ring-emerald-500 ring-offset-1" : ""}`
+                    : conDocumento
+                      ? "bg-emerald-100 text-emerald-900"
+                      : "border border-input bg-background hover:bg-accent"
+                }`}
+              >
+                {abrev}
+              </button>
+            );
+          })}
         </div>
-        <div className="space-y-3 text-sm">
-          <p className="font-medium">Horario del contrato en este mes</p>
-          {contratosMes.length === 0 ? (
-            <p className="text-muted-foreground">Sin contrato confirmado en este mes.</p>
-          ) : (
-            <AsistenciaDiasHoras filas={filasDias} />
-          )}
-          {contratosMes.length === 0 ? null : (
-            contratosMes.map((contrato) => {
+        <div className="space-y-1 text-sm">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <p className="font-medium">Horario del contrato</p>
+            <p>
+              Horas:{" "}
+              <span className="font-medium">
+                {minutosMes == null
+                  ? "no se pueden sumar (el horario está en texto libre)"
+                  : formatoHorasTotales(minutosMes)}
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">{textoVacaciones}</p>
+            {contratosMes.map((contrato) => {
               const abierto = horarioAbierto === contrato.version;
               const desde = contrato.inicio ? formatFechaPlanilla(contrato.inicio) : "";
               const hasta = contrato.fin ? formatFechaPlanilla(contrato.fin) : "";
@@ -337,48 +347,41 @@ export function FichaAsistencia({
                   ? ` · versión ${contrato.version}${vigencia ? ` · ${vigencia}` : ""}`
                   : "";
               return (
-                <div key={contrato.version} className="space-y-1">
-                  <button
-                    type="button"
-                    className="text-primary hover:underline"
-                    onClick={() => setHorarioAbierto(abierto ? null : contrato.version)}
-                  >
-                    {abierto ? "Ocultar detalle" : "Ver detalle del horario"}
-                    {detalle}
-                  </button>
-                  {abierto && contrato.horario ? (
-                    <HorarioContratoVista value={contrato.horario} className="text-muted-foreground" />
-                  ) : null}
-                </div>
+                <button
+                  key={contrato.version}
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => setHorarioAbierto(abierto ? null : contrato.version)}
+                >
+                  {abierto ? "Ocultar detalle" : "Ver detalle"}
+                  {detalle}
+                </button>
               );
-            })
+            })}
+          </div>
+          {contratosMes.length === 0 ? (
+            <p className="text-muted-foreground">Sin contrato confirmado en este mes.</p>
+          ) : (
+            <AsistenciaDiasHoras filas={filasDias} compact />
           )}
-          <p>
-            Horas del mes:{" "}
-            <span className="font-medium">
-              {minutosMes == null
-                ? "no se pueden sumar (el horario está en texto libre)"
-                : formatoHorasTotales(minutosMes)}
-            </span>
-          </p>
-          <p className="text-muted-foreground">
-            {diasVacaciones.length === 0
-              ? "Sin días de vacaciones en este mes."
-              : `Vacaciones (${diasVacaciones.length} ${diasVacaciones.length === 1 ? "día" : "días"}, no suman horas): ${diasVacaciones.map((iso) => formatFechaPlanilla(iso)).join(", ")}.`}
-          </p>
+          {contratosMes.map((contrato) =>
+            horarioAbierto === contrato.version && contrato.horario ? (
+              <HorarioContratoVista
+                key={contrato.version}
+                value={contrato.horario}
+                className="text-xs text-muted-foreground"
+              />
+            ) : null,
+          )}
         </div>
         <FeriadosMesPicker
           key={`${entidadId}-${mes}`}
           entidadId={entidadId}
           mes={mes}
           canWrite={canWrite}
+          compact
           onChange={setFeriados}
         />
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" disabled={pending} onClick={() => void onDescargar()}>
-            {pending ? "Preparando…" : `Descargar Excel · ${etiquetaMesAsistencia(mes)}`}
-          </Button>
-        </div>
       </section>
       <DocumentoPrevisualizacion
         key={mes}
@@ -389,19 +392,21 @@ export function FichaAsistencia({
         defaultVisible={Boolean(documento?.storage_path)}
         vacio="Aún no suben el PDF de este mes."
         extra={
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Observación · {etiquetaMesAsistencia(mes)}</p>
-              <p className="text-sm text-muted-foreground">
-                Anote si falta firma, está de vacaciones u otra novedad de este mes.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {documento?.storage_path ? (
-                  <span className="font-medium text-emerald-700">PDF firmado: subido.</span>
-                ) : (
-                  <span>PDF firmado: pendiente.</span>
-                )}
-              </p>
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <p className="text-sm font-medium">Observación · {etiquetaMesAsistencia(mes)}</p>
+                <p className="text-xs text-muted-foreground">
+                  Anote si falta firma, está de vacaciones u otra novedad.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {documento?.storage_path ? (
+                    <span className="font-medium text-emerald-700">PDF firmado: subido.</span>
+                  ) : (
+                    <span>PDF firmado: pendiente.</span>
+                  )}
+                </p>
+              </div>
               <AsistenciaNotaField
                 relacionId={relacionId}
                 mes={mes}

@@ -63,6 +63,7 @@ export function AsistenciasMesBar({
         fechasIniciales={feriadosIniciales}
         canWrite={canWrite}
         compact
+        onGuardado={() => router.refresh()}
       />
     </div>
   );

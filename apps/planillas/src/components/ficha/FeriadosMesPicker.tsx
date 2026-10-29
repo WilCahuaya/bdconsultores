@@ -23,6 +23,7 @@ export function FeriadosMesPicker({
   canWrite,
   compact = false,
   onChange,
+  onGuardado,
 }: {
   entidadId: string;
   mes: string;
@@ -30,6 +31,7 @@ export function FeriadosMesPicker({
   canWrite: boolean;
   compact?: boolean;
   onChange?: (fechas: string[]) => void;
+  onGuardado?: () => void;
 }) {
   const { pushToast } = useToast();
   const dias = diasIsoDelMes(mes);
@@ -78,6 +80,7 @@ export function FeriadosMesPicker({
       const result = await guardarFeriadosMes(entidadId, mes, fechas);
       setGuardando(false);
       if (result.error) toastRef.current(result.error, "error");
+      else onGuardado?.();
     });
   }
 

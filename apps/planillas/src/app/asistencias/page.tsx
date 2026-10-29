@@ -10,8 +10,18 @@ import { AsistenciaDiaEncabezados, AsistenciaHorasCeldas } from "@/components/fi
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEditarFichaLaboral } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
-import { listarFeriadosMes, listDocumentosAsistenciaAnio } from "@/lib/actions/asistencias";
-import { esMesAsistencia, etiquetaMesAsistencia, MES_ABREV, mesActualLima, trabajadorActivoEnMes } from "@/lib/horario-asistencia";
+import { listarFeriadosMes, listDocumentosAsistenciaAnio, listInsumosHorasAsistencia } from "@/lib/actions/asistencias";
+import {
+  esMesAsistencia,
+  etiquetaMesAsistencia,
+  formatoHorasRedondeadas,
+  MES_ABREV,
+  mesActualLima,
+  minutosTrabajadosDelMes,
+  trabajadorActivoEnMes,
+  type ContratoHorarioMes,
+  type RangoFecha,
+} from "@/lib/horario-asistencia";
 import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
 
 function mesesDelAnio(anio: number): string[] {
@@ -47,13 +57,26 @@ export default async function AsistenciasPage({
   const mesHoy = mesActualLima();
   const anio = Number(mes.slice(0, 4));
   const meses = mesesDelAnio(anio);
-  const [trabajadores, documentos, feriados] = selectedId
+  const [trabajadores, documentos, feriados, insumosHoras] = selectedId
     ? await Promise.all([
         listTrabajadores(selectedId),
         listDocumentosAsistenciaAnio(selectedId, anio),
         listarFeriadosMes(selectedId, mes),
+        listInsumosHorasAsistencia(selectedId, mes),
       ])
-    : [[], [], []];
+    : [[], [], [], { contratos: [], vacaciones: [] }];
+  const contratosPorRelacion = new Map<string, ContratoHorarioMes[]>();
+  for (const contrato of insumosHoras.contratos) {
+    const lista = contratosPorRelacion.get(contrato.relacionId) ?? [];
+    lista.push(contrato);
+    contratosPorRelacion.set(contrato.relacionId, lista);
+  }
+  const vacacionesPorRelacion = new Map<string, RangoFecha[]>();
+  for (const vacacion of insumosHoras.vacaciones) {
+    const lista = vacacionesPorRelacion.get(vacacion.relacionId) ?? [];
+    lista.push({ inicio: vacacion.inicio, fin: vacacion.fin });
+    vacacionesPorRelacion.set(vacacion.relacionId, lista);
+  }
   const subidoPorRelacion = new Map<string, Set<string>>();
   const notaPorRelacion = new Map<string, string | null>();
   for (const documento of documentos) {
@@ -87,7 +110,7 @@ export default async function AsistenciasPage({
       if (estado === "subido") subidos += 1;
     }
   }
-  const columnas = 23;
+  const columnas = 24;
   const etiquetaMes = etiquetaMesAsistencia(mes);
 
   return (
@@ -149,7 +172,7 @@ export default async function AsistenciasPage({
                   <AsistenciaMesEstado estado="no-aplica" etiqueta="" decorativo />
                   No aplica
                 </span>
-                <span>La X es un día que no trabaja. Las horas son del horario vigente.</span>
+                <span>La X es un día que no trabaja. Horas es el total del mes elegido, sin feriados ni vacaciones.</span>
                 <span className="sm:ml-auto">
                   {corresponden > 0 ? `Subidos: ${subidos} de ${corresponden}` : "Aún no hay meses que correspondan."}
                 </span>
@@ -169,6 +192,12 @@ export default async function AsistenciasPage({
                         Nombre
                       </th>
                       <AsistenciaDiaEncabezados />
+                      <th
+                        className="border border-border bg-primary/10 px-2 py-1.5 text-center align-middle text-xs font-medium text-foreground"
+                        title="Horas del mes elegido, redondeadas. No incluye feriados ni vacaciones."
+                      >
+                        Horas
+                      </th>
                       {meses.map((item) => (
                         <th
                           key={item}
@@ -194,6 +223,15 @@ export default async function AsistenciasPage({
                         const mesesSubidos = subidoPorRelacion.get(trabajador.id);
                         const nombre = nombreCompleto(trabajador.persona);
                         const activoMes = trabajadorActivoEnMes(mes, trabajador.fecha_ingreso, trabajador.fecha_cese);
+                        const minutosMes = minutosTrabajadosDelMes({
+                          mes,
+                          horarioFicha: trabajador.horario,
+                          fechaIngreso: trabajador.fecha_ingreso,
+                          fechaCese: trabajador.fecha_cese,
+                          feriados,
+                          vacaciones: vacacionesPorRelacion.get(trabajador.id) ?? [],
+                          contratos: contratosPorRelacion.get(trabajador.id) ?? [],
+                        });
                         return (
                           <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
                             <td className="px-3 py-2 font-mono align-middle">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
@@ -207,6 +245,18 @@ export default async function AsistenciasPage({
                               </Link>
                             </td>
                             <AsistenciaHorasCeldas horario={trabajador.horario} activo={activoMes} />
+                            <td
+                              className="bg-primary/10 px-2 py-2 text-center align-middle font-medium tabular-nums"
+                              title={
+                                !activoMes
+                                  ? "No aplica en el mes elegido"
+                                  : minutosMes == null
+                                    ? "El horario está en texto libre y no se puede sumar"
+                                    : "Horas del mes redondeadas, sin feriados ni vacaciones"
+                              }
+                            >
+                              {minutosMes == null ? "—" : formatoHorasRedondeadas(minutosMes)}
+                            </td>
                             {meses.map((item) => {
                               const estado = estadoAsistenciaMes(
                                 item,

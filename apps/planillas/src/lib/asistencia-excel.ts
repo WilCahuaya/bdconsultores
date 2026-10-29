@@ -1,5 +1,5 @@
 import type { Range, WorkSheet } from "xlsx-js-style";
-import { nombreBaseAsistencia, personaNombreArchivo, prefijoNumeroArchivo, prefijoNumerosArchivo } from "@/lib/nombre-archivo";
+import { nombreBaseAsistencia, personaNombreArchivo, prefijoNumeroArchivo } from "@/lib/nombre-archivo";
 import {
   MES_ABREV,
   MES_NOMBRE,
@@ -78,17 +78,13 @@ function slugNombre(text: string): string {
     .replace(/\s+/g, " ");
 }
 
-export function nombreArchivoAsistenciaEmpresa(
-  mes: string,
-  entidadNombre: string,
-  numeros?: Array<number | null | undefined>,
-): string {
+export function nombreArchivoAsistenciaEmpresa(mes: string, entidadNombre: string): string {
   const partes = partesMes(mes);
   const abrev = partes ? MES_ABREV[partes.month - 1].toUpperCase() : "MES";
-  const year = partes ? String(partes.year) : "";
+  const mesNumero = partes ? String(partes.month) : "";
   const entidad = slugNombre(entidadNombre).toUpperCase() || "EMPRESA";
-  const fecha = `${abrev} ${year}`.trim();
-  return `${prefijoNumerosArchivo(numeros ?? [])}ASISTENCIA - ${fecha} - ${entidad}.xlsx`;
+  const fecha = mesNumero ? `${mesNumero} ${abrev}` : abrev;
+  return `${fecha} - ASISTENCIA - ${entidad}.xlsx`;
 }
 
 export function nombreArchivoAsistenciaTrabajador(

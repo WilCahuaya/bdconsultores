@@ -147,6 +147,11 @@ export function formatoHorasTotales(minutos: number): string {
   return `${String(horas).padStart(2, "0")}:${String(resto).padStart(2, "0")}`;
 }
 
+/** Horas enteras. 30 minutos o más suben a la hora siguiente. */
+export function formatoHorasRedondeadas(minutos: number): string {
+  return String(Math.round(minutos / 60));
+}
+
 function turnoDeTramo(tramo: HorarioTramo, index: number, total: number): TurnoAsistencia {
   if (total === 1) {
     const hora = Number(tramo.desde.slice(0, 2));
@@ -260,6 +265,40 @@ export function diasVacacionesEnMes(mes: string, rangos: readonly RangoFecha[]):
     if (enVacaciones) out.push(iso);
   }
   return out;
+}
+
+/**
+ * Horas del mes seleccionado. No suma feriados ni vacaciones.
+ * null si el trabajador no estuvo activo o el horario está en texto libre.
+ */
+export function minutosTrabajadosDelMes(input: {
+  mes: string;
+  horarioFicha: string | null | undefined;
+  fechaIngreso?: string | null;
+  fechaCese?: string | null;
+  feriados: readonly string[];
+  vacaciones: readonly RangoFecha[];
+  contratos: readonly ContratoHorarioMes[];
+}): number | null {
+  if (!trabajadorActivoEnMes(input.mes, input.fechaIngreso, input.fechaCese)) return null;
+  const feriados = new Set(input.feriados.map((dia) => dia.slice(0, 10)));
+  const vacaciones = new Set(diasVacacionesEnMes(input.mes, input.vacaciones));
+  for (const iso of diasIsoDelMes(input.mes)) {
+    if (!trabajadorActivoEnFecha(iso, input.fechaIngreso, input.fechaCese)) continue;
+    if (feriados.has(iso) || vacaciones.has(iso)) continue;
+    const horario = horarioContratoEnFecha(iso, input.contratos) ?? input.horarioFicha;
+    if (!horario?.trim()) continue;
+    if (tramosDelDia(horario, diaSemanaDeIso(iso)) === null) return null;
+  }
+  return minutosHorarioMes({
+    mes: input.mes,
+    horario: input.horarioFicha,
+    fechaIngreso: input.fechaIngreso,
+    fechaCese: input.fechaCese,
+    feriados: input.feriados,
+    vacaciones: input.vacaciones,
+    horarioEnFecha: (iso) => horarioContratoEnFecha(iso, input.contratos) ?? input.horarioFicha,
+  });
 }
 
 /** Horas del horario del mes. Feriados y vacaciones no suman. */
