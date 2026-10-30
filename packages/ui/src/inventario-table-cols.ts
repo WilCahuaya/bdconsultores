@@ -100,7 +100,7 @@ export const INVENTARIO_TABLE_FULL_PREREGISTRO_COL_COUNT =
 export const INVENTARIO_TABLE_ADMIN_COL_WIDTHS_PX = [
   40, // N°
   56, // Cat.
-  108, // Código
+  152, // Código
   180, // Nombre del bien
   112, // Marca
   128, // Modelo
@@ -122,7 +122,7 @@ export const INVENTARIO_TABLE_ADMIN_COL_COUNT = INVENTARIO_TABLE_ADMIN_COL_WIDTH
 export const INVENTARIO_TABLE_ADMIN_PREREGISTRO_COL_WIDTHS_PX = [
   40, // N°
   56, // Cat.
-  108, // Código
+  152, // Código
   180, // Nombre del bien
   160, // Posible ambiente
   112, // Marca
@@ -156,7 +156,7 @@ export const INVENTARIO_PROCEDENCIA_COL_WIDTH_PX = 168;
 export const INVENTARIO_TABLE_COL_WIDTHS_PX = [
   40, // N°
   56, // Cat.
-  108, // Código
+  152, // Código
   180, // Nombre del bien
   112, // Marca
   128, // Modelo
@@ -202,7 +202,7 @@ export const INVENTARIO_TABLE_ADMIN_ENTITY_UBICACION_COL_COUNT =
 export const INVENTARIO_TABLE_COMPACT_COL_WIDTHS_PX = [
   40, // N°
   56, // Cat.
-  108, // Código
+  152, // Código
   180, // Nombre
   112, // Marca
   128, // Modelo
@@ -222,7 +222,7 @@ export const INVENTARIO_TABLE_COMPACT_COL_WIDTHS_PX = [
 export const INVENTARIO_TABLE_PREREGISTRO_COL_WIDTHS_PX = [
   40, // N°
   56, // Cat.
-  108, // Código
+  152, // Código
   180, // Nombre del bien
   160, // Posible ambiente
   112, // Marca
@@ -241,7 +241,7 @@ export const INVENTARIO_TABLE_PREREGISTRO_COL_WIDTHS_PX = [
 export const INVENTARIO_TABLE_FULL_PREREGISTRO_COL_WIDTHS_PX = [
   40, // N°
   56, // Cat.
-  108, // Código
+  152, // Código
   180, // Nombre del bien
   160, // Posible ambiente
   112, // Marca

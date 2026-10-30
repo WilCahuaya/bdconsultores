@@ -525,7 +525,7 @@ function FullTableBody<T extends Activo>({
               style={stickyCat?.style}
             />
             <td
-              className={`${tdBase} text-center ${stickyCod?.className ?? ""}`}
+              className={`${tdBase} whitespace-nowrap text-center ${stickyCod?.className ?? ""}`}
               style={stickyCod?.style}
             >
               <InventarioCodigoCellContent activo={activo} />
