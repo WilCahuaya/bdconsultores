@@ -1299,9 +1299,9 @@
       max-width: none;
     }
 
-    /* Nº, Cat., Código y Visita se van con el scroll. Solo el nombre queda fijo. */
-    html[data-bd-shell="web"] .inventario-activos-table th.inventario-sticky-col:not(.inventario-sticky-col--last),
-    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col:not(.inventario-sticky-col--last),
+    /* Nº, Cat. y Visita se van con el scroll. Código y nombre quedan fijos. */
+    html[data-bd-shell="web"] .inventario-activos-table th.inventario-sticky-col:not(.inventario-sticky-col--last):not(.inventario-sticky-col--codigo),
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col:not(.inventario-sticky-col--last):not(.inventario-sticky-col--codigo),
     html[data-bd-shell="web"] .inventario-activos-table tfoot td.inventario-sticky-col {
       position: static !important;
       left: auto !important;
@@ -1333,14 +1333,12 @@
     background: hsl(var(--muted));
   }
 
-  /* Celular y tablet: solo el nombre queda fijo, una línea y puntos suspensivos. */
+  /* Celular y tablet: código y nombre quedan fijos; el nombre, en una línea con puntos suspensivos. */
   @media (max-width: 1023px) {
     html[data-bd-shell="web"] .panel-list-table th.panel-name-cell,
     html[data-bd-shell="web"] .panel-list-table td.panel-name-cell,
     html[data-bd-shell="web"] .panel-scroll-table th:nth-child(3),
-    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3),
-    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last,
-    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last {
+    html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) {
       position: sticky !important;
       left: 0 !important;
       z-index: 3;
@@ -1354,8 +1352,40 @@
       box-shadow: 2px 0 0 hsl(var(--border) / 0.55);
     }
 
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--codigo,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--codigo {
+      position: sticky !important;
+      left: 0 !important;
+      z-index: 3;
+      box-sizing: border-box;
+      width: 7rem !important;
+      min-width: 7rem !important;
+      max-width: 7rem !important;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      background: hsl(var(--card));
+      box-shadow: none;
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last {
+      position: sticky !important;
+      left: 7rem !important;
+      z-index: 3;
+      box-sizing: border-box;
+      width: 10.5rem !important;
+      min-width: 10.5rem !important;
+      max-width: 10.5rem !important;
+      overflow: hidden;
+      white-space: nowrap;
+      background: hsl(var(--card));
+      box-shadow: 2px 0 0 hsl(var(--border) / 0.55);
+    }
+
     html[data-bd-shell="web"] .panel-list-table thead th.panel-name-cell,
     html[data-bd-shell="web"] .panel-scroll-table thead th:nth-child(3),
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--codigo,
     html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last {
       top: 0;
       z-index: 4;
@@ -1372,6 +1402,7 @@
     html[data-bd-shell="web"] .panel-name-cell > button,
     html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > a,
     html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > span,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--codigo > span,
     html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last > span,
     html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last > span,
     html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last > span > span:first-child {
@@ -1392,6 +1423,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table col.inventario-code-col {
+      width: 7rem !important;
+      min-width: 7rem !important;
+      max-width: 7rem !important;
     }
 
     html[data-bd-shell="web"] .inventario-activos-table col.inventario-name-col {

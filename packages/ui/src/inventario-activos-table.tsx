@@ -60,10 +60,12 @@ function Colgroup({
   widthsPx,
   floorsPx,
   nameColIndex,
+  codeColIndex,
 }: {
   widthsPx: readonly number[];
   floorsPx: readonly number[];
   nameColIndex: number;
+  codeColIndex: number;
 }) {
   return (
     <colgroup>
@@ -73,7 +75,13 @@ function Colgroup({
         return (
           <col
             key={i}
-            className={i === nameColIndex ? "inventario-name-col" : undefined}
+            className={
+              i === nameColIndex
+                ? "inventario-name-col"
+                : i === codeColIndex
+                  ? "inventario-code-col"
+                  : undefined
+            }
             style={
               flex
                 ? { width: w, minWidth: min }
@@ -92,12 +100,13 @@ function stickyCellProps(
   widthsPx?: readonly number[],
   baseZ = 12,
   lockWidth = true,
+  marker?: "codigo",
 ): { className: string; style: CSSProperties } | undefined {
   if (index < 0 || index >= offsets.length) return undefined;
   const isLast = index === offsets.length - 1;
   const width = widthsPx?.[index];
   return {
-    className: `inventario-sticky-col${isLast ? " inventario-sticky-col--last" : ""}`,
+    className: `inventario-sticky-col${isLast ? " inventario-sticky-col--last" : ""}${marker === "codigo" ? " inventario-sticky-col--codigo" : ""}`,
     style: {
       left: offsets[index],
       zIndex: baseZ + index,
@@ -492,7 +501,7 @@ function FullTableBody<T extends Activo>({
         const stickySel = stickyCellProps(stickyOffsets, 0, stickyWidths);
         const stickyN = stickyCellProps(stickyOffsets, sel, stickyWidths);
         const stickyCat = stickyCellProps(stickyOffsets, sel + 1, stickyWidths);
-        const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths);
+        const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths, 12, true, "codigo");
         const stickyVisita = columnaVisita
           ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths)
           : undefined;
@@ -678,7 +687,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
   const stickySel = stickyCellProps(stickyOffsets, 0, stickyWidths, 40);
   const stickyN = stickyCellProps(stickyOffsets, sel, stickyWidths, 40);
   const stickyCat = stickyCellProps(stickyOffsets, sel + 1, stickyWidths, 40);
-  const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths, 40);
+  const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths, 40, true, "codigo");
   const stickyVisita = columnaVisita
     ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths, 40)
     : undefined;
@@ -709,6 +718,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
             widthsPx={widthValues}
             floorsPx={floorValues}
             nameColIndex={nombreStickyAt}
+            codeColIndex={sel + 2}
           />
           <thead>
             <tr>
