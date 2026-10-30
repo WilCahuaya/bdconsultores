@@ -1358,8 +1358,8 @@
       left: 0 !important;
       z-index: 3;
       box-sizing: border-box;
-      width: max-content !important;
-      min-width: max-content !important;
+      width: 9.5rem !important;
+      min-width: 9.5rem !important;
       max-width: none !important;
       overflow: visible;
       white-space: nowrap;
@@ -1371,7 +1371,7 @@
     html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last,
     html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last {
       position: sticky !important;
-      left: var(--inventario-codigo-sticky, 9.5rem) !important;
+      left: 9.5rem !important;
       z-index: 3;
       box-sizing: border-box;
       width: 10.5rem !important;
@@ -1402,14 +1402,6 @@
     html[data-bd-shell="web"] .panel-name-cell > button,
     html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > a,
     html[data-bd-shell="web"] .panel-scroll-table td:nth-child(3) > span,
-    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--codigo > span {
-      display: inline;
-      max-width: none;
-      overflow: visible;
-      white-space: nowrap;
-      text-overflow: clip;
-    }
-
     html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last > span,
     html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--last > span,
     html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--last > span > span:first-child {
@@ -1433,9 +1425,17 @@
     }
 
     html[data-bd-shell="web"] .inventario-activos-table col.inventario-code-col {
-      width: auto !important;
-      min-width: max-content !important;
+      width: 9.5rem !important;
+      min-width: 9.5rem !important;
       max-width: none !important;
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--codigo > span {
+      display: inline;
+      max-width: none;
+      overflow: visible;
+      white-space: nowrap;
+      text-overflow: clip;
     }
 
     html[data-bd-shell="web"] .inventario-activos-table col.inventario-name-col {
