@@ -15,6 +15,8 @@ export * from "./cuentas-contables-panel";
 export * from "./grupo-catalogo-combobox";
 export * from "./clase-catalogo-combobox";
 export * from "./catalogo-picker";
+export * from "./menaje-ambiente-panel";
+export * from "./ambiente-bienes-filtros-menu";
 export * from "./cuenta-contable-fields";
 export * from "./nuevo-activo-ubicacion-dialog";
 export * from "./activo-historial-panel";

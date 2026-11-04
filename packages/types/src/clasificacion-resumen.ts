@@ -57,11 +57,15 @@ export interface ActivoValorizacionFuente extends ActivoCuentaContableSource {
 export function tipoBienDesdeActivo(activo: {
   categoria?: CategoriaBien | string | null;
 }): CategoriaBien {
-  return activo.categoria === "CUENTA_ORDEN" ? "CUENTA_ORDEN" : "ACTIVO";
+  if (activo.categoria === "CUENTA_ORDEN") return "CUENTA_ORDEN";
+  if (activo.categoria === "MENAJE") return "MENAJE";
+  return "ACTIVO";
 }
 
 export function categoriaBienResumenLabel(tipo: CategoriaBien): string {
-  return tipo === "CUENTA_ORDEN" ? "Cuenta de orden" : "Activo";
+  if (tipo === "CUENTA_ORDEN") return "Cuenta de orden";
+  if (tipo === "MENAJE") return "Menaje";
+  return "Activo";
 }
 
 export function cuentaGrupoActivoValorizacion(
@@ -146,6 +150,7 @@ export function buildClasificacionResumen(
   const map = new Map<string, ClasificacionResumen>();
 
   for (const activo of activos) {
+    if (activo.categoria === "MENAJE") continue;
     const tipoBien = tipoBienDesdeActivo(activo);
     const { cuenta, categoria, codigo } = cuentaGrupoActivoValorizacion(activo);
     const key = `${tipoBien}::${codigo || cuenta}`;
@@ -186,7 +191,7 @@ export function buildClasificacionResumen(
     }
   }
 
-  const tipoOrder = (t: CategoriaBien) => (t === "ACTIVO" ? 0 : 1);
+  const tipoOrder = (t: CategoriaBien) => (t === "ACTIVO" ? 0 : t === "CUENTA_ORDEN" ? 1 : 2);
 
   return Array.from(map.values()).sort((a, b) => {
     const byTipo = tipoOrder(a.tipoBien) - tipoOrder(b.tipoBien);

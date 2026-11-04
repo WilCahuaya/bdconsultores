@@ -40,7 +40,11 @@ import { ComprobanteCell } from "./ComprobanteCell";
 import { ComprobanteInline } from "./ComprobanteInline";
 
 function puedeImprimirEtiqueta(activo: Activo): boolean {
-  return activo.estado_registro === "REGISTRADO" && Boolean(activo.codigo_barras);
+  return (
+    activo.categoria !== "MENAJE" &&
+    activo.estado_registro === "REGISTRADO" &&
+    Boolean(activo.codigo_barras)
+  );
 }
 
 function puedeCopiarBien(activo: Activo): boolean {

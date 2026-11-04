@@ -5,6 +5,8 @@ import type { Activo } from "@inventario/types";
 import {
   CATEGORIA_BIEN_LABELS,
   buildDescripcionBien,
+  descripcionMenaje,
+  esMenaje,
   categoriaBienCorto,
   formatActivoCodigoDisplay,
   formatCuentaContableDisplay,
@@ -209,13 +211,15 @@ export function ActivoDetalleSheet({
   const codigoTitulo = formatActivoCodigoDisplay(activo);
   const cuentaContable = formatCuentaContableDisplay(activo.cuenta_codigo, activo.contabilidad);
 
-  const descripcion = buildDescripcionBien(
-    activo.marca,
-    activo.modelo,
-    activo.serie,
-    activo.color,
-    activo.medidas,
-  );
+  const descripcion = esMenaje(activo.categoria)
+    ? descripcionMenaje(activo)
+    : buildDescripcionBien(
+        activo.marca,
+        activo.modelo,
+        activo.serie,
+        activo.color,
+        activo.medidas,
+      );
 
   const estadoRegistroLabel = preregistrado
     ? "Preregistrado"
@@ -261,6 +265,9 @@ export function ActivoDetalleSheet({
           )}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <DetalleChip>{categoriaBienCorto(activo.categoria)}</DetalleChip>
+            {activo.categoria === "MENAJE" && (
+              <DetalleChip>Cant. {activo.cantidad ?? 1}</DetalleChip>
+            )}
             <EstadoBienBadge estado={activo.estado_bien} />
             <DetalleChip variant={estadoRegistroVariant}>{estadoRegistroLabel}</DetalleChip>
           </div>
@@ -315,7 +322,7 @@ export function ActivoDetalleSheet({
 
         <DetalleSection title="Registro" description="Códigos, responsable y fechas" cols={3}>
           <DetalleField
-            label="Código de barras"
+            label={activo.categoria === "MENAJE" ? "Código de catálogo" : "Código de barras"}
             value={formatActivoCodigoDisplay(activo)}
             mono
             hideIfEmpty={false}

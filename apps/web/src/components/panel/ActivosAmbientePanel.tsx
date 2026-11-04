@@ -13,7 +13,13 @@ import {
   pasoFiltrosColumnaInventario,
   validarFechaDDMMYYYY,
 } from "@inventario/types";
-import { useToast, mensajeEliminacionPreregistros, FechaDdMmYyyyInput } from "@inventario/ui";
+import {
+  useToast,
+  mensajeEliminacionPreregistros,
+  AmbienteApartadoNav,
+  AmbienteBienesFiltrosMenu,
+  MenajeAmbientePanel,
+} from "@inventario/ui";
 import {
   ActivoEditScopeNav,
   type ActivoEditScope,
@@ -30,7 +36,19 @@ import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { AmbienteReportesExport } from "./AmbienteReportesExport";
 import type { FichaAsignacionExportMeta } from "@/lib/actions/ficha-asignacion-meta";
 import { fetchAmbientesPorSedeWeb } from "@/lib/ambiente-nav";
-import { deleteActivosPreregistrados, updateActivoSerie } from "@/lib/actions/activos";
+import {
+  createActivo,
+  darDeBajaMenaje,
+  deleteActivosPreregistrados,
+  eliminarMenaje,
+  updateActivo,
+  updateActivoSerie,
+} from "@/lib/actions/activos";
+import {
+  getCatalogoByCodigo,
+  searchCatalogoNacionalOficial,
+  searchCatalogoPropio,
+} from "@/lib/actions/catalogo";
 import { useEjemplaresResumen } from "@/hooks/useEjemplaresResumen";
 import {
   PanelPageHeader,
@@ -150,6 +168,7 @@ export function ActivosAmbientePanel({
     setEditScope("single");
   }, [editActivo?.id]);
   const [busqueda, setBusqueda] = useState("");
+  const [apartado, setApartado] = useState<"bienes" | "menaje">("bienes");
   const [estadoRegistro, setEstadoRegistro] = useState<"" | EstadoRegistro>(
     esAmbientePreregistro ? "PREREGISTRADO" : "",
   );
@@ -184,7 +203,7 @@ export function ActivosAmbientePanel({
   const visita = useVisitaRevision({
     entidadId,
     ambienteId,
-    activos: activosList,
+    activos: activosList.filter((activo) => activo.categoria !== "MENAJE"),
     enabled: !isAdmin && !esAmbientePreregistro && !esAmbienteFaltante,
   });
 
@@ -332,6 +351,7 @@ export function ActivosAmbientePanel({
 
   const activosBase = useMemo(() => {
     const scoped = activosList.filter((a) => {
+      if (a.categoria === "MENAJE") return false;
       if (esAmbientePreregistro) {
         if (a.estado_registro !== "PREREGISTRADO") return false;
       } else if (a.estado_registro === "PREREGISTRADO") {
@@ -361,6 +381,57 @@ export function ActivosAmbientePanel({
       }),
     );
   }, [activosBase, columnFilters, isAdmin]);
+
+  const filtrosResumen = useMemo(() => {
+    const partes: string[] = [];
+    if (!esAmbientePreregistro && estadoRegistro) {
+      const label = FILTROS_ESTADO_AMBIENTE.find((item) => item.value === estadoRegistro)?.label;
+      if (label) partes.push(label);
+    }
+    if (fechaCorteText !== dateToDDMMYYYY(fechaCorteLocalHoy())) {
+      partes.push(fechaCorteText || "fecha");
+    }
+    return partes.length > 0 ? partes.join(" · ") : null;
+  }, [esAmbientePreregistro, estadoRegistro, fechaCorteText]);
+
+  const mostrarMenaje = !isAdmin && !esAmbientePreregistro && !esAmbienteFaltante;
+  const menajeLineas = useMemo(
+    () =>
+      activosList.filter(
+        (a) => a.categoria === "MENAJE" && a.estado_registro !== "DADO_DE_BAJA",
+      ),
+    [activosList],
+  );
+  const menajeBajas = useMemo(
+    () =>
+      activosList.filter(
+        (a) => a.categoria === "MENAJE" && a.estado_registro === "DADO_DE_BAJA",
+      ),
+    [activosList],
+  );
+
+  const searchMenaje = useCallback(async (query: string, limit?: number) => {
+    const perSide = Math.max(Math.ceil((limit ?? 50) / 2), 15);
+    const [nacional, propio] = await Promise.all([
+      searchCatalogoNacionalOficial(query, perSide),
+      searchCatalogoPropio(query, perSide),
+    ]);
+    return [...nacional, ...propio];
+  }, []);
+
+  const reemplazarMenaje = useCallback((next: Activo) => {
+    setActivosList((prev) => {
+      const kept = prev.filter((item) => {
+        if (item.id === next.id) return false;
+        return !(
+          item.categoria === "MENAJE" &&
+          item.codigo_catalogo === next.codigo_catalogo &&
+          item.estado_registro !== "DADO_DE_BAJA"
+        );
+      });
+      return [next, ...kept];
+    });
+  }, []);
 
   function handleSuccess() {
     setEditActivo(null);
@@ -435,20 +506,108 @@ export function ActivosAmbientePanel({
   return (
     <div className={`${panelInventarioPageClass} flex min-h-0 flex-col gap-1`}>
       <div className={panelInventarioChromeClass}>
-        <PanelPageHeader
-          breadcrumbs={listBreadcrumbs}
-          subtitle={
-            ambienteResponsable ? `Responsable: ${ambienteResponsable}` : undefined
-          }
-        />
-
+        <PanelPageHeader breadcrumbs={listBreadcrumbs} />
+        {ambienteResponsable || mostrarMenaje ? (
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
+            {ambienteResponsable ? (
+              <p className="max-w-full shrink-0 pb-1.5 text-sm text-muted-foreground">
+                Responsable: {ambienteResponsable}
+              </p>
+            ) : null}
+            {mostrarMenaje ? (
+              <AmbienteApartadoNav
+                className="flex max-w-full shrink-0 gap-5"
+                value={apartado}
+                onChange={setApartado}
+                menajeCount={menajeLineas.length}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
+      {mostrarMenaje && apartado === "menaje" ? (
+        <MenajeAmbientePanel
+          lineas={menajeLineas}
+          bajas={menajeBajas}
+          searchCatalogo={searchMenaje}
+          resolveCodigo={getCatalogoByCodigo}
+          onAgregar={async (input) => {
+            const result = await createActivo({
+              entidad_id: entidadId,
+              codigo_catalogo: input.codigo,
+              nombre: input.nombre,
+              categoria: "MENAJE",
+              cantidad: input.cantidad,
+              material: input.material,
+              color: input.color,
+              medidas: input.medidas,
+              caracteristicas: input.caracteristicas,
+              estado_bien: input.estado_bien,
+              observacion: input.observacion,
+              sede_id: sedeId,
+              ambiente_id: ambienteId,
+              estado_registro: "REGISTRADO",
+            });
+            if (result.data) reemplazarMenaje(result.data);
+            if (!result.error) router.refresh();
+            return { error: result.error, aviso: result.aviso };
+          }}
+          onGuardar={async (linea, input) => {
+            const result = await updateActivo(linea.id, {
+              codigo_catalogo: linea.codigo_catalogo,
+              nombre: linea.nombre,
+              categoria: "MENAJE",
+              cantidad: input.cantidad,
+              material: input.material,
+              color: input.color,
+              medidas: input.medidas,
+              caracteristicas: input.caracteristicas,
+              estado_bien: input.estado_bien,
+              observacion: input.observacion,
+              sede_id: sedeId,
+              ambiente_id: ambienteId,
+            });
+            if (result.data) reemplazarMenaje(result.data);
+            if (!result.error) router.refresh();
+            return { error: result.error, aviso: result.aviso };
+          }}
+          onQuitar={async (linea, motivo, cantidad) => {
+            const result = await darDeBajaMenaje(linea.id, motivo, cantidad);
+            if (!result.error) {
+              if (cantidad >= (linea.cantidad ?? 1)) {
+                quitarActivos([linea.id]);
+              } else {
+                setActivosList((prev) =>
+                  prev.map((item) =>
+                    item.id === linea.id
+                      ? { ...item, cantidad: (item.cantidad ?? 1) - cantidad }
+                      : item,
+                  ),
+                );
+              }
+              router.refresh();
+            }
+            return { error: result.error, aviso: result.aviso };
+          }}
+          onEliminar={async (linea) => {
+            const result = await eliminarMenaje(linea.id);
+            if (!result.error) {
+              quitarActivos([linea.id]);
+              router.refresh();
+            }
+            return { error: result.error };
+          }}
+        />
+      ) : null}
+
+      {apartado === "bienes" || !mostrarMenaje ? (
+      <>
       {!isAdmin && esAmbienteFaltante ? (
         <FaltanteBienesPanel
           entidadId={entidadId}
           ambienteId={ambienteId}
-          activos={activosList}
+          activos={activosList.filter((activo) => activo.categoria !== "MENAJE")}
           procedenciaPorActivo={procedenciaPorActivo}
         />
       ) : null}
@@ -462,32 +621,7 @@ export function ActivosAmbientePanel({
           bodyScrollRef={panelScrollRef}
           toolbar={
             <div className={panelInventarioToolbarClass}>
-              <div
-                className={panelFilterRowClass}
-                role={esAmbientePreregistro ? undefined : "tablist"}
-                aria-label={esAmbientePreregistro ? "Filtros de inventario" : "Filtros de inventario"}
-              >
-                {!esAmbientePreregistro && (
-                  <div className="inline-flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5">
-                    {FILTROS_ESTADO_AMBIENTE.map((f) => (
-                      <button
-                        key={f.value || "all"}
-                        type="button"
-                        role="tab"
-                        aria-selected={estadoRegistro === f.value}
-                        className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                          estadoRegistro === f.value
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        }`}
-                        onClick={() => setEstadoRegistro(f.value)}
-                      >
-                        {f.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
+              <div className={panelFilterRowClass} aria-label="Acciones de inventario">
                 <div
                   className={`min-w-[10rem] flex-1 md:max-w-md [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm ${esAmbientePreregistro ? "w-full max-w-none" : ""}`}
                 >
@@ -497,29 +631,32 @@ export function ActivosAmbientePanel({
                     placeholder="Buscar en nombre, código, cuenta, comprobante, marca…"
                   />
                 </div>
-
-                <div className="w-[9.5rem] shrink-0 space-y-0.5">
-                  <label htmlFor="ambiente_fecha_corte" className="sr-only">
-                    Fecha de corte
-                  </label>
-                  <FechaDdMmYyyyInput
-                    id="ambiente_fecha_corte"
-                    value={fechaCorteText}
-                    onChange={(next) => {
+                <AmbienteBienesFiltrosMenu
+                  resumen={filtrosResumen}
+                  estado={
+                    esAmbientePreregistro
+                      ? undefined
+                      : {
+                          label: "Estado",
+                          value: estadoRegistro,
+                          options: FILTROS_ESTADO_AMBIENTE.map((item) => ({
+                            value: item.value,
+                            label: item.label,
+                          })),
+                          onChange: (value) => setEstadoRegistro(value as "" | EstadoRegistro),
+                        }
+                  }
+                  fecha={{
+                    id: "ambiente_fecha_corte",
+                    value: fechaCorteText,
+                    error: fechaCorteError,
+                    onChange: (next) => {
                       setFechaCorteText(next);
                       aplicarFechaCorte(next);
-                    }}
-                    onFocus={(e) => e.currentTarget.select()}
-                    onBlur={(e) => aplicarFechaCorte(e.currentTarget.value, { fromBlur: true })}
-                    aria-invalid={Boolean(fechaCorteError)}
-                    aria-label="Fecha de corte"
-                    title="Fecha de corte (depreciación y valor neto)"
-                    className="h-8 text-sm"
-                  />
-                  {fechaCorteError && (
-                    <p className="text-[10px] leading-tight text-destructive">{fechaCorteError}</p>
-                  )}
-                </div>
+                    },
+                    onBlur: (value) => aplicarFechaCorte(value, { fromBlur: true }),
+                  }}
+                />
 
                 <div className={`${panelToolbarActionsClass} ml-auto`}>
                   {!esAmbientePreregistro && (
@@ -574,6 +711,8 @@ export function ActivosAmbientePanel({
           onCommitSerie={guardarSerie}
           puedeEditarSerie={puedeEditarSerie}
         />
+      </>
+      ) : null}
     </div>
   );
 }

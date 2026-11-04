@@ -6,6 +6,14 @@ import { rutaUbicacionFisica } from "@inventario/types";
 import {
   MAX_ACTIVOS_SIMILARES_CANTIDAD,
   applyCuentaContableToPayloadIfProvided,
+  aplicarMenajeEnPayload,
+  completarPayloadMenaje,
+  esMenaje,
+  ejecutarBajaMenaje,
+  fusionarMenajeSiHayOtro,
+  insertarOSumarMenaje,
+  traducirErrorMenaje,
+  varianteMenajeEfectiva,
   attachCatalogoNacionalPorCodigo,
   resolveCuentaContableActivo,
   resolveObservacionAdmin,
@@ -39,6 +47,7 @@ export interface CreateActivoInput {
   modelo?: string;
   serie?: string;
   color?: string;
+  material?: string;
   medidas?: string;
   medida_largo?: number;
   medida_ancho?: number;
@@ -61,6 +70,8 @@ export interface CreateActivoInput {
   comprobante_serie?: string;
   cuenta_contable_codigo?: string | null;
   cuenta_contable_nombre?: string | null;
+  /** Solo menaje: unidades de este código en el ambiente. */
+  cantidad?: number;
   /** Admin en bien REGISTRADO: observación del administrador (reemplaza la anterior). */
   observacion_admin?: string;
 }
@@ -149,6 +160,7 @@ export async function createActivo(input: CreateActivoInput) {
     modelo: input.modelo?.trim() || null,
     serie: input.serie?.trim() || null,
     color: input.color?.trim() || null,
+    ...(input.material != null ? { material: input.material.trim() || null } : {}),
     medidas: input.medidas?.trim() || null,
     medida_largo: input.medida_largo ?? null,
     medida_ancho: input.medida_ancho ?? null,
@@ -195,6 +207,38 @@ export async function createActivo(input: CreateActivoInput) {
     return { error: "Código catálogo y nombre son obligatorios." };
   }
 
+  const menajeError = aplicarMenajeEnPayload(payload, input.categoria, input.cantidad);
+  if (menajeError) return { error: menajeError };
+
+  if (esMenaje(input.categoria)) {
+    const ambienteMenaje = esPreregistro
+      ? String(payload.posible_ambiente_id ?? "")
+      : String(payload.ambiente_id ?? "");
+    const guardado = await insertarOSumarMenaje(supabase, {
+      payload,
+      entidadId: String(payload.entidad_id),
+      codigoCatalogo: String(payload.codigo_catalogo),
+      cantidad: Number(payload.cantidad),
+      esPreregistro,
+      ambienteId: ambienteMenaje,
+    });
+    if (guardado.error || !guardado.data) {
+      return { error: guardado.error ?? "No se pudo guardar el menaje." };
+    }
+    revalidatePath("/contador/inventario");
+    revalidatePath("/contador/entidades");
+    if (payload.ambiente_id) {
+      revalidatePath(`/contador/entidades/${payload.entidad_id}/ambientes/${payload.ambiente_id}`);
+    }
+    revalidatePath("/admin/activos");
+    revalidatePath("/admin/inventario");
+    revalidatePath("/admin");
+    if (payload.ambiente_id) {
+      revalidatePath(`/admin/ambientes/${payload.ambiente_id}`);
+    }
+    return { success: true, data: guardado.data, aviso: guardado.aviso };
+  }
+
   const { data, error } = await supabase.from("activos").insert(payload).select().single();
 
   if (error) {
@@ -235,7 +279,9 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
 
   const { data: existing, error: fetchError } = await supabase
     .from("activos")
-    .select("entidad_id, ambiente_id, posible_ambiente_id, estado_registro, estado_bien, observacion")
+    .select(
+      "entidad_id, ambiente_id, posible_ambiente_id, estado_registro, estado_bien, observacion, material, color, medidas, caracteristicas",
+    )
     .eq("id", activoId)
     .maybeSingle();
 
@@ -286,6 +332,7 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
         modelo: input.modelo?.trim() || null,
         serie: input.serie?.trim() || null,
         color: input.color?.trim() || null,
+    ...(input.material != null ? { material: input.material.trim() || null } : {}),
         medidas: input.medidas?.trim() || null,
         medida_largo: input.medida_largo ?? null,
         medida_ancho: input.medida_ancho ?? null,
@@ -348,6 +395,7 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
         observacion,
         updated_by: profile.id,
       };
+      completarPayloadMenaje(payload, input);
     }
   } else {
     responsable = input.responsable?.trim() || responsable;
@@ -365,6 +413,7 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
         modelo: input.modelo?.trim() || null,
         serie: input.serie?.trim() || null,
         color: input.color?.trim() || null,
+    ...(input.material != null ? { material: input.material.trim() || null } : {}),
         medidas: input.medidas?.trim() || null,
         medida_largo: input.medida_largo ?? null,
         medida_ancho: input.medida_ancho ?? null,
@@ -400,6 +449,7 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
         modelo: input.modelo?.trim() || null,
         serie: input.serie?.trim() || null,
         color: input.color?.trim() || null,
+    ...(input.material != null ? { material: input.material.trim() || null } : {}),
         medidas: input.medidas?.trim() || null,
         medida_largo: input.medida_largo ?? null,
         medida_ancho: input.medida_ancho ?? null,
@@ -433,6 +483,33 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
     }
   }
 
+  const categoriaEfectiva = (payload.categoria as string | undefined) ?? input.categoria;
+  if (esMenaje(categoriaEfectiva)) {
+    const errorMenaje = aplicarMenajeEnPayload(payload, "MENAJE", input.cantidad);
+    if (errorMenaje) return { error: errorMenaje };
+    const esPreregistroFila = existing.estado_registro === "PREREGISTRADO";
+    const ambienteMenaje = esPreregistroFila
+      ? String(payload.posible_ambiente_id ?? existing.posible_ambiente_id ?? "")
+      : String(payload.ambiente_id ?? existing.ambiente_id ?? "");
+    const fusion = await fusionarMenajeSiHayOtro(supabase, {
+      activoId,
+      entidadId: existing.entidad_id,
+      codigoCatalogo: String(payload.codigo_catalogo ?? input.codigo_catalogo ?? ""),
+      cantidad: Number(payload.cantidad),
+      nombre: String(payload.nombre ?? input.nombre ?? "Menaje"),
+      esPreregistro: esPreregistroFila,
+      ambienteId: ambienteMenaje,
+      variante: varianteMenajeEfectiva(payload, existing),
+      estadoBien: "estado_bien" in payload ? payload.estado_bien : existing.estado_bien,
+      observacion: "observacion" in payload ? payload.observacion : existing.observacion,
+    });
+    if (fusion.error) return { error: fusion.error };
+    if (fusion.fusionado) {
+      revalidateActivoPaths(existing.entidad_id, existing.ambiente_id);
+      return { success: true, data: fusion.data, aviso: fusion.aviso };
+    }
+  }
+
   const { data, error } = await supabase
     .from("activos")
     .update(payload)
@@ -441,7 +518,7 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
     .single();
 
   if (error) {
-    return { error: error.message };
+    return { error: traducirErrorMenaje(error.message) };
   }
 
   revalidateActivoPaths(existing.entidad_id, existing.ambiente_id);
@@ -581,6 +658,57 @@ export async function darDeBajaActivo(activoId: string, motivo: string) {
   return { success: true };
 }
 
+export async function darDeBajaMenaje(activoId: string, motivo: string, cantidad: number) {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede dar de baja menaje." };
+  }
+
+  const supabase = await createClient();
+  const resultado = await ejecutarBajaMenaje(supabase, {
+    activoId,
+    motivo,
+    cantidad,
+    usuarioId: profile.id,
+  });
+  if (resultado.error) return { error: resultado.error };
+  if (resultado.entidadId) {
+    revalidateActivoPaths(resultado.entidadId, resultado.ambienteId ?? null);
+  }
+  return { success: true, aviso: resultado.aviso };
+}
+
+export async function eliminarMenaje(activoId: string) {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede eliminar menaje." };
+  }
+
+  const supabase = await createClient();
+  const { data: existing, error: fetchError } = await supabase
+    .from("activos")
+    .select("entidad_id, ambiente_id, categoria, estado_registro")
+    .eq("id", activoId)
+    .maybeSingle();
+  if (fetchError || !existing) {
+    return { error: fetchError?.message ?? "Menaje no encontrado." };
+  }
+  if (!esMenaje(existing.categoria)) {
+    return { error: "Esta acción es solo para menaje." };
+  }
+  if (existing.estado_registro === "DADO_DE_BAJA") {
+    return { error: "Un menaje dado de baja no se elimina. Ya quedó en el historial de bajas." };
+  }
+
+  const { error } = await supabase.from("activos").delete().eq("id", activoId);
+  if (error) return { error: error.message };
+
+  revalidateActivoPaths(existing.entidad_id, existing.ambiente_id);
+  return { success: true };
+}
+
 export async function recuperarActivo(activoId: string) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
@@ -678,12 +806,16 @@ export async function createActivosSimilares(
 
   const { data: existing, error: fetchError } = await supabase
     .from("activos")
-    .select("entidad_id, ambiente_id, estado_registro")
+    .select("entidad_id, ambiente_id, estado_registro, categoria")
     .eq("id", activoId)
     .maybeSingle();
 
   if (fetchError || !existing) {
     return { error: fetchError?.message ?? "Activo no encontrado." };
+  }
+
+  if (esMenaje(existing.categoria)) {
+    return { error: "El menaje se controla por cantidad en el ambiente, no por ejemplares." };
   }
 
   if (existing.estado_registro === "DADO_DE_BAJA") {

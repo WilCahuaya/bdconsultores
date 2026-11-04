@@ -3,7 +3,7 @@ import {
   decodeCatalogoPropioDesdeSimbolo,
 } from "./codigo-barras";
 
-type CategoriaBien = "ACTIVO" | "CUENTA_ORDEN";
+type CategoriaBien = "ACTIVO" | "CUENTA_ORDEN" | "MENAJE";
 type EstadoBien = "BUENO" | "REGULAR" | "MALO";
 type EstadoRegistroImport = "PREREGISTRADO" | "REGISTRADO";
 
@@ -363,6 +363,7 @@ function parseCategoria(text: string): CategoriaBien | null {
   ) {
     return "CUENTA_ORDEN";
   }
+  if (key === "menaje") return "MENAJE";
   return null;
 }
 

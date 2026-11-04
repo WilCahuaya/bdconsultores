@@ -1,5 +1,8 @@
 import {
   buildDescripcionBien,
+  descripcionMenaje,
+  esMenaje,
+  nombreEnReporteBaja,
   calcPeriodoMesesHasta,
   calcValorizacionActivo,
   categoriaBienCorto,
@@ -315,7 +318,7 @@ function filaComunActivo(
   const { codigoCompleto = false, incluirCorr = true } = opciones;
   const base = [
     String(index + 1),
-    "1",
+    String(activo.categoria === "MENAJE" ? (activo.cantidad ?? 1) : 1),
     "Und.",
     categoriaBienCorto(activo.categoria),
   ];
@@ -550,7 +553,7 @@ export function buildReporteRows(
       String(index + 1),
       activo.codigo_barras ?? activo.codigo_catalogo,
       formatCorrelativoDisplay(activo.correlativo),
-      activo.nombre,
+      nombreEnReporteBaja(activo),
       activo.motivo_baja?.trim() || "—",
       formatFechaISOToDDMMYYYY(activo.updated_at.slice(0, 10)) || "—",
       ubicacionReporteLabel(activo, reporteId),
@@ -558,13 +561,15 @@ export function buildReporteRows(
   }
 
   return ordenados.map((activo, index) => {
-    const descripcion = buildDescripcionBien(
-      activo.marca,
-      activo.modelo,
-      activo.serie,
-      activo.color,
-      activo.medidas,
-    );
+    const descripcion = esMenaje(activo.categoria)
+      ? descripcionMenaje(activo)
+      : buildDescripcionBien(
+          activo.marca,
+          activo.modelo,
+          activo.serie,
+          activo.color,
+          activo.medidas,
+        );
 
     const sinUbicacion = omitUbicacionEnTabla(reporteId);
     const tablaValorizadoAmbiente = valorizado && esReporteValorizadoTablaAmbiente(reporteId);

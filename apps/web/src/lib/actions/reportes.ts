@@ -111,6 +111,9 @@ export async function cargarActivosReporte(
     query = query.eq("estado_registro", "REGISTRADO" as EstadoRegistro);
   }
 
+  const definicion = REPORTES.find((r) => r.id === input.reporteId);
+  if (definicion?.valorizado) query = query.neq("categoria", "MENAJE");
+
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
   if (corteISO && aplicaFiltroAdquisicionFechaCorte(input.reporteId as ReporteId, input.fechaCorte)) {
     query = query.or(`fecha_adquisicion.is.null,fecha_adquisicion.lte.${corteISO}`);

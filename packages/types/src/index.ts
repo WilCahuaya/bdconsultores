@@ -36,8 +36,13 @@ export function buildAmbientePreregistroNombre(year = new Date().getFullYear()):
 /** Estado físico del bien */
 export type EstadoBien = "BUENO" | "REGULAR" | "MALO";
 
-/** Categoría contable del bien */
-export type CategoriaBien = "ACTIVO" | "CUENTA_ORDEN";
+/** Categoría contable del bien. Menaje es stock por ambiente, sin etiqueta. */
+export type CategoriaBien = "ACTIVO" | "CUENTA_ORDEN" | "MENAJE";
+
+export const CATEGORIAS_BIEN = ["ACTIVO", "CUENTA_ORDEN", "MENAJE"] as const;
+
+/** Categorías del formulario de bienes. El menaje se carga en su propio apartado. */
+export const CATEGORIAS_FORMULARIO_BIEN = ["ACTIVO", "CUENTA_ORDEN"] as const;
 
 /** Campos con vocabulario global para autocompletado */
 export type ActivoAtributoCampo =
@@ -537,6 +542,8 @@ export interface Activo {
   modelo: string | null;
   serie: string | null;
   color: string | null;
+  /** Material del menaje. Vacío en activos y cuenta de orden. */
+  material?: string | null;
   medidas: string | null;
   medida_largo: number | null;
   medida_ancho: number | null;
@@ -553,6 +560,8 @@ export interface Activo {
   incremento_detalle?: string | null;
   /** Monto de la mejora; el valor efectivo es adquisición + incremento. */
   valor_incremento?: number | null;
+  /** Unidades en el ambiente. En activos y cuenta de orden siempre es 1. */
+  cantidad?: number | null;
   fecha_adquisicion: string | null;
   /** Primer día del mes en que inicia la depreciación (editable). */
   fecha_inicio_depreciacion?: string | null;
@@ -704,7 +713,7 @@ export function formatEjemplaresSimilaresTexto(resumen: EjemplaresSimilaresResum
 }
 
 export const CATEGORIA_BIEN_AYUDA =
-  "Ambos duran más de un año. La diferencia es el valor: si es importante para el patrimonio contable, elija Activo; si es bajo pero igual conviene controlarlo, elija Cuenta de orden.";
+  "Activo y cuenta de orden duran más de un año. La diferencia es el valor: si es importante para el patrimonio, elija Activo; si es bajo pero conviene controlarlo pieza por pieza, elija Cuenta de orden. Menaje es solo un control de cantidades en el ambiente (cucharas, platos) y no imprime etiqueta.";
 
 export const CATEGORIA_BIEN_LABELS: Record<
   CategoriaBien,
@@ -721,7 +730,13 @@ export const CATEGORIA_BIEN_LABELS: Record<
     titulo: "Cuenta de orden",
     descripcion:
       "Bien que también dura más de un año y debe controlarse, pero por su bajo valor no se considera patrimonio contable importante.",
-    ejemplos: "Sillas plásticas, tachos, sartenes, herramientas pequeñas.",
+    ejemplos: "Sillas plásticas, tachos, herramientas pequeñas.",
+  },
+  MENAJE: {
+    titulo: "Menaje",
+    descripcion:
+      "Existencia por ambiente. Se anota el código, la cantidad y, si hace falta, material, medida, color y características. No genera código de barras ni etiqueta.",
+    ejemplos: "Cucharas, tenedores, platos, vasos.",
   },
 };
 
@@ -1019,8 +1034,10 @@ export function formatFechaISOToCortoES(iso: string | null | undefined): string 
   return `${String(day).padStart(2, "0")} ${mes} ${year}`;
 }
 
-export function categoriaBienLetra(categoria: CategoriaBien): "A" | "C" {
-  return categoria === "CUENTA_ORDEN" ? "C" : "A";
+export function categoriaBienLetra(categoria: CategoriaBien): "A" | "C" | "M" {
+  if (categoria === "CUENTA_ORDEN") return "C";
+  if (categoria === "MENAJE") return "M";
+  return "A";
 }
 
 export {
@@ -1302,7 +1319,9 @@ export function formatMonedaPE(value: number | null | undefined): string {
 }
 
 export function categoriaBienCorto(categoria: CategoriaBien): string {
-  return categoria === "CUENTA_ORDEN" ? "Cta Orden" : "Activo";
+  if (categoria === "CUENTA_ORDEN") return "Cta Orden";
+  if (categoria === "MENAJE") return "Menaje";
+  return "Activo";
 }
 
 export function validarFechaDDMMYYYY(text: string): string | null {
@@ -1466,6 +1485,9 @@ export function calcValorizacionActivo(params: {
   estadoBien?: string | null;
 }): { depreciacionAcumulada: number | null; valorNeto: number | null } {
   const sinValorNeto = activoValorNetoEnCero(params.estadoRegistro, params.estadoBien);
+  if (params.categoria === "MENAJE") {
+    return { depreciacionAcumulada: null, valorNeto: null };
+  }
   if (params.categoria === "CUENTA_ORDEN") {
     if (params.valor == null) {
       return { depreciacionAcumulada: null, valorNeto: null };
@@ -1779,7 +1801,13 @@ export function opcionesFiltroColumnaDesdeActivos(
   const conSede = opts?.ubicacionConSede !== false;
 
   for (const a of activos) {
-    if (a.categoria === "ACTIVO" || a.categoria === "CUENTA_ORDEN") categorias.add(a.categoria);
+    if (
+      a.categoria === "ACTIVO" ||
+      a.categoria === "CUENTA_ORDEN" ||
+      a.categoria === "MENAJE"
+    ) {
+      categorias.add(a.categoria);
+    }
     const nombre = a.nombre?.trim();
     if (nombre) nombres.add(nombre);
     const anio = anioAdquisicionActivo(a.fecha_adquisicion);
@@ -1798,7 +1826,7 @@ export function opcionesFiltroColumnaDesdeActivos(
     }
   }
 
-  const categoriaOrder: CategoriaBien[] = ["ACTIVO", "CUENTA_ORDEN"];
+  const categoriaOrder: CategoriaBien[] = ["ACTIVO", "CUENTA_ORDEN", "MENAJE"];
   const estadoOrder: EstadoBien[] = ["BUENO", "REGULAR", "MALO"];
 
   return {
@@ -1806,7 +1834,8 @@ export function opcionesFiltroColumnaDesdeActivos(
       .filter((c) => categorias.has(c))
       .map((value) => ({
         value,
-        label: value === "CUENTA_ORDEN" ? "Cta. Orden" : "Activo",
+        label:
+          value === "CUENTA_ORDEN" ? "Cta. Orden" : value === "MENAJE" ? "Menaje" : "Activo",
       })),
     nombres: sortedUniqueOptions(nombres),
     anios: [...anios]
@@ -2602,6 +2631,26 @@ export {
   type HistorialActivoItem,
   type HistorialLookupMaps,
 } from "./historial-activo";
+
+export {
+  MAX_CANTIDAD_MENAJE,
+  aplicarMenajeEnPayload,
+  buildNombreConsolidadoMenaje,
+  cantidadInventarioBien,
+  claveVarianteMenaje,
+  completarPayloadMenaje,
+  descripcionMenaje,
+  esMenaje,
+  fusionarMenajeSiHayOtro,
+  insertarOSumarMenaje,
+  mensajeErrorMenajeDuplicado,
+  nombreEnReporteBaja,
+  parseCantidadMenaje,
+  textoMenaje,
+  traducirErrorMenaje,
+  varianteMenajeEfectiva,
+  ejecutarBajaMenaje,
+} from "./menaje";
 
 export {
   agruparClasificacionResumenPorTipo,

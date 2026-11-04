@@ -8,12 +8,16 @@ import {
   ACTIVO_FOTO_ACCEPT,
   CATEGORIA_BIEN_AYUDA,
   CATEGORIA_BIEN_LABELS,
+  CATEGORIAS_FORMULARIO_BIEN,
+  MAX_CANTIDAD_MENAJE,
+  parseCantidadMenaje,
   CATALOGO_CUENTA_ORDEN_CONTABILIDAD,
   activoTieneCuentaContablePropia,
   applyCuentaContableToPayloadIfProvided,
   assessLabelPrintWarnings,
   buildActivoCuentaContablePayload,
   buildNombreConsolidado,
+  buildNombreConsolidadoMenaje,
   calcPeriodoMeses,
   calcValorizacionActivo,
   formatComprobanteSerieInput,
@@ -198,12 +202,18 @@ export function ActivoForm({
   const [nombre, setNombre] = useState("");
   const [nombreEtiqueta, setNombreEtiqueta] = useState("");
   const [categoria, setCategoria] = useState<CategoriaBien>("ACTIVO");
-  const mostrarDepreciacion = categoria !== "CUENTA_ORDEN" && !esPreregistroAdmin;
+  const [cantidad, setCantidad] = useState(
+    activo?.cantidad != null ? String(activo.cantidad) : "1",
+  );
+  const esMenajeCategoria = categoria === "MENAJE";
+  const mostrarDepreciacion =
+    categoria !== "CUENTA_ORDEN" && !esMenajeCategoria && !esPreregistroAdmin;
   const mostrarCuentaContable =
-    asignaCodigoInmediato && !soloUbicacionEdit && !esEdicionMasiva;
+    !esMenajeCategoria && asignaCodigoInmediato && !soloUbicacionEdit && !esEdicionMasiva;
   /** Bulk: contador siempre ve cuenta/depreciación/vida útil (incluso en preregistro). */
   const mostrarCuentaContableBulk = esBulkContador;
-  const mostrarDepreciacionBulk = esBulkContador && categoria !== "CUENTA_ORDEN";
+  const mostrarDepreciacionBulk =
+    esBulkContador && categoria !== "CUENTA_ORDEN" && !esMenajeCategoria;
 
   const [catalogoEpoch, setCatalogoEpoch] = useState(0);
   const [catalogoCargando, setCatalogoCargando] = useState(false);
@@ -240,10 +250,12 @@ export function ActivoForm({
     const full = item.created_at ? item : await getCatalogoByCodigo(item.codigo);
     if (seq !== catalogoSelectSeq.current) return;
     const chosen = full ?? item;
-    if (isCatalogoPropio(chosen)) {
-      setCategoria("CUENTA_ORDEN");
-    } else if (categoria !== "CUENTA_ORDEN") {
-      setCategoria("ACTIVO");
+    if (categoria !== "MENAJE") {
+      if (isCatalogoPropio(chosen)) {
+        setCategoria("CUENTA_ORDEN");
+      } else if (categoria !== "CUENTA_ORDEN") {
+        setCategoria("ACTIVO");
+      }
     }
     setCatalogo(chosen);
   }
@@ -267,6 +279,7 @@ export function ActivoForm({
   const [modelo, setModelo] = useState("");
   const [serie, setSerie] = useState("");
   const [color, setColor] = useState("");
+  const [material, setMaterial] = useState("");
   const [medidas, setMedidas] = useState("");
   const [detalle, setDetalle] = useState("");
   const [depreciacion, setDepreciacion] = useState("");
@@ -354,11 +367,13 @@ export function ActivoForm({
     setNombre(activo.nombre);
     setNombreEtiqueta(activo.nombre_etiqueta ?? "");
     setCategoria(activo.categoria);
+    setCantidad(activo.cantidad != null ? String(activo.cantidad) : "1");
     setEstadoBien(activo.estado_bien);
     setMarca(activo.marca ?? "");
     setModelo(activo.modelo ?? "");
     setSerie(activo.serie ?? "");
     setColor(activo.color ?? "");
+    setMaterial(activo.material ?? "");
     setMedidas(activo.medidas ?? "");
     setDetalle(activo.caracteristicas ?? "");
     setDepreciacion(activo.depreciacion ?? "");
@@ -424,6 +439,7 @@ export function ActivoForm({
 
   useEffect(() => {
     if (!catalogo || isEdit) return;
+    if (categoria === "MENAJE") return;
     if (categoria === "CUENTA_ORDEN") {
       const codigo = catalogo.cuenta_codigo?.trim() || CATALOGO_CUENTA_ORDEN_CONTABILIDAD;
       const nombre = catalogo.contabilidad?.trim() || "";
@@ -441,6 +457,7 @@ export function ActivoForm({
 
   useEffect(() => {
     if (!isEdit || !activo || !catalogo || activoTieneCuentaContablePropia(activo)) return;
+    if (categoria === "MENAJE") return;
     if (categoria === "CUENTA_ORDEN") {
       const codigo = catalogo.cuenta_codigo?.trim() || CATALOGO_CUENTA_ORDEN_CONTABILIDAD;
       const nombre = catalogo.contabilidad?.trim() || "";
@@ -457,6 +474,11 @@ export function ActivoForm({
   }, [isEdit, activo, catalogo?.codigo, categoria]);
 
   useEffect(() => {
+    if (categoria === "MENAJE") {
+      setDepreciacion("");
+      setVidaUtilMeses("");
+      return;
+    }
     if (categoria === "CUENTA_ORDEN") {
       setDepreciacion("");
       setVidaUtilMeses("");
@@ -508,12 +530,12 @@ export function ActivoForm({
   }
 
   useEffect(() => {
-    if (!entidadEfectiva || !catalogo?.codigo || !asignaCodigoInmediato) {
+    if (!entidadEfectiva || !catalogo?.codigo || !asignaCodigoInmediato || categoria === "MENAJE") {
       setCodigoBarrasPreview(null);
       return;
     }
     void previewCodigoBarras(entidadEfectiva, catalogo.codigo).then(setCodigoBarrasPreview);
-  }, [entidadEfectiva, catalogo?.codigo, asignaCodigoInmediato]);
+  }, [entidadEfectiva, catalogo?.codigo, asignaCodigoInmediato, categoria]);
 
   const mostrarSelectorSede = entidadMuestraSelectorSede(sedes);
   const ambienteElegido = ambientes.find((a) => a.id === ambienteId) ?? null;
@@ -674,8 +696,11 @@ export function ActivoForm({
     [valorNum, vidaUtilNum, periodoMeses, categoria, estadoBien],
   );
   const nombreConsolidado = useMemo(
-    () => buildNombreConsolidado(nombre, marca, modelo, serie, color, medidas, detalle),
-    [nombre, marca, modelo, serie, color, medidas, detalle],
+    () =>
+      esMenajeCategoria
+        ? buildNombreConsolidadoMenaje(nombre, material, color, medidas, detalle)
+        : buildNombreConsolidado(nombre, marca, modelo, serie, color, medidas, detalle),
+    [esMenajeCategoria, nombre, material, marca, modelo, serie, color, medidas, detalle],
   );
   const nombreOficial = nombre.trim() || catalogo?.denominacion || "";
   const nombreEtiquetaSugerido = useMemo(
@@ -696,11 +721,13 @@ export function ActivoForm({
     setNombre("");
     setNombreEtiqueta("");
     setCategoria("ACTIVO");
+    setCantidad("1");
     setEstadoBien(null);
     setMarca("");
     setModelo("");
     setSerie("");
     setColor("");
+    setMaterial("");
     setMedidas("");
     setDepreciacion("");
     setVidaUtilMeses("");
@@ -819,6 +846,15 @@ export function ActivoForm({
         return;
       }
 
+      if (esMenajeCategoria) {
+        const cantidadMenaje = parseCantidadMenaje(cantidad);
+        if (cantidadMenaje.error) {
+          setPending(false);
+          setMessage(cantidadMenaje.error);
+          return;
+        }
+      }
+
       const result = esEdicionMasiva
         ? await updateActivosSimilares(activo.id, {
             sede_id: sedeId,
@@ -831,6 +867,8 @@ export function ActivoForm({
         : await updateActivo(activo.id, {
             codigo_catalogo: activo.codigo_catalogo,
             nombre: activo.nombre,
+            categoria: activo.categoria,
+            cantidad: esMenajeCategoria ? Number(cantidad) : undefined,
             sede_id: sedeId,
             ambiente_id: ambienteId,
             estado_bien: estadoBien,
@@ -855,11 +893,26 @@ export function ActivoForm({
 
     if (!catalogo) {
       setMessage(
-        categoria === "CUENTA_ORDEN"
-          ? "Seleccione un ítem del catálogo nacional o propio."
-          : "Seleccione un ítem del catálogo nacional.",
+        categoria === "ACTIVO"
+          ? "Seleccione un ítem del catálogo nacional."
+          : "Seleccione un ítem del catálogo nacional o propio.",
       );
       return;
+    }
+
+    if (esMenajeCategoria) {
+      const cantidadMenaje = parseCantidadMenaje(cantidad);
+      if (cantidadMenaje.error) {
+        setMessage(cantidadMenaje.error);
+        return;
+      }
+      const ambienteMenaje = mostrarPosibleAmbiente
+        ? posibleAmbienteId
+        : (fixedAmbienteId ?? ambienteId);
+      if (!ambienteMenaje) {
+        setMessage("Indique el ambiente del menaje.");
+        return;
+      }
     }
 
     if (!entidadEfectiva) {
@@ -893,7 +946,7 @@ export function ActivoForm({
       return;
     }
 
-    if (!esEdicionMasiva) {
+    if (!esEdicionMasiva && !esMenajeCategoria) {
       const labelWarnings = assessLabelPrintWarnings({
         nombreBien: nombreEnEtiqueta,
         entidadNombre: entidadEnEtiqueta,
@@ -955,13 +1008,15 @@ export function ActivoForm({
     const payload: UpdateActivoInput = {
       codigo_catalogo: catalogo.codigo,
       nombre: nombre.trim() || catalogo.denominacion,
-      nombre_etiqueta: mostrarNombreEtiqueta ? nombreEtiqueta.trim() || null : null,
+      nombre_etiqueta: mostrarNombreEtiqueta && !esMenajeCategoria ? nombreEtiqueta.trim() || null : null,
       categoria,
+      cantidad: esMenajeCategoria ? Number(cantidad) : undefined,
       estado_bien: estadoBien,
       marca: marca || undefined,
       modelo: modelo || undefined,
       serie: serie || undefined,
       color: color || undefined,
+      ...(esMenajeCategoria ? { material } : {}),
       medidas: medidas || undefined,
       caracteristicas: detalle.trim() || undefined,
       observacion: observacion || undefined,
@@ -1144,7 +1199,7 @@ export function ActivoForm({
     }
 
     let similaresNota = "";
-    if (!isEdit && agregarSimilares && activoId) {
+    if (!isEdit && !esMenajeCategoria && agregarSimilares && activoId) {
       const qty = Math.floor(Number(cantidadSimilares) || 0);
       const similares = await createActivosSimilares(activoId, qty);
       if (similares.error) {
@@ -1180,10 +1235,15 @@ export function ActivoForm({
           : "Activo actualizado correctamente.",
       );
     } else {
+      const aviso = "aviso" in result && typeof result.aviso === "string" ? result.aviso : undefined;
       setMessage(
-        result.data?.estado_registro === "REGISTRADO"
-          ? `Activo registrado. Código: ${result.data.codigo_barras ?? codigoBarrasPreview ?? "—"}.${similaresNota}`
-          : `Activo preregistrado.${similaresNota} Pendiente de validación del contador.`,
+        aviso
+          ? aviso
+          : esMenajeCategoria
+            ? `Menaje registrado: ${nombre.trim()} · ${catalogo.codigo} · cantidad ${cantidad}`
+            : result.data?.estado_registro === "REGISTRADO"
+              ? `Activo registrado. Código: ${result.data.codigo_barras ?? codigoBarrasPreview ?? "—"}.${similaresNota}`
+              : `Activo preregistrado.${similaresNota} Pendiente de validación del contador.`,
       );
       resetFormulario();
       form.reset();
@@ -1315,7 +1375,7 @@ export function ActivoForm({
               value={categoria}
               onChange={handleCategoriaChange}
               ayuda={CATEGORIA_BIEN_AYUDA}
-              opciones={(["ACTIVO", "CUENTA_ORDEN"] as const).map((key) => ({
+              opciones={CATEGORIAS_FORMULARIO_BIEN.map((key) => ({
                 key,
                 ...CATEGORIA_BIEN_LABELS[key],
               }))}
@@ -1665,7 +1725,7 @@ export function ActivoForm({
           value={categoria}
           onChange={handleCategoriaChange}
           ayuda={CATEGORIA_BIEN_AYUDA}
-          opciones={(["ACTIVO", "CUENTA_ORDEN"] as const).map((key) => ({
+          opciones={CATEGORIAS_FORMULARIO_BIEN.map((key) => ({
             key,
             ...CATEGORIA_BIEN_LABELS[key],
           }))}
@@ -1678,7 +1738,7 @@ export function ActivoForm({
         ) : null}
         {catalogoError ? <p className="text-xs text-destructive">{catalogoError}</p> : null}
         <CatalogoPicker
-          variant={categoria === "CUENTA_ORDEN" ? "ambos" : "nacional"}
+          variant={categoria === "ACTIVO" ? "nacional" : "ambos"}
           searchCatalogo={searchCatalogoByCategoria}
           searchEpoch={catalogoEpoch}
           debounceMs={0}
@@ -1722,6 +1782,26 @@ export function ActivoForm({
           )}
         />
 
+        {esMenajeCategoria ? (
+          <div className="space-y-2">
+            <Label htmlFor="cantidad_menaje">Cantidad en el ambiente</Label>
+            <Input
+              id="cantidad_menaje"
+              type="number"
+              min={1}
+              max={MAX_CANTIDAD_MENAJE}
+              required
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              className="max-w-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              {isEdit
+                ? "Total de unidades de este código en el ambiente. No se imprime etiqueta."
+                : "Si este código ya está en el ambiente, esta cantidad se suma. No se imprime etiqueta."}
+            </p>
+          </div>
+        ) : (
         <div className="space-y-2">
           <Label>Código de barras</Label>
           <Input
@@ -1734,6 +1814,7 @@ export function ActivoForm({
             className="bg-muted font-mono text-sm"
           />
         </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="nombre">Nombre del bien</Label>
@@ -1759,7 +1840,7 @@ export function ActivoForm({
           />
         )}
 
-        {mostrarNombreEtiqueta && (
+        {mostrarNombreEtiqueta && !esMenajeCategoria && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <Label htmlFor="nombre_etiqueta">Nombre en etiqueta</Label>
@@ -1791,7 +1872,7 @@ export function ActivoForm({
         </div>
         )}
 
-        {(nombreEnEtiqueta || entidadEnEtiqueta) && (
+        {!esMenajeCategoria && (nombreEnEtiqueta || entidadEnEtiqueta) && (
           <LabelPrintTextPreview
             nombreBien={nombreEnEtiqueta}
             entidadNombre={entidadEnEtiqueta}
@@ -1801,7 +1882,60 @@ export function ActivoForm({
 
       {/* Detalle físico */}
       <fieldset className={fieldsetCompact}>
-        <legend className={panelLegendClass}>Detalle del bien</legend>
+        <legend className={panelLegendClass}>
+          {esMenajeCategoria ? "Detalle del menaje" : "Detalle del bien"}
+        </legend>
+        {esMenajeCategoria ? (
+          <>
+            <div className={detalleGridClass}>
+              <div className="space-y-2">
+                <Label htmlFor="material">Material</Label>
+                <Input
+                  id="material"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  placeholder="Acero, loza, melamina, vidrio…"
+                />
+              </div>
+              <ActivoAtributoAutocomplete
+                id="color"
+                label="Color"
+                campo="color"
+                value={color}
+                onChange={setColor}
+                onSearch={searchAtributo}
+              />
+              <div className="col-span-2 min-w-0">
+                <ActivoAtributoAutocomplete
+                  id="medidas"
+                  label="Medida o capacidad"
+                  campo="medidas"
+                  value={medidas}
+                  onChange={setMedidas}
+                  onSearch={searchAtributo}
+                  placeholder="20 L, 28 cm, 250 ml"
+                />
+              </div>
+              <div className="col-span-2 min-w-0">
+                <ActivoAtributoAutocomplete
+                  id="detalle"
+                  label="Características"
+                  campo="detalle"
+                  value={detalle}
+                  onChange={setDetalle}
+                  onSearch={searchAtributo}
+                  placeholder="Con tapa, antiadherente, juego de 6…"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              El material, la medida, el color y las características distinguen la fila. La misma
+              variante en el ambiente suma la cantidad. La observación es una nota del conteo y no
+              crea otra fila.
+            </p>
+          </>
+        ) : (
+        <>
         <div className={detalleGridClass}>
           <ActivoAtributoAutocomplete
             id="marca"
@@ -1862,6 +1996,8 @@ export function ActivoForm({
             />
           </div>
         </div>
+        </>
+        )}
         <div className="space-y-2">
           <Label htmlFor="estado_bien">Estado del bien</Label>
           <Select
@@ -1884,8 +2020,9 @@ export function ActivoForm({
             {nombreConsolidado || "—"}
           </p>
           <p className="text-xs text-muted-foreground">
-            Nombre en mayúsculas; marca como se escribe; modelo, serie, color y medidas en
-            minúsculas.
+            {esMenajeCategoria
+              ? "Nombre en mayúsculas, seguido de material, color, medida y características."
+              : "Nombre en mayúsculas; marca como se escribe; modelo, serie, color y medidas en minúsculas."}
           </p>
         </div>
         <div className="space-y-2 border-t border-border/50 pt-4">
@@ -1895,12 +2032,17 @@ export function ActivoForm({
             className="min-h-[80px]"
             value={observacion}
             onChange={(e) => setObservacion(e.target.value)}
-            placeholder="Notas adicionales, incidencias, condiciones especiales…"
+            placeholder={
+              esMenajeCategoria
+                ? "Nota del conteo: faltantes, rotos, incidencias…"
+                : "Notas adicionales, incidencias, condiciones especiales…"
+            }
           />
         </div>
       </fieldset>
 
       {/* Valoración */}
+      {!esMenajeCategoria && (
       <fieldset className={fieldsetCompact}>
         <legend className={panelLegendClass}>
           {esPreregistroAdmin
@@ -2088,8 +2230,9 @@ export function ActivoForm({
           </>
         )}
       </fieldset>
+      )}
 
-      {!isEdit && (
+      {!isEdit && !esMenajeCategoria && (
         <fieldset className={`${fieldsetCompact} self-start`}>
           <legend className={panelLegendClass}>Bienes similares</legend>
           <div className="space-y-3">
@@ -2139,8 +2282,9 @@ export function ActivoForm({
         <fieldset className={fieldsetWide}>
           <legend className={panelLegendClass}>Posible ambiente</legend>
           <p className="mb-3 text-sm text-muted-foreground">
-            Indique dónde podría ubicarse el bien (opcional). Al validar el preregistro se podrá
-            confirmar o elegir otro ambiente.
+            {esMenajeCategoria
+              ? "Indique el ambiente del menaje. La cantidad corresponde a ese ambiente."
+              : "Indique dónde podría ubicarse el bien (opcional). Al validar el preregistro se podrá confirmar o elegir otro ambiente."}
           </p>
           <div className="space-y-2">
             <Label htmlFor="posible_sede_id">Sucursal</Label>
@@ -2189,6 +2333,24 @@ export function ActivoForm({
       {!hideUbicacion && (
       <fieldset className={fieldsetUbicacionAdmin}>
         <legend className={panelLegendClass}>Ubicación</legend>
+        {soloUbicacionEdit && esMenajeCategoria && (
+          <div className="mb-3 space-y-2">
+            <Label htmlFor="cantidad_menaje_ubicacion">Cantidad en el ambiente</Label>
+            <Input
+              id="cantidad_menaje_ubicacion"
+              type="number"
+              min={1}
+              max={MAX_CANTIDAD_MENAJE}
+              required
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              className="max-w-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              Total de unidades de este código en el ambiente. No se imprime etiqueta.
+            </p>
+          </div>
+        )}
         <div className={soloUbicacionEdit ? "grid gap-4" : undefined}>
         {!soloUbicacionEdit && sedes.length === 0 ? (
           <div className="flex flex-wrap gap-2">

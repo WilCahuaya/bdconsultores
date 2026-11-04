@@ -6,12 +6,16 @@ import {
   ACTIVO_FOTO_ACCEPT,
   CATEGORIA_BIEN_AYUDA,
   CATEGORIA_BIEN_LABELS,
+  CATEGORIAS_FORMULARIO_BIEN,
+  MAX_CANTIDAD_MENAJE,
+  parseCantidadMenaje,
   CATALOGO_CUENTA_ORDEN_CONTABILIDAD,
   activoTieneCuentaContablePropia,
   buildActivoCuentaContablePayload,
   debePersistirCuentaContableEnActivo,
   assessLabelPrintWarnings,
   buildNombreConsolidado,
+  buildNombreConsolidadoMenaje,
   calcPeriodoMeses,
   calcValorizacionActivo,
   formatComprobanteSerieInput,
@@ -170,6 +174,10 @@ export function ActivoFormDesktop({
   const [nombre, setNombre] = useState(activo?.nombre ?? "");
   const [nombreEtiqueta, setNombreEtiqueta] = useState(activo?.nombre_etiqueta ?? "");
   const [categoria, setCategoria] = useState<CategoriaBien>(activo?.categoria ?? "ACTIVO");
+  const [cantidad, setCantidad] = useState(
+    activo?.cantidad != null ? String(activo.cantidad) : "1",
+  );
+  const esMenajeCategoria = categoria === "MENAJE";
   const [estadoBien, setEstadoBien] = useState<"BUENO" | "REGULAR" | "MALO" | null>(
     activo?.estado_bien ?? null,
   );
@@ -197,6 +205,7 @@ export function ActivoFormDesktop({
   const [modelo, setModelo] = useState(activo?.modelo ?? "");
   const [serie, setSerie] = useState(activo?.serie ?? "");
   const [color, setColor] = useState(activo?.color ?? "");
+  const [material, setMaterial] = useState(activo?.material ?? "");
   const [medidas, setMedidas] = useState(activo?.medidas ?? "");
   const [detalle, setDetalle] = useState(activo?.caracteristicas ?? "");
   const [depreciacion, setDepreciacion] = useState(activo?.depreciacion ?? "");
@@ -434,13 +443,18 @@ export function ActivoFormDesktop({
     [valorNum, vidaUtilNum, periodoMeses, categoria, estadoBien],
   );
   const nombreOficial = nombre.trim() || catalogo?.denominacion || "";
-  const mostrarDepreciacion = categoria !== "CUENTA_ORDEN" && !modoPreregistro;
-  const mostrarCuentaContable = !modoPreregistro && !esEdicionMasiva;
-  const mostrarCuentaContableBulk = esEdicionMasiva;
-  const mostrarDepreciacionBulk = esEdicionMasiva && categoria !== "CUENTA_ORDEN";
+  const mostrarDepreciacion =
+    categoria !== "CUENTA_ORDEN" && !esMenajeCategoria && !modoPreregistro;
+  const mostrarCuentaContable = !esMenajeCategoria && !modoPreregistro && !esEdicionMasiva;
+  const mostrarCuentaContableBulk = esEdicionMasiva && !esMenajeCategoria;
+  const mostrarDepreciacionBulk =
+    esEdicionMasiva && categoria !== "CUENTA_ORDEN" && !esMenajeCategoria;
   const nombreConsolidado = useMemo(
-    () => buildNombreConsolidado(nombre, marca, modelo, serie, color, medidas, detalle),
-    [nombre, marca, modelo, serie, color, medidas, detalle],
+    () =>
+      esMenajeCategoria
+        ? buildNombreConsolidadoMenaje(nombre, material, color, medidas, detalle)
+        : buildNombreConsolidado(nombre, marca, modelo, serie, color, medidas, detalle),
+    [esMenajeCategoria, nombre, material, marca, modelo, serie, color, medidas, detalle],
   );
   const nombreEtiquetaSugerido = useMemo(
     () => (nombreOficial ? suggestNombreEtiqueta(nombreOficial) : ""),
@@ -514,13 +528,15 @@ export function ActivoFormDesktop({
       setCatalogo(item);
       setNombre(item.denominacion);
       setCategoria((current) => {
+        if (current === "MENAJE") return "MENAJE";
         if (isCatalogoPropio(item)) return "CUENTA_ORDEN";
         if (current === "CUENTA_ORDEN") return "CUENTA_ORDEN";
         return "ACTIVO";
       });
       const quedaCuentaOrden =
-        isCatalogoPropio(item) || categoria === "CUENTA_ORDEN";
-      if (!quedaCuentaOrden && item.depreciacion) {
+        categoria !== "MENAJE" && (isCatalogoPropio(item) || categoria === "CUENTA_ORDEN");
+      const sinDepreciacion = categoria === "MENAJE" || quedaCuentaOrden;
+      if (!sinDepreciacion && item.depreciacion) {
         setDepreciacion(item.depreciacion);
         const pct = parsePorcentajeDepreciacion(item.depreciacion);
         if (pct) setVidaUtilMeses(String(vidaUtilMesesFromPorcentaje(pct)));
@@ -528,7 +544,7 @@ export function ActivoFormDesktop({
         setDepreciacion("");
         setVidaUtilMeses("");
       }
-      if (!isEdit) {
+      if (!isEdit && categoria !== "MENAJE") {
         void previewCodigoBarras(entidadId, item.codigo).then(setCodigoBarrasPreview);
       }
       if (mostrarCuentaContable) {
@@ -682,11 +698,26 @@ export function ActivoFormDesktop({
     event.preventDefault();
     if (!catalogo) {
       setMessage(
-        categoria === "CUENTA_ORDEN"
-          ? "Seleccione un ítem del catálogo nacional o propio."
-          : "Seleccione un ítem del catálogo nacional.",
+        categoria === "ACTIVO"
+          ? "Seleccione un ítem del catálogo nacional."
+          : "Seleccione un ítem del catálogo nacional o propio.",
       );
       return;
+    }
+
+    if (esMenajeCategoria) {
+      const cantidadMenaje = parseCantidadMenaje(cantidad);
+      if (cantidadMenaje.error) {
+        setMessage(cantidadMenaje.error);
+        return;
+      }
+      const ambienteMenaje = mostrarPosibleAmbiente
+        ? posibleAmbienteId
+        : (fixedAmbienteId ?? ambienteId);
+      if (!ambienteMenaje) {
+        setMessage("Indique el ambiente del menaje.");
+        return;
+      }
     }
 
     const fechaError = validarFechaDDMMYYYY(fechaAdquisicion);
@@ -705,7 +736,7 @@ export function ActivoFormDesktop({
       return;
     }
 
-    if (!esEdicionMasiva) {
+    if (!esEdicionMasiva && !esMenajeCategoria) {
       const labelWarnings = assessLabelPrintWarnings({
         nombreBien: nombreEnEtiqueta,
         entidadNombre: entidadEnEtiqueta,
@@ -748,13 +779,15 @@ export function ActivoFormDesktop({
     const payload = {
       codigo_catalogo: catalogo.codigo,
       nombre: nombre.trim() || catalogo.denominacion,
-      nombre_etiqueta: mostrarNombreEtiqueta ? nombreEtiqueta.trim() || null : null,
+      nombre_etiqueta: mostrarNombreEtiqueta && !esMenajeCategoria ? nombreEtiqueta.trim() || null : null,
       categoria,
+      cantidad: esMenajeCategoria ? Number(cantidad) : undefined,
       estado_bien: estadoBien,
       marca: marca || undefined,
       modelo: modelo || undefined,
       serie: serie || undefined,
       color: color || undefined,
+      ...(esMenajeCategoria ? { material } : {}),
       medidas: medidas || undefined,
       caracteristicas: detalle.trim() || undefined,
       ...(mostrarDepreciacion && {
@@ -1223,7 +1256,7 @@ export function ActivoFormDesktop({
               value={categoria}
               onChange={handleCategoriaChange}
               ayuda={CATEGORIA_BIEN_AYUDA}
-              opciones={(["ACTIVO", "CUENTA_ORDEN"] as const).map((key) => ({
+              opciones={CATEGORIAS_FORMULARIO_BIEN.map((key) => ({
                 key,
                 ...CATEGORIA_BIEN_LABELS[key],
               }))}
@@ -1560,14 +1593,16 @@ export function ActivoFormDesktop({
           value={categoria}
           onChange={handleCategoriaChange}
           ayuda={CATEGORIA_BIEN_AYUDA}
-          opciones={(["ACTIVO", "CUENTA_ORDEN"] as const).map((key) => ({
+          className="grid gap-3 sm:grid-cols-2"
+          headerClassName="sm:col-span-2"
+          opciones={CATEGORIAS_FORMULARIO_BIEN.map((key) => ({
             key,
             ...CATEGORIA_BIEN_LABELS[key],
           }))}
         />
 
         <CatalogoPicker
-          variant={categoria === "CUENTA_ORDEN" ? "ambos" : "nacional"}
+          variant={categoria === "ACTIVO" ? "nacional" : "ambos"}
           searchCatalogo={searchCatalogoByCategoria}
           resolveCodigo={getCatalogoByCodigo}
           onSelect={(item) => {
@@ -1601,10 +1636,31 @@ export function ActivoFormDesktop({
           )}
         />
 
+        {esMenajeCategoria ? (
+          <div className="space-y-2">
+            <Label htmlFor="cantidad_menaje">Cantidad en el ambiente</Label>
+            <Input
+              id="cantidad_menaje"
+              type="number"
+              min={1}
+              max={MAX_CANTIDAD_MENAJE}
+              required
+              value={cantidad}
+              onChange={(e) => setCantidad(e.target.value)}
+              className="max-w-xs"
+            />
+            <p className="text-xs text-muted-foreground">
+              {isEdit
+                ? "Total de unidades de este código en el ambiente. No se imprime etiqueta."
+                : "Si este código ya está en el ambiente, esta cantidad se suma. No se imprime etiqueta."}
+            </p>
+          </div>
+        ) : (
         <div className="space-y-2">
           <Label>Código de barras</Label>
           <Input readOnly value={codigoBarrasDisplay} className="bg-muted font-mono text-sm" />
         </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="nombre">Nombre del bien</Label>
@@ -1630,7 +1686,7 @@ export function ActivoFormDesktop({
           />
         )}
 
-        {mostrarNombreEtiqueta && (
+        {mostrarNombreEtiqueta && !esMenajeCategoria && (
         <div className="space-y-2">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <Label htmlFor="nombre_etiqueta">Nombre en etiqueta</Label>
@@ -1662,7 +1718,7 @@ export function ActivoFormDesktop({
         </div>
         )}
 
-        {(nombreEnEtiqueta || entidadEnEtiqueta) && (
+        {!esMenajeCategoria && (nombreEnEtiqueta || entidadEnEtiqueta) && (
           <LabelPrintTextPreview
             nombreBien={nombreEnEtiqueta}
             entidadNombre={entidadEnEtiqueta}
@@ -1671,7 +1727,60 @@ export function ActivoFormDesktop({
       </fieldset>
 
       <fieldset className={fieldsetCompact}>
-        <legend className={panelLegendClass}>Detalle del bien</legend>
+        <legend className={panelLegendClass}>
+          {esMenajeCategoria ? "Detalle del menaje" : "Detalle del bien"}
+        </legend>
+        {esMenajeCategoria ? (
+          <>
+            <div className={detalleGridClass}>
+              <div className="space-y-2">
+                <Label htmlFor="material">Material</Label>
+                <Input
+                  id="material"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  placeholder="Acero, loza, melamina, vidrio…"
+                />
+              </div>
+              <ActivoAtributoAutocomplete
+                id="color"
+                label="Color"
+                campo="color"
+                value={color}
+                onChange={setColor}
+                onSearch={searchAtributo}
+              />
+              <div className="col-span-2 min-w-0">
+                <ActivoAtributoAutocomplete
+                  id="medidas"
+                  label="Medida o capacidad"
+                  campo="medidas"
+                  value={medidas}
+                  onChange={setMedidas}
+                  onSearch={searchAtributo}
+                  placeholder="20 L, 28 cm, 250 ml"
+                />
+              </div>
+              <div className="col-span-2 min-w-0">
+                <ActivoAtributoAutocomplete
+                  id="detalle"
+                  label="Características"
+                  campo="detalle"
+                  value={detalle}
+                  onChange={setDetalle}
+                  onSearch={searchAtributo}
+                  placeholder="Con tapa, antiadherente, juego de 6…"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              El material, la medida, el color y las características distinguen la fila. La misma
+              variante en el ambiente suma la cantidad. La observación es una nota del conteo y no
+              crea otra fila.
+            </p>
+          </>
+        ) : (
+        <>
         <div className={detalleGridClass}>
           <ActivoAtributoAutocomplete
             id="marca"
@@ -1732,6 +1841,8 @@ export function ActivoFormDesktop({
             />
           </div>
         </div>
+        </>
+        )}
         <div className="space-y-2">
           <Label htmlFor="estado_bien">Estado del bien</Label>
           <Select
@@ -1754,8 +1865,9 @@ export function ActivoFormDesktop({
             {nombreConsolidado || "—"}
           </p>
           <p className="text-xs text-muted-foreground">
-            Nombre en mayúsculas; marca como se escribe; modelo, serie, color y medidas en
-            minúsculas.
+            {esMenajeCategoria
+              ? "Nombre en mayúsculas, seguido de material, color, medida y características."
+              : "Nombre en mayúsculas; marca como se escribe; modelo, serie, color y medidas en minúsculas."}
           </p>
         </div>
         <div className="space-y-2 border-t border-border/50 pt-4">
@@ -1765,11 +1877,16 @@ export function ActivoFormDesktop({
             className="min-h-[80px]"
             value={observacion}
             onChange={(e) => setObservacion(e.target.value)}
-            placeholder="Notas adicionales, incidencias, condiciones especiales…"
+            placeholder={
+              esMenajeCategoria
+                ? "Nota del conteo: faltantes, rotos, incidencias…"
+                : "Notas adicionales, incidencias, condiciones especiales…"
+            }
           />
         </div>
       </fieldset>
 
+      {!esMenajeCategoria && (
       <fieldset className={fieldsetCompact}>
         <legend className={panelLegendClass}>
           {categoria === "CUENTA_ORDEN" ? "Valoración" : "Valoración y depreciación"}
@@ -1948,6 +2065,7 @@ export function ActivoFormDesktop({
         </>
         )}
       </fieldset>
+      )}
 
       {mostrarPosibleAmbiente && (
         <fieldset className={fieldsetWide}>

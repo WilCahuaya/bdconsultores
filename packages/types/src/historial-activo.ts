@@ -62,6 +62,7 @@ const CAMPOS_HISTORIAL_LABELS: Record<string, string> = {
   codigo_catalogo: "Código de catálogo",
   codigo_barras: "Código de barras",
   correlativo: "Correlativo",
+  cantidad: "Cantidad",
   sede_id: "Sede",
   ambiente_id: "Ambiente",
   posible_ambiente_id: "Ambiente probable",
@@ -74,6 +75,7 @@ const CAMPOS_HISTORIAL_LABELS: Record<string, string> = {
   modelo: "Modelo",
   serie: "Serie",
   color: "Color",
+  material: "Material",
   medidas: "Medidas",
   medida_largo: "Largo",
   medida_ancho: "Ancho",
@@ -117,6 +119,7 @@ function labelEstadoBien(value: string): string {
 
 function labelCategoria(value: string): string {
   if (value === "CUENTA_ORDEN") return "Cuenta de orden";
+  if (value === "MENAJE") return "Menaje";
   if (value === "ACTIVO") return "Activo";
   return value;
 }

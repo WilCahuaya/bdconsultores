@@ -4,6 +4,8 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode }
 import type { Activo, CategoriaBien, EstadoBien } from "@inventario/types";
 import {
   buildDescripcionBien,
+  descripcionMenaje,
+  esMenaje,
   calcPeriodoMesesHasta,
   calcValorizacionActivo,
   resolveFechaInicioDepreciacion,
@@ -20,9 +22,9 @@ import {
 import { ObservacionActivoDisplay } from "./observacion-activo-display";
 
 export const INVENTARIO_TABLA_LEYENDA =
-  "A = Activo · C = Cuenta de orden · PA = Precio adquisición · VM = Valor mercado";
+  "A = Activo · C = Cuenta de orden · M = Menaje · PA = Precio adquisición · VM = Valor mercado";
 
-export type InventarioTablaBadgeKind = "A" | "C" | "PA" | "VM";
+export type InventarioTablaBadgeKind = "A" | "C" | "M" | "PA" | "VM";
 
 export function inventarioTablaBadgeClass(kind: InventarioTablaBadgeKind): string {
   switch (kind) {
@@ -30,6 +32,8 @@ export function inventarioTablaBadgeClass(kind: InventarioTablaBadgeKind): strin
       return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300";
     case "C":
       return "bg-violet-500/15 text-violet-900 dark:text-violet-200";
+    case "M":
+      return "bg-orange-500/15 text-orange-900 dark:text-orange-200";
     case "PA":
       return "bg-sky-500/15 text-sky-900 dark:text-sky-200";
     case "VM":
@@ -55,6 +59,7 @@ const LEYENDA_ITEMS: ReadonlyArray<{
 }> = [
   { kind: "A", full: "Activo", short: "Activo" },
   { kind: "C", full: "Cuenta de orden", short: "Cta. Orden" },
+  { kind: "M", full: "Menaje", short: "Menaje" },
   { kind: "PA", full: "Precio adquisición", short: "Prc. Adq." },
   { kind: "VM", full: "Valor mercado", short: "Val. Mercado" },
 ];
@@ -275,6 +280,19 @@ export function InventarioCodigoCellContent({ activo }: { activo: Activo }) {
       </span>
     );
   }
+  if (activo.categoria === "MENAJE") {
+    const codigo = activo.codigo_catalogo?.trim() || "—";
+    const cantidad = activo.cantidad ?? 1;
+    return (
+      <span className="block text-xs leading-snug">
+        <span className="font-mono">{codigo}</span>
+        <span className="mt-0.5 block text-[11px] text-muted-foreground">
+          Cant. {cantidad}
+          {activo.estado_registro === "PREREGISTRADO" ? " · Prereg." : ""}
+        </span>
+      </span>
+    );
+  }
   if (activo.estado_registro === "PREREGISTRADO") {
     return (
       <span className="inline-block rounded bg-amber-500/20 px-1 py-0.5 text-[9px] font-semibold uppercase text-amber-800 dark:text-amber-200">
@@ -304,8 +322,9 @@ export function CategoriaBienCell({
   style?: CSSProperties;
 }) {
   const letra = categoriaBienLetra(categoria);
-  const titulo = categoria === "CUENTA_ORDEN" ? "Cuenta de orden" : "Activo";
-  const badgeKind: InventarioTablaBadgeKind = letra === "C" ? "C" : "A";
+  const titulo =
+    categoria === "CUENTA_ORDEN" ? "Cuenta de orden" : categoria === "MENAJE" ? "Menaje" : "Activo";
+  const badgeKind: InventarioTablaBadgeKind = letra;
 
   return (
     <td className={`${tdBase} text-center ${className ?? ""}`} style={style} title={titulo}>
@@ -505,13 +524,15 @@ export function InventarioTextCell({
 
 export function inventarioDescripcion(activo: Activo): string {
   return formatInventarioListaTexto(
-    buildDescripcionBien(
-      activo.marca,
-      activo.modelo,
-      activo.serie,
-      activo.color,
-      activo.medidas,
-    ),
+    esMenaje(activo.categoria)
+      ? descripcionMenaje(activo)
+      : buildDescripcionBien(
+          activo.marca,
+          activo.modelo,
+          activo.serie,
+          activo.color,
+          activo.medidas,
+        ),
   );
 }
 

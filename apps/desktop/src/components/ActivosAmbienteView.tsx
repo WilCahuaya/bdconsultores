@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { listAmbientesPorEntidad } from "../lib/ubicacion";
 import type { Entidad } from "@inventario/types";
-import { Button } from "@inventario/ui";
-import type { ActivoConUbicacion } from "../lib/activos";
+import { AmbienteApartadoNav, Button, MenajeAmbientePanel } from "@inventario/ui";
+import { createActivo, darDeBajaMenaje, eliminarMenaje, updateActivo, type ActivoConUbicacion } from "../lib/activos";
+import { getCatalogoByCodigo, searchCatalogo } from "../lib/catalogo";
 import type { AmbienteDestinoNavigation } from "./AgregarBienesSimilaresDialog";
 import {
   resolveFichaAsignacionExportMeta,
@@ -63,9 +64,30 @@ export function ActivosAmbienteView({
   onInventarioRefresh,
 }: ActivosAmbienteViewProps) {
   const activosAmbiente = useMemo(
-    () => activos.filter((a) => a.ambiente_id === ambienteId),
+    () => activos.filter((a) => a.ambiente_id === ambienteId && a.categoria !== "MENAJE"),
     [activos, ambienteId],
   );
+  const menajeLineas = useMemo(
+    () =>
+      activos.filter(
+        (a) =>
+          a.ambiente_id === ambienteId &&
+          a.categoria === "MENAJE" &&
+          a.estado_registro !== "DADO_DE_BAJA",
+      ),
+    [activos, ambienteId],
+  );
+  const menajeBajas = useMemo(
+    () =>
+      activos.filter(
+        (a) =>
+          a.ambiente_id === ambienteId &&
+          a.categoria === "MENAJE" &&
+          a.estado_registro === "DADO_DE_BAJA",
+      ),
+    [activos, ambienteId],
+  );
+  const [apartado, setApartado] = useState<"bienes" | "menaje">("bienes");
   const [esFaltanteRemoto, setEsFaltanteRemoto] = useState<boolean | null>(null);
   useEffect(() => {
     setEsFaltanteRemoto(null);
@@ -152,7 +174,73 @@ export function ActivosAmbienteView({
     ],
   );
 
+  const mostrarMenaje = !esAmbientePreregistro && !esFaltante;
+
   return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {mostrarMenaje ? (
+        <AmbienteApartadoNav
+          value={apartado}
+          onChange={setApartado}
+          menajeCount={menajeLineas.length}
+        />
+      ) : null}
+      {mostrarMenaje && apartado === "menaje" ? (
+        <MenajeAmbientePanel
+          lineas={menajeLineas}
+          bajas={menajeBajas}
+          searchCatalogo={searchCatalogo}
+          resolveCodigo={getCatalogoByCodigo}
+          onAgregar={async (input) => {
+            const result = await createActivo({
+              entidad_id: entidad.id,
+              codigo_catalogo: input.codigo,
+              nombre: input.nombre,
+              categoria: "MENAJE",
+              cantidad: input.cantidad,
+              material: input.material,
+              color: input.color,
+              medidas: input.medidas,
+              caracteristicas: input.caracteristicas,
+              estado_bien: input.estado_bien,
+              observacion: input.observacion,
+              sede_id: sedeId,
+              ambiente_id: ambienteId,
+              estado_registro: "REGISTRADO",
+            });
+            if (!result.error) onInventarioRefresh?.();
+            return { error: result.error, aviso: result.aviso };
+          }}
+          onGuardar={async (linea, input) => {
+            const result = await updateActivo(linea.id, {
+              codigo_catalogo: linea.codigo_catalogo,
+              nombre: linea.nombre,
+              categoria: "MENAJE",
+              cantidad: input.cantidad,
+              material: input.material,
+              color: input.color,
+              medidas: input.medidas,
+              caracteristicas: input.caracteristicas,
+              estado_bien: input.estado_bien,
+              observacion: input.observacion,
+              sede_id: sedeId,
+              ambiente_id: ambienteId,
+            });
+            if (!result.error) onInventarioRefresh?.();
+            return { error: result.error, aviso: result.aviso };
+          }}
+          onQuitar={async (linea, motivo, cantidad) => {
+            const result = await darDeBajaMenaje(linea.id, motivo, cantidad);
+            if (!result.error) onInventarioRefresh?.();
+            return { error: result.error, aviso: result.aviso };
+          }}
+          onEliminar={async (linea) => {
+            const result = await eliminarMenaje(linea.id);
+            if (!result.error) onInventarioRefresh?.();
+            return { error: result.error };
+          }}
+        />
+      ) : (
     <ActivosCampoList
       variant="ambiente"
       entidades={[entidad]}
@@ -206,5 +294,7 @@ export function ActivosAmbienteView({
       onActivoDeleted={onActivoDeleted}
       onAbrirAmbienteDestino={onAbrirAmbienteDestino}
     />
+      )}
+    </div>
   );
 }

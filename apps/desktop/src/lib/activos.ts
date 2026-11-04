@@ -1,6 +1,13 @@
 import {
   MAX_ACTIVOS_SIMILARES_CANTIDAD,
   applyCuentaContableToPayloadIfProvided,
+  aplicarMenajeEnPayload,
+  esMenaje,
+  ejecutarBajaMenaje,
+  fusionarMenajeSiHayOtro,
+  insertarOSumarMenaje,
+  varianteMenajeEfectiva,
+  traducirErrorMenaje,
   attachCatalogoNacionalPorCodigo,
   codigoBarrasLookupVariants,
   resolveCuentaContableActivo,
@@ -95,6 +102,7 @@ export interface CreateActivoInput {
   modelo?: string;
   serie?: string;
   color?: string;
+  material?: string;
   medidas?: string;
   depreciacion?: string;
   observacion?: string;
@@ -108,6 +116,8 @@ export interface CreateActivoInput {
   comprobante_serie?: string;
   cuenta_contable_codigo?: string | null;
   cuenta_contable_nombre?: string | null;
+  /** Solo menaje: unidades de este código en el ambiente. */
+  cantidad?: number;
   sede_id?: string;
   ambiente_id?: string;
   posible_ambiente_id?: string | null;
@@ -400,7 +410,7 @@ export async function getActivoById(activoId: string): Promise<ActivoConUbicacio
 
 export async function createActivo(
   input: CreateActivoInput,
-): Promise<{ data?: Activo; error?: string }> {
+): Promise<{ data?: Activo; error?: string; aviso?: string }> {
   const supabase = getSupabaseClient();
 
   // Con sede+ambiente se registra; sin ellos (o estado explícito) queda preregistro.
@@ -433,6 +443,7 @@ export async function createActivo(
     modelo: input.modelo?.trim() || null,
     serie: input.serie?.trim() || null,
     color: input.color?.trim() || null,
+    ...(input.material != null ? { material: input.material.trim() || null } : {}),
     medidas: input.medidas?.trim() || null,
     depreciacion: input.depreciacion?.trim() || null,
     observacion: input.observacion?.trim() || null,
@@ -465,6 +476,27 @@ export async function createActivo(
     return { error: "Código catálogo y nombre son obligatorios." };
   }
 
+  const menajeError = aplicarMenajeEnPayload(payloadFinal, input.categoria, input.cantidad);
+  if (menajeError) return { error: menajeError };
+
+  if (esMenaje(input.categoria)) {
+    const ambienteMenaje = esPreregistro
+      ? String(payloadFinal.posible_ambiente_id ?? "")
+      : String(payloadFinal.ambiente_id ?? "");
+    const guardado = await insertarOSumarMenaje(supabase, {
+      payload: payloadFinal,
+      entidadId: String(payloadFinal.entidad_id),
+      codigoCatalogo: String(payloadFinal.codigo_catalogo),
+      cantidad: Number(payloadFinal.cantidad),
+      esPreregistro,
+      ambienteId: ambienteMenaje,
+    });
+    if (guardado.error || !guardado.data) {
+      return { error: guardado.error ?? "No se pudo guardar el menaje." };
+    }
+    return { data: guardado.data as Activo, aviso: guardado.aviso };
+  }
+
   const { data, error } = await supabase.from("activos").insert(payloadFinal).select().single();
   if (error) return { error: error.message };
   return { data: data as Activo };
@@ -473,12 +505,14 @@ export async function createActivo(
 export async function updateActivo(
   activoId: string,
   input: UpdateActivoInput,
-): Promise<{ data?: Activo; error?: string }> {
+): Promise<{ data?: Activo; error?: string; aviso?: string }> {
   const supabase = getSupabaseClient();
 
   const { data: existing } = await supabase
     .from("activos")
-    .select("ambiente_id, estado_registro, posible_ambiente_id")
+    .select(
+      "entidad_id, ambiente_id, estado_registro, posible_ambiente_id, estado_bien, observacion, material, color, medidas, caracteristicas",
+    )
     .eq("id", activoId)
     .maybeSingle();
 
@@ -509,6 +543,7 @@ export async function updateActivo(
     modelo: input.modelo?.trim() || null,
     serie: input.serie?.trim() || null,
     color: input.color?.trim() || null,
+    ...(input.material != null ? { material: input.material.trim() || null } : {}),
     medidas: input.medidas?.trim() || null,
     depreciacion: input.depreciacion?.trim() || null,
     observacion: input.observacion?.trim() || null,
@@ -536,6 +571,32 @@ export async function updateActivo(
     return { error: "Código catálogo y nombre son obligatorios." };
   }
 
+  const categoriaEfectiva = (payloadFinal.categoria as string | undefined) ?? input.categoria;
+  if (esMenaje(categoriaEfectiva)) {
+    const errorMenaje = aplicarMenajeEnPayload(payloadFinal, "MENAJE", input.cantidad);
+    if (errorMenaje) return { error: errorMenaje };
+    const esPreregistroFila = existing?.estado_registro === "PREREGISTRADO";
+    const ambienteMenaje = esPreregistroFila
+      ? String(payloadFinal.posible_ambiente_id ?? existing?.posible_ambiente_id ?? "")
+      : String(payloadFinal.ambiente_id ?? existing?.ambiente_id ?? "");
+    if (existing?.entidad_id) {
+      const fusion = await fusionarMenajeSiHayOtro(supabase, {
+        activoId,
+        entidadId: existing.entidad_id,
+        codigoCatalogo: String(payloadFinal.codigo_catalogo ?? ""),
+        cantidad: Number(payloadFinal.cantidad),
+        nombre: String(payloadFinal.nombre ?? "Menaje"),
+        esPreregistro: esPreregistroFila,
+        ambienteId: ambienteMenaje,
+        variante: varianteMenajeEfectiva(payloadFinal, existing),
+        estadoBien: "estado_bien" in payloadFinal ? payloadFinal.estado_bien : existing.estado_bien,
+        observacion: "observacion" in payloadFinal ? payloadFinal.observacion : existing.observacion,
+      });
+      if (fusion.error) return { error: fusion.error };
+      if (fusion.fusionado) return { data: fusion.data as Activo, aviso: fusion.aviso };
+    }
+  }
+
   const { data, error } = await supabase
     .from("activos")
     .update(payloadFinal)
@@ -543,7 +604,7 @@ export async function updateActivo(
     .select()
     .single();
 
-  if (error) return { error: error.message };
+  if (error) return { error: traducirErrorMenaje(error.message) };
   return { data: data as Activo };
 }
 
@@ -792,6 +853,57 @@ export async function darDeBajaActivo(
   return { data: activo };
 }
 
+export async function darDeBajaMenaje(
+  activoId: string,
+  motivo: string,
+  cantidad: number,
+): Promise<{ error?: string; aviso?: string }> {
+  if (!isOnline()) {
+    return { error: "Dar de baja menaje requiere conexión." };
+  }
+  const profile = await fetchProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede dar de baja menaje." };
+  }
+  const supabase = getSupabaseClient();
+  return ejecutarBajaMenaje(supabase, {
+    activoId,
+    motivo,
+    cantidad,
+    usuarioId: profile.id,
+  });
+}
+
+export async function eliminarMenaje(activoId: string): Promise<{ error?: string }> {
+  if (!isOnline()) {
+    return { error: "Eliminar menaje requiere conexión." };
+  }
+  const profile = await fetchProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") {
+    return { error: "Solo el contador puede eliminar menaje." };
+  }
+  const supabase = getSupabaseClient();
+  const { data: existing, error: fetchError } = await supabase
+    .from("activos")
+    .select("categoria, estado_registro")
+    .eq("id", activoId)
+    .maybeSingle();
+  if (fetchError || !existing) {
+    return { error: fetchError?.message ?? "Menaje no encontrado." };
+  }
+  if (!esMenaje(existing.categoria)) {
+    return { error: "Esta acción es solo para menaje." };
+  }
+  if (existing.estado_registro === "DADO_DE_BAJA") {
+    return { error: "Un menaje dado de baja no se elimina. Ya quedó en el historial de bajas." };
+  }
+  const { error } = await supabase.from("activos").delete().eq("id", activoId);
+  if (error) return { error: error.message };
+  return {};
+}
+
 export async function recuperarActivo(
   activoId: string,
 ): Promise<{ data?: ActivoConUbicacion; error?: string }> {
@@ -1016,6 +1128,10 @@ export async function createActivosSimilares(
     if (!found) return { error: "Activo no encontrado en caché local." };
     const { entidadId, activo: template } = found;
 
+    if (esMenaje(template.categoria)) {
+      return { error: "El menaje se controla por cantidad en el ambiente, no por ejemplares." };
+    }
+
     if (template.estado_registro === "DADO_DE_BAJA") {
       return { error: "No puede duplicar un activo dado de baja." };
     }
@@ -1119,12 +1235,16 @@ export async function createActivosSimilares(
 
   const { data: existing, error: fetchError } = await supabase
     .from("activos")
-    .select("estado_registro")
+    .select("estado_registro, categoria")
     .eq("id", activoId)
     .maybeSingle();
 
   if (fetchError || !existing) {
     return { error: fetchError?.message ?? "Activo no encontrado." };
+  }
+
+  if (esMenaje(existing.categoria)) {
+    return { error: "El menaje se controla por cantidad en el ambiente, no por ejemplares." };
   }
 
   if (existing.estado_registro === "DADO_DE_BAJA") {

@@ -3,7 +3,7 @@
 import { Label } from "./components";
 import { InfoHintButton } from "./info-hint-button";
 
-export type CategoriaBienKey = "ACTIVO" | "CUENTA_ORDEN";
+export type CategoriaBienKey = "ACTIVO" | "CUENTA_ORDEN" | "MENAJE";
 
 export interface CategoriaBienOpcion {
   key: CategoriaBienKey;

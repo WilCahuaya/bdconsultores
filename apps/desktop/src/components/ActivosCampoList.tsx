@@ -9,7 +9,7 @@ import {
   seriesComprobanteDesdeActivos,
   sedeIdSinSelector,
 } from "@inventario/types";
-import { Button, ComprobanteSerieFiltroInput, Select, useToast, mensajeEliminacionPreregistros, PreregistroGestionToolbar, type PreregistroGestionToolbarState } from "@inventario/ui";
+import { AmbienteBienesFiltrosMenu, Button, ComprobanteSerieFiltroInput, Select, useToast, mensajeEliminacionPreregistros, PreregistroGestionToolbar, type PreregistroGestionToolbarState } from "@inventario/ui";
 import { listAmbientes, listAmbientesPorEntidad, listSedes } from "../lib/ubicacion";
 import {
   PanelSearchInput,
@@ -49,6 +49,7 @@ const FILTROS_CATEGORIA: { value: "" | CategoriaBien; label: string }[] = [
   { value: "", label: "Todas" },
   { value: "ACTIVO", label: "Activo" },
   { value: "CUENTA_ORDEN", label: "Cta. Orden" },
+  { value: "MENAJE", label: "Menaje" },
 ];
 
 type ActivosListVariant = "entity" | "global" | "ambiente" | "entity-inventario";
@@ -116,6 +117,10 @@ export function ActivosCampoList({
   exportMeta,
   reportesExport,
 }: ActivosCampoListProps) {
+  const filtrosCategoria =
+    variant === "ambiente"
+      ? FILTROS_CATEGORIA.filter((item) => item.value !== "MENAJE")
+      : FILTROS_CATEGORIA;
   const { pushToast } = useToast();
   const [activosLocal, setActivosLocal] = useState(activos);
 
@@ -472,57 +477,23 @@ export function ActivosCampoList({
     [puedeGestionarPreregistros, gestionPreregistrosAlcance, eliminarPreregistradosActivos],
   );
 
+  const filtrosAmbienteResumen = useMemo(() => {
+    const partes: string[] = [];
+    if (!esAmbientePreregistro && estadoRegistro) {
+      const label = FILTROS_ESTADO_AMBIENTE.find((item) => item.value === estadoRegistro)?.label;
+      if (label) partes.push(label);
+    }
+    if (categoria) {
+      const label = filtrosCategoria.find((item) => item.value === categoria)?.label;
+      if (label && label !== "Todas") partes.push(label);
+    }
+    if (orden !== "codigo") partes.push("Creación");
+    return partes.length > 0 ? partes.join(" · ") : null;
+  }, [categoria, esAmbientePreregistro, estadoRegistro, filtrosCategoria, orden]);
+
   const ambienteToolbar = isAmbiente ? (
     <div className={panelInventarioToolbarClass}>
-      <div
-        className={panelFilterRowClass}
-        role={esAmbientePreregistro ? undefined : "tablist"}
-        aria-label="Filtros de inventario"
-      >
-        {!esAmbientePreregistro && (
-          <div className="inline-flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5">
-            {FILTROS_ESTADO_AMBIENTE.map((f) => (
-              <button
-                key={f.value || "all"}
-                type="button"
-                role="tab"
-                aria-selected={estadoRegistro === f.value}
-                className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                  estadoRegistro === f.value
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setEstadoRegistro(f.value)}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div
-          className="inline-flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5"
-          role="tablist"
-          aria-label="Categoría"
-        >
-          {FILTROS_CATEGORIA.map((f) => (
-            <button
-              key={f.value || "all-cat"}
-              type="button"
-              role="tab"
-              aria-selected={categoria === f.value}
-              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                categoria === f.value
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-              onClick={() => setCategoria(f.value)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
+      <div className={panelFilterRowClass} aria-label="Acciones de inventario">
         <div className="min-w-[10rem] flex-1 md:max-w-xs [&_input]:h-8 [&_input]:py-1 [&_input]:text-sm">
           <PanelSearchInput
             value={filter}
@@ -530,14 +501,36 @@ export function ActivosCampoList({
             placeholder="Buscar por código, nombre, marca…"
           />
         </div>
-
-        <Select
-          aria-label="Orden de la lista"
-          size="compact"
-          value={orden}
-          onChange={(value) => setOrden(value as OrdenInventario)}
-          options={ORDEN_INVENTARIO_OPCIONES}
-          className="w-[7.25rem] shrink-0"
+        <AmbienteBienesFiltrosMenu
+          resumen={filtrosAmbienteResumen}
+          estado={
+            esAmbientePreregistro
+              ? undefined
+              : {
+                  label: "Estado",
+                  value: estadoRegistro,
+                  options: FILTROS_ESTADO_AMBIENTE.map((item) => ({
+                    value: item.value,
+                    label: item.label,
+                  })),
+                  onChange: (value) => setEstadoRegistro(value as "" | EstadoRegistro),
+                }
+          }
+          categoria={{
+            label: "Categoría",
+            value: categoria,
+            options: filtrosCategoria.map((item) => ({
+              value: item.value,
+              label: item.label,
+            })),
+            onChange: (value) => setCategoria(value as "" | CategoriaBien),
+          }}
+          orden={{
+            label: "Orden",
+            value: orden,
+            options: ORDEN_INVENTARIO_OPCIONES,
+            onChange: (value) => setOrden(value as OrdenInventario),
+          }}
         />
 
         <div className={`${panelToolbarActionsClass} ml-auto`}>
@@ -633,7 +626,7 @@ export function ActivosCampoList({
                     role="tablist"
                     aria-label="Categoría"
                   >
-                    {FILTROS_CATEGORIA.map((f) => (
+                    {filtrosCategoria.map((f) => (
                       <button
                         key={f.value || "all-cat"}
                         type="button"
@@ -814,7 +807,7 @@ export function ActivosCampoList({
               {f.label}
             </Button>
           ))}
-          {FILTROS_CATEGORIA.map((f) => (
+          {filtrosCategoria.map((f) => (
             <Button
               key={f.value || "all-cat"}
               type="button"
