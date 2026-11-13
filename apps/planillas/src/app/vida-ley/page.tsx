@@ -39,11 +39,28 @@ function altaVidaLey(estado?: string | null): boolean {
   return value === "Registrado" || value === "Tramitado";
 }
 
-function Marca({ listo, etiqueta }: { listo: boolean; etiqueta: string }) {
+function Marca({
+  listo,
+  etiqueta,
+  textoListo,
+  textoFalta,
+}: {
+  listo: boolean;
+  etiqueta: string;
+  textoListo?: string;
+  textoFalta?: string;
+}) {
   if (!listo) {
     return (
-      <span className="text-amber-800" aria-label={`Falta ${etiqueta}`}>
-        Falta
+      <span className="text-amber-800" aria-label={textoFalta ? `${textoFalta}: ${etiqueta}` : `Falta ${etiqueta}`}>
+        {textoFalta ?? "Falta"}
+      </span>
+    );
+  }
+  if (textoListo) {
+    return (
+      <span className="font-medium text-emerald-700" aria-label={`${textoListo}: ${etiqueta}`}>
+        {textoListo}
       </span>
     );
   }
@@ -163,7 +180,7 @@ export default async function VidaLeyPage({
                         "Paso",
                         "Estado",
                         "Certificado",
-                        "Declaración",
+                        "Declaración de beneficiarios",
                         "Alta",
                         "Póliza",
                         "Inicio",
@@ -219,7 +236,9 @@ export default async function VidaLeyPage({
                         <td className="px-4 py-2">
                           <Marca
                             listo={documentoCargado(trabajador.documentos, "VIDA_LEY_BENEFICIARIOS")}
-                            etiqueta="declaración de beneficiarios"
+                            etiqueta="declaración de beneficiarios en caso de fallecimiento"
+                            textoListo="Tramitó"
+                            textoFalta="No tramitó"
                           />
                         </td>
                         <td className="px-4 py-2">
