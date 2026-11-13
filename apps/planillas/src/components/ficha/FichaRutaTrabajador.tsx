@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Select } from "@inventario/ui";
 
 export function FichaRutaTrabajador({
   entidadId,
@@ -41,31 +42,25 @@ export function FichaRutaTrabajador({
       <span className="shrink-0 text-muted-foreground" aria-hidden>
         ›
       </span>
-      <div className="relative min-w-0 max-w-[16rem] flex-1 sm:max-w-xs">
-        <select
+      <div className="min-w-0 max-w-[16rem] flex-1 sm:max-w-xs">
+        <Select
           aria-label="Trabajador"
-          className="h-7 w-full cursor-pointer appearance-none truncate rounded-md bg-transparent py-0.5 pl-1 pr-6 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:text-sm"
+          size="compact"
           value={relacionId}
           disabled={trabajadores.length < 2}
-          onChange={(event) => {
-            if (event.target.value === relacionId) return;
+          options={trabajadores.map((trabajador) => ({
+            value: trabajador.id,
+            label: trabajador.etiqueta,
+          }))}
+          onChange={(value) => {
+            if (value === relacionId) return;
             const destino = destinoPrefijo
-              ? `${destinoPrefijo}${event.target.value}${destinoSufijo}`
-              : `/trabajadores/${event.target.value}${sufijo}`;
+              ? `${destinoPrefijo}${value}${destinoSufijo}`
+              : `/trabajadores/${value}${sufijo}`;
             router.push(destino);
           }}
-        >
-          {trabajadores.map((trabajador) => (
-            <option key={trabajador.id} value={trabajador.id}>
-              {trabajador.etiqueta}
-            </option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute inset-y-0 right-1 flex items-center text-muted-foreground" aria-hidden>
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.75">
-            <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
+          className="!h-7 !max-w-full !border-0 !bg-transparent !pl-1 !pr-7 !text-xs !font-medium !text-foreground !shadow-none sm:!text-sm"
+        />
       </div>
     </nav>
   );
