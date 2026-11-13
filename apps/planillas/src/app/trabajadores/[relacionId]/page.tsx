@@ -228,6 +228,7 @@ export default async function FichaTrabajadorPage({
             trabajador={trabajador}
             vidaLey={vidaLey}
             documentoCertificado={documentos.find((d) => d.tipo === "VIDA_LEY") ?? null}
+            documentoDeclaracion={documentos.find((d) => d.tipo === "VIDA_LEY_BENEFICIARIOS") ?? null}
             lote={lote}
             companerosEnvio={companeros
               .filter((item) => item.id !== params.relacionId)

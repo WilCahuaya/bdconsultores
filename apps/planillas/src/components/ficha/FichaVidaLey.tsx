@@ -58,6 +58,7 @@ export function FichaVidaLey({
   trabajador,
   vidaLey,
   documentoCertificado,
+  documentoDeclaracion,
   lote,
   companerosEnvio,
   enviosExistentes,
@@ -69,6 +70,7 @@ export function FichaVidaLey({
   trabajador: TrabajadorListItem;
   vidaLey: VidaLeyRow | null;
   documentoCertificado: DocumentoRow | null;
+  documentoDeclaracion: DocumentoRow | null;
   lote: VidaLeyLoteRow | null;
   companerosEnvio: CompaneroEnvioVidaLey[];
   enviosExistentes: EnvioVidaLeyExistente[];
@@ -83,11 +85,13 @@ export function FichaVidaLey({
   const [guardandoComprobante, setGuardandoComprobante] = useState(false);
   const [marcandoFactura, setMarcandoFactura] = useState(false);
   const [fileCertificado, setFileCertificado] = useState<File | null>(null);
+  const [fileDeclaracion, setFileDeclaracion] = useState<File | null>(null);
   const [fileComprobante, setFileComprobante] = useState<File | null>(null);
   const [cantidadTexto, setCantidadTexto] = useState(cantidadComprobante != null ? String(cantidadComprobante) : "");
   const [envioElegido, setEnvioElegido] = useState("");
   const [usandoEnvio, setUsandoEnvio] = useState(false);
   const [guardandoCertificado, setGuardandoCertificado] = useState(false);
+  const [guardandoDeclaracion, setGuardandoDeclaracion] = useState(false);
   const [archivoCertificadoId, setArchivoCertificadoId] = useState(0);
   const [estadoPaginas, setEstadoPaginas] = useState<EstadoPaginasCertificado>({ tipo: "completo" });
   const onEstadoPaginas = useCallback((estado: EstadoPaginasCertificado) => {
@@ -155,6 +159,39 @@ export function FichaVidaLey({
       return;
     }
     pushToast("Este trabajador usa la constancia y la factura de ese grupo.");
+    router.refresh();
+  }
+
+  async function onGuardarDeclaracion() {
+    if (!fileDeclaracion) {
+      pushToast("Elija la declaración de beneficiarios.", "error");
+      return;
+    }
+    if (!documentoDeclaracion) {
+      pushToast("No se pudo registrar la declaración. Recargue la página.", "error");
+      return;
+    }
+    setGuardandoDeclaracion(true);
+    const upload = await uploadDocumentoFile(
+      trabajador.entidad_id,
+      relacionId,
+      documentoDeclaracion.id,
+      fileDeclaracion,
+      documentoDeclaracion.storage_path,
+    );
+    if (upload.error || !upload.path) {
+      setGuardandoDeclaracion(false);
+      pushToast(upload.error ?? "No se pudo subir la declaración.", "error");
+      return;
+    }
+    const saved = await setDocumentoArchivo(relacionId, documentoDeclaracion.id, upload.path);
+    setGuardandoDeclaracion(false);
+    if (saved.error) {
+      pushToast(saved.error, "error");
+      return;
+    }
+    setFileDeclaracion(null);
+    pushToast("Declaración de beneficiarios en caso de fallecimiento guardada.");
     router.refresh();
   }
 
@@ -247,7 +284,13 @@ export function FichaVidaLey({
   }
 
   const ocupado =
-    pending || generando || guardandoCertificado || guardandoComprobante || marcandoFactura || usandoEnvio;
+    pending ||
+    generando ||
+    guardandoCertificado ||
+    guardandoDeclaracion ||
+    guardandoComprobante ||
+    marcandoFactura ||
+    usandoEnvio;
   const cantidadIngresada = /^\d+$/.test(cantidadTexto.trim()) ? Number(cantidadTexto.trim()) : null;
   const cantidadCambio =
     cantidadIngresada != null &&
@@ -307,6 +350,50 @@ export function FichaVidaLey({
           <p className="text-sm text-muted-foreground">Solo consulta.</p>
         )}
       </form>
+      <section className="rounded-xl border border-border bg-card p-4">
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.VIDA_LEY_BENEFICIARIOS}
+          storagePath={fileDeclaracion ? null : documentoDeclaracion?.storage_path}
+          file={fileDeclaracion}
+          vacio="Aún no está legalizada. Suba el documento cuando el notario lo haya certificado."
+          extra={
+            canWrite ? (
+              <div className="space-y-3">
+                <DocumentoFileInput
+                  accept={DOCUMENTO_ACCEPT}
+                  disabled={ocupado}
+                  file={fileDeclaracion}
+                  buttonLabel={
+                    fileDeclaracion || documentoDeclaracion?.storage_path
+                      ? "Cambiar declaración"
+                      : "Subir declaración legalizada"
+                  }
+                  emptyLabel="PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+                  onFileChange={setFileDeclaracion}
+                />
+                <div className="flex flex-wrap items-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={ocupado || !fileDeclaracion}
+                    onClick={() => void onGuardarDeclaracion()}
+                  >
+                    {guardandoDeclaracion ? "Guardando…" : "Guardar declaración"}
+                  </Button>
+                  {documentoDeclaracion?.storage_path ? (
+                    <EliminarDocumentoGuardado
+                      relacionId={relacionId}
+                      documentoId={documentoDeclaracion.id}
+                      descripcion="¿Quitar la declaración de beneficiarios en caso de fallecimiento? Volverá a figurar como pendiente."
+                      disabled={ocupado}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            ) : null
+          }
+        />
+      </section>
       <section className="space-y-4">
         <div className={`${panelCardClass} space-y-1 p-5`}>
           <p className="text-sm font-medium">Respuesta de la aseguradora</p>

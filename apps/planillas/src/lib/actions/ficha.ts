@@ -664,6 +664,7 @@ export async function asegurarDocumentoTrBaja(relacionId: string): Promise<void>
 
 export async function asegurarDocumentosVidaLey(relacionId: string): Promise<void> {
   await asegurarDocumentoTramite(relacionId, "VIDA_LEY");
+  await asegurarDocumentoTramite(relacionId, "VIDA_LEY_BENEFICIARIOS");
 }
 
 async function asegurarDocumentoTramite(
@@ -674,6 +675,7 @@ async function asegurarDocumentoTramite(
     | "TR_ALTA"
     | "TR_BAJA"
     | "VIDA_LEY"
+    | "VIDA_LEY_BENEFICIARIOS"
   >,
 ): Promise<void> {
   const gate = await assertEscrituraTramite(relacionId);
@@ -869,6 +871,7 @@ export async function setDocumentoArchivo(
   revalidatePath("/asistencias");
   revalidatePath("/vacaciones");
   revalidatePath("/tablero");
+  revalidatePath("/vida-ley");
   return {};
 }
 
@@ -906,6 +909,7 @@ export async function quitarDocumentoArchivo(
   revalidatePath("/asistencias");
   revalidatePath("/vacaciones");
   revalidatePath("/tablero");
+  revalidatePath("/vida-ley");
   return { path };
 }
 

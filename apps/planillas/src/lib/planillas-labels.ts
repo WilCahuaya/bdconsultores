@@ -107,6 +107,7 @@ export const TIPO_DOCUMENTO_LABEL: Record<TipoDocumentoPlanilla, string> = {
   VIDA_LEY_CONSTANCIA: "Constancia de asegurados",
   VIDA_LEY_FACTURA: "Factura electrónica Vida Ley",
   VIDA_LEY_COMPROBANTE: "Comprobante de envío Vida Ley",
+  VIDA_LEY_BENEFICIARIOS: "Declaración de beneficiarios en caso de fallecimiento",
   TRAMITE_AFP: "Documento de alta AFP",
   ASISTENCIA: "Asistencia del mes",
   VACACIONES_FIRMADO: "Respaldo de vacaciones firmado",

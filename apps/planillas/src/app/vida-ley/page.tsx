@@ -163,6 +163,7 @@ export default async function VidaLeyPage({
                         "Paso",
                         "Estado",
                         "Certificado",
+                        "Declaración",
                         "Alta",
                         "Póliza",
                         "Inicio",
@@ -181,7 +182,7 @@ export default async function VidaLeyPage({
                 <tbody>
                   {visibles.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={10}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={11}>
                         {filas.length === 0
                           ? "No hay trabajadores con alta validada en esta empresa."
                           : "No hay trámites en este paso."}
@@ -213,6 +214,12 @@ export default async function VidaLeyPage({
                           <Marca
                             listo={documentoCargado(trabajador.documentos, "VIDA_LEY")}
                             etiqueta="certificado"
+                          />
+                        </td>
+                        <td className="px-4 py-2">
+                          <Marca
+                            listo={documentoCargado(trabajador.documentos, "VIDA_LEY_BENEFICIARIOS")}
+                            etiqueta="declaración de beneficiarios"
                           />
                         </td>
                         <td className="px-4 py-2">
