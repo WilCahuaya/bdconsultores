@@ -31,7 +31,7 @@ import {
 } from "@/lib/flujo-ficha";
 import { planillasDb } from "@/lib/supabase/planillas";
 import { contratoFueGenerado } from "@/lib/tablero";
-import { anioActualLima, saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
+import { anioActualLima, diasVacacionesPorJornada, saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
 
 const HORIZONTE_DIAS = HORIZONTE_VENCIMIENTO_DIAS;
 
@@ -376,7 +376,7 @@ async function cargarPendientes(entidadId: string): Promise<{
       celdaVacaciones = celdaPendiente("gris", "—", "Aún no cumple el año para vacaciones.");
     } else {
       const tomados = diasVacacion.get(trabajador.id) ?? 0;
-      const saldo = saldoVacaciones(tomados);
+      const saldo = saldoVacaciones(tomados, diasVacacionesPorJornada(trabajador.jornada));
       if (saldo > 0) {
         const detalle =
           tomados === 0

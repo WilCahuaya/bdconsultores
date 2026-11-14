@@ -6,9 +6,36 @@ import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEditarFichaLaboral } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
-import { listVacacionesEmpresa } from "@/lib/actions/vacaciones";
-import { anioActualLima, esPeriodoVacacion, resumenPeriodoVacacion } from "@/lib/vacaciones";
-import { compareTrabajadoresPorNumero, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
+import { listVacacionesEmpresa, type VacacionRow } from "@/lib/actions/vacaciones";
+import {
+  anioActualLima,
+  esPeriodoVacacion,
+  resumenPeriodoVacacion,
+  situacionTomaVacaciones,
+  type SituacionTomaVacaciones,
+} from "@/lib/vacaciones";
+import { compareTrabajadoresPorNumero, formatFechaPlanilla, formatNumeroTrabajador, nombreCompleto } from "@/lib/planillas-labels";
+
+function etiquetaSalida(indice: number): string {
+  return `${indice + 1}.ª salida y retorno`;
+}
+
+function textoSalida(row: Pick<VacacionRow, "fecha_inicio" | "fecha_fin"> | undefined): string {
+  if (!row) return "—";
+  return `${formatFechaPlanilla(row.fecha_inicio)} – ${formatFechaPlanilla(row.fecha_fin)}`;
+}
+
+const TOMA_LABEL: Record<SituacionTomaVacaciones, string> = {
+  ninguno: "Sin días tomados",
+  proceso: "En proceso",
+  tomado: "Ya tomados",
+};
+
+const TOMA_CLASS: Record<SituacionTomaVacaciones, string> = {
+  ninguno: "bg-muted/70 text-muted-foreground",
+  proceso: "bg-amber-100 text-amber-950 dark:bg-amber-900/70 dark:text-amber-50",
+  tomado: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/70 dark:text-emerald-50",
+};
 
 export default async function VacacionesPage({
   searchParams,
@@ -34,15 +61,13 @@ export default async function VacacionesPage({
     porRelacion.set(row.relacion_id, lista);
   }
   const filas = trabajadores
-    .map((t) => ({
-      trabajador: t,
-      resumen: resumenPeriodoVacacion(porRelacion.get(t.id) ?? [], t.fecha_ingreso, periodo),
-    }))
-    .sort((a, b) => {
-      if (a.resumen.derecho !== b.resumen.derecho) return a.resumen.derecho ? -1 : 1;
-      if (a.resumen.saldo !== b.resumen.saldo) return b.resumen.saldo - a.resumen.saldo;
-      return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
-    });
+    .map((t) => {
+      const resumen = resumenPeriodoVacacion(porRelacion.get(t.id) ?? [], t.fecha_ingreso, periodo, t.jornada);
+      const salidas = [...resumen.registros].sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
+      return { trabajador: t, resumen, salidas };
+    })
+    .sort((a, b) => compareTrabajadoresPorNumero(a.trabajador, b.trabajador));
+  const columnasSalida = Math.max(1, ...filas.map((f) => f.salidas.length));
   const pendientes = filas.filter((f) => f.resumen.derecho && f.resumen.saldo > 0).length;
 
   return (
@@ -96,31 +121,46 @@ export default async function VacacionesPage({
                   {periodo + 1}
                 </Link>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Con saldo: {pendientes} de {filas.length}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                {(["ninguno", "proceso", "tomado"] as const).map((situacion) => (
+                  <span
+                    key={situacion}
+                    className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${TOMA_CLASS[situacion]}`}
+                  >
+                    {TOMA_LABEL[situacion]}
+                  </span>
+                ))}
+                <p className="text-sm text-muted-foreground">
+                  Con saldo: {pendientes} de {filas.length}
+                </p>
+              </div>
             </div>
             <div className={`${panelCardClass} panel-scroll-table overflow-x-auto p-0`}>
               <table className="w-full min-w-[760px] text-left text-sm">
                 <thead className="border-b bg-muted/40 text-muted-foreground">
                   <tr>
-                    <th className="px-4 py-2 font-medium">Nº</th>
+                    <th className="px-4 py-2 font-medium">Número</th>
                     <th className="px-4 py-2 font-medium">DNI</th>
-                    <th className="px-4 py-2 font-medium">Nombre</th>
-                    <th className="px-4 py-2 font-medium">Derecho</th>
+                    <th className="px-4 py-2 font-medium">Nombres</th>
+                    {Array.from({ length: columnasSalida }, (_, indice) => (
+                      <th key={indice} className="px-4 py-2 font-medium whitespace-nowrap">
+                        {etiquetaSalida(indice)}
+                      </th>
+                    ))}
                     <th className="px-4 py-2 font-medium">Tomados</th>
-                    <th className="px-4 py-2 font-medium">Saldo</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filas.length === 0 ? (
                     <tr>
-                      <td className="px-4 py-8 text-muted-foreground" colSpan={6}>
+                      <td className="px-4 py-8 text-muted-foreground" colSpan={4 + columnasSalida}>
                         No hay trabajadores en esta empresa.
                       </td>
                     </tr>
                   ) : (
-                    filas.map(({ trabajador, resumen }) => (
+                    filas.map(({ trabajador, resumen, salidas }) => {
+                      const situacion = situacionTomaVacaciones(salidas, resumen.diasCorrespondientes);
+                      return (
                       <tr key={trabajador.id} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="px-4 py-2 font-mono">{formatNumeroTrabajador(trabajador.numero) || "—"}</td>
                         <td className="px-4 py-2 font-mono">{trabajador.persona.dni}</td>
@@ -133,23 +173,22 @@ export default async function VacacionesPage({
                             {trabajador.estado === "CESADA" ? " · Baja" : ""}
                           </Link>
                         </td>
-                        <td className="px-4 py-2">
-                          {resumen.derecho ? resumen.diasCorrespondientes : "Aún no"}
-                        </td>
-                        <td className="px-4 py-2">{resumen.diasTomados}</td>
-                        <td className="px-4 py-2">
-                          {resumen.derecho ? (
-                            resumen.saldo > 0 ? (
-                              <span className="text-amber-800">{resumen.saldo}</span>
-                            ) : (
-                              <span className="font-medium text-emerald-700">{resumen.saldo}</span>
-                            )
-                          ) : (
-                            "—"
-                          )}
+                        {Array.from({ length: columnasSalida }, (_, indice) => (
+                          <td key={indice} className="px-4 py-2 whitespace-nowrap">
+                            {textoSalida(salidas[indice])}
+                          </td>
+                        ))}
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          <span
+                            title={TOMA_LABEL[situacion]}
+                            className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${TOMA_CLASS[situacion]}`}
+                          >
+                            {resumen.diasTomados} de {resumen.diasCorrespondientes}
+                          </span>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>

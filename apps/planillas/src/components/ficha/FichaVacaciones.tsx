@@ -13,19 +13,12 @@ import { EliminarDocumentoGuardado } from "@/components/ficha/ConfirmarEliminarA
 import { DOCUMENTO_ACCEPT } from "@/lib/documento-storage";
 import { formatFechaPlanilla, TIPO_DOCUMENTO_LABEL } from "@/lib/planillas-labels";
 import { uploadDocumentoFile } from "@/lib/upload-documento";
-import {
-  DIAS_VACACIONES_ANUALES,
-  ESTADO_VACACION,
-  ESTADO_VACACION_LABEL,
-} from "@/lib/vacaciones";
+import { ESTADO_VACACION, ESTADO_VACACION_LABEL } from "@/lib/vacaciones";
 
 export function FichaVacaciones({
   relacionId,
   entidadId,
   periodo,
-  derecho,
-  diasTomados,
-  saldo,
   registros,
   documentos,
   canWrite,
@@ -33,9 +26,6 @@ export function FichaVacaciones({
   relacionId: string;
   entidadId: string;
   periodo: number;
-  derecho: boolean;
-  diasTomados: number;
-  saldo: number;
   registros: VacacionRow[];
   documentos: DocumentoRow[];
   canWrite: boolean;
@@ -108,22 +98,6 @@ export function FichaVacaciones({
 
   return (
     <div className="space-y-4">
-      <section className={`${panelCardClass} space-y-2 p-5`}>
-        <p className="text-sm font-medium">Periodo {periodo}</p>
-        {derecho ? (
-          <p className="text-sm text-muted-foreground">
-            {DIAS_VACACIONES_ANUALES} días correspondientes · {diasTomados} registrados · saldo {saldo}
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Aún no genera derecho (un año de servicio). Puede registrar un goce si ya lo tomó.
-          </p>
-        )}
-        <p className="text-sm text-muted-foreground">
-          Cada goce requiere la solicitud o constancia firmada. Sin ese respaldo no se puede guardar.
-        </p>
-      </section>
-
       <ul className={`${panelCardClass} divide-y p-0`}>
         {registros.length === 0 ? (
           <li className="px-4 py-6 text-sm text-muted-foreground">Sin vacaciones registradas en este periodo.</li>

@@ -11,7 +11,7 @@ import {
 import { horarioEstaCompleto } from "@/lib/horario-laboral";
 import { trabajadorActivoEnMes } from "@/lib/horario-asistencia";
 import { ESTADO_CONTRATO_LABEL, TIPO_DOCUMENTO_LABEL, resolverEtapaVidaLey } from "@/lib/planillas-labels";
-import { saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
+import { diasVacacionesPorJornada, saldoVacaciones, tieneDerechoVacaciones } from "@/lib/vacaciones";
 
 export const PASOS_ALTA = [
   { id: "documentos", n: 1, label: "Documentos" },
@@ -397,7 +397,7 @@ export function listarPendientesOperativos(input: Parameters<typeof enlaceProces
     });
   }
   if (tieneDerechoVacaciones(input.fechaIngreso)) {
-    const saldo = saldoVacaciones(input.diasVacacionPeriodo);
+    const saldo = saldoVacaciones(input.diasVacacionPeriodo, diasVacacionesPorJornada(input.jornada));
     if (saldo > 0) {
       items.push({
         href: `/vacaciones?entidadId=${input.entidadId}`,
@@ -496,6 +496,7 @@ export function armarPendientesAlertaFicha(input: {
     vidaLey: input.vidaLey,
     pdfAsistenciaMes: input.pdfAsistenciaMes,
     diasVacacionPeriodo: input.diasVacacionPeriodo,
+    jornada: flujo.jornada,
     mes: input.mes,
     periodo: input.periodo,
     hoy: input.hoy,
@@ -731,6 +732,7 @@ export function enlaceProcesoOperativo(input: {
   vidaLey: { estado?: string | null; fecha_fin?: string | null } | null;
   pdfAsistenciaMes: boolean;
   diasVacacionPeriodo: number;
+  jornada?: string | null;
   mes: string;
   periodo: number;
   hoy: string;
@@ -762,7 +764,7 @@ export function enlaceProcesoOperativo(input: {
     return { href: `/asistencias?entidadId=${input.entidadId}`, etiqueta: "Falta PDF firmado del mes" };
   }
   if (tieneDerechoVacaciones(input.fechaIngreso)) {
-    const saldo = saldoVacaciones(input.diasVacacionPeriodo);
+    const saldo = saldoVacaciones(input.diasVacacionPeriodo, diasVacacionesPorJornada(input.jornada));
     if (saldo > 0) {
       return {
         href: `/vacaciones?entidadId=${input.entidadId}`,

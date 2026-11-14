@@ -124,7 +124,12 @@ export default async function FichaTrabajadorPage({
               hrefRaiz: `/vacaciones?entidadId=${trabajador.entidad_id}&periodo=${periodoVacacion}`,
             }
           : null;
-  const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodoVacacion);
+  const resumenVac = resumenPeriodoVacacion(
+    vacaciones,
+    trabajador.fecha_ingreso,
+    periodoVacacion,
+    trabajador.jornada,
+  );
   const mes = mesActualLima();
   const periodo = anioActualLima();
   const hoy = new Date().toISOString().slice(0, 10);
@@ -317,9 +322,6 @@ export default async function FichaTrabajadorPage({
               relacionId={params.relacionId}
               entidadId={trabajador.entidad_id}
               periodo={periodoVacacion}
-              derecho={resumenVac.derecho}
-              diasTomados={resumenVac.diasTomados}
-              saldo={resumenVac.saldo}
               registros={resumenVac.registros}
               documentos={documentos}
               canWrite={canEditFicha}

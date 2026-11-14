@@ -21,12 +21,7 @@ import {
   formatRemuneracion,
   montoAsignacionFamiliar,
 } from "@/lib/planillas-labels";
-import {
-  DIAS_VACACIONES_ANUALES,
-  ESTADO_VACACION_LABEL,
-  anioActualLima,
-  resumenPeriodoVacacion,
-} from "@/lib/vacaciones";
+import { ESTADO_VACACION_LABEL, anioActualLima, resumenPeriodoVacacion } from "@/lib/vacaciones";
 
 type Linea = { texto: string; href?: string; destacada?: boolean };
 
@@ -238,7 +233,7 @@ export function FichaResumen({
     .filter((d) => d.tipo === "ASISTENCIA")
     .slice()
     .sort((a, b) => String(b.observaciones ?? "").localeCompare(String(a.observaciones ?? "")));
-  const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodo);
+  const resumenVac = resumenPeriodoVacacion(vacaciones, trabajador.fecha_ingreso, periodo, trabajador.jornada);
   function estadoContrato(item: ContratoRow) {
     const respaldo = trabajador.contratos.find((c) => c.version === item.version);
     return etiquetaEstadoRespaldoContrato(
@@ -386,7 +381,7 @@ export function FichaResumen({
   const vacacionLineas: Linea[] = [
     {
       texto: resumenVac.derecho
-        ? `${periodo}: ${resumenVac.diasTomados} de ${DIAS_VACACIONES_ANUALES} días · saldo ${resumenVac.saldo}`
+        ? `${periodo}: ${resumenVac.diasTomados} de ${resumenVac.diasCorrespondientes} días · saldo ${resumenVac.saldo}`
         : `${periodo}: aún no genera derecho`,
     },
     ...resumenVac.registros.map((item) => {
