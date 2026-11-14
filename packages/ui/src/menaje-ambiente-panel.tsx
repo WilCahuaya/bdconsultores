@@ -12,6 +12,8 @@ import { CatalogoPicker } from "./catalogo-picker";
 import { Button, Input, Label, Textarea } from "./components";
 import { ConfirmDialog } from "./confirm-dialog";
 import { EstadoBienBadge } from "./inventario-table-cells";
+import { DeleteIcon, PanelIconAction } from "./panel-action-buttons";
+import { EditIcon } from "./panel";
 import { PanelViewToggle, useStoredViewMode } from "./panel-view-toggle";
 import { Select } from "./select";
 import { Sheet } from "./sheet";
@@ -116,6 +118,50 @@ function resumenLinea(linea: MenajeLinea): string {
     .map((parte) => textoMenaje(parte))
     .filter((parte): parte is string => Boolean(parte))
     .join(" · ");
+}
+
+function IconoBaja({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 11.25L12 15.75m0 0l4.5-4.5M12 15.75V3"
+      />
+    </svg>
+  );
+}
+
+function MenajeAcciones({
+  nombre,
+  disabled,
+  onEditar,
+  onBaja,
+  onEliminar,
+}: {
+  nombre: string;
+  disabled: boolean;
+  onEditar: () => void;
+  onBaja?: () => void;
+  onEliminar?: () => void;
+}) {
+  return (
+    <div className="flex justify-end gap-1">
+      <PanelIconAction label={`Editar ${nombre}`} disabled={disabled} onClick={onEditar}>
+        <EditIcon />
+      </PanelIconAction>
+      {onBaja ? (
+        <PanelIconAction label={`Dar de baja ${nombre}`} disabled={disabled} onClick={onBaja}>
+          <IconoBaja />
+        </PanelIconAction>
+      ) : null}
+      {onEliminar ? (
+        <PanelIconAction label={`Eliminar ${nombre}`} variant="danger" disabled={disabled} onClick={onEliminar}>
+          <DeleteIcon />
+        </PanelIconAction>
+      ) : null}
+    </div>
+  );
 }
 
 function IconoVista({ className }: { className?: string }) {
@@ -320,6 +366,7 @@ export function MenajeAmbientePanel({
   const [cantidadBaja, setCantidadBaja] = useState("");
   const [errorBaja, setErrorBaja] = useState<string | null>(null);
   const [eliminarLinea, setEliminarLinea] = useState<MenajeLinea | null>(null);
+  const [confirmacionEliminar, setConfirmacionEliminar] = useState("");
   const [errorEliminar, setErrorEliminar] = useState<string | null>(null);
   const [hojaBajas, setHojaBajas] = useState<{ clave: string | null } | null>(null);
 
@@ -425,6 +472,12 @@ export function MenajeAmbientePanel({
     setErrorBaja(null);
   }, [bajaLinea]);
 
+  useEffect(() => {
+    if (!eliminarLinea) return;
+    setConfirmacionEliminar("");
+    setErrorEliminar(null);
+  }, [eliminarLinea]);
+
   async function confirmarBaja() {
     if (!onQuitar || !bajaLinea) return;
     const motivo = motivoBaja.trim();
@@ -465,6 +518,7 @@ export function MenajeAmbientePanel({
       return;
     }
     setMensaje(`${eliminarLinea.nombre} se eliminó.`);
+    setConfirmacionEliminar("");
     setEliminarLinea(null);
   }
 
@@ -641,41 +695,25 @@ export function MenajeAmbientePanel({
                       <dd>{linea.observacion?.trim() || "—"}</dd>
                     </div>
                   </dl>
-                  <div className="mt-auto flex flex-wrap justify-end gap-1">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={guardando}
-                      onClick={() => {
-                        setEditandoId(linea.id);
-                        setEdicion(formDesdeLinea(linea));
-                        setError(null);
-                        setMensaje(null);
-                      }}
-                    >
-                      Editar
-                    </Button>
-                    {onQuitar ? (
-                      <Button type="button" size="sm" variant="ghost" disabled={guardando} onClick={() => setBajaLinea(linea)}>
-                        Dar de baja
-                      </Button>
-                    ) : null}
-                    {onEliminar ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={guardando}
-                        onClick={() => {
-                          setErrorEliminar(null);
-                          setEliminarLinea(linea);
-                        }}
-                      >
-                        Eliminar
-                      </Button>
-                    ) : null}
-                  </div>
+                  <MenajeAcciones
+                    nombre={linea.nombre}
+                    disabled={guardando}
+                    onEditar={() => {
+                      setEditandoId(linea.id);
+                      setEdicion(formDesdeLinea(linea));
+                      setError(null);
+                      setMensaje(null);
+                    }}
+                    onBaja={onQuitar ? () => setBajaLinea(linea) : undefined}
+                    onEliminar={
+                      onEliminar
+                        ? () => {
+                            setErrorEliminar(null);
+                            setEliminarLinea(linea);
+                          }
+                        : undefined
+                    }
+                  />
                 </article>
               );
             })}
@@ -695,7 +733,7 @@ export function MenajeAmbientePanel({
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Características</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Estado</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Observación</th>
-                  <th className="px-3 py-2 font-medium" />
+                  <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -774,47 +812,25 @@ export function MenajeAmbientePanel({
                       </td>
                       <td className="px-3 py-2">{linea.observacion?.trim() || "—"}</td>
                       <td className="px-3 py-2">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={guardando}
-                            onClick={() => {
-                              setEditandoId(linea.id);
-                              setEdicion(formDesdeLinea(linea));
-                              setError(null);
-                              setMensaje(null);
-                            }}
-                          >
-                            Editar
-                          </Button>
-                          {onQuitar ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={guardando}
-                              onClick={() => setBajaLinea(linea)}
-                            >
-                              Dar de baja
-                            </Button>
-                          ) : null}
-                          {onEliminar ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={guardando}
-                              onClick={() => {
-                                setErrorEliminar(null);
-                                setEliminarLinea(linea);
-                              }}
-                            >
-                              Eliminar
-                            </Button>
-                          ) : null}
-                        </div>
+                        <MenajeAcciones
+                          nombre={linea.nombre}
+                          disabled={guardando}
+                          onEditar={() => {
+                            setEditandoId(linea.id);
+                            setEdicion(formDesdeLinea(linea));
+                            setError(null);
+                            setMensaje(null);
+                          }}
+                          onBaja={onQuitar ? () => setBajaLinea(linea) : undefined}
+                          onEliminar={
+                            onEliminar
+                              ? () => {
+                                  setErrorEliminar(null);
+                                  setEliminarLinea(linea);
+                                }
+                              : undefined
+                          }
+                        />
                       </td>
                     </tr>
                   );
@@ -884,20 +900,37 @@ export function MenajeAmbientePanel({
         open={eliminarLinea != null}
         onClose={() => {
           if (guardando) return;
+          setConfirmacionEliminar("");
           setEliminarLinea(null);
         }}
         title="Eliminar menaje"
         description={
           eliminarLinea
-            ? `Se borrará «${eliminarLinea.nombre}» (${eliminarLinea.cantidad ?? 1}) de este ambiente. No queda como baja y no se puede deshacer.`
+            ? `¿Está seguro de eliminar «${eliminarLinea.nombre}» (${eliminarLinea.cantidad ?? 1}) de este ambiente? No queda como baja y no se puede deshacer.`
             : undefined
         }
         confirmLabel="Eliminar"
         confirmVariant="destructive"
         pending={guardando}
         error={errorEliminar}
+        confirmDisabled={confirmacionEliminar.trim().toLowerCase() !== "eliminar"}
         onConfirm={() => void confirmarEliminar()}
-      />
+      >
+        <div className="space-y-2">
+          <Label htmlFor="confirmar_eliminar_menaje">
+            Escriba <strong>eliminar</strong> para confirmar
+          </Label>
+          <Input
+            id="confirmar_eliminar_menaje"
+            value={confirmacionEliminar}
+            onChange={(event) => setConfirmacionEliminar(event.target.value)}
+            placeholder="eliminar"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={guardando}
+          />
+        </div>
+      </ConfirmDialog>
 
       <Sheet
         open={hojaBajas != null}
