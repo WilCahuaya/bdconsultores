@@ -87,6 +87,7 @@ import {
   searchCatalogoNacionalOficial,
   searchCatalogoPropio,
   searchCuentasContables,
+  suggestCatalogoClase,
   suggestCatalogoGrupo,
   upsertCuentaContable,
 } from "@/lib/actions/catalogo";
@@ -2416,6 +2417,7 @@ export function ActivoForm({
           loadClases={listCatalogoClases}
           searchCuentasContables={searchCuentasContables}
           suggestGrupo={suggestCatalogoGrupo}
+          suggestClase={suggestCatalogoClase}
           onRegisterOpcionPersonalizada={registerCatalogoOpcionPersonalizada}
           onDeleteOpcionPersonalizada={deleteCatalogoOpcionPersonalizada}
           onSubmit={

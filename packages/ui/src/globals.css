@@ -1626,4 +1626,20 @@
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
   }
+
+  /*
+   * Con el formulario de alta abierto, la tarjeta scrollea entera.
+   * Si no, la tabla queda en unos pocos píxeles y el encabezado fijo tapa los nombres.
+   */
+  .catalogo-tabla-card:has(.catalogo-alta) {
+    overflow: auto !important;
+  }
+
+  .catalogo-tabla-card:has(.catalogo-alta) .catalogo-tabla-panel,
+  .catalogo-tabla-card:has(.catalogo-alta) .catalogo-cols-full,
+  .catalogo-tabla-card:has(.catalogo-alta) .catalogo-cols-scroll {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+  }
 }

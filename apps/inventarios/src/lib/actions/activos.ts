@@ -113,6 +113,8 @@ export interface ActivoListRow {
   contabilidad?: string | null;
   catalogo_grupo?: string | null;
   catalogo_clase?: string | null;
+  /** Usuario que registró la baja de un menaje. */
+  actualizado_por_nombre?: string | null;
 }
 
 const POSIBLE_AMBIENTE_SELECT = "posible_ambiente:posible_ambiente_id(nombre, sede_id)";
@@ -976,7 +978,10 @@ export async function listActivosPorAmbiente(ambienteId: string) {
     supabase,
     data as Record<string, unknown>[],
   );
-  return enrichPosibleSedeNombres(supabase, mapActivoRows(conCatalogo));
+  return attachNombresBajaMenaje(
+    supabase,
+    await enrichPosibleSedeNombres(supabase, mapActivoRows(conCatalogo)),
+  );
 }
 
 export type ActivoConUbicacion = Activo & ActivoListRow;
@@ -1076,6 +1081,37 @@ async function enrichPosibleSedeNombres(
     const sedeNombre = nombreById.get(row.posible_sede_id);
     if (!sedeNombre) return row;
     return { ...row, posible_sede_nombre: sedeNombre };
+  });
+}
+
+/** Nombre del usuario que dio de baja cada menaje. */
+async function attachNombresBajaMenaje(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  rows: ActivoConUbicacion[],
+): Promise<ActivoConUbicacion[]> {
+  const ids = [
+    ...new Set(
+      rows
+        .filter((row) => row.categoria === "MENAJE" && row.estado_registro === "DADO_DE_BAJA")
+        .map((row) => row.updated_by)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (ids.length === 0) return rows;
+
+  const { data, error } = await supabase.from("profiles").select("id, nombre").in("id", ids);
+  if (error || !data) return rows;
+
+  const nombres = new Map(
+    data.map((profile) => [profile.id as string, String(profile.nombre ?? "").trim()]),
+  );
+  return rows.map((row) => {
+    if (row.categoria !== "MENAJE" || row.estado_registro !== "DADO_DE_BAJA" || !row.updated_by) {
+      return row;
+    }
+    const nombre = nombres.get(row.updated_by);
+    if (!nombre) return row;
+    return { ...row, actualizado_por_nombre: nombre };
   });
 }
 

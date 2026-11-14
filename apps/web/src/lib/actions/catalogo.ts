@@ -25,6 +25,7 @@ import {
   nextCodigoCatalogoPropioFromMax,
   normalizeCuentaCodigo,
   shouldRegistrarCatalogoOpcionPersonalizada,
+  suggestClaseForDenominacion,
   suggestGrupoForDenominacion,
   validarCreateCatalogoCuentaOrdenInput,
   validarCreateCatalogoNacionalExtensionInput,
@@ -368,6 +369,14 @@ export async function suggestCatalogoGrupo(denominacion: string): Promise<string
     listCatalogoGrupos(),
   ]);
   return suggestGrupoForDenominacion(denominacion, items, grupos.opciones);
+}
+
+export async function suggestCatalogoClase(denominacion: string): Promise<string | null> {
+  const [items, clases] = await Promise.all([
+    searchCatalogo(denominacion, 15),
+    listCatalogoClases(),
+  ]);
+  return suggestClaseForDenominacion(denominacion, items, clases.opciones);
 }
 
 export async function createCatalogoNacional(

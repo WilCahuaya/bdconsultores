@@ -21,6 +21,7 @@ export function Sheet({
   children,
   footer,
   className,
+  wide = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -29,6 +30,8 @@ export function Sheet({
   children: ReactNode;
   footer?: ReactNode;
   className?: string;
+  /** Panel más ancho, para tablas de varias columnas. */
+  wide?: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
 
@@ -64,7 +67,9 @@ export function Sheet({
         aria-modal="true"
         aria-labelledby="sheet-title"
         className={cn(
-          "bd-dialog-panel relative flex h-full w-full max-w-md flex-col border-l border-border/70 bg-card shadow-2xl sm:max-w-lg",
+          wide
+            ? "bd-dialog-panel relative flex h-full w-full max-w-md flex-col border-l border-border/70 bg-card shadow-2xl sm:max-w-2xl"
+            : "bd-dialog-panel relative flex h-full w-full max-w-md flex-col border-l border-border/70 bg-card shadow-2xl sm:max-w-lg",
           className,
         )}
       >

@@ -20,6 +20,7 @@ import {
   PanelCountLabel,
   PanelTableTd,
   PanelTableTh,
+  PanelTabs,
   StatusBadge,
   PanelDataTable,
   panelCardClass,
@@ -120,6 +121,14 @@ const RESUMEN_TABLA_SECTION_CLASS =
 const RESUMEN_TABLA_SUBTOTAL_CLASS =
   "bg-sky-50/90 font-semibold text-foreground dark:bg-sky-950/25";
 
+type ResumenVista = "resumen" | "depreciacion" | "ambientes";
+
+const RESUMEN_VISTAS: { id: ResumenVista; label: string }[] = [
+  { id: "resumen", label: "Resumen" },
+  { id: "depreciacion", label: "Depreciación acumulada por mes" },
+  { id: "ambientes", label: "Ambientes" },
+];
+
 export function EntidadResumenPanel({
   entidadNombre,
   entidadRuc,
@@ -133,6 +142,7 @@ export function EntidadResumenPanel({
   const [fechaCorteText, setFechaCorteText] = useState(() => dateToDDMMYYYY(fechaResumen));
   const [fechaCorte, setFechaCorte] = useState(() => fechaResumen);
   const [fechaError, setFechaError] = useState<string | null>(null);
+  const [vista, setVista] = useState<ResumenVista>("resumen");
 
   const activosResumen = useMemo(
     () => filtrarActivosPorFechaCorte(filtrarParaResumenDashboard(activos), fechaCorte),
@@ -245,236 +255,242 @@ export function EntidadResumenPanel({
       ) : null}
 
       <section className={panelCardClass}>
-        <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0 text-center sm:text-left">
-            <h3 className="text-xl font-bold tracking-wide text-foreground">RESUMEN</h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Depreciación y valor neto recalculados a la fecha de corte
-            </p>
-          </div>
-          <div className="mx-auto w-full max-w-[12.5rem] space-y-1 sm:mx-0">
-            <label
-              htmlFor="resumen_fecha_corte"
-              className="text-xs font-medium text-muted-foreground"
-            >
-              Fecha de corte
-            </label>
-            <FechaDdMmYyyyInput
-              id="resumen_fecha_corte"
-              value={fechaCorteText}
-              onChange={onFechaCorteChange}
-              onFocus={(e) => e.currentTarget.select()}
-              onBlur={(e) => aplicarFechaCorte(e.currentTarget.value, { fromBlur: true })}
-              aria-invalid={Boolean(fechaError)}
-            />
-            {fechaError && <p className="text-xs text-destructive">{fechaError}</p>}
-          </div>
+        <div className="px-2 sm:pr-4">
+          <PanelTabs
+            tabs={RESUMEN_VISTAS}
+            value={vista}
+            onChange={setVista}
+            actions={
+              <div className="w-[12.5rem] space-y-1 pb-1">
+                <label
+                  htmlFor="resumen_fecha_corte"
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  Fecha de corte
+                </label>
+                <FechaDdMmYyyyInput
+                  id="resumen_fecha_corte"
+                  value={fechaCorteText}
+                  onChange={onFechaCorteChange}
+                  onFocus={(e) => e.currentTarget.select()}
+                  onBlur={(e) => aplicarFechaCorte(e.currentTarget.value, { fromBlur: true })}
+                  aria-invalid={Boolean(fechaError)}
+                />
+                {fechaError && <p className="text-xs text-destructive">{fechaError}</p>}
+              </div>
+            }
+          />
         </div>
 
-        {resumenFilas.length === 0 ? (
-          <PanelEmptyState message="No hay activos registrados ni preregistrados para valorizar en esta entidad." />
-        ) : (
-          <PanelDataTable layout="auto" scroll>
-              <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
-                <tr className={panelTableHeadRowClass}>
-                  <PanelTableTh className={panelTableNameCellClass}>Cuenta contable</PanelTableTh>
-                  <PanelTableTh align="right" className="whitespace-nowrap">
-                    Suma de Importe
-                  </PanelTableTh>
-                  <PanelTableTh align="right" className="whitespace-nowrap">
-                    Suma de Depreciación acumulada
-                  </PanelTableTh>
-                  <PanelTableTh align="right" className="whitespace-nowrap">
-                    Suma de Valor neto
-                  </PanelTableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {resumenSecciones.map((seccion) => (
-                  <Fragment key={seccion.tipoBien}>
-                    <tr className={RESUMEN_TABLA_SECTION_CLASS}>
-                      <PanelTableTd colSpan={4}>{seccion.label}</PanelTableTd>
-                    </tr>
-                    {seccion.filas.map((fila: ClasificacionResumen) => (
-                      <tr key={`${seccion.tipoBien}-${fila.cuenta}`} className={panelTableBodyRowClass}>
-                        <PanelTableTd className={`font-medium ${panelTableNameCellClass}`}>
-                          {fila.categoria}
+        {vista === "resumen" && (
+          <>
+            <p className="px-4 py-3 text-xs text-muted-foreground">
+              Depreciación y valor neto recalculados a la fecha de corte
+            </p>
+            {resumenFilas.length === 0 ? (
+              <PanelEmptyState message="No hay activos registrados ni preregistrados para valorizar en esta entidad." />
+            ) : (
+              <PanelDataTable layout="auto" scroll>
+                <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
+                  <tr className={panelTableHeadRowClass}>
+                    <PanelTableTh className={panelTableNameCellClass}>Cuenta contable</PanelTableTh>
+                    <PanelTableTh align="right" className="whitespace-nowrap">
+                      Suma de Importe
+                    </PanelTableTh>
+                    <PanelTableTh align="right" className="whitespace-nowrap">
+                      Suma de Depreciación acumulada
+                    </PanelTableTh>
+                    <PanelTableTh align="right" className="whitespace-nowrap">
+                      Suma de Valor neto
+                    </PanelTableTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {resumenSecciones.map((seccion) => (
+                    <Fragment key={seccion.tipoBien}>
+                      <tr className={RESUMEN_TABLA_SECTION_CLASS}>
+                        <PanelTableTd colSpan={4}>{seccion.label}</PanelTableTd>
+                      </tr>
+                      {seccion.filas.map((fila: ClasificacionResumen) => (
+                        <tr key={`${seccion.tipoBien}-${fila.cuenta}`} className={panelTableBodyRowClass}>
+                          <PanelTableTd className={`font-medium ${panelTableNameCellClass}`}>
+                            {fila.categoria}
+                          </PanelTableTd>
+                          <PanelTableTd
+                            align="right"
+                            className="whitespace-nowrap font-mono text-xs tabular-nums"
+                          >
+                            {formatResumenNumero(fila.valorAdquisicion)}
+                          </PanelTableTd>
+                          <PanelTableTd
+                            align="right"
+                            className="whitespace-nowrap font-mono text-xs tabular-nums"
+                          >
+                            {formatResumenNumero(fila.depreciacionAcumulada)}
+                          </PanelTableTd>
+                          <PanelTableTd
+                            align="right"
+                            className="whitespace-nowrap font-mono text-xs tabular-nums"
+                          >
+                            {formatResumenNumero(fila.valorNeto)}
+                          </PanelTableTd>
+                        </tr>
+                      ))}
+                      <tr className={RESUMEN_TABLA_SUBTOTAL_CLASS}>
+                        <PanelTableTd className={panelTableNameCellClass}>
+                          Total {seccion.label}
                         </PanelTableTd>
                         <PanelTableTd
                           align="right"
                           className="whitespace-nowrap font-mono text-xs tabular-nums"
                         >
-                          {formatResumenNumero(fila.valorAdquisicion)}
+                          {formatResumenNumero(seccion.subtotal.valorAdquisicion)}
                         </PanelTableTd>
                         <PanelTableTd
                           align="right"
                           className="whitespace-nowrap font-mono text-xs tabular-nums"
                         >
-                          {formatResumenNumero(fila.depreciacionAcumulada)}
+                          {formatResumenNumero(seccion.subtotal.depreciacionAcumulada)}
                         </PanelTableTd>
                         <PanelTableTd
                           align="right"
                           className="whitespace-nowrap font-mono text-xs tabular-nums"
                         >
-                          {formatResumenNumero(fila.valorNeto)}
+                          {formatResumenNumero(seccion.subtotal.valorNeto)}
                         </PanelTableTd>
                       </tr>
-                    ))}
-                    <tr className={RESUMEN_TABLA_SUBTOTAL_CLASS}>
-                      <PanelTableTd className={panelTableNameCellClass}>
-                        Total {seccion.label}
-                      </PanelTableTd>
-                      <PanelTableTd
-                        align="right"
-                        className="whitespace-nowrap font-mono text-xs tabular-nums"
-                      >
-                        {formatResumenNumero(seccion.subtotal.valorAdquisicion)}
-                      </PanelTableTd>
-                      <PanelTableTd
-                        align="right"
-                        className="whitespace-nowrap font-mono text-xs tabular-nums"
-                      >
-                        {formatResumenNumero(seccion.subtotal.depreciacionAcumulada)}
-                      </PanelTableTd>
-                      <PanelTableTd
-                        align="right"
-                        className="whitespace-nowrap font-mono text-xs tabular-nums"
-                      >
-                        {formatResumenNumero(seccion.subtotal.valorNeto)}
-                      </PanelTableTd>
-                    </tr>
-                  </Fragment>
-                ))}
-                <tr className={RESUMEN_TABLA_TOTAL_CLASS}>
-                  <PanelTableTd className={panelTableNameCellClass}>Total general</PanelTableTd>
-                  <PanelTableTd
-                    align="right"
-                    className="whitespace-nowrap font-mono text-xs tabular-nums"
-                  >
-                    {formatResumenNumero(totales.valorAdquisicion)}
-                  </PanelTableTd>
-                  <PanelTableTd
-                    align="right"
-                    className="whitespace-nowrap font-mono text-xs tabular-nums"
-                  >
-                    {formatResumenNumero(totales.depreciacionAcumulada)}
-                  </PanelTableTd>
-                  <PanelTableTd
-                    align="right"
-                    className="whitespace-nowrap font-mono text-xs tabular-nums"
-                  >
-                    {formatResumenNumero(totales.valorNeto)}
-                  </PanelTableTd>
-                </tr>
-              </tbody>
-          </PanelDataTable>
-        )}
-      </section>
-
-      {resumenFilas.length > 0 && (
-        <section className={panelCardClass}>
-          <div className="border-b border-border/60 px-4 py-4 text-center sm:text-left">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-              Depreciación acumulada por mes
-            </h3>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Del año {fechaCorte.getFullYear()}, de enero hasta el mes de la fecha de corte
-            </p>
-          </div>
-          <PanelDataTable layout="auto" scroll>
-              <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
-                <tr className={panelTableHeadRowClass}>
-                  <PanelTableTh className={panelTableNameCellClass}>Mes</PanelTableTh>
-                  <PanelTableTh align="right" className="whitespace-nowrap">
-                    Depreciación acumulada
-                  </PanelTableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {depreciacionMensual.map((fila) => (
-                  <tr key={fila.mes}>
-                    <PanelTableTd className={`font-medium ${panelTableNameCellClass}`}>
-                      {fila.label}
+                    </Fragment>
+                  ))}
+                  <tr className={RESUMEN_TABLA_TOTAL_CLASS}>
+                    <PanelTableTd className={panelTableNameCellClass}>Total general</PanelTableTd>
+                    <PanelTableTd
+                      align="right"
+                      className="whitespace-nowrap font-mono text-xs tabular-nums"
+                    >
+                      {formatResumenNumero(totales.valorAdquisicion)}
                     </PanelTableTd>
                     <PanelTableTd
                       align="right"
                       className="whitespace-nowrap font-mono text-xs tabular-nums"
                     >
-                      {formatResumenNumero(fila.depreciacionAcumulada)}
+                      {formatResumenNumero(totales.depreciacionAcumulada)}
+                    </PanelTableTd>
+                    <PanelTableTd
+                      align="right"
+                      className="whitespace-nowrap font-mono text-xs tabular-nums"
+                    >
+                      {formatResumenNumero(totales.valorNeto)}
                     </PanelTableTd>
                   </tr>
-                ))}
-              </tbody>
-          </PanelDataTable>
-        </section>
-      )}
+                </tbody>
+              </PanelDataTable>
+            )}
+          </>
+        )}
 
-      <section className={panelCardClass}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Ambientes</h3>
-            <p className="text-xs text-muted-foreground">
-              {multiplesSedes ? "Agrupados por sucursal" : "Inventario por ambiente"}
+        {vista === "depreciacion" && (
+          <>
+            <p className="px-4 py-3 text-xs text-muted-foreground">
+              Del año {fechaCorte.getFullYear()}, de enero hasta el mes de la fecha de corte
             </p>
-          </div>
-          <PanelCountLabel count={ambientes.length} singular="ambiente" plural="ambientes" />
-        </div>
+            {resumenFilas.length === 0 ? (
+              <PanelEmptyState message="No hay activos registrados ni preregistrados para valorizar en esta entidad." />
+            ) : (
+              <PanelDataTable layout="auto" scroll>
+                <thead className={`${panelTableStickyHeadClass} ${RESUMEN_TABLA_HEAD_CLASS}`}>
+                  <tr className={panelTableHeadRowClass}>
+                    <PanelTableTh className={panelTableNameCellClass}>Mes</PanelTableTh>
+                    <PanelTableTh align="right" className="whitespace-nowrap">
+                      Depreciación acumulada
+                    </PanelTableTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {depreciacionMensual.map((fila) => (
+                    <tr key={fila.mes}>
+                      <PanelTableTd className={`font-medium ${panelTableNameCellClass}`}>
+                        {fila.label}
+                      </PanelTableTd>
+                      <PanelTableTd
+                        align="right"
+                        className="whitespace-nowrap font-mono text-xs tabular-nums"
+                      >
+                        {formatResumenNumero(fila.depreciacionAcumulada)}
+                      </PanelTableTd>
+                    </tr>
+                  ))}
+                </tbody>
+              </PanelDataTable>
+            )}
+          </>
+        )}
 
-        {gruposAmbientes.length === 0 ? (
-          <PanelEmptyState message="No hay ambientes registrados en esta entidad." />
-        ) : (
-          <div className="divide-y divide-border/60">
-            {gruposAmbientes.map(({ sede, ambientes: lista }) => (
-              <div key={sede.id}>
-                {multiplesSedes && (
-                  <div className="border-b border-border/40 bg-muted/20 px-4 py-2.5">
-                    <h4 className="text-sm font-bold uppercase tracking-wide text-primary">
-                      {sede.nombre}
-                    </h4>
-                  </div>
-                )}
-                <PanelDataTable layout="auto" scroll>
-                    <thead className={panelTableStickyHeadClass}>
-                      <tr className={panelTableHeadRowClass}>
-                        <PanelTableTh className={panelTableNameCellClass}>Ambiente</PanelTableTh>
-                        <PanelTableTh className="min-w-[11rem]">Responsable</PanelTableTh>
-                        <PanelTableTh className="min-w-[12rem]">Descripción</PanelTableTh>
-                        <PanelTableTh align="center" className={panelTableShrinkCellClass}>
-                          Activos
-                        </PanelTableTh>
-                        <PanelTableTh className={panelTableNowrapCellClass}>Estado</PanelTableTh>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lista.map((amb) => (
-                        <tr key={amb.id} className={panelTableBodyRowClass}>
-                          <PanelTableTd className={panelTableNameCellClass} title={amb.nombre}>
-                            {amb.nombre}
-                          </PanelTableTd>
-                          <PanelTableTd className="min-w-[11rem]" title={amb.responsable ?? undefined}>
-                            {amb.responsable ?? "—"}
-                          </PanelTableTd>
-                          <PanelTableTd
-                            className="min-w-[12rem] text-muted-foreground"
-                            title={amb.descripcion ?? undefined}
-                          >
-                            {amb.descripcion ?? "—"}
-                          </PanelTableTd>
-                          <PanelTableTd align="center" className={panelTableShrinkCellClass}>
-                            {conteoActivosAmbiente(amb, conteosAmbiente)}
-                          </PanelTableTd>
-                          <PanelTableTd className={panelTableNowrapCellClass}>
-                            <StatusBadge variant={amb.activo !== false ? "active" : "default"}>
-                              {amb.activo !== false ? "Activo" : "Inactivo"}
-                            </StatusBadge>
-                          </PanelTableTd>
+        {vista === "ambientes" && (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
+              <p className="text-xs text-muted-foreground">
+                {multiplesSedes ? "Agrupados por sucursal" : "Inventario por ambiente"}
+              </p>
+              <PanelCountLabel count={ambientes.length} singular="ambiente" plural="ambientes" />
+            </div>
+
+            {gruposAmbientes.length === 0 ? (
+              <PanelEmptyState message="No hay ambientes registrados en esta entidad." />
+            ) : (
+              <div className="divide-y divide-border/60">
+                {gruposAmbientes.map(({ sede, ambientes: lista }) => (
+                  <div key={sede.id}>
+                    {multiplesSedes && (
+                      <div className="border-b border-border/40 bg-muted/20 px-4 py-2.5">
+                        <h4 className="text-sm font-bold uppercase tracking-wide text-primary">
+                          {sede.nombre}
+                        </h4>
+                      </div>
+                    )}
+                    <PanelDataTable layout="auto" scroll>
+                      <thead className={panelTableStickyHeadClass}>
+                        <tr className={panelTableHeadRowClass}>
+                          <PanelTableTh className={panelTableNameCellClass}>Ambiente</PanelTableTh>
+                          <PanelTableTh className="min-w-[11rem]">Responsable</PanelTableTh>
+                          <PanelTableTh className="min-w-[12rem]">Descripción</PanelTableTh>
+                          <PanelTableTh align="center" className={panelTableShrinkCellClass}>
+                            Activos
+                          </PanelTableTh>
+                          <PanelTableTh className={panelTableNowrapCellClass}>Estado</PanelTableTh>
                         </tr>
-                      ))}
-                    </tbody>
-                </PanelDataTable>
+                      </thead>
+                      <tbody>
+                        {lista.map((amb) => (
+                          <tr key={amb.id} className={panelTableBodyRowClass}>
+                            <PanelTableTd className={panelTableNameCellClass} title={amb.nombre}>
+                              {amb.nombre}
+                            </PanelTableTd>
+                            <PanelTableTd className="min-w-[11rem]" title={amb.responsable ?? undefined}>
+                              {amb.responsable ?? "—"}
+                            </PanelTableTd>
+                            <PanelTableTd
+                              className="min-w-[12rem] text-muted-foreground"
+                              title={amb.descripcion ?? undefined}
+                            >
+                              {amb.descripcion ?? "—"}
+                            </PanelTableTd>
+                            <PanelTableTd align="center" className={panelTableShrinkCellClass}>
+                              {conteoActivosAmbiente(amb, conteosAmbiente)}
+                            </PanelTableTd>
+                            <PanelTableTd className={panelTableNowrapCellClass}>
+                              <StatusBadge variant={amb.activo !== false ? "active" : "default"}>
+                                {amb.activo !== false ? "Activo" : "Inactivo"}
+                              </StatusBadge>
+                            </PanelTableTd>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </PanelDataTable>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </section>
     </div>

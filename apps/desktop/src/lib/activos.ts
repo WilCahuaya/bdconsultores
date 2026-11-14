@@ -76,6 +76,8 @@ export type ActivoConUbicacion = Activo & {
   contabilidad?: string | null;
   catalogo_grupo?: string | null;
   catalogo_clase?: string | null;
+  /** Usuario que registró la baja de un menaje. */
+  actualizado_por_nombre?: string | null;
 };
 
 const POSIBLE_AMBIENTE_SELECT = "posible_ambiente:posible_ambiente_id(nombre, sede_id)";
@@ -372,11 +374,42 @@ async function enrichPosibleSedeNombres(
   });
 }
 
+/** Nombre del usuario que dio de baja cada menaje. */
+async function attachNombresBajaMenaje(
+  rows: ActivoConUbicacion[],
+): Promise<ActivoConUbicacion[]> {
+  const ids = [
+    ...new Set(
+      rows
+        .filter((row) => row.categoria === "MENAJE" && row.estado_registro === "DADO_DE_BAJA")
+        .map((row) => row.updated_by)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (ids.length === 0) return rows;
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.from("profiles").select("id, nombre").in("id", ids);
+  if (error || !data) return rows;
+
+  const nombres = new Map(
+    data.map((profile) => [profile.id as string, String(profile.nombre ?? "").trim()]),
+  );
+  return rows.map((row) => {
+    if (row.categoria !== "MENAJE" || row.estado_registro !== "DADO_DE_BAJA" || !row.updated_by) {
+      return row;
+    }
+    const nombre = nombres.get(row.updated_by);
+    if (!nombre) return row;
+    return { ...row, actualizado_por_nombre: nombre };
+  });
+}
+
 async function mapActivoRowsEnriched(
   data: Record<string, unknown>[] | null,
 ): Promise<ActivoConUbicacion[]> {
   const conCatalogo = await attachCatalogoNacionalPorCodigo(getSupabaseClient(), data);
-  return enrichPosibleSedeNombres(mapActivoRows(conCatalogo));
+  return attachNombresBajaMenaje(await enrichPosibleSedeNombres(mapActivoRows(conCatalogo)));
 }
 
 export async function getActivoById(activoId: string): Promise<ActivoConUbicacion | null> {

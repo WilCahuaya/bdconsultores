@@ -12,6 +12,7 @@ import {
   listCatalogoPropio,
   registerCatalogoOpcionPersonalizada,
   searchCatalogoNacionalOficial,
+  suggestCatalogoClase,
   suggestCatalogoGrupo,
   updateCatalogoPropio,
   updateCatalogoNacionalContabilidad,
@@ -34,6 +35,7 @@ export function CatalogoPanel({ initialDenominacion = "" }: CatalogoPanelProps) 
       loadGrupos={listCatalogoGrupos}
       loadClases={listCatalogoClases}
       suggestGrupo={suggestCatalogoGrupo}
+      suggestClase={suggestCatalogoClase}
       onRegisterOpcionPersonalizada={registerCatalogoOpcionPersonalizada}
       onDeleteOpcionPersonalizada={deleteCatalogoOpcionPersonalizada}
       onCreate={createCatalogoNacional}

@@ -50,6 +50,7 @@ export interface CatalogoPageProps {
   loadGrupos: () => Promise<CatalogoCampoOpciones>;
   loadClases: () => Promise<CatalogoCampoOpciones>;
   suggestGrupo: (denominacion: string) => Promise<string | null>;
+  suggestClase: (denominacion: string) => Promise<string | null>;
   onRegisterOpcionPersonalizada?: (
     tipo: CatalogoOpcionTipo,
     valor: string,
@@ -95,6 +96,7 @@ export function CatalogoPage({
   loadGrupos,
   loadClases,
   suggestGrupo,
+  suggestClase,
   onRegisterOpcionPersonalizada,
   onDeleteOpcionPersonalizada,
   onCreate,
@@ -201,7 +203,7 @@ export function CatalogoPage({
           </div>
 
           {showAltaForm && !readOnlyPropio && (
-            <div className="mb-6">
+            <div className="catalogo-alta mb-6">
               <CatalogoAltaPanel
                 initialDenominacion={altaDenominacion}
                 successSuffix={successSuffix}
@@ -210,6 +212,7 @@ export function CatalogoPage({
                 loadClases={loadClases}
                 searchCuentasContables={searchCuentasContables}
                 suggestGrupo={suggestGrupo}
+                suggestClase={suggestClase}
                 onRegisterOpcionPersonalizada={onRegisterOpcionPersonalizada}
                 onDeleteOpcionPersonalizada={onDeleteOpcionPersonalizada}
                 onSubmit={onCreate}
@@ -272,7 +275,7 @@ export function CatalogoPage({
           </div>
 
           {showAltaNacionalForm && onCreateNacional && !readOnlyNacionalCreate && (
-            <div className="mb-6">
+            <div className="catalogo-alta mb-6">
               <CatalogoAltaPanel
                 variant="nacional"
                 initialDenominacion={altaNacionalDenominacion}
@@ -282,6 +285,7 @@ export function CatalogoPage({
                 loadClases={loadClases}
                 searchCuentasContables={searchCuentasContables}
                 suggestGrupo={suggestGrupo}
+                suggestClase={suggestClase}
                 onRegisterOpcionPersonalizada={onRegisterOpcionPersonalizada}
                 onDeleteOpcionPersonalizada={onDeleteOpcionPersonalizada}
                 onSubmit={onCreateNacional}

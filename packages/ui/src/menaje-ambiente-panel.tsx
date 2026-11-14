@@ -31,6 +31,8 @@ export interface MenajeLinea {
 export interface MenajeBaja extends MenajeLinea {
   motivo_baja?: string | null;
   updated_at?: string | null;
+  /** Nombre del usuario que registró la baja. */
+  actualizado_por_nombre?: string | null;
 }
 
 export interface MenajeGuardadoInput {
@@ -107,6 +109,22 @@ function resumenLinea(linea: MenajeLinea): string {
     .map((parte) => textoMenaje(parte))
     .filter((parte): parte is string => Boolean(parte))
     .join(" · ");
+}
+
+function IconoVista({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      className={className}
+      aria-hidden
+    >
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
 }
 
 function MenajeCampos({
@@ -326,12 +344,22 @@ export function MenajeAmbientePanel({
     return map;
   }, [bajasOrdenadas]);
 
-  const totalBajas = bajasOrdenadas.reduce((sum, baja) => sum + (baja.cantidad ?? 1), 0);
-  const bajasVisibles = hojaBajas?.clave
-    ? (bajaPorClave.get(hojaBajas.clave)?.items ?? [])
+  const claveHoja = hojaBajas?.clave ?? null;
+  const bajasVisibles = claveHoja
+    ? (bajaPorClave.get(claveHoja)?.items ?? [])
     : bajasOrdenadas;
-  const tituloHoja =
-    hojaBajas?.clave && bajasVisibles[0] ? bajasVisibles[0].nombre : "Dados de baja";
+  const tituloHoja = claveHoja && bajasVisibles[0] ? bajasVisibles[0].nombre : "Bajas";
+  const unidadesHoja = bajasVisibles.reduce((sum, baja) => sum + (baja.cantidad ?? 1), 0);
+  const existenciaHoja = claveHoja
+    ? (ordenadas.find((linea) => claveLinea(linea) === claveHoja)?.cantidad ?? 0)
+    : 0;
+  const subtituloHoja = claveHoja
+    ? unidadesHoja > 0
+      ? `${unidadesHoja} de ${unidadesHoja + existenciaHoja}`
+      : undefined
+    : unidadesHoja > 0
+      ? `${unidadesHoja} unidades`
+      : undefined;
 
   async function handleAgregar() {
     setMensaje(null);
@@ -491,15 +519,6 @@ export function MenajeAmbientePanel({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={guardando}
-              onClick={() => setHojaBajas({ clave: null })}
-            >
-              Bajas{totalBajas > 0 ? ` (${totalBajas})` : ""}
-            </Button>
             {altaAbierta ? null : (
               <Button
                 type="button"
@@ -521,7 +540,7 @@ export function MenajeAmbientePanel({
         {ordenadas.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground">
             {bajasOrdenadas.length > 0
-              ? "No quedan existencias. Las unidades dadas de baja están en Bajas."
+              ? "No quedan existencias."
               : "Este ambiente no tiene menaje."}
           </p>
         ) : (
@@ -532,7 +551,7 @@ export function MenajeAmbientePanel({
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Código</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Nombre</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Cantidad</th>
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">De baja</th>
+                  <th className="whitespace-nowrap px-3 py-2 font-medium">Bajas</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Material</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Medida</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Color</th>
@@ -586,6 +605,7 @@ export function MenajeAmbientePanel({
                     );
                   }
                   const deBaja = bajaPorClave.get(claveLinea(linea))?.total ?? 0;
+                  const totalLinea = (linea.cantidad ?? 0) + deBaja;
                   return (
                     <tr key={linea.id} className="border-b border-border/70 align-top last:border-0">
                       <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
@@ -597,11 +617,12 @@ export function MenajeAmbientePanel({
                         {deBaja > 0 ? (
                           <button
                             type="button"
-                            className="font-medium underline-offset-2 hover:underline"
-                            aria-label={`Ver ${deBaja} dados de baja de ${linea.nombre}`}
+                            className="inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 tabular-nums text-foreground hover:bg-muted"
+                            aria-label={`Ver bajas de ${linea.nombre}: ${deBaja} de ${totalLinea}`}
                             onClick={() => setHojaBajas({ clave: claveLinea(linea) })}
                           >
-                            {deBaja}
+                            {deBaja} de {totalLinea}
+                            <IconoVista className="h-4 w-4 text-muted-foreground" />
                           </button>
                         ) : (
                           "—"
@@ -744,32 +765,49 @@ export function MenajeAmbientePanel({
         open={hojaBajas != null}
         onClose={() => setHojaBajas(null)}
         title={tituloHoja}
-        subtitle={
-          bajasVisibles.length > 0
-            ? `${bajasVisibles.reduce((sum, baja) => sum + (baja.cantidad ?? 1), 0)} unidades`
-            : undefined
-        }
+        subtitle={subtituloHoja}
+        wide
       >
         {bajasVisibles.length === 0 ? (
           <p className="text-sm text-muted-foreground">Este ambiente no tiene menajes dados de baja.</p>
         ) : (
-          <ul className="divide-y divide-border">
-            {bajasVisibles.map((baja) => {
-              const detalle = resumenLinea(baja);
-              const fecha = formatFechaISOToDDMMYYYY(baja.updated_at?.slice(0, 10));
-              return (
-                <li key={baja.id} className="space-y-1 py-3 first:pt-0">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="font-medium">{baja.nombre}</p>
-                    <p className="shrink-0 tabular-nums">{baja.cantidad ?? 1}</p>
-                  </div>
-                  {detalle ? <p className="text-xs text-muted-foreground">{detalle}</p> : null}
-                  <p className="text-sm">{baja.motivo_baja?.trim() || "Sin motivo"}</p>
-                  {fecha ? <p className="text-xs text-muted-foreground">{fecha}</p> : null}
-                </li>
-              );
-            })}
-          </ul>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr className="border-b border-border">
+                  {claveHoja ? null : (
+                    <th className="whitespace-nowrap px-2 py-2 font-medium">Menaje</th>
+                  )}
+                  <th className="whitespace-nowrap px-2 py-2 font-medium">Cantidad</th>
+                  <th className="whitespace-nowrap px-2 py-2 font-medium">Fecha de baja</th>
+                  <th className="whitespace-nowrap px-2 py-2 font-medium">Motivo</th>
+                  <th className="whitespace-nowrap px-2 py-2 font-medium">Responsable</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bajasVisibles.map((baja) => {
+                  const fecha = formatFechaISOToDDMMYYYY(baja.updated_at?.slice(0, 10));
+                  const detalle = resumenLinea(baja);
+                  return (
+                    <tr key={baja.id} className="border-b border-border/70 align-top last:border-0">
+                      {claveHoja ? null : (
+                        <td className="px-2 py-2">
+                          <p>{baja.nombre}</p>
+                          {detalle ? (
+                            <p className="text-xs text-muted-foreground">{detalle}</p>
+                          ) : null}
+                        </td>
+                      )}
+                      <td className="px-2 py-2 tabular-nums">{baja.cantidad ?? 1}</td>
+                      <td className="whitespace-nowrap px-2 py-2">{fecha || "—"}</td>
+                      <td className="px-2 py-2">{baja.motivo_baja?.trim() || "—"}</td>
+                      <td className="px-2 py-2">{baja.actualizado_por_nombre?.trim() || "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Sheet>
     </div>

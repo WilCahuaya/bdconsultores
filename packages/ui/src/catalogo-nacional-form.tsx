@@ -33,6 +33,7 @@ export interface CatalogoNacionalFormProps {
   pending?: boolean;
   searchCuentasContables: (query: string) => Promise<CuentaContable[]>;
   onSuggestGrupo?: (denominacion: string) => Promise<string | null>;
+  onSuggestClase?: (denominacion: string) => Promise<string | null>;
   onRegisterOpcionPersonalizada?: (
     tipo: CatalogoOpcionTipo,
     valor: string,
@@ -62,6 +63,7 @@ export function CatalogoNacionalForm({
   pending = false,
   searchCuentasContables,
   onSuggestGrupo,
+  onSuggestClase,
   onRegisterOpcionPersonalizada,
   onDeleteOpcionPersonalizada,
   onOpcionesChanged,
@@ -82,12 +84,20 @@ export function CatalogoNacionalForm({
   const [cuentaError, setCuentaError] = useState<string | null>(null);
   const [codigosCuentaMaestra, setCodigosCuentaMaestra] = useState<string[]>([]);
   const [grupoSugerido, setGrupoSugerido] = useState<string | null>(null);
+  const [claseSugerida, setClaseSugerida] = useState<string | null>(null);
   const [grupoManual, setGrupoManual] = useState(false);
+  const [claseManual, setClaseManual] = useState(false);
   const [sugiriendoGrupo, setSugiriendoGrupo] = useState(false);
+  const [sugiriendoClase, setSugiriendoClase] = useState(false);
   const suggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const grupoManualRef = useRef(false);
+  const claseManualRef = useRef(false);
   const onSuggestGrupoRef = useRef(onSuggestGrupo);
+  const onSuggestClaseRef = useRef(onSuggestClase);
+  const clasesOpcionesRef = useRef(clases.opciones);
   onSuggestGrupoRef.current = onSuggestGrupo;
+  onSuggestClaseRef.current = onSuggestClase;
+  clasesOpcionesRef.current = clases.opciones;
 
   const gruposDisponibles = useMemo(() => {
     const merged = new Set(grupos.opciones);
@@ -106,6 +116,11 @@ export function CatalogoNacionalForm({
     setGrupoManual(manual);
   }
 
+  function setClaseManualState(manual: boolean) {
+    claseManualRef.current = manual;
+    setClaseManual(manual);
+  }
+
   useEffect(() => {
     setDenominacion(initialDenominacion);
     setGrupo("");
@@ -116,49 +131,78 @@ export function CatalogoNacionalForm({
     setResolucion("");
     setCuentaError(null);
     setGrupoSugerido(null);
+    setClaseSugerida(null);
     setGrupoManualState(false);
+    setClaseManualState(false);
   }, [initialDenominacion, codigoProp, esNacional]);
 
   useEffect(() => {
     const texto = denominacion.trim();
-    if (texto.length < 2 || grupoManual) {
+    const buscarGrupo = !grupoManual && Boolean(onSuggestGrupoRef.current);
+    const buscarClase = !claseManual && Boolean(onSuggestClaseRef.current);
+
+    if (texto.length < 2 || (!buscarGrupo && !buscarClase)) {
       setSugiriendoGrupo(false);
+      setSugiriendoClase(false);
       return;
     }
 
     if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
-    setSugiriendoGrupo(true);
+    setSugiriendoGrupo(buscarGrupo);
+    setSugiriendoClase(buscarClase);
 
     suggestTimerRef.current = setTimeout(() => {
       void (async () => {
-        const sugeridoRemoto = onSuggestGrupoRef.current
-          ? await onSuggestGrupoRef.current(texto)
-          : null;
-        const sugerido = sugeridoRemoto;
+        const [sugeridoGrupo, sugeridoClase] = await Promise.all([
+          buscarGrupo && onSuggestGrupoRef.current
+            ? onSuggestGrupoRef.current(texto)
+            : Promise.resolve(null),
+          buscarClase && onSuggestClaseRef.current
+            ? onSuggestClaseRef.current(texto)
+            : Promise.resolve(null),
+        ]);
 
         setSugiriendoGrupo(false);
-        if (grupoManualRef.current) return;
+        setSugiriendoClase(false);
 
-        setGrupoSugerido(sugerido);
-        if (sugerido) setGrupo(sugerido);
+        if (!grupoManualRef.current && buscarGrupo) {
+          setGrupoSugerido(sugeridoGrupo);
+          if (sugeridoGrupo) setGrupo(sugeridoGrupo);
+        }
+        if (!claseManualRef.current && buscarClase) {
+          const aplicable =
+            sugeridoClase && clasesOpcionesRef.current.includes(sugeridoClase)
+              ? sugeridoClase
+              : null;
+          setClaseSugerida(aplicable);
+          if (aplicable) setClase(aplicable);
+        }
       })();
     }, 350);
 
     return () => {
       if (suggestTimerRef.current) clearTimeout(suggestTimerRef.current);
     };
-  }, [denominacion, grupoManual]);
+  }, [denominacion, grupoManual, claseManual, clases.opciones]);
 
   function handleDenominacionChange(value: string) {
     setDenominacion(value);
     setGrupoManualState(false);
+    setClaseManualState(false);
     setGrupoSugerido(null);
+    setClaseSugerida(null);
   }
 
   function handleGrupoChange(value: string) {
     setGrupo(value);
     setGrupoManualState(Boolean(value));
     if (value && value !== grupoSugerido) setGrupoSugerido(null);
+  }
+
+  function handleClaseChange(value: string) {
+    setClase(value);
+    setClaseManualState(Boolean(value));
+    if (value && value !== claseSugerida) setClaseSugerida(null);
   }
 
   async function handleRegister(tipo: CatalogoOpcionTipo, valor: string) {
@@ -300,7 +344,13 @@ export function CatalogoNacionalForm({
           personalizadas={clases.personalizadas}
           disabled={camposDeshabilitados || clasesLoading}
           loading={clasesLoading}
-          onChange={setClase}
+          suggestedClase={claseSugerida}
+          onChange={handleClaseChange}
+          helperText={
+            sugiriendoClase
+              ? "Buscando clase recomendada según la denominación…"
+              : undefined
+          }
           onRegisterPersonalizada={(valor) => handleRegister("clase", valor)}
           onDeletePersonalizada={(valor) => handleDelete("clase", valor)}
         />

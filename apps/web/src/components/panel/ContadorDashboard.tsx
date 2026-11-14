@@ -4,26 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { EntidadConConteo } from "@inventario/types";
 import { entidadEtiqueta, sortEntidadesByNumero } from "@inventario/types";
+import { Select } from "@inventario/ui";
 import {
   EntidadResumenPanel,
-  PanelDataTable,
-  PanelCountLabel,
   PanelEmptyState,
   PanelPageHeader,
-  PanelSearchInput,
-  PanelTableColgroup,
-  PanelTableTd,
-  PanelTableTh,
-  panelCardClass,
-  panelTableClickableRowClass,
-  panelTableHeadRowClass,
-  panelTableStickyHeadClass,
-  ENTIDADES_TABLE_COLS,
 } from "@inventario/ui/panel";
 import { listActivos, type ActivoConUbicacion } from "@/lib/actions/activos";
 import { listAmbientesPorEntidad, listSedesConConteo } from "@/lib/actions/ubicacion";
-
-const ENTIDAD_COLS = ENTIDADES_TABLE_COLS.slice(0, 3);
 
 interface ContadorDashboardProps {
   entidades: EntidadConConteo[];
@@ -39,7 +27,6 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
   const searchParams = useSearchParams();
   const selectedIdFromUrl = searchParams.get("entidad")?.trim() || "";
 
-  const [busqueda, setBusqueda] = useState("");
   const [activos, setActivos] = useState<ActivoConUbicacion[]>([]);
   const [ambientes, setAmbientes] = useState<
     Awaited<ReturnType<typeof listAmbientesPorEntidad>>
@@ -58,20 +45,14 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
     [entidades, selectedId],
   );
 
-  const filtradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    const base = !q
-      ? entidades
-      : entidades.filter(
-          (e) =>
-            entidadEtiqueta(e).toLowerCase().includes(q) ||
-            e.nombre.toLowerCase().includes(q) ||
-            (e.numero_interno?.toLowerCase().includes(q) ?? false) ||
-            (e.pe_codigo?.toLowerCase().includes(q) ?? false) ||
-            (e.ruc?.toLowerCase().includes(q) ?? false),
-        );
-    return sortEntidadesByNumero(base);
-  }, [entidades, busqueda]);
+  const opcionesEntidad = useMemo(
+    () =>
+      sortEntidadesByNumero(entidades).map((entidad) => ({
+        value: entidad.id,
+        label: entidadEtiqueta(entidad),
+      })),
+    [entidades],
+  );
 
   const seleccionarEntidad = useCallback(
     (entidadId: string) => {
@@ -132,70 +113,23 @@ export function ContadorDashboard({ entidades }: ContadorDashboardProps) {
         subtitle="Seleccione una entidad para ver el resumen contable y sus ambientes"
       />
 
-      <div className={panelCardClass}>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-4 py-3">
-          <PanelCountLabel count={filtradas.length} singular="entidad" plural="entidades" />
-          <div className="min-w-[12rem] flex-1 sm:max-w-xs">
-            <PanelSearchInput
-              value={busqueda}
-              onChange={setBusqueda}
-              placeholder="Buscar razón social o RUC…"
-            />
-          </div>
-        </div>
-
-        {filtradas.length === 0 ? (
-          <PanelEmptyState
-            message={
-              busqueda.trim()
-                ? "No hay entidades que coincidan con la búsqueda."
-                : "No hay entidades registradas."
-            }
+      {entidades.length === 0 ? (
+        <PanelEmptyState message="No hay entidades registradas." />
+      ) : (
+        <div className="w-full max-w-xl space-y-1">
+          <label htmlFor="dashboard-entidad" className="text-xs font-medium text-muted-foreground">
+            Entidad
+          </label>
+          <Select
+            id="dashboard-entidad"
+            aria-label="Entidad"
+            value={selectedId}
+            onChange={seleccionarEntidad}
+            options={opcionesEntidad}
+            className="max-w-none"
           />
-        ) : (
-          <PanelDataTable layout="fixed">
-            <PanelTableColgroup cols={ENTIDAD_COLS} />
-            <thead className={panelTableStickyHeadClass}>
-              <tr className={panelTableHeadRowClass}>
-                <PanelTableTh>Razón social</PanelTableTh>
-                <PanelTableTh className="shrink-0">RUC</PanelTableTh>
-                <PanelTableTh align="center" className="shrink-0">
-                  Ambientes
-                </PanelTableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {filtradas.map((entidad) => {
-                const selected = entidad.id === selectedId;
-                return (
-                  <tr
-                    key={entidad.id}
-                    className={`${panelTableClickableRowClass} ${
-                      selected ? "bg-primary/10 hover:bg-primary/15" : ""
-                    }`}
-                    onClick={() => seleccionarEntidad(entidad.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        seleccionarEntidad(entidad.id);
-                      }
-                    }}
-                    tabIndex={0}
-                    role="link"
-                    aria-current={selected ? "true" : undefined}
-                  >
-                    <PanelTableTd className="font-medium text-primary">{entidadEtiqueta(entidad)}</PanelTableTd>
-                    <PanelTableTd className="font-mono text-xs text-muted-foreground">
-                      {entidad.ruc ?? "—"}
-                    </PanelTableTd>
-                    <PanelTableTd align="center">{entidad.ambiente_count}</PanelTableTd>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </PanelDataTable>
-        )}
-      </div>
+        </div>
+      )}
 
       {entidadSeleccionada && (
         <>

@@ -2309,29 +2309,32 @@ export function isCatalogoNacionalOficial(
   return !isCatalogoPropio(item);
 }
 
-export function suggestGrupoFromCatalogoItems(items: CatalogoNacional[]): string | null {
+function suggestValorMasFrecuente(
+  items: CatalogoNacional[],
+  campo: "grupo" | "clase",
+): string | null {
   const counts = new Map<string, number>();
   for (const item of items) {
-    const grupo = item.grupo?.trim();
-    if (!grupo) continue;
-    counts.set(grupo, (counts.get(grupo) ?? 0) + 1);
+    const valor = item[campo]?.trim();
+    if (!valor) continue;
+    counts.set(valor, (counts.get(valor) ?? 0) + 1);
   }
 
   let mejor: string | null = null;
   let mejorConteo = 0;
-  for (const [grupo, conteo] of counts) {
+  for (const [valor, conteo] of counts) {
     if (conteo > mejorConteo) {
-      mejor = grupo;
+      mejor = valor;
       mejorConteo = conteo;
     }
   }
   return mejor;
 }
 
-/** Coincide palabras de la denominación con nombres de grupo del catálogo. */
-export function suggestGrupoByDenominacionKeywords(
+/** Coincide palabras de la denominación con los nombres de las opciones. */
+function suggestOpcionByDenominacionKeywords(
   denominacion: string,
-  grupos: string[],
+  opciones: string[],
 ): string | null {
   const tokens = normalizeCatalogoDenominacion(denominacion)
     .toLowerCase()
@@ -2343,19 +2346,43 @@ export function suggestGrupoByDenominacionKeywords(
   let mejor: string | null = null;
   let mejorPuntaje = 0;
 
-  for (const grupo of grupos) {
-    const grupoLower = grupo.toLowerCase();
+  for (const opcion of opciones) {
+    const opcionLower = opcion.toLowerCase();
     let puntaje = 0;
     for (const token of tokens) {
-      if (grupoLower.includes(token)) puntaje += token.length;
+      if (opcionLower.includes(token)) puntaje += token.length;
     }
     if (puntaje > mejorPuntaje) {
-      mejor = grupo;
+      mejor = opcion;
       mejorPuntaje = puntaje;
     }
   }
 
   return mejor;
+}
+
+export function suggestGrupoFromCatalogoItems(items: CatalogoNacional[]): string | null {
+  return suggestValorMasFrecuente(items, "grupo");
+}
+
+/** Coincide palabras de la denominación con nombres de grupo del catálogo. */
+export function suggestGrupoByDenominacionKeywords(
+  denominacion: string,
+  grupos: string[],
+): string | null {
+  return suggestOpcionByDenominacionKeywords(denominacion, grupos);
+}
+
+export function suggestClaseFromCatalogoItems(items: CatalogoNacional[]): string | null {
+  return suggestValorMasFrecuente(items, "clase");
+}
+
+/** Coincide palabras de la denominación con nombres de clase del catálogo. */
+export function suggestClaseByDenominacionKeywords(
+  denominacion: string,
+  clases: string[],
+): string | null {
+  return suggestOpcionByDenominacionKeywords(denominacion, clases);
 }
 
 export function suggestGrupoForDenominacion(
@@ -2367,6 +2394,31 @@ export function suggestGrupoForDenominacion(
   return (
     suggestGrupoFromCatalogoItems(catalogItems) ??
     suggestGrupoByDenominacionKeywords(denominacion, lista)
+  );
+}
+
+export function suggestClaseForDenominacion(
+  denominacion: string,
+  catalogItems: CatalogoNacional[],
+  clases?: string[],
+): string | null {
+  const lista = resolveCatalogoClases(clases);
+  const permitidas = new Set(lista);
+  const itemsConClase = catalogItems.filter((item) => permitidas.has(item.clase?.trim() ?? ""));
+
+  const grupoPreferido =
+    suggestGrupoFromCatalogoItems(catalogItems) ??
+    suggestGrupoByDenominacionKeywords(denominacion, resolveCatalogoGrupos());
+
+  if (grupoPreferido) {
+    const delGrupo = itemsConClase.filter((item) => item.grupo?.trim() === grupoPreferido);
+    const claseDelGrupo = suggestClaseFromCatalogoItems(delGrupo);
+    if (claseDelGrupo) return claseDelGrupo;
+  }
+
+  return (
+    suggestClaseFromCatalogoItems(itemsConClase) ??
+    suggestClaseByDenominacionKeywords(denominacion, lista)
   );
 }
 

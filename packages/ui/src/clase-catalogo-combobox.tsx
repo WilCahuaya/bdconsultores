@@ -10,6 +10,7 @@ export type ClaseCatalogoComboboxProps = Omit<
   label?: string;
   clases?: string[];
   opciones?: string[];
+  suggestedClase?: string | null;
 };
 
 export function ClaseCatalogoCombobox({
@@ -17,8 +18,10 @@ export function ClaseCatalogoCombobox({
   label = "Clase",
   clases = [...CATALOGO_CLASES_OPCIONES],
   personalizadas = [],
+  suggestedClase = null,
   helperText = "Seleccione una clase de la lista o elija «Otros» para escribir una personalizada.",
   opciones,
+  suggestedValue,
   ...rest
 }: ClaseCatalogoComboboxProps) {
   return (
@@ -28,6 +31,7 @@ export function ClaseCatalogoCombobox({
       opciones={opciones ?? clases}
       personalizadas={personalizadas}
       opcionTipo="clase"
+      suggestedValue={suggestedClase ?? suggestedValue ?? null}
       helperText={helperText}
       emptyOptionLabel="Seleccione una clase"
       confirmLabel="Usar esta clase"

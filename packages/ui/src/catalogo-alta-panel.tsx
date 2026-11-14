@@ -26,6 +26,7 @@ export interface CatalogoAltaPanelProps {
   loadClases: () => Promise<CatalogoCampoOpciones>;
   searchCuentasContables: (query: string) => Promise<CuentaContable[]>;
   suggestGrupo: (denominacion: string) => Promise<string | null>;
+  suggestClase: (denominacion: string) => Promise<string | null>;
   onRegisterOpcionPersonalizada?: (
     tipo: CatalogoOpcionTipo,
     valor: string,
@@ -57,6 +58,7 @@ export function CatalogoAltaPanel({
   loadClases,
   searchCuentasContables,
   suggestGrupo,
+  suggestClase,
   onRegisterOpcionPersonalizada,
   onDeleteOpcionPersonalizada,
   onSubmit,
@@ -191,6 +193,7 @@ export function CatalogoAltaPanel({
           pending={pending}
           searchCuentasContables={searchCuentasContables}
           onSuggestGrupo={suggestGrupo}
+          onSuggestClase={suggestClase}
           onRegisterOpcionPersonalizada={onRegisterOpcionPersonalizada}
           onDeleteOpcionPersonalizada={onDeleteOpcionPersonalizada}
           onOpcionesChanged={refreshMeta}
