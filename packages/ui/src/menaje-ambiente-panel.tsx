@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { CatalogoNacional, EstadoBien } from "@inventario/types";
 import {
   claveVarianteMenaje,
-  estadoBienLabel,
   formatFechaISOToDDMMYYYY,
   parseCantidadMenaje,
   textoMenaje,
@@ -12,8 +11,16 @@ import {
 import { CatalogoPicker } from "./catalogo-picker";
 import { Button, Input, Label, Textarea } from "./components";
 import { ConfirmDialog } from "./confirm-dialog";
+import { EstadoBienBadge } from "./inventario-table-cells";
+import { PanelViewToggle, useStoredViewMode } from "./panel-view-toggle";
 import { Select } from "./select";
 import { Sheet } from "./sheet";
+import { useToast } from "./toast";
+
+const MENAJE_STICKY_CODIGO =
+  "sticky left-0 z-20 w-[8.75rem] min-w-[8.75rem] max-w-[8.75rem] bg-card";
+const MENAJE_STICKY_NOMBRE =
+  "sticky left-[8.75rem] z-10 w-[14rem] min-w-[14rem] max-w-[14rem] bg-card shadow-[2px_0_0_0_hsl(var(--border)/0.55)]";
 
 export interface MenajeLinea {
   id: string;
@@ -298,6 +305,8 @@ export function MenajeAmbientePanel({
   onQuitar,
   onEliminar,
 }: MenajeAmbientePanelProps) {
+  const { pushToast } = useToast();
+  const [viewMode, setViewMode] = useStoredViewMode("inventario-view-menaje", "list");
   const [catalogo, setCatalogo] = useState<CatalogoNacional | null>(null);
   const [altaAbierta, setAltaAbierta] = useState(false);
   const [alta, setAlta] = useState<MenajeFormValues>(FORM_VACIO);
@@ -383,7 +392,8 @@ export function MenajeAmbientePanel({
     setCatalogo(null);
     setAlta(FORM_VACIO);
     setAltaAbierta(false);
-    setMensaje(
+    setMensaje(null);
+    pushToast(
       result.aviso ??
         `Menaje registrado: ${parsed.input.nombre} · ${parsed.input.codigo} · cantidad ${parsed.input.cantidad}.`,
     );
@@ -518,7 +528,8 @@ export function MenajeAmbientePanel({
               unidades
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <PanelViewToggle value={viewMode} onChange={setViewMode} listLabel="Tabla" />
             {altaAbierta ? null : (
               <Button
                 type="button"
@@ -544,12 +555,138 @@ export function MenajeAmbientePanel({
               : "Este ambiente no tiene menaje."}
           </p>
         ) : (
+          viewMode === "cards" ? (
+          <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            {ordenadas.map((linea) => {
+              const editando = editandoId === linea.id;
+              const deBaja = bajaPorClave.get(claveLinea(linea))?.total ?? 0;
+              const totalLinea = (linea.cantidad ?? 0) + deBaja;
+              if (editando) {
+                return (
+                  <article key={linea.id} className="rounded-lg border border-border bg-muted/15 p-3 sm:col-span-2 xl:col-span-3">
+                    <p className="mb-2 text-sm font-medium">
+                      {linea.nombre}{" "}
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {linea.codigo_catalogo}
+                      </span>
+                    </p>
+                    <MenajeCampos
+                      idPrefix={`menaje-card-${linea.id}`}
+                      values={edicion}
+                      disabled={guardando}
+                      onChange={setEdicion}
+                    />
+                    {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+                    <div className="mt-3 flex justify-end gap-1">
+                      <Button type="button" size="sm" disabled={guardando} onClick={() => void handleGuardar(linea)}>
+                        Guardar
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" disabled={guardando} onClick={() => setEditandoId(null)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </article>
+                );
+              }
+              return (
+                <article key={linea.id} className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/15 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium leading-snug">{linea.nombre}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{linea.codigo_catalogo}</p>
+                    </div>
+                    <EstadoBienBadge estado={linea.estado_bien} />
+                  </div>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                    <div>
+                      <dt className="text-muted-foreground">Cantidad</dt>
+                      <dd className="tabular-nums">{linea.cantidad ?? 1}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Bajas</dt>
+                      <dd>
+                        {deBaja > 0 ? (
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1.5 rounded-md tabular-nums text-foreground hover:bg-muted"
+                            aria-label={`Ver bajas de ${linea.nombre}: ${deBaja} de ${totalLinea}`}
+                            onClick={() => setHojaBajas({ clave: claveLinea(linea) })}
+                          >
+                            {deBaja} de {totalLinea}
+                            <IconoVista className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        ) : (
+                          "—"
+                        )}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Material</dt>
+                      <dd>{linea.material?.trim() || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Medida</dt>
+                      <dd>{linea.medidas?.trim() || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Color</dt>
+                      <dd>{linea.color?.trim() || "—"}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Características</dt>
+                      <dd>{linea.caracteristicas?.trim() || "—"}</dd>
+                    </div>
+                    <div className="col-span-2">
+                      <dt className="text-muted-foreground">Observación</dt>
+                      <dd>{linea.observacion?.trim() || "—"}</dd>
+                    </div>
+                  </dl>
+                  <div className="mt-auto flex flex-wrap justify-end gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={guardando}
+                      onClick={() => {
+                        setEditandoId(linea.id);
+                        setEdicion(formDesdeLinea(linea));
+                        setError(null);
+                        setMensaje(null);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                    {onQuitar ? (
+                      <Button type="button" size="sm" variant="ghost" disabled={guardando} onClick={() => setBajaLinea(linea)}>
+                        Dar de baja
+                      </Button>
+                    ) : null}
+                    {onEliminar ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={guardando}
+                        onClick={() => {
+                          setErrorEliminar(null);
+                          setEliminarLinea(linea);
+                        }}
+                      >
+                        Eliminar
+                      </Button>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[72rem] text-sm">
+            <table className="w-full min-w-[72rem] border-separate border-spacing-0 text-sm [&_td]:border-b [&_td]:border-border/70 [&_th]:border-b [&_th]:border-border">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr className="border-b border-border">
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">Código</th>
-                  <th className="whitespace-nowrap px-3 py-2 font-medium">Nombre</th>
+                  <th className={`whitespace-nowrap px-3 py-2 font-medium ${MENAJE_STICKY_CODIGO}`}>Código</th>
+                  <th className={`px-3 py-2 font-medium ${MENAJE_STICKY_NOMBRE}`}>Nombre</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Cantidad</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Bajas</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Material</th>
@@ -608,10 +745,10 @@ export function MenajeAmbientePanel({
                   const totalLinea = (linea.cantidad ?? 0) + deBaja;
                   return (
                     <tr key={linea.id} className="border-b border-border/70 align-top last:border-0">
-                      <td className="whitespace-nowrap px-3 py-2 font-mono text-xs">
+                      <td className={`whitespace-nowrap px-3 py-2 font-mono text-xs ${MENAJE_STICKY_CODIGO}`}>
                         {linea.codigo_catalogo}
                       </td>
-                      <td className="px-3 py-2">{linea.nombre}</td>
+                      <td className={`px-3 py-2 ${MENAJE_STICKY_NOMBRE}`}>{linea.nombre}</td>
                       <td className="px-3 py-2">{linea.cantidad ?? 1}</td>
                       <td className="px-3 py-2">
                         {deBaja > 0 ? (
@@ -633,7 +770,7 @@ export function MenajeAmbientePanel({
                       <td className="px-3 py-2">{linea.color?.trim() || "—"}</td>
                       <td className="px-3 py-2">{linea.caracteristicas?.trim() || "—"}</td>
                       <td className="whitespace-nowrap px-3 py-2">
-                        {linea.estado_bien ? estadoBienLabel(linea.estado_bien) : "—"}
+                        <EstadoBienBadge estado={linea.estado_bien} />
                       </td>
                       <td className="px-3 py-2">{linea.observacion?.trim() || "—"}</td>
                       <td className="px-3 py-2">
@@ -685,6 +822,7 @@ export function MenajeAmbientePanel({
               </tbody>
             </table>
           </div>
+          )
         )}
       </div>
 
