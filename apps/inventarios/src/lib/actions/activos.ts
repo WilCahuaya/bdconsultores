@@ -12,6 +12,8 @@ import {
   ejecutarBajaMenaje,
   fusionarMenajeSiHayOtro,
   insertarOSumarMenaje,
+  adjuntarComprobantesMenaje,
+  rutasPdfComprobantesMenaje,
   traducirErrorMenaje,
   varianteMenajeEfectiva,
   attachCatalogoNacionalPorCodigo,
@@ -732,8 +734,12 @@ export async function eliminarMenaje(activoId: string) {
     return { error: "Un menaje dado de baja no se elimina. Ya quedó en el historial de bajas." };
   }
 
+  const pdfs = await rutasPdfComprobantesMenaje(supabase, activoId);
   const { error } = await supabase.from("activos").delete().eq("id", activoId);
   if (error) return { error: error.message };
+  if (pdfs.length > 0) {
+    await supabase.storage.from("comprobantes-activos").remove(pdfs);
+  }
 
   revalidateActivoPaths(existing.entidad_id, existing.ambiente_id);
   return { success: true };
@@ -978,9 +984,12 @@ export async function listActivosPorAmbiente(ambienteId: string) {
     supabase,
     data as Record<string, unknown>[],
   );
-  return attachNombresBajaMenaje(
+  return adjuntarComprobantesMenaje(
     supabase,
-    await enrichPosibleSedeNombres(supabase, mapActivoRows(conCatalogo)),
+    await attachNombresBajaMenaje(
+      supabase,
+      await enrichPosibleSedeNombres(supabase, mapActivoRows(conCatalogo)),
+    ),
   );
 }
 

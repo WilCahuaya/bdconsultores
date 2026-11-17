@@ -6,6 +6,8 @@ import {
   ejecutarBajaMenaje,
   fusionarMenajeSiHayOtro,
   insertarOSumarMenaje,
+  adjuntarComprobantesMenaje,
+  rutasPdfComprobantesMenaje,
   varianteMenajeEfectiva,
   traducirErrorMenaje,
   attachCatalogoNacionalPorCodigo,
@@ -408,8 +410,12 @@ async function attachNombresBajaMenaje(
 async function mapActivoRowsEnriched(
   data: Record<string, unknown>[] | null,
 ): Promise<ActivoConUbicacion[]> {
-  const conCatalogo = await attachCatalogoNacionalPorCodigo(getSupabaseClient(), data);
-  return attachNombresBajaMenaje(await enrichPosibleSedeNombres(mapActivoRows(conCatalogo)));
+  const supabase = getSupabaseClient();
+  const conCatalogo = await attachCatalogoNacionalPorCodigo(supabase, data);
+  return adjuntarComprobantesMenaje(
+    supabase,
+    await attachNombresBajaMenaje(await enrichPosibleSedeNombres(mapActivoRows(conCatalogo))),
+  );
 }
 
 export async function getActivoById(activoId: string): Promise<ActivoConUbicacion | null> {
@@ -932,8 +938,12 @@ export async function eliminarMenaje(activoId: string): Promise<{ error?: string
   if (existing.estado_registro === "DADO_DE_BAJA") {
     return { error: "Un menaje dado de baja no se elimina. Ya quedó en el historial de bajas." };
   }
+  const pdfs = await rutasPdfComprobantesMenaje(supabase, activoId);
   const { error } = await supabase.from("activos").delete().eq("id", activoId);
   if (error) return { error: error.message };
+  if (pdfs.length > 0) {
+    await supabase.storage.from("comprobantes-activos").remove(pdfs);
+  }
   return {};
 }
 

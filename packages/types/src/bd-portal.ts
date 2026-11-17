@@ -28,9 +28,9 @@ export function contadorPortalHomePath(): string {
   return "/contador/portal";
 }
 
-/** Dashboard de inventarios del contador. */
+/** Página inicial de inventarios del contador. */
 export function contadorGestionInventariosPath(): string {
-  return "/contador";
+  return "/contador/entidades";
 }
 
 /** @deprecated Use contadorPortalHomePath — redirige al portal del contador. */

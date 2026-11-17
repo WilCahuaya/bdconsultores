@@ -298,6 +298,13 @@ export async function fusionarMenajeSiHayOtro(
     .single();
   if (error) return { fusionado: false, error: traducirErrorMenaje(error.message) };
 
+  const db = supabase as { from(table: string): any };
+  const { error: moverError } = await db
+    .from("menaje_comprobantes")
+    .update({ activo_id: otro.id })
+    .eq("activo_id", args.activoId);
+  if (moverError) return { fusionado: false, error: moverError.message };
+
   const { error: deleteError } = await supabase.from("activos").delete().eq("id", args.activoId);
   if (deleteError) return { fusionado: false, error: deleteError.message };
 
@@ -408,4 +415,194 @@ export function nombreEnReporteBaja(activo: {
     return `${activo.nombre} (${cantidad})`;
   }
   return activo.nombre;
+}
+
+/** Compra registrada sobre una línea de menaje. Una línea puede tener varias. */
+export interface MenajeComprobante {
+  id: string;
+  activo_id: string;
+  cantidad: number;
+  precio: number | null;
+  serie: string | null;
+  pdf_path: string | null;
+  fecha: string | null;
+}
+
+export interface MenajeComprobanteDatos {
+  cantidad: number;
+  precio: number | null;
+  serie: string | null;
+  fecha: string | null;
+}
+
+export interface MenajeComprobanteCorreccion {
+  id: string;
+  cantidad: number;
+  precio: number | null;
+  serie: string | null;
+  fecha: string | null;
+}
+
+export function parsePrecioMenaje(value: string): { error?: string; precio: number | null } {
+  const trimmed = value.trim();
+  if (!trimmed) return { precio: null };
+  const normalized = trimmed.replace(/\s/g, "").replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) {
+    return { error: "El precio de adquisición debe ser un monto con hasta 2 decimales.", precio: null };
+  }
+  const precio = Number(normalized);
+  if (!Number.isFinite(precio) || precio < 0 || precio > 999999999999.99) {
+    return { error: "El precio de adquisición no es válido.", precio: null };
+  }
+  return { precio };
+}
+
+type DbMenaje = { from(table: string): any };
+
+function mapComprobanteMenaje(row: Record<string, unknown>): MenajeComprobante {
+  const precioRaw = row.precio;
+  const precio =
+    precioRaw == null || precioRaw === ""
+      ? null
+      : Number(precioRaw);
+  return {
+    id: String(row.id),
+    activo_id: String(row.activo_id),
+    cantidad: Number(row.cantidad ?? 1),
+    precio: precio != null && Number.isFinite(precio) ? precio : null,
+    serie: textoMenaje(row.serie),
+    pdf_path: textoMenaje(row.pdf_path),
+    fecha: row.fecha ? String(row.fecha).slice(0, 10) : null,
+  };
+}
+
+export async function listarComprobantesMenaje(
+  supabase: DbMenaje,
+  activoIds: string[],
+): Promise<{ data: MenajeComprobante[]; error?: string }> {
+  const ids = [...new Set(activoIds.filter(Boolean))];
+  if (ids.length === 0) return { data: [] };
+  const data: MenajeComprobante[] = [];
+  for (let i = 0; i < ids.length; i += 150) {
+    const slice = ids.slice(i, i + 150);
+    const { data: rows, error } = await supabase
+      .from("menaje_comprobantes")
+      .select("id, activo_id, cantidad, precio, serie, pdf_path, fecha, created_at")
+      .in("activo_id", slice)
+      .order("created_at", { ascending: true });
+    if (error) return { data, error: error.message };
+    for (const row of (rows ?? []) as Record<string, unknown>[]) {
+      data.push(mapComprobanteMenaje(row));
+    }
+  }
+  return { data };
+}
+
+export async function adjuntarComprobantesMenaje<T extends { id: string; categoria?: string | null }>(
+  supabase: DbMenaje,
+  rows: T[],
+): Promise<Array<T & { comprobantes?: MenajeComprobante[] }>> {
+  const ids = rows.filter((row) => esMenaje(row.categoria)).map((row) => row.id);
+  if (ids.length === 0) return rows;
+  const lista = await listarComprobantesMenaje(supabase, ids);
+  if (lista.error) return rows;
+  const porActivo = new Map<string, MenajeComprobante[]>();
+  for (const item of lista.data) {
+    const actual = porActivo.get(item.activo_id) ?? [];
+    actual.push(item);
+    porActivo.set(item.activo_id, actual);
+  }
+  return rows.map((row) =>
+    esMenaje(row.categoria) ? { ...row, comprobantes: porActivo.get(row.id) ?? [] } : row,
+  );
+}
+
+export async function rutasPdfComprobantesMenaje(
+  supabase: DbMenaje,
+  activoId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("menaje_comprobantes")
+    .select("pdf_path")
+    .eq("activo_id", activoId);
+  if (error || !data) return [];
+  return (data as { pdf_path?: string | null }[])
+    .map((row) => row.pdf_path?.trim() ?? "")
+    .filter(Boolean);
+}
+
+type ArchivoNombre = { name: string };
+
+/**
+ * Inserta el comprobante de una compra y aplica correcciones de los ya guardados.
+ * El PDF se sube aparte: `subirPdf` devuelve la ruta en el bucket.
+ */
+export async function persistirComprobantesMenaje(
+  supabase: DbMenaje,
+  args: {
+    activoId: string;
+    usuarioId: string | null;
+    nuevo?: (MenajeComprobanteDatos & { archivo?: ArchivoNombre | null }) | null;
+    cambios?: Array<
+      MenajeComprobanteCorreccion & { archivo?: ArchivoNombre | null; pdfAnterior?: string | null }
+    >;
+    subirPdf?: (
+      comprobanteId: string,
+      archivo: ArchivoNombre,
+      pdfAnterior?: string | null,
+    ) => Promise<{ path?: string; error?: string }>;
+  },
+): Promise<{ error?: string; comprobantes?: MenajeComprobante[] }> {
+  const nuevo = args.nuevo;
+  if (nuevo) {
+    const { data: creado, error } = await supabase
+      .from("menaje_comprobantes")
+      .insert({
+        activo_id: args.activoId,
+        cantidad: nuevo.cantidad,
+        precio: nuevo.precio,
+        serie: nuevo.serie,
+        fecha: nuevo.fecha,
+        pdf_path: null,
+        created_by: args.usuarioId,
+      })
+      .select("id, activo_id, cantidad, precio, serie, pdf_path, fecha")
+      .single();
+    if (error) return { error: error.message };
+    if (nuevo.archivo) {
+      if (!args.subirPdf) return { error: "No se pudo adjuntar el PDF del comprobante." };
+      const upload = await args.subirPdf(String(creado.id), nuevo.archivo, null);
+      if (upload.error || !upload.path) {
+        return { error: upload.error ?? "No se pudo subir el PDF del comprobante." };
+      }
+      const { error: pathError } = await supabase
+        .from("menaje_comprobantes")
+        .update({ pdf_path: upload.path })
+        .eq("id", creado.id);
+      if (pathError) return { error: pathError.message };
+    }
+  }
+
+  for (const cambio of args.cambios ?? []) {
+    const patch: Record<string, unknown> = {
+      cantidad: cambio.cantidad,
+      precio: cambio.precio,
+      serie: cambio.serie,
+      fecha: cambio.fecha,
+    };
+    if (cambio.archivo) {
+      if (!args.subirPdf) return { error: "No se pudo adjuntar el PDF del comprobante." };
+      const upload = await args.subirPdf(cambio.id, cambio.archivo, cambio.pdfAnterior);
+      if (upload.error || !upload.path) {
+        return { error: upload.error ?? "No se pudo subir el PDF del comprobante." };
+      }
+      patch.pdf_path = upload.path;
+    }
+    const { error } = await supabase.from("menaje_comprobantes").update(patch).eq("id", cambio.id);
+    if (error) return { error: error.message };
+  }
+
+  const lista = await listarComprobantesMenaje(supabase, [args.activoId]);
+  if (lista.error) return { error: lista.error };
+  return { comprobantes: lista.data };
 }

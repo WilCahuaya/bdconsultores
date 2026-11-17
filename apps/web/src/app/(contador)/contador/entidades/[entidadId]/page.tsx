@@ -50,17 +50,19 @@ export default async function EntidadAmbientesPage({
       visitasActivas={visitasActivas}
       visitasHistorial={visitasHistorial}
       initialTab={
-        tab === "ambientes"
-          ? "ambientes"
-          : tab === "espacios"
-            ? "espacios"
-            : tab === "responsables"
-              ? "responsables"
-              : tab === "visitas"
-                ? "visitas"
-                : tab === "sucursales"
-                  ? "sucursales"
-                  : undefined
+        tab === "inventario"
+          ? "inventario"
+          : tab === "ambientes"
+            ? "ambientes"
+            : tab === "espacios"
+              ? "espacios"
+              : tab === "responsables"
+                ? "responsables"
+                : tab === "visitas"
+                  ? "visitas"
+                  : tab === "sucursales"
+                    ? "sucursales"
+                    : undefined
       }
     />
   );

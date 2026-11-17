@@ -9,6 +9,7 @@ import {
   filtrarActivosPorFechaCorte,
   matchesInventarioBusquedaMultiColumna,
   opcionesFiltroColumnaDesdeActivos,
+  parseCantidadMenaje,
   parseFechaDDMMYYYY,
   pasoFiltrosColumnaInventario,
   validarFechaDDMMYYYY,
@@ -48,6 +49,8 @@ import {
   updateActivoSerie,
 } from "@/lib/actions/activos";
 import { getCatalogoByCodigo } from "@/lib/actions/catalogo";
+import { aplicarComprobantesMenaje } from "@/lib/menaje-comprobantes-client";
+import { getSignedStorageUrl } from "@/lib/storage-url";
 import { buscarCatalogoLocal, ensureCatalogoBusqueda } from "@/lib/catalogo-local";
 import {
   ORDEN_INVENTARIO_OPCIONES,
@@ -557,6 +560,11 @@ export function ActivosAmbientePanel({
           bajas={menajeBajas}
           searchCatalogo={searchMenaje}
           resolveCodigo={getCatalogoByCodigo}
+          onVerComprobante={(path) => {
+            void getSignedStorageUrl("comprobantes-activos", path).then((result) => {
+              if (result.url) window.open(result.url, "_blank", "noopener,noreferrer");
+            });
+          }}
           onAgregar={async (input) => {
             const result = await createActivo({
               entidad_id: entidadId,
@@ -574,11 +582,35 @@ export function ActivosAmbientePanel({
               ambiente_id: ambienteId,
               estado_registro: "REGISTRADO",
             });
-            if (result.data) reemplazarMenaje(result.data);
-            if (!result.error) router.refresh();
-            return { error: result.error, aviso: result.aviso };
+            if (result.error || !result.data) {
+              return { error: result.error ?? "No se pudo guardar el menaje." };
+            }
+            const comp = await aplicarComprobantesMenaje({
+              entidadId,
+              activoId: result.data.id,
+              nuevo: input.comprobanteNuevo,
+              cambios: input.comprobantesCambio,
+            });
+            reemplazarMenaje({
+              ...result.data,
+              ...(comp.comprobantes ? { comprobantes: comp.comprobantes } : {}),
+            });
+            router.refresh();
+            if (comp.error) {
+              return {
+                aviso: `Menaje registrado. El comprobante no se guardó: ${comp.error}. Edite la fila para cargarlo de nuevo.`,
+              };
+            }
+            return { aviso: result.aviso };
           }}
           onGuardar={async (linea, input) => {
+            const comp = await aplicarComprobantesMenaje({
+              entidadId,
+              activoId: linea.id,
+              nuevo: input.comprobanteNuevo,
+              cambios: input.comprobantesCambio,
+            });
+            if (comp.error) return { error: comp.error };
             const result = await updateActivo(linea.id, {
               codigo_catalogo: linea.codigo_catalogo,
               nombre: linea.nombre,
@@ -593,9 +625,50 @@ export function ActivosAmbientePanel({
               sede_id: sedeId,
               ambiente_id: ambienteId,
             });
-            if (result.data) reemplazarMenaje(result.data);
-            if (!result.error) router.refresh();
-            return { error: result.error, aviso: result.aviso };
+            if (result.error || !result.data) {
+              return { error: result.error ?? "No se pudo guardar el menaje." };
+            }
+            reemplazarMenaje({
+              ...result.data,
+              ...(comp.comprobantes ? { comprobantes: comp.comprobantes } : {}),
+            });
+            router.refresh();
+            return { aviso: result.aviso };
+          }}
+          onAgregarAdquisicion={async (linea, input) => {
+            const total = (linea.cantidad ?? 0) + input.cantidad;
+            const tope = parseCantidadMenaje(total);
+            if (!tope.cantidad) return { error: tope.error ?? "Cantidad no válida." };
+            const comp = await aplicarComprobantesMenaje({
+              entidadId,
+              activoId: linea.id,
+              nuevo: input,
+              cambios: [],
+            });
+            if (comp.error) return { error: comp.error };
+            const result = await updateActivo(linea.id, {
+              codigo_catalogo: linea.codigo_catalogo,
+              nombre: linea.nombre,
+              categoria: "MENAJE",
+              cantidad: tope.cantidad,
+              material: linea.material ?? "",
+              color: linea.color ?? "",
+              medidas: linea.medidas ?? "",
+              caracteristicas: linea.caracteristicas ?? "",
+              estado_bien: linea.estado_bien ?? null,
+              observacion: linea.observacion ?? "",
+              sede_id: sedeId,
+              ambiente_id: ambienteId,
+            });
+            if (result.error || !result.data) {
+              return { error: result.error ?? "No se pudo guardar el menaje." };
+            }
+            reemplazarMenaje({
+              ...result.data,
+              ...(comp.comprobantes ? { comprobantes: comp.comprobantes } : {}),
+            });
+            router.refresh();
+            return { aviso: `Se sumaron ${input.cantidad}. Total en el ambiente: ${tope.cantidad}.` };
           }}
           onQuitar={async (linea, motivo, cantidad) => {
             const result = await darDeBajaMenaje(linea.id, motivo, cantidad);

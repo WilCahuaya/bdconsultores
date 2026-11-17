@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { CatalogoNacional, EstadoBien } from "@inventario/types";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { CatalogoNacional, EstadoBien, MenajeComprobante } from "@inventario/types";
 import {
+  ACTIVO_COMPROBANTE_ACCEPT,
   claveVarianteMenaje,
+  formatComprobanteSerieInput,
   formatFechaISOToDDMMYYYY,
+  formatMonedaPE,
+  normalizarSerieComprobante,
   parseCantidadMenaje,
+  parseFechaDDMMYYYY,
+  parsePrecioMenaje,
   textoMenaje,
 } from "@inventario/types";
 import { CatalogoPicker } from "./catalogo-picker";
-import { Button, Input, Label, Textarea } from "./components";
+import { Button, FileInput, Input, Label, Textarea } from "./components";
+import { FechaDdMmYyyyInput } from "./fecha-dd-mm-yyyy-input";
 import { ConfirmDialog } from "./confirm-dialog";
 import { EstadoBienBadge } from "./inventario-table-cells";
 import { DeleteIcon, PanelIconAction } from "./panel-action-buttons";
@@ -23,6 +30,7 @@ const MENAJE_STICKY_CODIGO =
   "sticky left-0 z-20 w-[8.75rem] min-w-[8.75rem] max-w-[8.75rem] bg-card";
 const MENAJE_STICKY_NOMBRE =
   "sticky left-[8.75rem] z-10 w-[14rem] min-w-[14rem] max-w-[14rem] bg-card shadow-[2px_0_0_0_hsl(var(--border)/0.55)]";
+const MENAJE_TABLA_COLUMNAS = 15;
 
 export interface MenajeLinea {
   id: string;
@@ -35,6 +43,25 @@ export interface MenajeLinea {
   caracteristicas?: string | null;
   estado_bien?: EstadoBien | null;
   observacion?: string | null;
+  comprobantes?: MenajeComprobante[];
+}
+
+export interface MenajeComprobanteNuevo {
+  cantidad: number;
+  precio: number | null;
+  serie: string | null;
+  fecha: string | null;
+  archivo: File | null;
+}
+
+export interface MenajeComprobanteCambio {
+  id: string;
+  cantidad: number;
+  precio: number | null;
+  serie: string | null;
+  fecha: string | null;
+  archivo: File | null;
+  pdf_path: string | null;
 }
 
 export interface MenajeBaja extends MenajeLinea {
@@ -54,6 +81,8 @@ export interface MenajeGuardadoInput {
   caracteristicas: string;
   estado_bien: EstadoBien | null;
   observacion: string;
+  comprobanteNuevo: MenajeComprobanteNuevo | null;
+  comprobantesCambio: MenajeComprobanteCambio[];
 }
 
 interface MenajeAmbientePanelProps {
@@ -66,6 +95,11 @@ interface MenajeAmbientePanelProps {
     linea: MenajeLinea,
     input: MenajeGuardadoInput,
   ) => Promise<{ error?: string; aviso?: string }>;
+  onAgregarAdquisicion?: (
+    linea: MenajeLinea,
+    input: MenajeComprobanteNuevo,
+  ) => Promise<{ error?: string; aviso?: string }>;
+  onVerComprobante?: (path: string) => void;
   onQuitar?: (linea: MenajeLinea, motivo: string, cantidad: number) => Promise<{ error?: string; aviso?: string }>;
   onEliminar?: (linea: MenajeLinea) => Promise<{ error?: string }>;
 }
@@ -78,6 +112,20 @@ interface MenajeFormValues {
   caracteristicas: string;
   estadoBien: string;
   observacion: string;
+  precio: string;
+  fecha: string;
+  serie: string;
+  archivo: File | null;
+}
+
+interface ComprobanteEdicion {
+  id: string;
+  cantidad: string;
+  precio: string;
+  fecha: string;
+  serie: string;
+  archivo: File | null;
+  pdf_path: string | null;
 }
 
 const FORM_VACIO: MenajeFormValues = {
@@ -88,6 +136,10 @@ const FORM_VACIO: MenajeFormValues = {
   caracteristicas: "",
   estadoBien: "",
   observacion: "",
+  precio: "",
+  fecha: "",
+  serie: "",
+  archivo: null,
 };
 
 const ESTADO_OPCIONES = [
@@ -106,7 +158,23 @@ function formDesdeLinea(linea: MenajeLinea): MenajeFormValues {
     caracteristicas: linea.caracteristicas ?? "",
     estadoBien: linea.estado_bien ?? "",
     observacion: linea.observacion ?? "",
+    precio: "",
+    fecha: "",
+    serie: "",
+    archivo: null,
   };
+}
+
+function edicionDesdeComprobantes(comprobantes: MenajeComprobante[] | undefined): ComprobanteEdicion[] {
+  return (comprobantes ?? []).map((item) => ({
+    id: item.id,
+    cantidad: String(item.cantidad ?? 1),
+    precio: item.precio != null ? String(item.precio) : "",
+    fecha: formatFechaISOToDDMMYYYY(item.fecha),
+    serie: item.serie ? formatComprobanteSerieInput(item.serie) : "",
+    archivo: null,
+    pdf_path: item.pdf_path,
+  }));
 }
 
 function claveLinea(linea: MenajeLinea): string {
@@ -132,21 +200,36 @@ function IconoBaja({ className = "h-3.5 w-3.5" }: { className?: string }) {
   );
 }
 
+function IconoAgregar({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
 function MenajeAcciones({
   nombre,
   disabled,
   onEditar,
+  onAgregar,
   onBaja,
   onEliminar,
 }: {
   nombre: string;
   disabled: boolean;
   onEditar: () => void;
+  onAgregar?: () => void;
   onBaja?: () => void;
   onEliminar?: () => void;
 }) {
   return (
     <div className="flex justify-end gap-1">
+      {onAgregar ? (
+        <PanelIconAction label={`Agregar menaje a ${nombre}`} disabled={disabled} onClick={onAgregar}>
+          <IconoAgregar />
+        </PanelIconAction>
+      ) : null}
       <PanelIconAction label={`Editar ${nombre}`} disabled={disabled} onClick={onEditar}>
         <EditIcon />
       </PanelIconAction>
@@ -180,23 +263,130 @@ function IconoVista({ className }: { className?: string }) {
   );
 }
 
+function leerFechaComprobante(fecha: string): { error?: string; iso: string | null } {
+  const trimmed = fecha.trim();
+  if (!trimmed) return { iso: null };
+  const iso = parseFechaDDMMYYYY(trimmed);
+  if (!iso) return { error: "La fecha de adquisición debe tener el formato DD/MM/AAAA.", iso: null };
+  return { iso };
+}
+
+function leerCompra(
+  values: MenajeFormValues,
+  cantidad: number,
+): { error?: string; nuevo: MenajeComprobanteNuevo | null } {
+  const precio = parsePrecioMenaje(values.precio);
+  if (precio.error) return { error: precio.error, nuevo: null };
+  const fecha = leerFechaComprobante(values.fecha);
+  if (fecha.error) return { error: fecha.error, nuevo: null };
+  return {
+    nuevo: {
+      cantidad,
+      precio: precio.precio,
+      serie: normalizarSerieComprobante(values.serie) || null,
+      fecha: fecha.iso,
+      archivo: values.archivo,
+    },
+  };
+}
+
+function leerComprobantesCambio(
+  items: ComprobanteEdicion[],
+): { error?: string; cambios: MenajeComprobanteCambio[] } {
+  const cambios: MenajeComprobanteCambio[] = [];
+  for (const item of items) {
+    const cantidad = parseCantidadMenaje(item.cantidad);
+    if (!cantidad.cantidad) {
+      return { error: cantidad.error ?? "La cantidad de la adquisición no es válida.", cambios: [] };
+    }
+    const precio = parsePrecioMenaje(item.precio);
+    if (precio.error) return { error: precio.error, cambios: [] };
+    const fecha = leerFechaComprobante(item.fecha);
+    if (fecha.error) return { error: fecha.error, cambios: [] };
+    cambios.push({
+      id: item.id,
+      cantidad: cantidad.cantidad,
+      precio: precio.precio,
+      serie: normalizarSerieComprobante(item.serie) || null,
+      fecha: fecha.iso,
+      archivo: item.archivo,
+      pdf_path: item.pdf_path,
+    });
+  }
+  return { cambios };
+}
+
+function textoPrecio(precio: number | null): string {
+  if (precio == null) return "—";
+  return `S/ ${formatMonedaPE(precio)}`;
+}
+
+function PilaComprobantes({
+  comprobantes,
+  render,
+}: {
+  comprobantes: MenajeComprobante[];
+  render: (item: MenajeComprobante) => ReactNode;
+}) {
+  if (comprobantes.length === 0) return <>—</>;
+  return (
+    <div className="flex flex-col gap-1">
+      {comprobantes.map((item) => (
+        <div key={item.id} className="min-h-5 whitespace-nowrap">
+          {render(item)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EnlacePdf({
+  path,
+  onVer,
+  etiqueta,
+}: {
+  path: string | null | undefined;
+  onVer?: (path: string) => void;
+  etiqueta?: string;
+}) {
+  if (!path) return <>—</>;
+  if (!onVer) return <>PDF</>;
+  return (
+    <button
+      type="button"
+      className="text-primary underline-offset-2 hover:underline"
+      aria-label={etiqueta ? `Ver PDF ${etiqueta}` : "Ver PDF"}
+      onClick={() => onVer(path)}
+    >
+      Ver PDF
+    </button>
+  );
+}
+
 function MenajeCampos({
   values,
   onChange,
   disabled,
   idPrefix,
+  variante = "alta",
 }: {
   values: MenajeFormValues;
   onChange: (values: MenajeFormValues) => void;
   disabled: boolean;
   idPrefix: string;
+  /** alta: primera fila. linea: datos del menaje. primera: la única adquisición. adquisicion: otra compra. */
+  variante?: "alta" | "linea" | "primera" | "adquisicion";
 }) {
   function patch(partial: Partial<MenajeFormValues>) {
     onChange({ ...values, ...partial });
   }
+  const muestraLinea = variante !== "adquisicion";
+  const muestraCantidad = variante !== "linea";
+  const muestraCompra = variante !== "linea";
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {muestraCantidad ? (
       <div className="space-y-1.5">
         <Label htmlFor={`${idPrefix}-cantidad`}>Cantidad</Label>
         <Input
@@ -207,6 +397,9 @@ function MenajeCampos({
           onChange={(event) => patch({ cantidad: event.target.value.replace(/\D/g, "") })}
         />
       </div>
+      ) : null}
+      {muestraLinea ? (
+      <>
       <div className="space-y-1.5">
         <Label htmlFor={`${idPrefix}-material`}>Material</Label>
         <Input
@@ -268,6 +461,77 @@ function MenajeCampos({
           onChange={(event) => patch({ observacion: event.target.value })}
         />
       </div>
+      </>
+      ) : null}
+      {muestraCompra ? (
+      <div className="space-y-3 border-t border-border/70 pt-3 sm:col-span-2 lg:col-span-4">
+        <div>
+          <p className="text-sm font-medium">
+            {variante === "adquisicion" ? "Nueva adquisición" : "Comprobante de esta compra"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {variante === "adquisicion"
+              ? "La cantidad se suma al stock y queda en este comprobante."
+              : "La cantidad de arriba es la de este comprobante."}
+          </p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-precio`}>Precio de adquisición (S/)</Label>
+            <Input
+              id={`${idPrefix}-precio`}
+              inputMode="decimal"
+              value={values.precio}
+              disabled={disabled}
+              placeholder="0.00"
+              onChange={(event) => patch({ precio: event.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-fecha`}>Fecha de adquisición</Label>
+            <FechaDdMmYyyyInput
+              id={`${idPrefix}-fecha`}
+              value={values.fecha}
+              disabled={disabled}
+              onChange={(fecha) => patch({ fecha })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-serie`}>Serie del comprobante</Label>
+            <Input
+              id={`${idPrefix}-serie`}
+              spellCheck={false}
+              value={values.serie}
+              disabled={disabled}
+              placeholder="Ej. E001 - 1"
+              onChange={(event) => patch({ serie: formatComprobanteSerieInput(event.target.value) })}
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor={`${idPrefix}-pdf`}>PDF del comprobante</Label>
+            <FileInput
+              id={`${idPrefix}-pdf`}
+              accept={ACTIVO_COMPROBANTE_ACCEPT}
+              file={values.archivo}
+              disabled={disabled}
+              onFileChange={(archivo) => patch({ archivo })}
+              buttonLabel="Seleccionar PDF"
+              emptyLabel="Sin archivo adjunto"
+              canPreview={Boolean(values.archivo)}
+              previewLabel="Previsualizar comprobante"
+              onPreview={
+                values.archivo
+                  ? () => {
+                      const url = URL.createObjectURL(values.archivo as File);
+                      window.open(url, "_blank", "noopener,noreferrer");
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        </div>
+      </div>
+      ) : null}
     </div>
   );
 }
@@ -319,17 +583,46 @@ function valoresAGuardado(
   codigo: string,
   nombre: string,
   values: MenajeFormValues,
+  opciones?: {
+    alta?: boolean;
+    stockActual?: number;
+    comprobantes?: ComprobanteEdicion[];
+    cantidadesOriginales?: number[];
+  },
 ): { error?: string; input?: MenajeGuardadoInput } {
-  const parsed = parseCantidadMenaje(values.cantidad);
-  if (!parsed.cantidad) {
-    return { error: parsed.error ?? "Cantidad no válida." };
+  const alta = opciones?.alta !== false;
+  const hayAdquisiciones = !alta && (opciones?.comprobantes?.length ?? 0) > 0;
+  let cantidad = opciones?.stockActual ?? 1;
+  let comprobanteNuevo: MenajeComprobanteNuevo | null = null;
+  let comprobantesCambio: MenajeComprobanteCambio[] = [];
+
+  if (hayAdquisiciones) {
+    const cambios = leerComprobantesCambio(opciones?.comprobantes ?? []);
+    if (cambios.error) return { error: cambios.error };
+    comprobantesCambio = cambios.cambios;
+    const sumaNueva = comprobantesCambio.reduce((sum, item) => sum + item.cantidad, 0);
+    const sumaVieja = (opciones?.cantidadesOriginales ?? []).reduce((sum, item) => sum + item, 0);
+    const stock = (opciones?.stockActual ?? 0) + sumaNueva - sumaVieja;
+    const tope = parseCantidadMenaje(stock);
+    if (!tope.cantidad) {
+      return { error: tope.error ?? "La cantidad de las adquisiciones deja el stock fuera de rango." };
+    }
+    cantidad = tope.cantidad;
+  } else {
+    const parsed = parseCantidadMenaje(values.cantidad);
+    if (!parsed.cantidad) return { error: parsed.error ?? "Cantidad no válida." };
+    const compra = leerCompra(values, parsed.cantidad);
+    if (compra.error || !compra.nuevo) return { error: compra.error ?? "La adquisición no es válida." };
+    cantidad = parsed.cantidad;
+    comprobanteNuevo = compra.nuevo;
   }
+
   const estado = values.estadoBien;
   return {
     input: {
       codigo,
       nombre,
-      cantidad: parsed.cantidad,
+      cantidad,
       material: values.material.trim(),
       color: values.color.trim(),
       medidas: values.medidas.trim(),
@@ -337,8 +630,111 @@ function valoresAGuardado(
       estado_bien:
         estado === "BUENO" || estado === "REGULAR" || estado === "MALO" ? estado : null,
       observacion: values.observacion.trim(),
+      comprobanteNuevo,
+      comprobantesCambio,
     },
   };
+}
+
+function leerAdquisicion(values: MenajeFormValues): { error?: string; nuevo?: MenajeComprobanteNuevo } {
+  const parsed = parseCantidadMenaje(values.cantidad);
+  if (!parsed.cantidad) return { error: parsed.error ?? "Cantidad no válida." };
+  const compra = leerCompra(values, parsed.cantidad);
+  if (compra.error || !compra.nuevo) return { error: compra.error ?? "La adquisición no es válida." };
+  return { nuevo: compra.nuevo };
+}
+
+function ComprobantesGuardados({
+  items,
+  disabled,
+  idPrefix,
+  onChange,
+  onVerComprobante,
+}: {
+  items: ComprobanteEdicion[];
+  disabled: boolean;
+  idPrefix: string;
+  onChange: (items: ComprobanteEdicion[]) => void;
+  onVerComprobante?: (path: string) => void;
+}) {
+  if (items.length === 0) return null;
+  function patch(id: string, partial: Partial<ComprobanteEdicion>) {
+    onChange(items.map((item) => (item.id === id ? { ...item, ...partial } : item)));
+  }
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-sm font-medium">Adquisiciones</p>
+      <p className="text-xs text-muted-foreground">
+        La cantidad que cambies queda en esa compra. El stock de la fila se ajusta con esa diferencia.
+      </p>
+      {items.map((item, index) => (
+        <div key={item.id} className="grid gap-3 rounded-md border border-border/70 p-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-${item.id}-cantidad`}>Cantidad {index + 1}</Label>
+            <Input
+              id={`${idPrefix}-${item.id}-cantidad`}
+              inputMode="numeric"
+              value={item.cantidad}
+              disabled={disabled}
+              onChange={(event) => patch(item.id, { cantidad: event.target.value.replace(/\D/g, "") })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-${item.id}-precio`}>Precio {index + 1} (S/)</Label>
+            <Input
+              id={`${idPrefix}-${item.id}-precio`}
+              inputMode="decimal"
+              value={item.precio}
+              disabled={disabled}
+              onChange={(event) => patch(item.id, { precio: event.target.value })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-${item.id}-fecha`}>Fecha</Label>
+            <FechaDdMmYyyyInput
+              id={`${idPrefix}-${item.id}-fecha`}
+              value={item.fecha}
+              disabled={disabled}
+              onChange={(fecha) => patch(item.id, { fecha })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-${item.id}-serie`}>Serie</Label>
+            <Input
+              id={`${idPrefix}-${item.id}-serie`}
+              spellCheck={false}
+              value={item.serie}
+              disabled={disabled}
+              onChange={(event) => patch(item.id, { serie: formatComprobanteSerieInput(event.target.value) })}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={`${idPrefix}-${item.id}-pdf`}>PDF</Label>
+            <FileInput
+              id={`${idPrefix}-${item.id}-pdf`}
+              accept={ACTIVO_COMPROBANTE_ACCEPT}
+              file={item.archivo}
+              disabled={disabled}
+              onFileChange={(archivo) => patch(item.id, { archivo })}
+              buttonLabel={item.pdf_path ? "Reemplazar PDF" : "Seleccionar PDF"}
+              emptyLabel="Sin archivo nuevo"
+              hint={item.pdf_path && !item.archivo ? "Ya hay un PDF adjunto" : undefined}
+              canPreview={Boolean(item.archivo || item.pdf_path)}
+              previewLabel="Previsualizar comprobante"
+              onPreview={() => {
+                if (item.archivo) {
+                  const url = URL.createObjectURL(item.archivo);
+                  window.open(url, "_blank", "noopener,noreferrer");
+                  return;
+                }
+                if (item.pdf_path) onVerComprobante?.(item.pdf_path);
+              }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export function MenajeAmbientePanel({
@@ -348,8 +744,10 @@ export function MenajeAmbientePanel({
   resolveCodigo,
   onAgregar,
   onGuardar,
+  onAgregarAdquisicion,
   onQuitar,
   onEliminar,
+  onVerComprobante,
 }: MenajeAmbientePanelProps) {
   const { pushToast } = useToast();
   const [viewMode, setViewMode] = useStoredViewMode("inventario-view-menaje", "list");
@@ -361,6 +759,9 @@ export function MenajeAmbientePanel({
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [edicion, setEdicion] = useState<MenajeFormValues>(FORM_VACIO);
+  const [comprobantesEdicion, setComprobantesEdicion] = useState<ComprobanteEdicion[]>([]);
+  const [adquisicionLinea, setAdquisicionLinea] = useState<MenajeLinea | null>(null);
+  const [adquisicion, setAdquisicion] = useState<MenajeFormValues>(FORM_VACIO);
   const [bajaLinea, setBajaLinea] = useState<MenajeLinea | null>(null);
   const [motivoBaja, setMotivoBaja] = useState("");
   const [cantidadBaja, setCantidadBaja] = useState("");
@@ -449,7 +850,12 @@ export function MenajeAmbientePanel({
   async function handleGuardar(linea: MenajeLinea) {
     setMensaje(null);
     setError(null);
-    const parsed = valoresAGuardado(linea.codigo_catalogo, linea.nombre, edicion);
+    const parsed = valoresAGuardado(linea.codigo_catalogo, linea.nombre, edicion, {
+      alta: false,
+      stockActual: linea.cantidad ?? 0,
+      comprobantes: comprobantesEdicion,
+      cantidadesOriginales: (linea.comprobantes ?? []).map((item) => item.cantidad),
+    });
     if (!parsed.input) {
       setError(parsed.error ?? "Cantidad no válida.");
       return;
@@ -462,7 +868,51 @@ export function MenajeAmbientePanel({
       return;
     }
     setEditandoId(null);
+    setComprobantesEdicion([]);
     setMensaje(result.aviso ?? `${linea.nombre}: cantidad ${parsed.input.cantidad}.`);
+  }
+
+  function empezarEdicion(linea: MenajeLinea) {
+    setAdquisicionLinea(null);
+    setAltaAbierta(false);
+    setEditandoId(linea.id);
+    setEdicion(formDesdeLinea(linea));
+    setComprobantesEdicion(edicionDesdeComprobantes(linea.comprobantes));
+    setError(null);
+    setMensaje(null);
+  }
+
+  function abrirAdquisicion(linea: MenajeLinea) {
+    setEditandoId(null);
+    setAltaAbierta(false);
+    setAdquisicionLinea(linea);
+    setAdquisicion({ ...FORM_VACIO, cantidad: "1" });
+    setError(null);
+    setMensaje(null);
+  }
+
+  async function handleAdquisicion() {
+    if (!adquisicionLinea || !onAgregarAdquisicion) return;
+    setMensaje(null);
+    setError(null);
+    const parsed = leerAdquisicion(adquisicion);
+    if (!parsed.nuevo) {
+      setError(parsed.error ?? "Cantidad no válida.");
+      return;
+    }
+    setGuardando(true);
+    const result = await onAgregarAdquisicion(adquisicionLinea, parsed.nuevo);
+    setGuardando(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setAdquisicionLinea(null);
+    setAdquisicion(FORM_VACIO);
+    pushToast(
+      result.aviso ??
+        `Adquisición registrada en ${adquisicionLinea.nombre}: ${parsed.nuevo.cantidad} unidades.`,
+    );
   }
 
   useEffect(() => {
@@ -535,8 +985,8 @@ export function MenajeAmbientePanel({
         <div className="rounded-lg border border-border bg-card p-4">
           <h2 className="text-sm font-semibold">Agregar menaje</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Una fila por código, material, medida, color y características. Si esa misma variante ya
-            está en el ambiente, la cantidad se suma. El estado y la observación no crean otra fila.
+            Una fila por código, material, medida, color y características. La cantidad queda en el
+            primer comprobante. Si esa variante ya está, se suma como otra adquisición.
           </p>
           <div className="mt-3 space-y-3">
             <CatalogoPicker
@@ -569,7 +1019,46 @@ export function MenajeAmbientePanel({
               </Button>
             </div>
           </div>
-          {error && !editandoId ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
+          {error && !editandoId && !adquisicionLinea ? (
+            <p className="mt-2 text-sm text-destructive">{error}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {adquisicionLinea ? (
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold">Agregar menaje</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {adquisicionLinea.nombre}{" "}
+            <span className="font-mono">{adquisicionLinea.codigo_catalogo}</span>. Esta compra se suma
+            a la fila y se puede editar después.
+          </p>
+          <div className="mt-3 space-y-3">
+            <MenajeCampos
+              idPrefix="menaje-adquisicion"
+              variante="adquisicion"
+              values={adquisicion}
+              disabled={guardando}
+              onChange={setAdquisicion}
+            />
+            <div className="flex gap-2">
+              <Button type="button" disabled={guardando} onClick={() => void handleAdquisicion()}>
+                Guardar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={guardando}
+                onClick={() => {
+                  setAdquisicionLinea(null);
+                  setError(null);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+          {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
         </div>
       ) : null}
 
@@ -584,13 +1073,14 @@ export function MenajeAmbientePanel({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <PanelViewToggle value={viewMode} onChange={setViewMode} listLabel="Tabla" />
-            {altaAbierta ? null : (
+            {altaAbierta || adquisicionLinea ? null : (
               <Button
                 type="button"
                 size="sm"
                 disabled={guardando}
                 onClick={() => {
                   setEditandoId(null);
+                  setAdquisicionLinea(null);
                   setError(null);
                   setMensaje(null);
                   setAltaAbierta(true);
@@ -626,9 +1116,17 @@ export function MenajeAmbientePanel({
                     </p>
                     <MenajeCampos
                       idPrefix={`menaje-card-${linea.id}`}
+                      variante={comprobantesEdicion.length > 0 ? "linea" : "primera"}
                       values={edicion}
                       disabled={guardando}
                       onChange={setEdicion}
+                    />
+                    <ComprobantesGuardados
+                      idPrefix={`menaje-card-${linea.id}`}
+                      items={comprobantesEdicion}
+                      disabled={guardando}
+                      onChange={setComprobantesEdicion}
+                      onVerComprobante={onVerComprobante}
                     />
                     {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
                     <div className="mt-3 flex justify-end gap-1">
@@ -694,16 +1192,35 @@ export function MenajeAmbientePanel({
                       <dt className="text-muted-foreground">Observación</dt>
                       <dd>{linea.observacion?.trim() || "—"}</dd>
                     </div>
+                    <div className="col-span-2">
+                      <dt className="text-muted-foreground">Comprobantes</dt>
+                      <dd>
+                        <PilaComprobantes
+                          comprobantes={linea.comprobantes ?? []}
+                          render={(item) => (
+                            <span>
+                              {textoPrecio(item.precio)}
+                              {" · "}
+                              {formatFechaISOToDDMMYYYY(item.fecha) || "sin fecha"}
+                              {" · "}
+                              {item.serie || "sin serie"}
+                              {" · "}
+                              <EnlacePdf
+                                path={item.pdf_path}
+                                onVer={onVerComprobante}
+                                etiqueta={item.serie || formatFechaISOToDDMMYYYY(item.fecha)}
+                              />
+                            </span>
+                          )}
+                        />
+                      </dd>
+                    </div>
                   </dl>
                   <MenajeAcciones
                     nombre={linea.nombre}
                     disabled={guardando}
-                    onEditar={() => {
-                      setEditandoId(linea.id);
-                      setEdicion(formDesdeLinea(linea));
-                      setError(null);
-                      setMensaje(null);
-                    }}
+                    onAgregar={onAgregarAdquisicion ? () => abrirAdquisicion(linea) : undefined}
+                    onEditar={() => empezarEdicion(linea)}
                     onBaja={onQuitar ? () => setBajaLinea(linea) : undefined}
                     onEliminar={
                       onEliminar
@@ -720,7 +1237,7 @@ export function MenajeAmbientePanel({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[72rem] border-separate border-spacing-0 text-sm [&_td]:border-b [&_td]:border-border/70 [&_th]:border-b [&_th]:border-border">
+            <table className="w-full min-w-[96rem] border-separate border-spacing-0 text-sm [&_td]:border-b [&_td]:border-border/70 [&_th]:border-b [&_th]:border-border">
               <thead className="text-left text-xs text-muted-foreground">
                 <tr className="border-b border-border">
                   <th className={`whitespace-nowrap px-3 py-2 font-medium ${MENAJE_STICKY_CODIGO}`}>Código</th>
@@ -733,6 +1250,10 @@ export function MenajeAmbientePanel({
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Características</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Estado</th>
                   <th className="whitespace-nowrap px-3 py-2 font-medium">Observación</th>
+                  <th className="whitespace-nowrap px-3 py-2 font-medium">Precio</th>
+                  <th className="whitespace-nowrap px-3 py-2 font-medium">Fecha</th>
+                  <th className="whitespace-nowrap px-3 py-2 font-medium">Serie</th>
+                  <th className="whitespace-nowrap px-3 py-2 font-medium">PDF</th>
                   <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Acciones</th>
                 </tr>
               </thead>
@@ -742,7 +1263,7 @@ export function MenajeAmbientePanel({
                   if (editando) {
                     return (
                       <tr key={linea.id} className="border-b border-border/70 last:border-0">
-                        <td className="px-3 py-3" colSpan={11}>
+                        <td className="px-3 py-3" colSpan={MENAJE_TABLA_COLUMNAS}>
                           <p className="mb-2 text-sm font-medium">
                             {linea.nombre}{" "}
                             <span className="font-mono text-xs text-muted-foreground">
@@ -751,9 +1272,17 @@ export function MenajeAmbientePanel({
                           </p>
                           <MenajeCampos
                             idPrefix={`menaje-${linea.id}`}
+                            variante={comprobantesEdicion.length > 0 ? "linea" : "primera"}
                             values={edicion}
                             disabled={guardando}
                             onChange={setEdicion}
+                          />
+                          <ComprobantesGuardados
+                            idPrefix={`menaje-${linea.id}`}
+                            items={comprobantesEdicion}
+                            disabled={guardando}
+                            onChange={setComprobantesEdicion}
+                            onVerComprobante={onVerComprobante}
                           />
                           {error ? <p className="mt-2 text-sm text-destructive">{error}</p> : null}
                           <div className="mt-3 flex justify-end gap-1">
@@ -811,16 +1340,42 @@ export function MenajeAmbientePanel({
                         <EstadoBienBadge estado={linea.estado_bien} />
                       </td>
                       <td className="px-3 py-2">{linea.observacion?.trim() || "—"}</td>
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums">
+                        <PilaComprobantes
+                          comprobantes={linea.comprobantes ?? []}
+                          render={(item) => textoPrecio(item.precio)}
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <PilaComprobantes
+                          comprobantes={linea.comprobantes ?? []}
+                          render={(item) => formatFechaISOToDDMMYYYY(item.fecha) || "—"}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <PilaComprobantes
+                          comprobantes={linea.comprobantes ?? []}
+                          render={(item) => item.serie || "—"}
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <PilaComprobantes
+                          comprobantes={linea.comprobantes ?? []}
+                          render={(item) => (
+                            <EnlacePdf
+                              path={item.pdf_path}
+                              onVer={onVerComprobante}
+                              etiqueta={item.serie || formatFechaISOToDDMMYYYY(item.fecha)}
+                            />
+                          )}
+                        />
+                      </td>
                       <td className="px-3 py-2">
                         <MenajeAcciones
                           nombre={linea.nombre}
                           disabled={guardando}
-                          onEditar={() => {
-                            setEditandoId(linea.id);
-                            setEdicion(formDesdeLinea(linea));
-                            setError(null);
-                            setMensaje(null);
-                          }}
+                          onAgregar={onAgregarAdquisicion ? () => abrirAdquisicion(linea) : undefined}
+                          onEditar={() => empezarEdicion(linea)}
                           onBaja={onQuitar ? () => setBajaLinea(linea) : undefined}
                           onEliminar={
                             onEliminar

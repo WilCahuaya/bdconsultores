@@ -2703,6 +2703,14 @@ export {
   traducirErrorMenaje,
   varianteMenajeEfectiva,
   ejecutarBajaMenaje,
+  adjuntarComprobantesMenaje,
+  listarComprobantesMenaje,
+  parsePrecioMenaje,
+  persistirComprobantesMenaje,
+  rutasPdfComprobantesMenaje,
+  type MenajeComprobante,
+  type MenajeComprobanteCorreccion,
+  type MenajeComprobanteDatos,
 } from "./menaje";
 
 export {

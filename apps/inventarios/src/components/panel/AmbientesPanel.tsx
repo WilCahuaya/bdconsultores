@@ -102,6 +102,7 @@ const ENTITY_TABS: { id: EntityTab; label: string }[] = [
 
 function parseInitialTab(value?: string): EntityTab {
   if (
+    value === "inventario" ||
     value === "ambientes" ||
     value === "espacios" ||
     value === "responsables" ||
@@ -110,7 +111,7 @@ function parseInitialTab(value?: string): EntityTab {
   ) {
     return value;
   }
-  return "inventario";
+  return "ambientes";
 }
 
 type AmbienteRow = AmbienteConVisita;
@@ -194,7 +195,7 @@ export function AmbientesPanel({
   activos = [],
   visitasActivas: initialVisitasActivas = [],
   visitasHistorial: initialVisitasHistorial = [],
-  initialTab = "inventario",
+  initialTab = "ambientes",
   sedeFocus = null,
   panelMode = "contador",
 }: AmbientesPanelProps) {
@@ -215,7 +216,7 @@ export function AmbientesPanel({
     setTab(next);
     if (sedeFocus) return;
     const path = entidadHref;
-    router.replace(next === "inventario" ? path : `${path}?tab=${next}`, { scroll: false });
+    router.replace(next === "ambientes" ? path : `${path}?tab=${next}`, { scroll: false });
   }
 
   const [ambientes, setAmbientes] = useState(initial);
