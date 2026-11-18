@@ -322,7 +322,9 @@ export function FichaResumen({
                 ? `AFP ${pension.afp_nombre.trim()}`
                 : "AFP: Sin dato",
         },
-        ...(pension.tipo === "AFP" ? [{ texto: valorOSinDato("CUSPP", pension.cuspp) }] : []),
+        ...(pension.tipo === "AFP"
+          ? [{ texto: pension.cuspp?.trim() ? pension.cuspp.trim() : "Falta CUSPP" }]
+          : []),
         {
           texto: pension.tramite_estado ? TRAMITE_PENSION_LABEL[pension.tramite_estado] : "Trámite: Sin dato",
         },

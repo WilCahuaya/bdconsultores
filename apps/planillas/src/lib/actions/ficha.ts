@@ -937,7 +937,6 @@ export async function savePension(relacionId: string, formData: FormData): Promi
   const tramiteEstado = (tipo === "ONP" ? "NO_APLICA" : String(formData.get("tramite_estado"))) as EstadoTramitePension;
   if (tipo === "AFP" && tramiteEstado === "TRAMITADO") {
     if (!afpNombre) return { error: "Indique la AFP (Habitat, Integra, Prima o Profuturo)." };
-    if (!cuspp) return { error: "Indique el CUSPP." };
   }
   const payload = {
     relacion_id: relacionId,

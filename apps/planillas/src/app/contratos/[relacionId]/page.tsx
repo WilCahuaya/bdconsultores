@@ -218,16 +218,18 @@ export default async function ContratoProcesoPage({
             </p>
             <ApartadoDesplegable
               titulo={pension?.tipo === "ONP" ? "ONP" : "AFP"}
-              pendiente={!pensionAltaLista({ pension })}
-              defaultOpen={!pensionAltaLista({ pension })}
+              pendiente={!pensionAltaLista({ pension }) || (pension?.tipo === "AFP" && !pension.cuspp?.trim())}
+              defaultOpen={!pensionAltaLista({ pension }) || (pension?.tipo === "AFP" && !pension.cuspp?.trim())}
               resumen={
                 !pension?.tipo
                   ? "Pendiente: aún no se marcó AFP u ONP en Documentos."
                   : pension.tipo === "ONP"
                     ? "ONP"
                     : pensionAltaLista({ pension })
-                      ? `Listo · ${pension.afp_nombre?.trim() || "AFP"}${pension.cuspp?.trim() ? ` · ${pension.cuspp.trim()}` : ""}.`
-                      : "Pendiente: complete nombre de AFP y CUSPP."
+                      ? `Listo · ${pension.afp_nombre?.trim() || "AFP"}${
+                          pension.cuspp?.trim() ? ` · ${pension.cuspp.trim()}` : ". Falta CUSPP"
+                        }.`
+                      : "Pendiente: indique el nombre de AFP. El CUSPP puede llegar después."
               }
             >
               <FichaPensiones

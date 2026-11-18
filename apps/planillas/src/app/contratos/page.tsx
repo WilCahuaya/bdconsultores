@@ -248,7 +248,7 @@ export default async function ContratosPage({
                           {fechaAlta ? formatFechaPlanilla(fechaAlta) : <span className="text-muted-foreground">—</span>}
                         </td>
                         <td className="px-3 py-2">
-                          <Marca listo={pensionAltaLista(flujo)} />
+                          <Marca listo={pensionAltaLista(flujo) && !faltas.alta.some((falta) => falta.id === "cuspp")} />
                         </td>
                         <td className="px-3 py-2">
                           <Marca listo={tRegistroAltaLista(flujo)} />

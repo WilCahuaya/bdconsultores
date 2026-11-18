@@ -568,7 +568,7 @@ function CapturaPension({
       storagePath={documento?.storage_path}
       alerta={alerta}
       alertaNombre="sistema de pensiones firmado"
-      hint="Suba el sistema de pensiones firmado e indique AFP u ONP. Si es AFP, el alta queda válida con el nombre de AFP y el CUSPP. El documento de alta AFP es opcional."
+      hint="Suba el sistema de pensiones firmado e indique AFP u ONP. Si es AFP, el alta queda válida con el nombre de AFP. El CUSPP puede llegar después y la ficha avisa Falta CUSPP. El documento de alta AFP es opcional."
       preview={preview}
       datos={
         <>

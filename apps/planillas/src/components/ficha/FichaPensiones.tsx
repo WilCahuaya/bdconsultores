@@ -90,9 +90,8 @@ export function FichaPensiones({
   async function onSubmit(formData: FormData) {
     const afpNombreGuardar = String(formData.get("afp_nombre") ?? "").trim();
     const cusppGuardar = String(formData.get("cuspp") ?? "").trim();
-    const afiliacionCompleta = Boolean(afpNombreGuardar && cusppGuardar);
-    if (!afiliacionCompleta) {
-      pushToast("Indique el nombre de AFP y el CUSPP.", "error");
+    if (!afpNombreGuardar) {
+      pushToast("Indique el nombre de AFP.", "error");
       return;
     }
     formData.set("tipo", "AFP");
@@ -133,7 +132,11 @@ export function FichaPensiones({
     setCuspp(cusppGuardar);
     setFechaTramite(String(formData.get("fecha_tramite") ?? "").trim());
     setFileAlta(null);
-    pushToast("Sistema de pensión guardado. Siga con T-Registro.");
+    pushToast(
+      cusppGuardar
+        ? "Sistema de pensión guardado. Siga con T-Registro."
+        : "Sistema de pensión guardado. Falta CUSPP.",
+    );
     router.refresh();
   }
 
@@ -174,8 +177,8 @@ export function FichaPensiones({
             defaultOpen={false}
           >
             <p className="text-sm text-muted-foreground">
-              Abra AFPNet, copie el DNI y los datos de abajo y péguelos en el alta. El documento de alta es opcional: con
-              el nombre de AFP y el CUSPP ya queda registrado.
+              Abra AFPNet, copie el DNI y los datos de abajo y péguelos en el alta. El documento de alta es opcional.
+              Puede guardar con el nombre de AFP. Si el CUSPP llega después, la ficha queda con la alerta Falta CUSPP.
             </p>
             <div className="grid items-start gap-4 lg:grid-cols-2">
               <section className="space-y-3">
@@ -242,7 +245,7 @@ export function FichaPensiones({
                   ) : null}
             <FormSection
               title="Datos de afiliación AFP"
-              hint="Nombre de AFP (Profuturo, Integra, Habitat o Prima) y CUSPP. La fecha de afiliación es opcional."
+              hint="Nombre de AFP (Profuturo, Integra, Habitat o Prima). El CUSPP puede quedar vacío hasta que llegue. La fecha de afiliación es opcional."
             >
               <div className="grid gap-4 sm:grid-cols-2">
                 <SelectField

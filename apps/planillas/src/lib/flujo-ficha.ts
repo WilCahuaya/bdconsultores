@@ -170,11 +170,17 @@ export function afpConNombreYCuspp(
   return Boolean(pension?.afp_nombre?.trim()) && Boolean(pension?.cuspp?.trim());
 }
 
+export function faltaCuspp(
+  pension: { tipo?: string | null; cuspp?: string | null } | null | undefined,
+): boolean {
+  return pension?.tipo === "AFP" && !pension.cuspp?.trim();
+}
+
 export function pensionAltaLista(input: Pick<FlujoFichaInput, "pension">): boolean {
   const pension = input.pension;
   if (pension?.tipo === "ONP") return true;
   if (pension?.tipo !== "AFP") return false;
-  return afpConNombreYCuspp(pension);
+  return Boolean(pension.afp_nombre?.trim());
 }
 
 export function tRegistroAltaLista(input: Pick<FlujoFichaInput, "documentos" | "tRegistro">): boolean {
@@ -565,6 +571,8 @@ export function faltasPorPaso(input: FlujoFichaInput): FaltasPasosAlta {
       id: "afp",
       etiqueta: input.pension?.tipo === "AFP" ? "Completar alta AFP" : "AFP u ONP",
     });
+  } else if (faltaCuspp(input.pension)) {
+    alta.push({ id: "cuspp", etiqueta: "CUSPP" });
   }
   if (!tRegistroAltaLista(input)) {
     alta.push({ id: "t-registro", etiqueta: "Alta T-Registro" });
@@ -650,7 +658,7 @@ export function resolverSiguientePaso(input: FlujoFichaInput, esEstudio: boolean
       ? { paso: "contratos", tab: "contratos", etiqueta: "Cerrar contrato (marcar recogido)", rol: "estudio" }
       : { paso: "contratos", tab: "contratos", etiqueta: "En revisión del estudio", rol: "empresa" };
   }
-  if (!pensionAltaLista(input) || !tRegistroAltaLista(input)) {
+  if (faltas.alta.length > 0) {
     const detalle = etiquetaFaltaEspecifica(faltas.alta);
     return {
       paso: "alta",
@@ -896,11 +904,10 @@ export function resolverEtapaContrato(
       ? { id: "recoger", etiqueta: "Contrato validado: falta cerrar el proceso", tab: "contratos", rol: "estudio", pendiente: true }
       : { id: "recoger", etiqueta: "Contrato en revisión del estudio", tab: "contratos", rol: "empresa", pendiente: true };
   }
-  if (!pensionAltaLista(flujo) || !tRegistroAltaLista(flujo)) {
-    const faltasAlta = faltas.alta;
-    const detalle = etiquetaFaltaEspecifica(faltasAlta);
+  if (faltas.alta.length > 0) {
+    const detalle = etiquetaFaltaEspecifica(faltas.alta);
     return {
-      id: !pensionAltaLista(flujo) ? "afp" : "t-registro",
+      id: !pensionAltaLista(flujo) || faltaCuspp(flujo.pension) ? "afp" : "t-registro",
       etiqueta: esEstudio ? detalle : `En estudio: ${detalle.charAt(0).toLowerCase()}${detalle.slice(1)}`,
       tab: "alta",
       rol: esEstudio ? "estudio" : "empresa",
