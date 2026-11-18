@@ -90,12 +90,6 @@ export function fechaVidaLeyDoc(value: string | null | undefined): string {
   return `${day}/${month}/${year}`;
 }
 
-function anioFinPeriodoVidaLey(year: string, month: string): string {
-  const mes = Number(month);
-  if (!Number.isFinite(mes) || mes <= 7) return year;
-  return String(Number(year) + 1);
-}
-
 export function periodoVidaLey(fechaIngreso: string | null | undefined): string {
   const iso = fechaIngreso?.slice(0, 10);
   const [year, month] = iso ? iso.split("-") : new Date().toISOString().slice(0, 10).split("-");
@@ -103,16 +97,14 @@ export function periodoVidaLey(fechaIngreso: string | null | undefined): string 
   const mes = (MESES[mesIdx] ?? "").toUpperCase();
   const anio = year ?? "";
   if (!mes || !anio) return "";
-  const anioFin = anioFinPeriodoVidaLey(anio, month ?? "");
-  if (mesIdx === 6) return `JULIO ${anio}`;
-  return `${mes} – JULIO ${anioFin}`;
+  if (mesIdx === 11) return `DICIEMBRE ${anio}`;
+  return `${mes} – DICIEMBRE ${anio}`;
 }
 
 export function fechaFinPeriodoVidaLey(fechaIngreso: string | null | undefined): string {
   const iso = fechaIngreso?.slice(0, 10) ?? new Date().toISOString().slice(0, 10);
   const year = iso.slice(0, 4);
-  const month = iso.slice(5, 7);
-  return `${anioFinPeriodoVidaLey(year, month)}-07-31`;
+  return `${year}-12-31`;
 }
 
 function remuneracionDoc(value: number | null | undefined): string {
