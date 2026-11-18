@@ -25,7 +25,10 @@ export function AsistenciasMesBar({
 
   function irAlMes(next: string) {
     setMes(next);
-    router.push(`/asistencias?entidadId=${entidadId}&mes=${next}`);
+    const params = new URLSearchParams(window.location.search);
+    params.set("entidadId", entidadId);
+    params.set("mes", next);
+    router.push(`/asistencias?${params.toString()}`);
   }
 
   async function onDescargarEmpresa() {

@@ -3,7 +3,7 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
-import { ContratosVistaBajas } from "@/components/ContratosVistaBajas";
+import { PlanillasVistaBajas } from "@/components/PlanillasVistaBajas";
 import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
 import { VersionesContratoButton, type VersionContratoLista } from "@/components/ficha/VersionesContratoButton";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
@@ -155,7 +155,7 @@ export default async function ContratosPage({
                     : ETAPA_CONTRATO_FILTRO_LABEL[filtro]}
               </h2>
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <ContratosVistaBajas entidadId={selectedId} checked={mostrarBajas} />
+                <PlanillasVistaBajas entidadId={selectedId} checked={mostrarBajas} hrefBase="/contratos" />
                 {hayBajas && !mostrarBajas ? (
                   <span className="text-muted-foreground">Hay trabajadores de baja ocultos.</span>
                 ) : null}

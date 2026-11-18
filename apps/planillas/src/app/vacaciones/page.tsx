@@ -3,6 +3,7 @@ import { esUsuarioEntidad } from "@inventario/types";
 import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
+import { PlanillasVistaBajas } from "@/components/PlanillasVistaBajas";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEditarFichaLaboral } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
@@ -40,7 +41,7 @@ const TOMA_CLASS: Record<SituacionTomaVacaciones, string> = {
 export default async function VacacionesPage({
   searchParams,
 }: {
-  searchParams: { entidadId?: string; periodo?: string };
+  searchParams: { entidadId?: string; periodo?: string; bajas?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const canCreate = puedeCrearEntidad(profile);
@@ -51,6 +52,7 @@ export default async function VacacionesPage({
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
   const periodo = esPeriodoVacacion(searchParams.periodo) ? Number(searchParams.periodo) : anioActualLima();
+  const mostrarBajas = searchParams.bajas === "1";
   const [trabajadores, registros] = selectedId
     ? await Promise.all([listTrabajadores(selectedId), listVacacionesEmpresa(selectedId, periodo)])
     : [[], []];
@@ -60,15 +62,26 @@ export default async function VacacionesPage({
     lista.push(row);
     porRelacion.set(row.relacion_id, lista);
   }
-  const filas = trabajadores
+  const todas = trabajadores
     .map((t) => {
       const resumen = resumenPeriodoVacacion(porRelacion.get(t.id) ?? [], t.fecha_ingreso, periodo, t.jornada);
       const salidas = [...resumen.registros].sort((a, b) => a.fecha_inicio.localeCompare(b.fecha_inicio));
       return { trabajador: t, resumen, salidas };
     })
     .sort((a, b) => compareTrabajadoresPorNumero(a.trabajador, b.trabajador));
-  const columnasSalida = Math.max(1, ...filas.map((f) => f.salidas.length));
+  const filas = todas.filter((f) =>
+    mostrarBajas ? f.trabajador.estado === "CESADA" : f.trabajador.estado !== "CESADA",
+  );
+  const hayBajas = todas.some((f) => f.trabajador.estado === "CESADA");
+  const columnasSalida = Math.max(1, ...filas.map((f) => f.salidas.length), 1);
   const pendientes = filas.filter((f) => f.resumen.derecho && f.resumen.saldo > 0).length;
+  const queryExtraParts = [`periodo=${periodo}`, mostrarBajas ? "bajas=1" : null].filter(Boolean);
+  const queryExtra = queryExtraParts.join("&");
+  const hrefPeriodo = (anio: number) => {
+    const params = new URLSearchParams({ entidadId: selectedId, periodo: String(anio) });
+    if (mostrarBajas) params.set("bajas", "1");
+    return `/vacaciones?${params.toString()}`;
+  };
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -85,7 +98,7 @@ export default async function VacacionesPage({
                 selectedId={selectedId}
                 locked={esUsuarioEntidad(profile.rol)}
                 hrefBase="/vacaciones"
-                queryExtra={`periodo=${periodo}`}
+                queryExtra={queryExtra}
                 inline
               />
             </>
@@ -107,21 +120,21 @@ export default async function VacacionesPage({
           <>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <div className="flex flex-wrap items-center gap-3 text-sm">
-                <Link
-                  href={`/vacaciones?entidadId=${selectedId}&periodo=${periodo - 1}`}
-                  className="text-primary hover:underline"
-                >
+                <Link href={hrefPeriodo(periodo - 1)} className="text-primary hover:underline">
                   {periodo - 1}
                 </Link>
-                <h2 className="text-sm font-medium text-foreground">Periodo {periodo}</h2>
-                <Link
-                  href={`/vacaciones?entidadId=${selectedId}&periodo=${periodo + 1}`}
-                  className="text-primary hover:underline"
-                >
+                <h2 className="text-sm font-medium text-foreground">
+                  {mostrarBajas ? "Bajas · " : ""}Periodo {periodo}
+                </h2>
+                <Link href={hrefPeriodo(periodo + 1)} className="text-primary hover:underline">
                   {periodo + 1}
                 </Link>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <PlanillasVistaBajas entidadId={selectedId} checked={mostrarBajas} hrefBase="/vacaciones" />
+                {hayBajas && !mostrarBajas ? (
+                  <span className="text-sm text-muted-foreground">Hay trabajadores de baja ocultos.</span>
+                ) : null}
                 {(["ninguno", "proceso", "tomado"] as const).map((situacion) => (
                   <span
                     key={situacion}
@@ -154,7 +167,13 @@ export default async function VacacionesPage({
                   {filas.length === 0 ? (
                     <tr>
                       <td className="px-4 py-8 text-muted-foreground" colSpan={4 + columnasSalida}>
-                        No hay trabajadores en esta empresa.
+                        {todas.length === 0
+                          ? "No hay trabajadores en esta empresa."
+                          : mostrarBajas
+                            ? "No hay bajas."
+                            : hayBajas
+                              ? "No hay trabajadores activos. Marque Mostrar bajas para ver a los cesados."
+                              : "No hay trabajadores en esta empresa."}
                       </td>
                     </tr>
                   ) : (

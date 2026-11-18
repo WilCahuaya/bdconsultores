@@ -4,6 +4,7 @@ import { panelCardClass } from "@inventario/ui/panel";
 import { PlanillasShell } from "@/components/PlanillasShell";
 import { EntidadSwitcher } from "@/components/EntidadSwitcher";
 import { GenerarVidaLeyGrupoButton } from "@/components/ficha/GenerarVidaLeyGrupoButton";
+import { PlanillasVistaBajas } from "@/components/PlanillasVistaBajas";
 import { SinEmpresasPlanillas } from "@/components/ProcesoResumenCard";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEscribirPlanillas } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
@@ -28,9 +29,10 @@ function plusDays(iso: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function hrefVidaLey(entidadId: string, etapa?: string) {
+function hrefVidaLey(entidadId: string, etapa?: string, bajas?: boolean) {
   const query = new URLSearchParams({ entidadId });
   if (etapa && etapa !== "todos") query.set("etapa", etapa);
+  if (bajas) query.set("bajas", "1");
   return `/vida-ley?${query.toString()}`;
 }
 
@@ -82,7 +84,7 @@ function claseEtapaVidaLey(id: EtapaVidaLeyId) {
 export default async function VidaLeyPage({
   searchParams,
 }: {
-  searchParams: { entidadId?: string; etapa?: string };
+  searchParams: { entidadId?: string; etapa?: string; bajas?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const canCreate = puedeCrearEntidad(profile);
@@ -93,6 +95,7 @@ export default async function VidaLeyPage({
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
   const filtro = parseEtapaVidaLeyFiltro(searchParams.etapa);
+  const mostrarBajas = searchParams.bajas === "1";
   const hoy = new Date().toISOString().slice(0, 10);
   const limite = plusDays(hoy, HORIZONTE_VENCIMIENTO_DIAS);
   const items = esEstudio && selectedId ? await listVidaLeyEmpresa(selectedId) : [];
@@ -101,19 +104,25 @@ export default async function VidaLeyPage({
       ...item,
       etapa: resolverEtapaVidaLey(item.registro, { hoy, limite }),
     }))
-    .sort((a, b) => {
-      if (a.etapa.pendiente !== b.etapa.pendiente) return a.etapa.pendiente ? -1 : 1;
-      return compareTrabajadoresPorNumero(a.trabajador, b.trabajador);
-    });
+    .sort((a, b) => compareTrabajadoresPorNumero(a.trabajador, b.trabajador));
+  const porEstado = filas.filter((fila) =>
+    mostrarBajas ? fila.trabajador.estado === "CESADA" : fila.trabajador.estado !== "CESADA",
+  );
+  const hayBajas = filas.some((fila) => fila.trabajador.estado === "CESADA");
   const visibles =
     filtro === "todos"
-      ? filas
+      ? porEstado
       : filtro === "pendientes"
-        ? filas.filter((fila) => fila.etapa.pendiente)
-        : filas.filter((fila) => fila.etapa.id === filtro);
-  const cantidadGrupo = filas.filter(
+        ? porEstado.filter((fila) => fila.etapa.pendiente)
+        : porEstado.filter((fila) => fila.etapa.id === filtro);
+  const cantidadGrupo = porEstado.filter(
     (fila) => fila.trabajador.estado !== "CESADA" && vidaLeyPendienteRecepcion(fila.registro?.estado),
   ).length;
+  const queryExtraParts = [
+    filtro !== "todos" ? `etapa=${filtro}` : null,
+    mostrarBajas ? "bajas=1" : null,
+  ].filter(Boolean);
+  const queryExtra = queryExtraParts.length > 0 ? queryExtraParts.join("&") : undefined;
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId || undefined}>
@@ -131,7 +140,7 @@ export default async function VidaLeyPage({
                   selectedId={selectedId}
                   locked={esUsuarioEntidad(profile.rol)}
                   hrefBase="/vida-ley"
-                  queryExtra={filtro === "todos" ? undefined : `etapa=${filtro}`}
+                  queryExtra={queryExtra}
                   inline
                 />
               </>
@@ -153,14 +162,22 @@ export default async function VidaLeyPage({
           <>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-medium text-foreground">
-                {filtro === "todos" ? "Todos los trámites" : ETAPA_VIDA_LEY_FILTRO_LABEL[filtro]}
+                {mostrarBajas
+                  ? "Bajas"
+                  : filtro === "todos"
+                    ? "Todos los trámites"
+                    : ETAPA_VIDA_LEY_FILTRO_LABEL[filtro]}
               </h2>
               <div className="flex flex-wrap items-center gap-3 text-sm">
+                <PlanillasVistaBajas entidadId={selectedId} checked={mostrarBajas} hrefBase="/vida-ley" />
+                {hayBajas && !mostrarBajas ? (
+                  <span className="text-muted-foreground">Hay trabajadores de baja ocultos.</span>
+                ) : null}
                 <p className="text-muted-foreground">
-                  {visibles.length} de {filas.length}
+                  {visibles.length} de {porEstado.length}
                 </p>
                 {filtro !== "todos" ? (
-                  <Link href={hrefVidaLey(selectedId)} className="text-primary hover:underline">
+                  <Link href={hrefVidaLey(selectedId, undefined, mostrarBajas)} className="text-primary hover:underline">
                     Ver todos
                   </Link>
                 ) : null}
@@ -202,7 +219,11 @@ export default async function VidaLeyPage({
                       <td className="px-4 py-8 text-muted-foreground" colSpan={11}>
                         {filas.length === 0
                           ? "No hay trabajadores con alta validada en esta empresa."
-                          : "No hay trámites en este paso."}
+                          : mostrarBajas
+                            ? "No hay bajas."
+                            : hayBajas
+                              ? "No hay trámites activos en este paso. Marque Mostrar bajas para ver a los cesados."
+                              : "No hay trámites en este paso."}
                       </td>
                     </tr>
                   ) : (

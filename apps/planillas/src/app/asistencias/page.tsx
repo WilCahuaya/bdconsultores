@@ -7,6 +7,7 @@ import { AsistenciasMesBar, DescargarAsistenciaTrabajador } from "@/components/f
 import { AsistenciaMesEstado, type EstadoAsistenciaMes } from "@/components/ficha/AsistenciaMesEstado";
 import { AsistenciaNotaIcono } from "@/components/ficha/AsistenciaNotaField";
 import { AsistenciaDiaEncabezados, AsistenciaHorasCeldas } from "@/components/ficha/AsistenciaSemana";
+import { PlanillasVistaBajas } from "@/components/PlanillasVistaBajas";
 import { requirePlanillasProfile, puedeCrearEntidad, puedeEditarFichaLaboral } from "@/lib/auth/access";
 import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import { listTrabajadores } from "@/lib/actions/trabajadores";
@@ -43,7 +44,7 @@ function estadoAsistenciaMes(
 export default async function AsistenciasPage({
   searchParams,
 }: {
-  searchParams: { entidadId?: string; mes?: string };
+  searchParams: { entidadId?: string; mes?: string; bajas?: string };
 }) {
   const profile = await requirePlanillasProfile();
   const canCreate = puedeCrearEntidad(profile);
@@ -54,6 +55,7 @@ export default async function AsistenciasPage({
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
   const mes = searchParams.mes && esMesAsistencia(searchParams.mes) ? searchParams.mes : mesActualLima();
+  const mostrarBajas = searchParams.bajas === "1";
   const mesHoy = mesActualLima();
   const anio = Number(mes.slice(0, 4));
   const meses = mesesDelAnio(anio);
@@ -87,13 +89,15 @@ export default async function AsistenciasPage({
     }
     if (documento.mes === mes) notaPorRelacion.set(documento.relacion_id, documento.nota);
   }
-  const activos = trabajadores
-    .filter(
-      (t) =>
-        t.estado !== "CESADA" &&
-        meses.some((item) => trabajadorActivoEnMes(item, t.fecha_ingreso, t.fecha_cese)),
-    )
+  const enAnio = trabajadores.filter((t) =>
+    meses.some((item) => trabajadorActivoEnMes(item, t.fecha_ingreso, t.fecha_cese)),
+  );
+  const hayBajas = enAnio.some((t) => t.estado === "CESADA");
+  const activos = enAnio
+    .filter((t) => (mostrarBajas ? t.estado === "CESADA" : t.estado !== "CESADA"))
     .sort(compareTrabajadoresPorNumero);
+  const queryExtraParts = [`mes=${mes}`, mostrarBajas ? "bajas=1" : null].filter(Boolean);
+  const queryExtra = queryExtraParts.join("&");
   let subidos = 0;
   let corresponden = 0;
   for (const trabajador of activos) {
@@ -128,7 +132,7 @@ export default async function AsistenciasPage({
                 selectedId={selectedId}
                 locked={esUsuarioEntidad(profile.rol)}
                 hrefBase="/asistencias"
-                queryExtra={`mes=${mes}`}
+                queryExtra={queryExtra}
                 inline
               />
             </>
@@ -160,6 +164,10 @@ export default async function AsistenciasPage({
 
             <section className="space-y-1.5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <PlanillasVistaBajas entidadId={selectedId} checked={mostrarBajas} hrefBase="/asistencias" />
+                {hayBajas && !mostrarBajas ? (
+                  <span>Hay trabajadores de baja ocultos.</span>
+                ) : null}
                 <span className="inline-flex items-center gap-1.5">
                   <AsistenciaMesEstado estado="subido" etiqueta="" decorativo />
                   Subido
@@ -215,7 +223,11 @@ export default async function AsistenciasPage({
                     {activos.length === 0 ? (
                       <tr>
                         <td className="px-4 py-8 text-muted-foreground" colSpan={columnas}>
-                          No hay trabajadores activos en {anio}.
+                          {mostrarBajas
+                            ? `No hay bajas en ${anio}.`
+                            : hayBajas
+                              ? `No hay trabajadores activos en ${anio}. Marque Mostrar bajas para ver a los cesados.`
+                              : `No hay trabajadores activos en ${anio}.`}
                         </td>
                       </tr>
                     ) : (
@@ -242,6 +254,7 @@ export default async function AsistenciasPage({
                                 className="whitespace-nowrap font-medium text-primary hover:underline"
                               >
                                 {nombre}
+                                {trabajador.estado === "CESADA" ? " · Baja" : ""}
                               </Link>
                             </td>
                             <AsistenciaHorasCeldas horario={trabajador.horario} activo={activoMes} />
