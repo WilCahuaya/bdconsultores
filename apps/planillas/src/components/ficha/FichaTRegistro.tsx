@@ -57,6 +57,7 @@ export function FichaTRegistro({
   documentoTrAlta,
   documentoTrBaja,
   documentoCartaRenuncia,
+  documentoActaFallecimiento,
   canWrite,
   canWriteTrBaja = canWrite,
   abrirAltaPorDefecto = false,
@@ -70,6 +71,7 @@ export function FichaTRegistro({
   documentoTrAlta: DocumentoRow | null;
   documentoTrBaja: DocumentoRow | null;
   documentoCartaRenuncia?: DocumentoRow | null;
+  documentoActaFallecimiento?: DocumentoRow | null;
   canWrite: boolean;
   canWriteTrBaja?: boolean;
   /** Si AFP ya está lista, abrir Alta T-Registro al entrar al paso. */
@@ -319,12 +321,13 @@ export function FichaTRegistro({
           resumen={
             yaBaja
               ? "Baja registrada en T-Registro."
-              : "Cese del trabajador: carta (si renuncia), baja T-Registro y AFP."
+              : "Cese del trabajador: sustento del motivo, baja T-Registro y AFP."
           }
         >
           <DarDeBajaControl
             trabajador={trabajador}
             documentoCarta={documentoCartaRenuncia ?? null}
+            documentoActa={documentoActaFallecimiento ?? null}
             documentoTrBaja={documentoTrBaja}
           />
         </ApartadoDesplegable>

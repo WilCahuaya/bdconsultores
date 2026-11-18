@@ -15,15 +15,17 @@ import { uploadDocumentoFile } from "@/lib/upload-documento";
 import { documentoCargado } from "@/lib/flujo-ficha";
 import { DateField, SelectField } from "@/components/fields";
 
-type MotivoBaja = "CARTA_RENUNCIA" | "TERMINO_CONTRATO";
+type MotivoBaja = "CARTA_RENUNCIA" | "TERMINO_CONTRATO" | "ACTA_FALLECIMIENTO";
 
 export function DarDeBajaControl({
   trabajador,
   documentoCarta = null,
+  documentoActa = null,
   documentoTrBaja = null,
 }: {
   trabajador: TrabajadorListItem;
   documentoCarta?: DocumentoRow | null;
+  documentoActa?: DocumentoRow | null;
   documentoTrBaja?: DocumentoRow | null;
 }) {
   const router = useRouter();
@@ -35,14 +37,18 @@ export function DarDeBajaControl({
   const [observacion, setObservacion] = useState("");
   const [bajaAfp, setBajaAfp] = useState(false);
   const [archivoCarta, setArchivoCarta] = useState<File | null>(null);
+  const [archivoActa, setArchivoActa] = useState<File | null>(null);
   const [archivoTrBaja, setArchivoTrBaja] = useState<File | null>(null);
 
   const yaHayCarta = Boolean(documentoCarta?.storage_path) || documentoCargado(trabajador.documentos, "CARTA_RENUNCIA");
+  const yaHayActa = Boolean(documentoActa?.storage_path) || documentoCargado(trabajador.documentos, "ACTA_FALLECIMIENTO");
   const yaHayTrBaja = Boolean(documentoTrBaja?.storage_path) || documentoCargado(trabajador.documentos, "TR_BAJA");
   const esCarta = motivo === "CARTA_RENUNCIA";
+  const esFallecimiento = motivo === "ACTA_FALLECIMIENTO";
   const listoCarta = !esCarta || yaHayCarta || Boolean(archivoCarta);
+  const listoActa = !esFallecimiento || yaHayActa || Boolean(archivoActa);
   const listoTrBaja = yaHayTrBaja || Boolean(archivoTrBaja);
-  const puedeDarDeBaja = Boolean(fechaCese.trim()) && listoCarta && listoTrBaja && bajaAfp;
+  const puedeDarDeBaja = Boolean(fechaCese.trim()) && listoCarta && listoActa && listoTrBaja && bajaAfp;
 
   async function subirDocumento(
     tipo: TipoDocumentoPlanilla,
@@ -85,6 +91,14 @@ export function DarDeBajaControl({
         return;
       }
     }
+    if (esFallecimiento && archivoActa) {
+      const errorActa = await subirDocumento("ACTA_FALLECIMIENTO", archivoActa, documentoActa);
+      if (errorActa) {
+        setPending(false);
+        pushToast(errorActa, "error");
+        return;
+      }
+    }
     if (archivoTrBaja) {
       const errorTr = await subirDocumento("TR_BAJA", archivoTrBaja, documentoTrBaja);
       if (errorTr) {
@@ -106,6 +120,7 @@ export function DarDeBajaControl({
     }
     setConfirmOpen(false);
     setArchivoCarta(null);
+    setArchivoActa(null);
     setArchivoTrBaja(null);
     setObservacion("");
     setBajaAfp(false);
@@ -127,10 +142,12 @@ export function DarDeBajaControl({
         options={[
           { value: "CARTA_RENUNCIA", label: TIPO_DOCUMENTO_LABEL.CARTA_RENUNCIA },
           { value: "TERMINO_CONTRATO", label: TIPO_DOCUMENTO_LABEL.TERMINO_CONTRATO },
+          { value: "ACTA_FALLECIMIENTO", label: "Fallecimiento" },
         ]}
         onChange={(event) => {
           setMotivo(event.target.value as MotivoBaja);
           setArchivoCarta(null);
+          setArchivoActa(null);
         }}
       />
 
@@ -167,12 +184,57 @@ export function DarDeBajaControl({
         />
       ) : null}
 
+      {esFallecimiento ? (
+        <DocumentoPrevisualizacion
+          titulo={TIPO_DOCUMENTO_LABEL.ACTA_FALLECIMIENTO}
+          storagePath={archivoActa ? null : documentoActa?.storage_path}
+          file={archivoActa}
+          vacio="Suba el acta de fallecimiento."
+          extra={
+            <div className="space-y-3">
+              <DocumentoFileInput
+                accept={DOCUMENTO_ACCEPT}
+                disabled={pending}
+                file={archivoActa}
+                buttonLabel={
+                  archivoActa || documentoActa?.storage_path
+                    ? "Cambiar acta de fallecimiento"
+                    : "Subir acta de fallecimiento"
+                }
+                emptyLabel="Obligatorio. PDF, Word, Excel o imagen. Se guarda como PDF. Máximo 10 MB."
+                onFileChange={setArchivoActa}
+              />
+              {documentoActa?.storage_path ? (
+                <EliminarDocumentoGuardado
+                  relacionId={trabajador.id}
+                  documentoId={documentoActa.id}
+                  descripcion="¿Eliminar el acta de fallecimiento?"
+                  disabled={pending}
+                />
+              ) : null}
+            </div>
+          }
+        />
+      ) : null}
+
       <DateField
-        label={esCarta ? "Fecha de último día de trabajo (fecha de baja)" : "Fecha de baja"}
+        label={
+          esCarta
+            ? "Fecha de último día de trabajo (fecha de baja)"
+            : esFallecimiento
+              ? "Fecha de fallecimiento"
+              : "Fecha de baja"
+        }
         name="fecha_cese"
         value={fechaCese}
         onChange={setFechaCese}
-        hint={esCarta ? "Es el último día trabajado; queda como fecha de cese." : undefined}
+        hint={
+          esCarta
+            ? "Es el último día trabajado; queda como fecha de cese."
+            : esFallecimiento
+              ? "Queda como fecha de cese."
+              : undefined
+        }
       />
 
       <DocumentoPrevisualizacion
@@ -245,8 +307,9 @@ export function DarDeBajaControl({
           <p className="text-xs text-muted-foreground">
             Falta completar:{" "}
             {[
-              !fechaCese.trim() ? "fecha de baja" : null,
+              !fechaCese.trim() ? (esFallecimiento ? "fecha de fallecimiento" : "fecha de baja") : null,
               esCarta && !listoCarta ? "carta de renuncia" : null,
+              esFallecimiento && !listoActa ? "acta de fallecimiento" : null,
               !listoTrBaja ? "T-Registro baja" : null,
               !bajaAfp ? "marcar baja AFP" : null,
             ]

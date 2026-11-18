@@ -2491,6 +2491,7 @@ export type TipoDocumentoPlanilla =
   | "TR_BAJA"
   | "CARTA_RENUNCIA"
   | "TERMINO_CONTRATO"
+  | "ACTA_FALLECIMIENTO"
   | "VIDA_LEY"
   | "VIDA_LEY_CONSTANCIA"
   | "VIDA_LEY_FACTURA"
@@ -2520,7 +2521,11 @@ export const TIPOS_DOCUMENTO_ALTA_INICIALES: TipoDocumentoPlanilla[] = [
 ];
 
 /** Sustento para cesar la relación con la empresa (no el fin de un contrato). */
-export const TIPOS_DOCUMENTO_BAJA: TipoDocumentoPlanilla[] = ["CARTA_RENUNCIA", "TERMINO_CONTRATO"];
+export const TIPOS_DOCUMENTO_BAJA: TipoDocumentoPlanilla[] = [
+  "CARTA_RENUNCIA",
+  "TERMINO_CONTRATO",
+  "ACTA_FALLECIMIENTO",
+];
 
 export function esTipoDocumentoBaja(tipo: string): tipo is TipoDocumentoPlanilla {
   return TIPOS_DOCUMENTO_BAJA.includes(tipo as TipoDocumentoPlanilla);

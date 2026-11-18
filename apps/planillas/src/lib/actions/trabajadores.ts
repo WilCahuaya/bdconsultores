@@ -52,7 +52,7 @@ export type PersonaRow = {
   region: string | null;
 };
 
-export type TipoBajaRelacion = "CARTA_RENUNCIA" | "TERMINO_CONTRATO";
+export type TipoBajaRelacion = "CARTA_RENUNCIA" | "TERMINO_CONTRATO" | "ACTA_FALLECIMIENTO";
 
 export type RelacionRow = {
   id: string;
@@ -245,7 +245,7 @@ function mapTrabajadorRow(row: {
   return {
     ...(relacion as RelacionRow),
     tipo_baja:
-      tipoBaja === "CARTA_RENUNCIA" || tipoBaja === "TERMINO_CONTRATO"
+      tipoBaja === "CARTA_RENUNCIA" || tipoBaja === "TERMINO_CONTRATO" || tipoBaja === "ACTA_FALLECIMIENTO"
         ? tipoBaja
         : null,
     observacion_baja: (relacion.observacion_baja as string | null | undefined) ?? null,
@@ -498,11 +498,14 @@ export async function darDeBajaTrabajador(
     return { error: "El cese no puede ser anterior al ingreso a la empresa." };
   }
   const motivo = String(formData.get("tipo_baja") ?? "").trim();
-  if (motivo !== "CARTA_RENUNCIA" && motivo !== "TERMINO_CONTRATO") {
-    return { error: "Indique si la baja es por carta de renuncia o término de contrato." };
+  if (motivo !== "CARTA_RENUNCIA" && motivo !== "TERMINO_CONTRATO" && motivo !== "ACTA_FALLECIMIENTO") {
+    return { error: "Indique si la baja es por carta de renuncia, término de contrato o fallecimiento." };
   }
   if (motivo === "CARTA_RENUNCIA" && !documentoCargado(actual.documentos, "CARTA_RENUNCIA")) {
     return { error: "Suba la carta de renuncia." };
+  }
+  if (motivo === "ACTA_FALLECIMIENTO" && !documentoCargado(actual.documentos, "ACTA_FALLECIMIENTO")) {
+    return { error: "Suba el acta de fallecimiento." };
   }
   if (!documentoCargado(actual.documentos, "TR_BAJA")) {
     return { error: "Suba el documento de T-Registro baja." };
