@@ -161,9 +161,7 @@ export function FichaPensiones({
         <section className={`${panelCardClass} space-y-2 p-5`}>
           <p className="text-sm font-medium">Sistema de pensión</p>
           <p className="text-sm">ONP</p>
-          <p className="text-sm text-muted-foreground">
-            Es ONP: no hay alta en AFP ni CUSPP. Puede seguir a T-Registro.
-          </p>
+          <p className="text-sm text-muted-foreground">Puede seguir a T-Registro.</p>
         </section>
       ) : null}
 

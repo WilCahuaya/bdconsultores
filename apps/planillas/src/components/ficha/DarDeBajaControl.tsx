@@ -45,10 +45,11 @@ export function DarDeBajaControl({
   const yaHayTrBaja = Boolean(documentoTrBaja?.storage_path) || documentoCargado(trabajador.documentos, "TR_BAJA");
   const esCarta = motivo === "CARTA_RENUNCIA";
   const esFallecimiento = motivo === "ACTA_FALLECIMIENTO";
+  const esOnp = trabajador.pension?.tipo === "ONP";
   const listoCarta = !esCarta || yaHayCarta || Boolean(archivoCarta);
   const listoActa = !esFallecimiento || yaHayActa || Boolean(archivoActa);
   const listoTrBaja = yaHayTrBaja || Boolean(archivoTrBaja);
-  const puedeDarDeBaja = Boolean(fechaCese.trim()) && listoCarta && listoActa && listoTrBaja && bajaAfp;
+  const puedeDarDeBaja = Boolean(fechaCese.trim()) && listoCarta && listoActa && listoTrBaja && (esOnp || bajaAfp);
 
   async function subirDocumento(
     tipo: TipoDocumentoPlanilla,
@@ -111,7 +112,7 @@ export function DarDeBajaControl({
     form.set("fecha_cese", fechaCese);
     form.set("tipo_baja", motivo);
     form.set("observacion_baja", observacion.trim());
-    form.set("baja_afp", "true");
+    if (!esOnp) form.set("baja_afp", "true");
     const result = await darDeBajaTrabajador(trabajador.id, form);
     setPending(false);
     if (result.error) {
@@ -131,8 +132,9 @@ export function DarDeBajaControl({
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
-        Complete el formulario con previsualización. El botón se habilita al marcar la baja de AFP. El modal solo confirma
-        el cese.
+        {esOnp
+          ? "Complete el formulario con previsualización. El sistema de pensión es ONP. El modal solo confirma el cese."
+          : "Complete el formulario con previsualización. El botón se habilita al marcar la baja de AFP. El modal solo confirma el cese."}
       </p>
 
       <SelectField
@@ -282,17 +284,19 @@ export function DarDeBajaControl({
         />
       </label>
 
-      <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          name="baja_afp"
-          className="h-4 w-4 rounded border-input"
-          checked={bajaAfp}
-          disabled={pending}
-          onChange={(event) => setBajaAfp(event.target.checked)}
-        />
-        Se dio de baja de AFP
-      </label>
+      {esOnp ? null : (
+        <label className="inline-flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="baja_afp"
+            className="h-4 w-4 rounded border-input"
+            checked={bajaAfp}
+            disabled={pending}
+            onChange={(event) => setBajaAfp(event.target.checked)}
+          />
+          Se dio de baja de AFP
+        </label>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <Button
@@ -311,7 +315,7 @@ export function DarDeBajaControl({
               esCarta && !listoCarta ? "carta de renuncia" : null,
               esFallecimiento && !listoActa ? "acta de fallecimiento" : null,
               !listoTrBaja ? "T-Registro baja" : null,
-              !bajaAfp ? "marcar baja AFP" : null,
+              !esOnp && !bajaAfp ? "marcar baja AFP" : null,
             ]
               .filter(Boolean)
               .join(", ")}

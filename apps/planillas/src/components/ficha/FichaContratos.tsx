@@ -335,7 +335,11 @@ export function FichaContratos({
       pushToast(result.error, "error");
       return;
     }
-    pushToast("Contrato cerrado. Siga con el alta AFP y T-Registro.");
+    pushToast(
+      trabajador.pension?.tipo === "ONP"
+        ? "Contrato cerrado. Siga con el alta de T-Registro. Sistema de pensión: ONP."
+        : "Contrato cerrado. Siga con el alta AFP y T-Registro.",
+    );
     router.push(`/contratos/${relacionId}?paso=alta`);
   }
 

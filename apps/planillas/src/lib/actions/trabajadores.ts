@@ -511,11 +511,13 @@ export async function darDeBajaTrabajador(
     return { error: "Suba el documento de T-Registro baja." };
   }
   const observacion = String(formData.get("observacion_baja") ?? "").trim() || null;
+  const esOnp = actual.pension?.tipo === "ONP";
   const bajaAfp =
-    formData.get("baja_afp") === "on" ||
-    formData.get("baja_afp") === "true" ||
-    formData.get("baja_afp") === "1";
-  if (!bajaAfp) {
+    !esOnp &&
+    (formData.get("baja_afp") === "on" ||
+      formData.get("baja_afp") === "true" ||
+      formData.get("baja_afp") === "1");
+  if (!esOnp && !bajaAfp) {
     return { error: "Marque que se dio de baja de AFP antes de confirmar el cese." };
   }
 

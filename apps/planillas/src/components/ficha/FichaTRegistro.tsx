@@ -210,8 +210,14 @@ export function FichaTRegistro({
                     remuneracionBruta(trabajador.remuneracion, trabajador.recibe_asignacion_familiar),
                   )}
                 />
-                <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
-                <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
+                {pension?.tipo === "ONP" ? (
+                  <DatoAlta label="ONP" value="ONP" />
+                ) : (
+                  <>
+                    <DatoAlta label="Tipo de AFP" value={tipoAfpCopia(pension)} />
+                    <DatoAlta label="CUSPP" value={pension?.cuspp?.trim() ?? ""} />
+                  </>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 {LEYENDA_CODIGO_OCUPACION.map((item) => `${item.corto} ${item.codigo}`).join(" · ")}
@@ -321,7 +327,9 @@ export function FichaTRegistro({
           resumen={
             yaBaja
               ? "Baja registrada en T-Registro."
-              : "Cese del trabajador: sustento del motivo, baja T-Registro y AFP."
+              : pension?.tipo === "ONP"
+                ? "Cese del trabajador: sustento del motivo y baja T-Registro. Sistema de pensión: ONP."
+                : "Cese del trabajador: sustento del motivo, baja T-Registro y AFP."
           }
         >
           <DarDeBajaControl

@@ -187,7 +187,11 @@ export function FichaPuestoForm({
           {trabajador.tipo_baja ? (
             <p>Motivo: {TIPO_DOCUMENTO_LABEL[trabajador.tipo_baja]}</p>
           ) : null}
-          <p>Baja AFP: {trabajador.baja_afp ? "Sí" : "No"}</p>
+          {trabajador.pension?.tipo === "ONP" ? (
+            <p>Sistema de pensión: ONP</p>
+          ) : (
+            <p>Baja AFP: {trabajador.baja_afp ? "Sí" : "No"}</p>
+          )}
           {trabajador.observacion_baja?.trim() ? (
             <p>Observación: {trabajador.observacion_baja.trim()}</p>
           ) : null}

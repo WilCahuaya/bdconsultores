@@ -212,18 +212,19 @@ export default async function ContratoProcesoPage({
         {paso === "alta" ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              El estudio da de alta AFP y T-Registro aquí, en Contratos. Si es ONP, no hay alta AFP. Después se
-              registra el alta en T-Registro.
+              {pension?.tipo === "ONP"
+                ? "Sistema de pensión: ONP. El estudio registra el alta en T-Registro aquí, en Contratos."
+                : "El estudio da de alta AFP y T-Registro aquí, en Contratos. Después se registra el alta en T-Registro."}
             </p>
             <ApartadoDesplegable
-              titulo="AFP"
+              titulo={pension?.tipo === "ONP" ? "ONP" : "AFP"}
               pendiente={!pensionAltaLista({ pension })}
               defaultOpen={!pensionAltaLista({ pension })}
               resumen={
                 !pension?.tipo
                   ? "Pendiente: aún no se marcó AFP u ONP en Documentos."
                   : pension.tipo === "ONP"
-                    ? "ONP · no requiere alta AFP."
+                    ? "ONP"
                     : pensionAltaLista({ pension })
                       ? `Listo · ${pension.afp_nombre?.trim() || "AFP"}${pension.cuspp?.trim() ? ` · ${pension.cuspp.trim()}` : ""}.`
                       : "Pendiente: complete nombre de AFP y CUSPP."
