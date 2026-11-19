@@ -3,6 +3,15 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+
+  if (
+    pathname === "/icon" ||
+    pathname === "/apple-icon" ||
+    pathname === "/opengraph-image" ||
+    pathname === "/favicon.ico"
+  ) {
+    return NextResponse.next();
+  }
   const hasOAuthPayload = searchParams.has("code") || searchParams.has("error");
   if (
     hasOAuthPayload &&
@@ -19,6 +28,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|icon|apple-icon|opengraph-image|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
