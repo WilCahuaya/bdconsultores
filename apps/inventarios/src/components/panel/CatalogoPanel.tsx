@@ -9,7 +9,11 @@ import {
   getNextCodigoCatalogoPropio,
   listCatalogoClases,
   listCatalogoGrupos,
+  createCatalogoMenaje,
+  deleteCatalogoMenaje,
+  listCatalogoMenaje,
   listCatalogoPropio,
+  updateCatalogoMenaje,
   registerCatalogoOpcionPersonalizada,
   searchCatalogoNacionalOficial,
   suggestCatalogoClase,
@@ -41,6 +45,10 @@ export function CatalogoPanel({ initialDenominacion = "" }: CatalogoPanelProps) 
       onCreate={createCatalogoNacional}
       onCreateNacional={createCatalogoNacionalExtension}
       listPropio={listCatalogoPropio}
+      listMenaje={listCatalogoMenaje}
+      onCreateMenaje={createCatalogoMenaje}
+      onUpdateMenaje={updateCatalogoMenaje}
+      onDeleteMenaje={deleteCatalogoMenaje}
       onUpdatePropio={updateCatalogoPropio}
       onDeletePropio={deleteCatalogoPropio}
       searchNacional={searchCatalogoNacionalOficial}

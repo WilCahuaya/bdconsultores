@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   upsertCatalogRow: (row: unknown) => ipcRenderer.invoke("catalog:upsert", row),
   deleteCatalogRow: (codigo: string) => ipcRenderer.invoke("catalog:delete", codigo),
   listCatalogoPropioLocal: () => ipcRenderer.invoke("catalog:listPropio"),
+  listCatalogoMenajeLocal: () => ipcRenderer.invoke("catalog:listMenaje"),
   syncAtributoVocab: (rows: unknown[]) => ipcRenderer.invoke("atributoVocab:replace", rows),
   searchAtributoVocabLocal: (campo: string, query: string, limit?: number) =>
     ipcRenderer.invoke("atributoVocab:search", campo, query, limit),

@@ -13,20 +13,24 @@ import type {
 import {
   buildCatalogoCampoOpciones,
   buildCreateCatalogoCuentaOrdenPayload,
+  buildCreateCatalogoMenajePayload,
   buildCreateCatalogoNacionalExtensionPayload,
   buildUpdateCatalogoPropioPayload,
   buildUpdateCatalogoNacionalContabilidadPayload,
   CATALOGO_CONSULTA_MAX_RESULTS,
   CATALOGO_SEARCH_MAX_RESULTS,
+  CATALOGO_MENAJE_CODIGO_RE,
   CATALOGO_PROPIO_CODIGO_RE,
   isCatalogoNacionalOficial,
   isCatalogoPropio,
   minCatalogoQueryLength,
+  nextCodigoCatalogoMenajeFromMax,
   nextCodigoCatalogoPropioFromMax,
   normalizeCuentaCodigo,
   shouldRegistrarCatalogoOpcionPersonalizada,
   suggestClaseForDenominacion,
   suggestGrupoForDenominacion,
+  validarDenominacionCatalogoMenaje,
   validarCreateCatalogoCuentaOrdenInput,
   validarCreateCatalogoNacionalExtensionInput,
   validarUpdateCatalogoPropioInput,
@@ -211,6 +215,160 @@ export async function listCatalogoPropio(): Promise<CatalogoNacional[]> {
   }
 
   return (data ?? []) as CatalogoNacional[];
+}
+
+export async function listCatalogoMenaje(): Promise<CatalogoNacional[]> {
+  await requireProfile("CONTADOR");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("catalogo_nacional")
+    .select("*")
+    .eq("origen", "MENAJE")
+    .order("codigo");
+
+  if (error) {
+    console.error("listCatalogoMenaje:", error.message);
+    return [];
+  }
+
+  return (data ?? []) as CatalogoNacional[];
+}
+
+export async function searchCatalogoMenaje(
+  query: string,
+  limit = CATALOGO_SEARCH_MAX_RESULTS,
+): Promise<CatalogoNacional[]> {
+  const profile = await getProfile();
+  if (!profile) return [];
+
+  const trimmed = query.trim();
+  if (trimmed.length < minCatalogoQueryLength(trimmed)) return [];
+
+  const safe = trimmed.replace(/[%_,]/g, "");
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("catalogo_nacional")
+    .select("*")
+    .eq("origen", "MENAJE")
+    .or(`codigo.ilike.${safe}%,denominacion.ilike.%${safe}%`)
+    .order("denominacion")
+    .limit(Math.min(limit, CATALOGO_SEARCH_MAX_RESULTS));
+
+  if (error) {
+    console.error("searchCatalogoMenaje:", error.message);
+    return [];
+  }
+
+  return (data ?? []) as CatalogoNacional[];
+}
+
+async function leerSiguienteCodigoMenaje(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ codigo?: string; error?: string }> {
+  const { data, error } = await supabase
+    .from("catalogo_nacional")
+    .select("codigo")
+    .eq("origen", "MENAJE")
+    .order("codigo", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return { error: error.message };
+  return { codigo: nextCodigoCatalogoMenajeFromMax(data?.codigo ?? null) };
+}
+
+export async function createCatalogoMenaje(
+  denominacion: string,
+): Promise<{ data?: CatalogoNacional; error?: string }> {
+  await requireProfile("CONTADOR");
+
+  const validationError = validarDenominacionCatalogoMenaje(denominacion);
+  if (validationError) return { error: validationError };
+
+  const supabase = await createClient();
+  const siguiente = await leerSiguienteCodigoMenaje(supabase);
+  if (siguiente.error || !siguiente.codigo) {
+    return { error: siguiente.error ?? "No se pudo asignar el código de menaje." };
+  }
+
+  let codigo = siguiente.codigo;
+  for (let intento = 0; intento < 5; intento++) {
+    const payload = buildCreateCatalogoMenajePayload(codigo, denominacion);
+    const { data, error } = await supabase
+      .from("catalogo_nacional")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (!error && data) return { data: data as CatalogoNacional };
+    if (!codigoCatalogoDuplicado(error)) {
+      return { error: error?.message ?? "No se pudo crear el ítem de menaje." };
+    }
+
+    const otro = await leerSiguienteCodigoMenaje(supabase);
+    if (otro.error || !otro.codigo || otro.codigo === codigo) {
+      return { error: "No se pudo asignar un código de menaje libre. Intente de nuevo." };
+    }
+    codigo = otro.codigo;
+  }
+
+  return { error: "No se pudo asignar un código de menaje libre. Intente de nuevo." };
+}
+
+export async function updateCatalogoMenaje(
+  codigo: string,
+  denominacion: string,
+): Promise<{ data?: CatalogoNacional; error?: string }> {
+  await requireProfile("CONTADOR");
+
+  const trimmed = codigo.trim().toUpperCase();
+  if (!CATALOGO_MENAJE_CODIGO_RE.test(trimmed)) {
+    return { error: "Solo se pueden editar ítems del catálogo de menajes (MJ…)." };
+  }
+  const validationError = validarDenominacionCatalogoMenaje(denominacion);
+  if (validationError) return { error: validationError };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("catalogo_nacional")
+    .update({ denominacion: denominacion.trim().replace(/\s+/g, " ").toUpperCase() })
+    .eq("codigo", trimmed)
+    .eq("origen", "MENAJE")
+    .select()
+    .single();
+
+  if (error) return { error: error.message };
+  return { data: data as CatalogoNacional };
+}
+
+export async function deleteCatalogoMenaje(codigo: string): Promise<{ error?: string }> {
+  await requireProfile("CONTADOR");
+
+  const trimmed = codigo.trim().toUpperCase();
+  if (!CATALOGO_MENAJE_CODIGO_RE.test(trimmed)) {
+    return { error: "Solo se pueden eliminar ítems del catálogo de menajes (MJ…)." };
+  }
+
+  const supabase = await createClient();
+  const { count, error: countError } = await supabase
+    .from("activos")
+    .select("id", { count: "exact", head: true })
+    .eq("codigo_catalogo", trimmed);
+
+  if (countError) return { error: countError.message };
+  if ((count ?? 0) > 0) {
+    return { error: `No se puede eliminar: ${count} bien(es) usan el código ${trimmed}.` };
+  }
+
+  const { error } = await supabase
+    .from("catalogo_nacional")
+    .delete()
+    .eq("codigo", trimmed)
+    .eq("origen", "MENAJE");
+
+  if (error) return { error: error.message };
+  return {};
 }
 
 const INTENTOS_CODIGO_PROPIO = 5;

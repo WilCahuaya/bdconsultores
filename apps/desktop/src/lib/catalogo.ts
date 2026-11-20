@@ -12,20 +12,24 @@ import type {
 import {
   buildCatalogoCampoOpciones,
   buildCreateCatalogoCuentaOrdenPayload,
+  buildCreateCatalogoMenajePayload,
   buildCreateCatalogoNacionalExtensionPayload,
   buildUpdateCatalogoPropioPayload,
   buildUpdateCatalogoNacionalContabilidadPayload,
   CATALOGO_CONSULTA_MAX_RESULTS,
   CATALOGO_SEARCH_MAX_RESULTS,
+  CATALOGO_MENAJE_CODIGO_RE,
   CATALOGO_PROPIO_CODIGO_RE,
   isCatalogoNacionalOficial,
   isCatalogoPropio,
   minCatalogoQueryLength,
+  nextCodigoCatalogoMenajeFromMax,
   nextCodigoCatalogoPropioFromMax,
   normalizeCuentaCodigo,
   shouldRegistrarCatalogoOpcionPersonalizada,
   suggestClaseForDenominacion,
   suggestGrupoForDenominacion,
+  validarDenominacionCatalogoMenaje,
   validarCreateCatalogoCuentaOrdenInput,
   validarCreateCatalogoNacionalExtensionInput,
   validarUpdateCatalogoPropioInput,
@@ -93,7 +97,15 @@ type LocalCatalogRow = {
 };
 
 function mapLocalRow(row: LocalCatalogRow): CatalogoNacional {
-  const origen: CatalogoOrigen = row.origen === "PROPIO" ? "PROPIO" : "NACIONAL";
+  const codigo = row.codigo.trim().toUpperCase();
+  const origen: CatalogoOrigen =
+    row.origen === "PROPIO" || row.origen === "MENAJE"
+      ? row.origen
+      : codigo.startsWith("MJ")
+        ? "MENAJE"
+        : codigo.startsWith("BD")
+          ? "PROPIO"
+          : "NACIONAL";
   return {
     codigo: row.codigo,
     denominacion: row.denominacion,
@@ -198,6 +210,44 @@ export async function searchCatalogoPropio(
   return items.filter(isCatalogoPropio);
 }
 
+async function leerCatalogoMenaje(): Promise<CatalogoNacional[]> {
+  if (window.electronAPI?.listCatalogoMenajeLocal) {
+    const rows = await window.electronAPI.listCatalogoMenajeLocal();
+    if (rows.length > 0 || !isOnline()) return rows.map((row) => mapLocalRow(row));
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("catalogo_nacional")
+    .select("*")
+    .eq("origen", "MENAJE")
+    .order("codigo");
+
+  if (error) {
+    console.error("leerCatalogoMenaje:", error.message);
+    return [];
+  }
+  return (data ?? []) as CatalogoNacional[];
+}
+
+export async function searchCatalogoMenaje(
+  query: string,
+  limit = CATALOGO_SEARCH_MAX_RESULTS,
+): Promise<CatalogoNacional[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < minCatalogoQueryLength(trimmed)) return [];
+  const up = trimmed.toUpperCase();
+  const lower = trimmed.toLowerCase();
+  const items = await leerCatalogoMenaje();
+  return items
+    .filter(
+      (item) =>
+        item.codigo.toUpperCase().startsWith(up) ||
+        item.denominacion.toLowerCase().includes(lower),
+    )
+    .slice(0, limit);
+}
+
 export async function getCatalogoByCodigo(codigo: string): Promise<CatalogoNacional | null> {
   const trimmed = codigo.trim();
   if (!trimmed) return null;
@@ -241,6 +291,147 @@ export async function listCatalogoPropio(): Promise<CatalogoNacional[]> {
   }
 
   return [];
+}
+
+export async function listCatalogoMenaje(): Promise<CatalogoNacional[]> {
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return [];
+  return leerCatalogoMenaje();
+}
+
+export async function createCatalogoMenaje(
+  denominacion: string,
+): Promise<{ data?: CatalogoNacional; error?: string }> {
+  const profile = await fetchProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") return { error: "No autorizado." };
+
+  const validationError = validarDenominacionCatalogoMenaje(denominacion);
+  if (validationError) return { error: validationError };
+
+  const existentes = await leerCatalogoMenaje();
+  const maximo = existentes.map((item) => item.codigo).sort((a, b) => b.localeCompare(a))[0];
+  let codigo = nextCodigoCatalogoMenajeFromMax(maximo ?? null);
+
+  for (let intento = 0; intento < 5; intento++) {
+    const payload = buildCreateCatalogoMenajePayload(codigo, denominacion);
+    if (!isOnline()) {
+      const row: CatalogoNacional = { ...payload, created_at: new Date().toISOString() };
+      syncLocalRow(row);
+      await enqueueOfflineOp("catalogo:create", CATALOGO_SYNC_ENTIDAD, { payload: row });
+      return { data: row };
+    }
+
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("catalogo_nacional")
+      .insert(payload)
+      .select()
+      .single();
+
+    if (!error && data) {
+      const row = data as CatalogoNacional;
+      syncLocalRow(row);
+      return { data: row };
+    }
+
+    const message = (error?.message ?? "").toLowerCase();
+    const duplicado =
+      error?.code === "23505" || message.includes("duplicate") || message.includes("unique");
+    if (!duplicado) return { error: error?.message ?? "No se pudo crear el ítem de menaje." };
+    codigo = nextCodigoCatalogoMenajeFromMax(codigo);
+  }
+
+  return { error: "No se pudo asignar un código de menaje libre. Intente de nuevo." };
+}
+
+export async function updateCatalogoMenaje(
+  codigo: string,
+  denominacion: string,
+): Promise<{ data?: CatalogoNacional; error?: string }> {
+  const profile = await fetchProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") return { error: "No autorizado." };
+
+  const trimmed = codigo.trim().toUpperCase();
+  if (!CATALOGO_MENAJE_CODIGO_RE.test(trimmed)) {
+    return { error: "Solo se pueden editar ítems del catálogo de menajes (MJ…)." };
+  }
+  const validationError = validarDenominacionCatalogoMenaje(denominacion);
+  if (validationError) return { error: validationError };
+
+  const existing = await getCatalogoByCodigo(trimmed);
+  if (!existing || existing.origen !== "MENAJE") {
+    return { error: "El ítem no existe en el catálogo de menajes." };
+  }
+
+  const payload = { denominacion: denominacion.trim().replace(/\s+/g, " ").toUpperCase() };
+  const row: CatalogoNacional = { ...existing, ...payload, codigo: trimmed, origen: "MENAJE" };
+
+  if (!isOnline()) {
+    syncLocalRow(row);
+    await enqueueOfflineOp("catalogo:update", CATALOGO_SYNC_ENTIDAD, {
+      codigo: trimmed,
+      origen: "MENAJE",
+      payload,
+    });
+    return { data: row };
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("catalogo_nacional")
+    .update(payload)
+    .eq("codigo", trimmed)
+    .eq("origen", "MENAJE")
+    .select()
+    .single();
+
+  if (error) return { error: error.message };
+  const saved = data as CatalogoNacional;
+  syncLocalRow(saved);
+  return { data: saved };
+}
+
+export async function deleteCatalogoMenaje(codigo: string): Promise<{ error?: string }> {
+  const profile = await fetchProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR") return { error: "No autorizado." };
+
+  const trimmed = codigo.trim().toUpperCase();
+  if (!CATALOGO_MENAJE_CODIGO_RE.test(trimmed)) {
+    return { error: "Solo se pueden eliminar ítems del catálogo de menajes (MJ…)." };
+  }
+
+  if (!isOnline()) {
+    await enqueueOfflineOp("catalogo:delete", CATALOGO_SYNC_ENTIDAD, {
+      codigo: trimmed,
+      origen: "MENAJE",
+    });
+    window.electronAPI?.deleteCatalogRow?.(trimmed);
+    return {};
+  }
+
+  const supabase = getSupabaseClient();
+  const { count, error: countError } = await supabase
+    .from("activos")
+    .select("id", { count: "exact", head: true })
+    .eq("codigo_catalogo", trimmed);
+
+  if (countError) return { error: countError.message };
+  if ((count ?? 0) > 0) {
+    return { error: `No se puede eliminar: ${count} bien(es) usan el código ${trimmed}.` };
+  }
+
+  const { error } = await supabase
+    .from("catalogo_nacional")
+    .delete()
+    .eq("codigo", trimmed)
+    .eq("origen", "MENAJE");
+
+  if (error) return { error: error.message };
+  window.electronAPI?.deleteCatalogRow?.(trimmed);
+  return {};
 }
 
 export async function getNextCodigoCatalogoPropio(): Promise<string> {

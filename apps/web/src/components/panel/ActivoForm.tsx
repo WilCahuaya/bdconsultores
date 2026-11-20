@@ -41,6 +41,7 @@ import {
   vidaUtilMesesFromPorcentaje,
   debePersistirCuentaContableEnActivo,
   entidadMuestraSelectorSede,
+  isCatalogoMenaje,
   isCatalogoPropio,
   sedeIdSinSelector,
   splitObservacionActivo,
@@ -51,6 +52,7 @@ import {
   ActivoAtributoAutocomplete,
   Button,
   CatalogoAltaPanel,
+  CatalogoMenajeAlta,
   CatalogoPicker,
   CategoriaBienSelector,
   ConfirmDialog,
@@ -78,6 +80,7 @@ import {
 } from "@/lib/actions/activos";
 import { suggestActivoAtributo } from "@/lib/actions/atributo-vocab";
 import {
+  createCatalogoMenaje,
   createCatalogoNacional,
   createCatalogoNacionalExtension,
   deleteCatalogoOpcionPersonalizada,
@@ -86,6 +89,7 @@ import {
   listCatalogoClases,
   listCatalogoGrupos,
   registerCatalogoOpcionPersonalizada,
+  searchCatalogoMenaje,
   searchCatalogoNacionalOficial,
   searchCatalogoPropio,
   searchCuentasContables,
@@ -102,7 +106,7 @@ import type { ActivoEditScope } from "@inventario/ui/panel";
 import { panelFieldsetClass, panelLegendClass, panelModalClass } from "./panel-ui";
 
 type CatalogoAltaInline = {
-  variant: "nacional" | "propio";
+  variant: "nacional" | "propio" | "menaje";
   query: string;
 };
 
@@ -217,6 +221,9 @@ export function ActivoForm({
 
   const searchCatalogoByCategoria = useCallback(
     async (query: string, limit?: number) => {
+      if (categoria === "MENAJE") {
+        return searchCatalogoMenaje(query, limit);
+      }
       if (categoria === "ACTIVO") {
         return searchCatalogoNacionalOficial(query, limit);
       }
@@ -233,8 +240,11 @@ export function ActivoForm({
   function handleCategoriaChange(next: CategoriaBien) {
     setCategoria(next);
     if (!catalogo) return;
-    const esPropio = isCatalogoPropio(catalogo);
-    if (next === "ACTIVO" && esPropio) {
+    const incompatible =
+      (next === "MENAJE" && !isCatalogoMenaje(catalogo)) ||
+      (next !== "MENAJE" && isCatalogoMenaje(catalogo)) ||
+      (next === "ACTIVO" && isCatalogoPropio(catalogo));
+    if (incompatible) {
       setCatalogo(null);
       setNombre("");
       setNombreEtiqueta("");
@@ -983,6 +993,16 @@ export function ActivoForm({
         setMessage("Para categoría Activo use un código del catálogo nacional.");
         return;
       }
+      if (categoria === "MENAJE" && !isCatalogoMenaje(catalogo)) {
+        setPending(false);
+        setMessage("Para menaje use un ítem del catálogo de menajes.");
+        return;
+      }
+      if (categoria !== "MENAJE" && isCatalogoMenaje(catalogo)) {
+        setPending(false);
+        setMessage("El catálogo de menajes solo se usa en bienes de menaje.");
+        return;
+      }
     }
 
     const payload: UpdateActivoInput = {
@@ -1686,7 +1706,9 @@ export function ActivoForm({
         />
 
         <CatalogoPicker
-          variant={categoria === "ACTIVO" ? "nacional" : "ambos"}
+          variant={
+            categoria === "MENAJE" ? "menaje" : categoria === "ACTIVO" ? "nacional" : "ambos"
+          }
           searchCatalogo={searchCatalogoByCategoria}
           resolveCodigo={getCatalogoByCodigo}
           selectedCodigo={catalogo?.codigo}
@@ -1722,6 +1744,14 @@ export function ActivoForm({
                   onClick={() => setCatalogoAlta({ variant: "nacional", query: q })}
                 >
                   Crear en catálogo nacional
+                </button>
+              ) : categoria === "MENAJE" ? (
+                <button
+                  type="button"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                  onClick={() => setCatalogoAlta({ variant: "menaje", query: q })}
+                >
+                  Crear en catálogo de menajes
                 </button>
               ) : (
                 <button
@@ -2413,18 +2443,34 @@ export function ActivoForm({
       title={
         catalogoAlta?.variant === "nacional"
           ? "Nuevo ítem del catálogo nacional"
-          : "Nuevo bien de cuenta de orden"
+          : catalogoAlta?.variant === "menaje"
+            ? "Nuevo ítem de menaje"
+            : "Nuevo bien de cuenta de orden"
       }
       description={
         catalogoAlta?.variant === "nacional"
           ? "Se agregará al catálogo SBN y quedará seleccionado en este activo."
-          : "Se agregará al catálogo propio y quedará seleccionado en este activo."
+          : catalogoAlta?.variant === "menaje"
+            ? "Se agregará al catálogo de menajes y quedará seleccionado."
+            : "Se agregará al catálogo propio y quedará seleccionado en este activo."
       }
       className={panelModalClass}
     >
-      {catalogoAlta && (
+      {catalogoAlta?.variant === "menaje" ? (
+        <CatalogoMenajeAlta
+          hideIntro
+          initialDenominacion={catalogoAlta.query}
+          onSubmit={createCatalogoMenaje}
+          onClose={() => setCatalogoAlta(null)}
+          onItemCreated={(item) => {
+            setCatalogo(item);
+            setNombre(item.denominacion);
+            setCatalogoAlta(null);
+          }}
+        />
+      ) : catalogoAlta && (
         <CatalogoAltaPanel
-          variant={catalogoAlta.variant}
+          variant={catalogoAlta.variant === "nacional" ? "nacional" : "propio"}
           hideIntro
           initialDenominacion={
             catalogoAlta.variant === "nacional"

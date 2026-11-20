@@ -20,7 +20,7 @@ export default async function ContadorCatalogoPage({
     <div className="space-y-6">
       <PanelPageHeader
         title="Catálogo"
-        subtitle="Administre el catálogo propio (cuenta de orden) y consulte el catálogo nacional oficial."
+        subtitle="Administre el catálogo propio, el de menajes y consulte el catálogo nacional oficial."
       />
       <CatalogoPanel initialDenominacion={params.q ?? ""} />
     </div>

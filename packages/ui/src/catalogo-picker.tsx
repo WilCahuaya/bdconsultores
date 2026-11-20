@@ -11,7 +11,7 @@ import {
 import { computeFloatingMenuLayout, type FloatingMenuLayout } from "./dropdown-position";
 import { cn, Input, Label } from "./components";
 
-export type CatalogoPickerVariant = "nacional" | "propio" | "ambos";
+export type CatalogoPickerVariant = "nacional" | "propio" | "ambos" | "menaje";
 
 const CATALOGO_PICKER_COPY: Record<
   CatalogoPickerVariant,
@@ -28,6 +28,12 @@ const CATALOGO_PICKER_COPY: Record<
     hint: "Escriba código o denominación del catálogo.",
     placeholder: "Buscar por código o denominación…",
     empty: "Sin coincidencias en el catálogo propio.",
+  },
+  menaje: {
+    label: "Código catálogo de menajes",
+    hint: "Escriba código MJ o la denominación.",
+    placeholder: "Buscar menaje por código o denominación…",
+    empty: "Sin coincidencias en el catálogo de menajes.",
   },
   ambos: {
     label: "Código catálogo",
