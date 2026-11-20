@@ -145,6 +145,9 @@ export const INVENTARIO_TABLE_ADMIN_PREREGISTRO_COL_COUNT =
 /** Anchos mínimos por columna (px) — lectura cómoda con scroll horizontal. */
 export const INVENTARIO_TABLE_SELECTION_COL_WIDTH_PX = 40;
 
+/** Columna fija a la izquierda, solo con el lápiz de editar. */
+export const INVENTARIO_EDITAR_COL_WIDTH_PX = 44;
+
 /** Columnas fijas a la izquierda: N°, Cat., Código, Nombre (+ Visita y selección si aplican). */
 export const INVENTARIO_STICKY_DATA_COL_COUNT = 4;
 
@@ -397,6 +400,7 @@ export function inventarioTableWidthValuesPx(options?: {
   withSelection?: boolean;
   columnaVisita?: boolean;
   columnaProcedencia?: boolean;
+  columnaEditar?: boolean;
 }): number[] {
   const withSelection = options?.withSelection ?? false;
   let widths: readonly number[];
@@ -418,7 +422,8 @@ export function inventarioTableWidthValuesPx(options?: {
   if (options?.columnaProcedencia) {
     data = insertInventarioProcedenciaColumn(data, columnaVisita);
   }
-  return withSelection ? [INVENTARIO_TABLE_SELECTION_COL_WIDTH_PX, ...data] : data;
+  const values = withSelection ? [INVENTARIO_TABLE_SELECTION_COL_WIDTH_PX, ...data] : data;
+  return options?.columnaEditar ? [INVENTARIO_EDITAR_COL_WIDTH_PX, ...values] : values;
 }
 
 /** Offsets `left` (px) para columnas sticky. */
@@ -473,6 +478,7 @@ export function inventarioTableFloorValuesPx(options?: {
   withSelection?: boolean;
   columnaVisita?: boolean;
   columnaProcedencia?: boolean;
+  columnaEditar?: boolean;
 }): number[] {
   const preferred = inventarioTableWidthValuesPx(options);
   return preferred.map((width, index) => inventarioColFloorPx(width, index, preferred.length));
@@ -485,6 +491,7 @@ export function inventarioTableMinWidthPx(options?: {
   withSelection?: boolean;
   columnaVisita?: boolean;
   columnaProcedencia?: boolean;
+  columnaEditar?: boolean;
 }): number {
   return sumWidths(inventarioTableFloorValuesPx(options));
 }

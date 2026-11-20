@@ -34,6 +34,8 @@ interface ActivosCampoAccionesProps {
   puedeEliminarPreregistro?: boolean;
   compact?: boolean;
   variant?: "auto" | "menu" | "icons-and-menu" | "icons";
+  /** El lápiz se pinta en la columna izquierda de la tabla. */
+  ocultarEditar?: boolean;
 }
 
 export function ActivosCampoAcciones({
@@ -51,6 +53,7 @@ export function ActivosCampoAcciones({
   puedeEliminarPreregistro = false,
   compact,
   variant = "auto",
+  ocultarEditar = false,
 }: ActivosCampoAccionesProps) {
   const [fotoOpen, setFotoOpen] = useState(false);
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -64,7 +67,7 @@ export function ActivosCampoAcciones({
 
   const items = useMemo<TableActionItem[]>(() => {
     const list: TableActionItem[] = [];
-    if (!inactivo && onEdit) {
+    if (!ocultarEditar && !inactivo && onEdit) {
       list.push({
         id: "editar",
         label: esPreregistrado ? "Editar preregistro" : "Editar activo",
@@ -120,7 +123,7 @@ export function ActivosCampoAcciones({
       });
     }
     return list;
-  }, [activo, esPendiente, esPreregistrado, inactivo, online, onEdit, onIrAmbiente, onPrintLabel]);
+  }, [activo, esPendiente, esPreregistrado, inactivo, ocultarEditar, online, onEdit, onIrAmbiente, onPrintLabel]);
 
   return (
     <>
@@ -128,7 +131,7 @@ export function ActivosCampoAcciones({
         <TableActionsOverflow items={items} iconClassName={iconSize} variant={overflowVariant} />
       ) : (
         <div className="flex flex-row flex-wrap items-center justify-center gap-1">
-          {!inactivo && onEdit && (
+          {!ocultarEditar && !inactivo && onEdit && (
             <ActivoIconButton
               label={esPreregistrado ? "Editar preregistro" : "Editar activo"}
               variant={esPreregistrado ? "default" : "primary"}

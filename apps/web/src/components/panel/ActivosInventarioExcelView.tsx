@@ -25,6 +25,7 @@ import {
 import { createActivosSimilares } from "@/lib/actions/activos";
 import { listAmbientes, listSedes } from "@/lib/actions/ubicacion";
 import { ActivoAccionesBar } from "./ActivoAccionesBar";
+import { ActivoIconButton, IconEditar } from "./activo-icons";
 import { ActivosInventarioMobileCards } from "./ActivosInventarioMobileCards";
 import { ComprobanteCell } from "./ComprobanteCell";
 
@@ -285,9 +286,22 @@ export function ActivosInventarioExcelView({
           onActivoEliminado={onActivoEliminado}
           compact
           variant="icons"
+          ocultarEditar
           {...accionesProps}
         />
       )}
+      renderEditar={(activo) =>
+        activo.estado_registro === "DADO_DE_BAJA" ? null : (
+          <ActivoIconButton
+            label={editarLabel ?? "Editar activo"}
+            variant={activo.estado_registro === "PREREGISTRADO" ? "default" : "primary"}
+            onClick={() => onEditActivo(activo)}
+            className="h-7 w-7"
+          >
+            <IconEditar />
+          </ActivoIconButton>
+        )
+      }
     />
   );
 
