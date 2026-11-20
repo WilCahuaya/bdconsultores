@@ -25,6 +25,8 @@ import {
   syncFechaInicioDepreciacionInput,
   valorActivoEfectivo,
   formatPorcentajeDepreciacion,
+  depreciacionEsCoeficiente,
+  normalizarDepreciacionEntrada,
   nombreRequiereEtiquetaOverride,
   parseFechaDDMMYYYY,
   parsePorcentajeDepreciacion,
@@ -209,10 +211,18 @@ export function ActivoFormDesktop({
   const [material, setMaterial] = useState(activo?.material ?? "");
   const [medidas, setMedidas] = useState(activo?.medidas ?? "");
   const [detalle, setDetalle] = useState(activo?.caracteristicas ?? "");
-  const [depreciacion, setDepreciacion] = useState(activo?.depreciacion ?? "");
-  const [vidaUtilMeses, setVidaUtilMeses] = useState(
-    activo?.vida_util_meses != null ? String(activo.vida_util_meses) : "",
+  const [depreciacion, setDepreciacion] = useState(() =>
+    normalizarDepreciacionEntrada(activo?.depreciacion),
   );
+  const [vidaUtilMeses, setVidaUtilMeses] = useState(() => {
+    if (depreciacionEsCoeficiente(activo?.depreciacion)) {
+      const pct = parsePorcentajeDepreciacion(
+        normalizarDepreciacionEntrada(activo?.depreciacion),
+      );
+      return pct ? String(vidaUtilMesesFromPorcentaje(pct)) : "";
+    }
+    return activo?.vida_util_meses != null ? String(activo.vida_util_meses) : "";
+  });
   const [valor, setValor] = useState(
     activo?.valor_adquisicion != null ? String(activo.valor_adquisicion) : "",
   );
@@ -538,8 +548,9 @@ export function ActivoFormDesktop({
         categoria !== "MENAJE" && (isCatalogoPropio(item) || categoria === "CUENTA_ORDEN");
       const sinDepreciacion = categoria === "MENAJE" || quedaCuentaOrden;
       if (!sinDepreciacion && item.depreciacion) {
-        setDepreciacion(item.depreciacion);
-        const pct = parsePorcentajeDepreciacion(item.depreciacion);
+        const texto = normalizarDepreciacionEntrada(item.depreciacion);
+        setDepreciacion(texto);
+        const pct = parsePorcentajeDepreciacion(texto);
         if (pct) setVidaUtilMeses(String(vidaUtilMesesFromPorcentaje(pct)));
       } else {
         setDepreciacion("");

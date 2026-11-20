@@ -222,7 +222,7 @@ export function AmbientesView({
   onActivoUpdated,
   onActivoDeleted,
   onAbrirAmbienteDestino,
-  initialTab = "ambientes",
+  initialTab = "inventario",
   sedeFocus,
 }: AmbientesViewProps) {
   const [ambientes, setAmbientes] = useState<AmbienteConVisita[]>([]);

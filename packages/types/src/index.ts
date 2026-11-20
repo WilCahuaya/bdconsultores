@@ -1538,6 +1538,32 @@ export function formatPorcentajeDepreciacion(porcentaje: number): string {
   return `${texto} %`;
 }
 
+/**
+ * El catálogo SBN guarda la tasa como coeficiente (0.1 = 10 %, 0.2 = 20 %), sin signo %.
+ * Un valor ya escrito como "10 %" se deja igual.
+ */
+export function depreciacionEsCoeficiente(raw: string | null | undefined): boolean {
+  const trimmed = (raw ?? "").replace(/\u00a0/g, " ").trim();
+  if (!trimmed || trimmed.includes("%")) return false;
+  const match = trimmed.match(/^(\d+(?:[.,]\d+)?)$/);
+  if (!match) return false;
+  const value = Number(match[1].replace(",", "."));
+  return Number.isFinite(value) && value > 0 && value <= 1;
+}
+
+/** Lleva la depreciación al formato del formulario: "10 %", "20 %". */
+export function normalizarDepreciacionEntrada(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").replace(/\u00a0/g, " ").trim();
+  if (!trimmed) return "";
+  const hasPct = trimmed.includes("%");
+  const match = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*%?$/);
+  if (!match) return trimmed;
+  let value = Number(match[1].replace(",", "."));
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (!hasPct && value <= 1) value *= 100;
+  return formatPorcentajeDepreciacion(value);
+}
+
 function caracteristicasPartes(
   marca?: string | null,
   modelo?: string | null,

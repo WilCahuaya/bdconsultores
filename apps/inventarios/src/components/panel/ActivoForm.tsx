@@ -27,6 +27,8 @@ import {
   syncFechaInicioDepreciacionInput,
   valorActivoEfectivo,
   formatPorcentajeDepreciacion,
+  depreciacionEsCoeficiente,
+  normalizarDepreciacionEntrada,
   nombreRequiereEtiquetaOverride,
   parseFechaDDMMYYYY,
   parsePorcentajeDepreciacion,
@@ -377,8 +379,13 @@ export function ActivoForm({
     setMaterial(activo.material ?? "");
     setMedidas(activo.medidas ?? "");
     setDetalle(activo.caracteristicas ?? "");
-    setDepreciacion(activo.depreciacion ?? "");
-    setVidaUtilMeses(activo.vida_util_meses != null ? String(activo.vida_util_meses) : "");
+    setDepreciacion(normalizarDepreciacionEntrada(activo.depreciacion));
+    if (depreciacionEsCoeficiente(activo.depreciacion)) {
+      const pct = parsePorcentajeDepreciacion(normalizarDepreciacionEntrada(activo.depreciacion));
+      setVidaUtilMeses(pct ? String(vidaUtilMesesFromPorcentaje(pct)) : "");
+    } else {
+      setVidaUtilMeses(activo.vida_util_meses != null ? String(activo.vida_util_meses) : "");
+    }
     setValor(activo.valor_adquisicion != null ? String(activo.valor_adquisicion) : "");
     setIncrementoDetalle(activo.incremento_detalle ?? "");
     setValorIncremento(
@@ -427,14 +434,20 @@ export function ActivoForm({
     setPosibleAmbienteId(posibleAmbientePreset.ambienteId);
   }, [isEdit, posibleAmbientePreset]);
 
+  const omitirCatalogoInicialRef = useRef(isEdit);
   useEffect(() => {
-    if (catalogo) {
-      setNombre(catalogo.denominacion);
-      if (mostrarDepreciacion && catalogo.depreciacion) {
-        setDepreciacion(catalogo.depreciacion);
-        const pct = parsePorcentajeDepreciacion(catalogo.depreciacion);
-        if (pct) setVidaUtilMeses(String(vidaUtilMesesFromPorcentaje(pct)));
-      }
+    if (!catalogo) return;
+    // Al abrir la edición el catálogo llega después y no debe pisar la tasa ni el nombre del activo.
+    if (omitirCatalogoInicialRef.current) {
+      omitirCatalogoInicialRef.current = false;
+      return;
+    }
+    setNombre(catalogo.denominacion);
+    if (mostrarDepreciacion && catalogo.depreciacion) {
+      const texto = normalizarDepreciacionEntrada(catalogo.depreciacion);
+      setDepreciacion(texto);
+      const pct = parsePorcentajeDepreciacion(texto);
+      if (pct) setVidaUtilMeses(String(vidaUtilMesesFromPorcentaje(pct)));
     }
   }, [catalogo?.codigo, mostrarDepreciacion]);
 
@@ -531,12 +544,23 @@ export function ActivoForm({
   }
 
   useEffect(() => {
+    if (isEdit && activo?.codigo_barras) {
+      setCodigoBarrasPreview(activo.codigo_barras);
+      return;
+    }
     if (!entidadEfectiva || !catalogo?.codigo || !asignaCodigoInmediato || categoria === "MENAJE") {
       setCodigoBarrasPreview(null);
       return;
     }
     void previewCodigoBarras(entidadEfectiva, catalogo.codigo).then(setCodigoBarrasPreview);
-  }, [entidadEfectiva, catalogo?.codigo, asignaCodigoInmediato, categoria]);
+  }, [
+    entidadEfectiva,
+    catalogo?.codigo,
+    asignaCodigoInmediato,
+    categoria,
+    isEdit,
+    activo?.codigo_barras,
+  ]);
 
   const mostrarSelectorSede = entidadMuestraSelectorSede(sedes);
   const ambienteElegido = ambientes.find((a) => a.id === ambienteId) ?? null;
@@ -1808,9 +1832,11 @@ export function ActivoForm({
           <Input
             readOnly
             value={
-              asignaCodigoInmediato
-                ? codigoBarrasPreview ?? "Seleccione catálogo y entidad…"
-                : "Se asignará al validar (contador)"
+              isEdit && activo?.codigo_barras
+                ? activo.codigo_barras
+                : asignaCodigoInmediato
+                  ? codigoBarrasPreview ?? "Seleccione catálogo y entidad…"
+                  : "Se asignará al validar (contador)"
             }
             className="bg-muted font-mono text-sm"
           />
