@@ -14,6 +14,7 @@ import {
   parsePrecioMenaje,
   textoMenaje,
 } from "@inventario/types";
+import { CatalogoMenajeAlta } from "./catalogo-menaje-alta";
 import { CatalogoPicker } from "./catalogo-picker";
 import { Button, FileInput, Input, Label, Textarea } from "./components";
 import { FechaDdMmYyyyInput } from "./fecha-dd-mm-yyyy-input";
@@ -100,6 +101,9 @@ interface MenajeAmbientePanelProps {
     input: MenajeComprobanteNuevo,
   ) => Promise<{ error?: string; aviso?: string }>;
   onVerComprobante?: (path: string) => void;
+  onCrearCatalogo?: (
+    denominacion: string,
+  ) => Promise<{ data?: CatalogoNacional; error?: string }>;
   onQuitar?: (linea: MenajeLinea, motivo: string, cantidad: number) => Promise<{ error?: string; aviso?: string }>;
   onEliminar?: (linea: MenajeLinea) => Promise<{ error?: string }>;
 }
@@ -748,10 +752,12 @@ export function MenajeAmbientePanel({
   onQuitar,
   onEliminar,
   onVerComprobante,
+  onCrearCatalogo,
 }: MenajeAmbientePanelProps) {
   const { pushToast } = useToast();
   const [viewMode, setViewMode] = useStoredViewMode("inventario-view-menaje", "list");
   const [catalogo, setCatalogo] = useState<CatalogoNacional | null>(null);
+  const [altaCatalogo, setAltaCatalogo] = useState<string | null>(null);
   const [altaAbierta, setAltaAbierta] = useState(false);
   const [alta, setAlta] = useState<MenajeFormValues>(FORM_VACIO);
   const [mensaje, setMensaje] = useState<string | null>(null);
@@ -838,6 +844,7 @@ export function MenajeAmbientePanel({
       return;
     }
     setCatalogo(null);
+    setAltaCatalogo(null);
     setAlta(FORM_VACIO);
     setAltaAbierta(false);
     setMensaje(null);
@@ -975,6 +982,7 @@ export function MenajeAmbientePanel({
   function cerrarAlta() {
     setAltaAbierta(false);
     setCatalogo(null);
+    setAltaCatalogo(null);
     setAlta(FORM_VACIO);
     setError(null);
   }
@@ -989,16 +997,41 @@ export function MenajeAmbientePanel({
             primer comprobante. Si esa variante ya está, se suma como otra adquisición.
           </p>
           <div className="mt-3 space-y-3">
-            <CatalogoPicker
-              variant="ambos"
-              searchCatalogo={searchCatalogo}
-              resolveCodigo={resolveCodigo}
-              selectedCodigo={catalogo?.codigo}
-              selectedDenominacion={catalogo?.denominacion}
-              onSelect={setCatalogo}
-              onClear={() => setCatalogo(null)}
-              disabled={guardando}
-            />
+            {altaCatalogo != null && onCrearCatalogo ? (
+              <CatalogoMenajeAlta
+                initialDenominacion={altaCatalogo}
+                onSubmit={onCrearCatalogo}
+                onClose={() => setAltaCatalogo(null)}
+                onItemCreated={(item) => {
+                  setCatalogo(item);
+                  setAltaCatalogo(null);
+                }}
+              />
+            ) : (
+              <CatalogoPicker
+                variant="menaje"
+                searchCatalogo={searchCatalogo}
+                resolveCodigo={resolveCodigo}
+                selectedCodigo={catalogo?.codigo}
+                selectedDenominacion={catalogo?.denominacion}
+                onSelect={setCatalogo}
+                onClear={() => setCatalogo(null)}
+                disabled={guardando}
+                renderAddMissing={
+                  onCrearCatalogo
+                    ? (query) => (
+                        <button
+                          type="button"
+                          className="font-medium text-primary underline-offset-2 hover:underline"
+                          onClick={() => setAltaCatalogo(query)}
+                        >
+                          Agregar denominación al catálogo
+                        </button>
+                      )
+                    : undefined
+                }
+              />
+            )}
             <MenajeCampos
               idPrefix="menaje-alta"
               values={alta}

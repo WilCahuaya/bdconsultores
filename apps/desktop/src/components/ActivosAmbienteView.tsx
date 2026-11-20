@@ -5,7 +5,7 @@ import { AmbienteApartadoNav, Button, MenajeAmbientePanel } from "@inventario/ui
 import { createActivo, darDeBajaMenaje, eliminarMenaje, updateActivo, type ActivoConUbicacion } from "../lib/activos";
 import { aplicarComprobantesMenaje } from "../lib/menaje-comprobantes-client";
 import { getSignedStorageUrl } from "../lib/storage-url";
-import { getCatalogoByCodigo, searchCatalogo } from "../lib/catalogo";
+import { createCatalogoMenaje, getCatalogoByCodigo, searchCatalogoMenaje } from "../lib/catalogo";
 import type { AmbienteDestinoNavigation } from "./AgregarBienesSimilaresDialog";
 import {
   resolveFichaAsignacionExportMeta,
@@ -191,8 +191,9 @@ export function ActivosAmbienteView({
         <MenajeAmbientePanel
           lineas={menajeLineas}
           bajas={menajeBajas}
-          searchCatalogo={searchCatalogo}
+          searchCatalogo={searchCatalogoMenaje}
           resolveCodigo={getCatalogoByCodigo}
+          onCrearCatalogo={createCatalogoMenaje}
           onVerComprobante={(path) => {
             void getSignedStorageUrl("comprobantes-activos", path).then((result) => {
               if (result.url) window.open(result.url, "_blank", "noopener,noreferrer");

@@ -48,9 +48,9 @@ import {
 import { aplicarComprobantesMenaje } from "@/lib/menaje-comprobantes-client";
 import { getSignedStorageUrl } from "@/lib/storage-url";
 import {
+  createCatalogoMenaje,
   getCatalogoByCodigo,
-  searchCatalogoNacionalOficial,
-  searchCatalogoPropio,
+  searchCatalogoMenaje,
 } from "@/lib/actions/catalogo";
 import { useEjemplaresResumen } from "@/hooks/useEjemplaresResumen";
 import {
@@ -397,7 +397,7 @@ export function ActivosAmbientePanel({
     return partes.length > 0 ? partes.join(" · ") : null;
   }, [esAmbientePreregistro, estadoRegistro, fechaCorteText]);
 
-  const mostrarMenaje = !isAdmin && !esAmbientePreregistro && !esAmbienteFaltante;
+  const mostrarMenaje = !esAmbientePreregistro && !esAmbienteFaltante;
   const menajeLineas = useMemo(
     () =>
       activosList.filter(
@@ -413,14 +413,10 @@ export function ActivosAmbientePanel({
     [activosList],
   );
 
-  const searchMenaje = useCallback(async (query: string, limit?: number) => {
-    const perSide = Math.max(Math.ceil((limit ?? 50) / 2), 15);
-    const [nacional, propio] = await Promise.all([
-      searchCatalogoNacionalOficial(query, perSide),
-      searchCatalogoPropio(query, perSide),
-    ]);
-    return [...nacional, ...propio];
-  }, []);
+  const searchMenaje = useCallback(
+    (query: string, limit?: number) => searchCatalogoMenaje(query, limit),
+    [],
+  );
 
   const reemplazarMenaje = useCallback((next: Activo) => {
     setActivosList((prev) => {
@@ -535,6 +531,7 @@ export function ActivosAmbientePanel({
           bajas={menajeBajas}
           searchCatalogo={searchMenaje}
           resolveCodigo={getCatalogoByCodigo}
+          onCrearCatalogo={createCatalogoMenaje}
           onVerComprobante={(path) => {
             void getSignedStorageUrl("comprobantes-activos", path).then((result) => {
               if (result.url) window.open(result.url, "_blank", "noopener,noreferrer");
@@ -663,14 +660,18 @@ export function ActivosAmbientePanel({
             }
             return { error: result.error, aviso: result.aviso };
           }}
-          onEliminar={async (linea) => {
-            const result = await eliminarMenaje(linea.id);
-            if (!result.error) {
-              quitarActivos([linea.id]);
-              router.refresh();
-            }
-            return { error: result.error };
-          }}
+          onEliminar={
+            isAdmin
+              ? undefined
+              : async (linea) => {
+                  const result = await eliminarMenaje(linea.id);
+                  if (!result.error) {
+                    quitarActivos([linea.id]);
+                    router.refresh();
+                  }
+                  return { error: result.error };
+                }
+          }
         />
       ) : null}
 

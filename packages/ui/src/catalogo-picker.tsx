@@ -70,6 +70,9 @@ function looksLikeCatalogoCodigo(trimmed: string, variant: CatalogoPickerVariant
   if (variant === "ambos") {
     return /^BD\d{1,6}$/i.test(trimmed) || /^\d{1,12}$/.test(trimmed);
   }
+  if (variant === "menaje") {
+    return /^MJ\d{0,6}$/i.test(trimmed);
+  }
   return /^\d{1,12}$/.test(trimmed);
 }
 

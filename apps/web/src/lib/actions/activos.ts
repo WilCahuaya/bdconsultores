@@ -136,7 +136,35 @@ export async function createActivo(input: CreateActivoInput) {
   const supabase = await createClient();
 
   const esAdminEntidad = profile.rol === "ADMIN_ENTIDAD";
-  const esPreregistro = esAdminEntidad || input.estado_registro !== "REGISTRADO";
+  const menajeRegistradoAdmin =
+    esAdminEntidad && esMenaje(input.categoria) && input.estado_registro === "REGISTRADO";
+  const esPreregistro =
+    !menajeRegistradoAdmin && (esAdminEntidad || input.estado_registro !== "REGISTRADO");
+
+  if (menajeRegistradoAdmin) {
+    if (!profile.entidad_id || (input.entidad_id && input.entidad_id !== profile.entidad_id)) {
+      return { error: "No autorizado." };
+    }
+    if (!input.sede_id || !input.ambiente_id) {
+      return { error: "Seleccione sede y ambiente para registrar el menaje." };
+    }
+    const { data: sede } = await supabase
+      .from("sedes")
+      .select("entidad_id")
+      .eq("id", input.sede_id)
+      .maybeSingle();
+    if (!sede || sede.entidad_id !== profile.entidad_id) {
+      return { error: "La sede seleccionada no pertenece a su entidad." };
+    }
+    const { data: ambiente } = await supabase
+      .from("ambientes")
+      .select("sede_id")
+      .eq("id", input.ambiente_id)
+      .maybeSingle();
+    if (!ambiente || ambiente.sede_id !== input.sede_id) {
+      return { error: "El ambiente no pertenece a la sede seleccionada." };
+    }
+  }
 
   let responsable = input.responsable?.trim() || null;
   const ambienteResponsableId = esPreregistro
@@ -284,7 +312,7 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
   const { data: existing, error: fetchError } = await supabase
     .from("activos")
     .select(
-      "entidad_id, ambiente_id, posible_ambiente_id, estado_registro, estado_bien, observacion, material, color, medidas, caracteristicas",
+      "entidad_id, ambiente_id, posible_ambiente_id, estado_registro, estado_bien, observacion, material, color, medidas, caracteristicas, categoria, codigo_catalogo, nombre",
     )
     .eq("id", activoId)
     .maybeSingle();
@@ -317,7 +345,48 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
   let payload: Record<string, unknown>;
 
   if (profile.rol === "ADMIN_ENTIDAD") {
-    if (existing.estado_registro === "PREREGISTRADO") {
+    if (esMenaje(existing.categoria) && existing.estado_registro !== "PREREGISTRADO") {
+      if (!input.sede_id || !ambienteId) {
+        return { error: "Seleccione sede y ambiente." };
+      }
+
+      const { data: sede } = await supabase
+        .from("sedes")
+        .select("entidad_id")
+        .eq("id", input.sede_id)
+        .maybeSingle();
+
+      if (!sede || sede.entidad_id !== profile.entidad_id) {
+        return { error: "La sede seleccionada no pertenece a su entidad." };
+      }
+
+      const { data: ambiente } = await supabase
+        .from("ambientes")
+        .select("sede_id")
+        .eq("id", ambienteId)
+        .maybeSingle();
+
+      if (!ambiente || ambiente.sede_id !== input.sede_id) {
+        return { error: "El ambiente no pertenece a la sede seleccionada." };
+      }
+
+      payload = {
+        codigo_catalogo: existing.codigo_catalogo,
+        nombre: input.nombre?.trim() || existing.nombre,
+        categoria: "MENAJE",
+        estado_bien:
+          input.estado_bien !== undefined ? input.estado_bien : existing.estado_bien,
+        sede_id: input.sede_id,
+        ambiente_id: ambienteId,
+        responsable,
+        updated_by: profile.id,
+      };
+      completarPayloadMenaje(payload, {
+        ...input,
+        categoria: "MENAJE",
+        codigo_catalogo: existing.codigo_catalogo,
+      });
+    } else if (existing.estado_registro === "PREREGISTRADO") {
       const codigo = input.codigo_catalogo.trim();
       const nombre = input.nombre.trim();
       if (!codigo || !nombre) {
@@ -665,11 +734,25 @@ export async function darDeBajaActivo(activoId: string, motivo: string) {
 export async function darDeBajaMenaje(activoId: string, motivo: string, cantidad: number) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
-  if (profile.rol !== "CONTADOR") {
-    return { error: "Solo el contador puede dar de baja menaje." };
+  if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
+    return { error: "No autorizado." };
   }
 
   const supabase = await createClient();
+  if (profile.rol === "ADMIN_ENTIDAD") {
+    const { data: propio, error: propioError } = await supabase
+      .from("activos")
+      .select("entidad_id, categoria")
+      .eq("id", activoId)
+      .maybeSingle();
+    if (propioError || !propio) {
+      return { error: propioError?.message ?? "Menaje no encontrado." };
+    }
+    if (propio.entidad_id !== profile.entidad_id || !esMenaje(propio.categoria)) {
+      return { error: "No autorizado." };
+    }
+  }
+
   const resultado = await ejecutarBajaMenaje(supabase, {
     activoId,
     motivo,

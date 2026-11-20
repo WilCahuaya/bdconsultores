@@ -281,7 +281,10 @@ async function leerSiguienteCodigoMenaje(
 export async function createCatalogoMenaje(
   denominacion: string,
 ): Promise<{ data?: CatalogoNacional; error?: string }> {
-  await requireProfile("CONTADOR");
+  const profile = await getProfile();
+  if (!profile || (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD")) {
+    return { error: "No autorizado." };
+  }
 
   const validationError = validarDenominacionCatalogoMenaje(denominacion);
   if (validationError) return { error: validationError };
