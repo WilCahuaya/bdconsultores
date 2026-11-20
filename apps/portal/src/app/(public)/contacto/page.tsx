@@ -1,47 +1,38 @@
-import { PublicPageHeader } from "@/components/public/PublicPageHeader";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@inventario/ui";
+import { ContactActions } from "@/components/public/ContactActions";
 import { CONTACTO } from "@/lib/content/public";
 
 export default function ContactoPage() {
   return (
-    <section className="space-y-10">
-      <PublicPageHeader title="Contacto" description={CONTACTO.heading} />
-      <p className="max-w-2xl text-muted-foreground">{CONTACTO.intro}</p>
+    <section className="mx-auto max-w-3xl">
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">Contacto</p>
+      <h1 className="mt-3 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+        {CONTACTO.heading}
+      </h1>
+      <p className="mt-4 max-w-xl text-lg text-muted-foreground">{CONTACTO.intro}</p>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">{CONTACTO.empresa}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              <span className="font-medium text-foreground">Ubicación:</span> {CONTACTO.direccion}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Teléfono:</span> {CONTACTO.telefono}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Correo:</span> {CONTACTO.email}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">RUC:</span> 20614326418
-            </p>
-          </CardContent>
-        </Card>
+      <p className="mt-8 font-mono text-4xl font-semibold tracking-tight text-primary sm:text-5xl">
+        {CONTACTO.telefono}
+      </p>
+      <ContactActions className="mt-6" />
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg text-primary">{CONTACTO.cotizacion.title}</CardTitle>
-            <CardDescription>{CONTACTO.cotizacion.description}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="rounded-lg border border-dashed bg-muted/40 p-6 text-sm text-muted-foreground">
-              Formulario de contacto y cotización en desarrollo. Próximamente podrá enviarnos su
-              consulta desde esta página.
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      <dl className="mt-12 grid gap-6 border-t pt-8 text-sm sm:grid-cols-3">
+        <div>
+          <dt className="font-medium text-foreground">Correo</dt>
+          <dd className="mt-1">
+            <a href={`mailto:${CONTACTO.email}`} className="text-muted-foreground hover:text-primary">
+              {CONTACTO.email}
+            </a>
+          </dd>
+        </div>
+        <div>
+          <dt className="font-medium text-foreground">Dónde estamos</dt>
+          <dd className="mt-1 text-muted-foreground">{CONTACTO.direccion}</dd>
+        </div>
+        <div>
+          <dt className="font-medium text-foreground">{CONTACTO.empresa}</dt>
+          <dd className="mt-1 text-muted-foreground">RUC 20614326418</dd>
+        </div>
+      </dl>
     </section>
   );
 }
