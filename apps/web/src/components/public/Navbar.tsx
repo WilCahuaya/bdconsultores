@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { CONTACTO } from "@/lib/content/public";
 import { PUBLIC_NAV } from "@/lib/routes";
 import { BrandLogo } from "@/components/public/BrandLogo";
 import { ThemeToggle } from "@/components/public/ThemeToggle";
@@ -55,16 +56,30 @@ export function Navbar() {
 
         <div className="hidden min-w-0 items-center gap-1 lg:flex">
           <nav className="flex min-w-0 items-center gap-0.5" aria-label="Principal">
-            {PUBLIC_NAV.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="whitespace-nowrap rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-accent xl:px-3"
-              >
-                {item.label}
-              </Link>
-            ))}
+            {PUBLIC_NAV.map((item) => {
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`whitespace-nowrap rounded-md px-2.5 py-2 text-sm xl:px-3 ${
+                    active ? "bg-accent font-medium text-foreground" : "text-foreground hover:bg-accent"
+                  }`}
+                  aria-current={active ? "page" : undefined}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
+          <a
+            href={CONTACTO.whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-1 inline-flex h-9 shrink-0 items-center rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+          >
+            WhatsApp
+          </a>
           <ThemeToggle />
           <Link
             href="/login"
@@ -94,16 +109,32 @@ export function Navbar() {
           aria-label="Menú móvil"
         >
           <ul className="space-y-1">
-            {PUBLIC_NAV.map((item) => (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
-                >
-                  {item.label}
-                </Link>
-              </li>
-            ))}
+            {PUBLIC_NAV.map((item) => {
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={`block rounded-md px-3 py-2 text-sm ${
+                      active ? "bg-accent font-medium text-foreground" : "text-foreground hover:bg-accent"
+                    }`}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+            <li>
+              <a
+                href={CONTACTO.whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-md px-3 py-2 text-sm font-medium text-primary hover:bg-accent"
+              >
+                WhatsApp
+              </a>
+            </li>
             <li className="pt-2">
               <Link
                 href="/login"

@@ -946,7 +946,7 @@
 
   /* Sitio público (marketing) */
   .public-page {
-    @apply mx-auto w-full min-w-0 max-w-full overflow-x-clip px-4 py-8 sm:px-5 sm:py-9 md:px-6 md:py-10 lg:px-8 xl:px-10 2xl:px-12;
+    @apply mx-auto w-full min-w-0 max-w-full px-4 py-8 sm:px-5 sm:py-9 md:px-6 md:py-10 lg:px-8 xl:px-10 2xl:px-12;
   }
 
   .public-page img,
