@@ -1538,6 +1538,32 @@ export function formatPorcentajeDepreciacion(porcentaje: number): string {
   return `${texto} %`;
 }
 
+/**
+ * El catálogo SBN guarda la tasa como coeficiente (0.1 = 10 %, 0.2 = 20 %), sin signo %.
+ * Un valor ya escrito como "10 %" se deja igual.
+ */
+export function depreciacionEsCoeficiente(raw: string | null | undefined): boolean {
+  const trimmed = (raw ?? "").replace(/\u00a0/g, " ").trim();
+  if (!trimmed || trimmed.includes("%")) return false;
+  const match = trimmed.match(/^(\d+(?:[.,]\d+)?)$/);
+  if (!match) return false;
+  const value = Number(match[1].replace(",", "."));
+  return Number.isFinite(value) && value > 0 && value <= 1;
+}
+
+/** Lleva la depreciación al formato del formulario: "10 %", "20 %". */
+export function normalizarDepreciacionEntrada(raw: string | null | undefined): string {
+  const trimmed = (raw ?? "").replace(/\u00a0/g, " ").trim();
+  if (!trimmed) return "";
+  const hasPct = trimmed.includes("%");
+  const match = trimmed.match(/^(\d+(?:[.,]\d+)?)\s*%?$/);
+  if (!match) return trimmed;
+  let value = Number(match[1].replace(",", "."));
+  if (!Number.isFinite(value) || value <= 0) return "";
+  if (!hasPct && value <= 1) value *= 100;
+  return formatPorcentajeDepreciacion(value);
+}
+
 function caracteristicasPartes(
   marca?: string | null,
   modelo?: string | null,
@@ -1909,11 +1935,12 @@ export function formatMedidas(
   return parts.join(" × ");
 }
 
-export type CatalogoOrigen = "NACIONAL" | "PROPIO";
+export type CatalogoOrigen = "NACIONAL" | "PROPIO" | "MENAJE";
 
 export const CATALOGO_ORIGEN_LABELS: Record<CatalogoOrigen, string> = {
   NACIONAL: "Nacional (catálogo oficial SBN)",
   PROPIO: "Propio (extensión de la entidad)",
+  MENAJE: "Menaje",
 };
 
 /** Mínimo de caracteres para buscar en catálogo (1 si solo dígitos, 2 si hay texto). */
@@ -1980,6 +2007,11 @@ export const CATALOGO_CUENTA_ORDEN_ESTADO: CatalogoEstadoSbn = "EXCLUIDO";
 export const CATALOGO_CUENTA_ORDEN_CLASE = "25 OTROS SUMINISTROS";
 
 export const CATALOGO_PROPIO_CODIGO_RE = /^BD\d{6}$/;
+
+/** Prefijo del catálogo de menajes del estudio. */
+export const CATALOGO_MENAJE_PREFIX = "MJ";
+
+export const CATALOGO_MENAJE_CODIGO_RE = /^MJ\d{6}$/;
 
 /** Grupos disponibles al dar de alta ítems propios (cuenta de orden). */
 export const CATALOGO_GRUPOS_OPCIONES = [
@@ -2114,6 +2146,27 @@ export function nextCodigoCatalogoPropioFromMax(maxCodigo: string | null | undef
   return formatCodigoCatalogoPropio(secuencia + 1);
 }
 
+export function formatCodigoCatalogoMenaje(secuencia: number): string {
+  if (!Number.isInteger(secuencia) || secuencia < 1 || secuencia > 999_999) {
+    throw new Error("Secuencia de catálogo de menajes fuera de rango.");
+  }
+  return `${CATALOGO_MENAJE_PREFIX}${String(secuencia).padStart(6, "0")}`;
+}
+
+export function parseCodigoCatalogoMenajeSecuencia(codigo: string): number | null {
+  const match = codigo.trim().match(/^MJ(\d{6})$/i);
+  if (!match) return null;
+  const secuencia = Number.parseInt(match[1], 10);
+  return secuencia >= 1 ? secuencia : null;
+}
+
+export function nextCodigoCatalogoMenajeFromMax(maxCodigo: string | null | undefined): string {
+  if (!maxCodigo) return formatCodigoCatalogoMenaje(1);
+  const secuencia = parseCodigoCatalogoMenajeSecuencia(maxCodigo);
+  if (secuencia === null) return formatCodigoCatalogoMenaje(1);
+  return formatCodigoCatalogoMenaje(secuencia + 1);
+}
+
 export function normalizeCatalogoDenominacion(value: string): string {
   return value.trim().replace(/\s+/g, " ").toUpperCase();
 }
@@ -2217,6 +2270,9 @@ export function validarCreateCatalogoNacionalExtensionInput(
   if (CATALOGO_PROPIO_CODIGO_RE.test(input.codigo.trim())) {
     return "Use el catálogo propio para códigos BD…";
   }
+  if (CATALOGO_MENAJE_CODIGO_RE.test(input.codigo.trim())) {
+    return "Use el catálogo de menajes para códigos MJ…";
+  }
   if (!normalizeCatalogoDenominacion(input.denominacion)) {
     return "La denominación es obligatoria.";
   }
@@ -2303,10 +2359,39 @@ export function isCatalogoPropio(item: Pick<CatalogoNacional, "codigo" | "origen
   return item.origen === "PROPIO" || CATALOGO_PROPIO_CODIGO_RE.test(item.codigo.trim());
 }
 
+export function isCatalogoMenaje(item: Pick<CatalogoNacional, "codigo" | "origen">): boolean {
+  return item.origen === "MENAJE" || CATALOGO_MENAJE_CODIGO_RE.test(item.codigo.trim());
+}
+
 export function isCatalogoNacionalOficial(
   item: Pick<CatalogoNacional, "codigo" | "origen">,
 ): boolean {
-  return !isCatalogoPropio(item);
+  return !isCatalogoPropio(item) && !isCatalogoMenaje(item);
+}
+
+export function validarDenominacionCatalogoMenaje(denominacion: string): string | null {
+  if (!normalizeCatalogoDenominacion(denominacion)) {
+    return "La denominación es obligatoria.";
+  }
+  return null;
+}
+
+export function buildCreateCatalogoMenajePayload(
+  codigo: string,
+  denominacion: string,
+): Omit<CatalogoNacional, "created_at"> {
+  return {
+    codigo: codigo.trim().toUpperCase(),
+    denominacion: normalizeCatalogoDenominacion(denominacion),
+    grupo: null,
+    clase: null,
+    cuenta_codigo: null,
+    contabilidad: null,
+    depreciacion: null,
+    resolucion: null,
+    estado: "ACTIVO",
+    origen: "MENAJE",
+  };
 }
 
 function suggestValorMasFrecuente(

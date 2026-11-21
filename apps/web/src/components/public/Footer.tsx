@@ -30,7 +30,20 @@ export function Footer() {
 
         <div>
           <p className="text-sm font-medium text-foreground">Contacto</p>
-          <p className="mt-3 text-sm text-muted-foreground">{CONTACTO.telefono}</p>
+          <a
+            href={CONTACTO.whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 block text-sm text-muted-foreground hover:text-primary"
+          >
+            WhatsApp {CONTACTO.telefono}
+          </a>
+          <a
+            href={`tel:${CONTACTO.telefonoTel}`}
+            className="mt-1 block text-sm text-muted-foreground hover:text-primary"
+          >
+            Llamar al {CONTACTO.telefono}
+          </a>
           <a
             href={`mailto:${CONTACTO.email}`}
             className="mt-1 block text-sm text-muted-foreground hover:text-primary"

@@ -14,7 +14,10 @@ let cache: CatalogoIndexado[] | null = null;
 let inflight: Promise<CatalogoIndexado[]> | null = null;
 
 function origenDeCodigo(codigo: string): CatalogoOrigen {
-  return codigo.toUpperCase().startsWith("BD") ? "PROPIO" : "NACIONAL";
+  const up = codigo.toUpperCase();
+  if (up.startsWith("MJ")) return "MENAJE";
+  if (up.startsWith("BD")) return "PROPIO";
+  return "NACIONAL";
 }
 
 function indexar(items: CatalogoBusquedaItem[]): CatalogoIndexado[] {
@@ -46,17 +49,22 @@ export function filtrarCatalogoLocal(
   items: CatalogoIndexado[],
   query: string,
   limit = CATALOGO_SEARCH_MAX_RESULTS,
+  solo?: CatalogoOrigen,
 ): CatalogoNacional[] {
   const raw = query.trim();
   if (raw.length < minCatalogoQueryLength(raw)) return [];
 
   const up = raw.toUpperCase();
   const lower = raw.toLowerCase();
-  const origen: CatalogoOrigen | null = up.startsWith("BD")
-    ? "PROPIO"
-    : /^\d+$/.test(raw)
-      ? "NACIONAL"
-      : null;
+  const origen: CatalogoOrigen | "sin-menaje" | null = solo
+    ? solo
+    : up.startsWith("MJ")
+      ? "MENAJE"
+      : up.startsWith("BD")
+        ? "PROPIO"
+        : /^\d+$/.test(raw)
+          ? "NACIONAL"
+          : "sin-menaje";
 
   const hits: Array<{
     item: CatalogoIndexado;
@@ -66,7 +74,8 @@ export function filtrarCatalogoLocal(
   }> = [];
 
   for (const item of items) {
-    if (origen && item.origen !== origen) continue;
+    if (origen === "sin-menaje" && item.origen === "MENAJE") continue;
+    if (origen && origen !== "sin-menaje" && item.origen !== origen) continue;
     const prefix = item.codigoUp.startsWith(up);
     const inName = item.denominacionLower.includes(lower);
     if (!prefix && !inName) continue;
@@ -109,7 +118,8 @@ export async function ensureCatalogoBusqueda(force = false): Promise<CatalogoInd
 export function buscarCatalogoLocal(
   query: string,
   limit = CATALOGO_SEARCH_MAX_RESULTS,
+  solo?: CatalogoOrigen,
 ): CatalogoNacional[] {
   if (!cache) return [];
-  return filtrarCatalogoLocal(cache, query, limit);
+  return filtrarCatalogoLocal(cache, query, limit, solo);
 }

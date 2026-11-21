@@ -14,11 +14,13 @@ import type {
 import { Button } from "./components";
 import { CatalogoAltaPanel } from "./catalogo-alta-panel";
 import { CatalogoNacionalConsulta } from "./catalogo-nacional-consulta";
+import { CatalogoMenajeAlta } from "./catalogo-menaje-alta";
+import { CatalogoMenajePanel } from "./catalogo-menaje-panel";
 import { CatalogoPropioPanel } from "./catalogo-propio-panel";
 import { CuentasContablesPanel } from "./cuentas-contables-panel";
 import { PanelTabs } from "./panel";
 
-type CatalogoTab = "propio" | "nacional" | "cuentas";
+type CatalogoTab = "propio" | "menaje" | "nacional" | "cuentas";
 
 export interface CatalogoNacionalAltaPrefill {
   codigo?: string;
@@ -37,6 +39,7 @@ export function parseCatalogoNacionalAltaPrefill(query: string): CatalogoNaciona
 
 const CATALOGO_TABS: { id: CatalogoTab; label: string }[] = [
   { id: "propio", label: "Catálogo propio" },
+  { id: "menaje", label: "Catálogo de menajes" },
   { id: "cuentas", label: "Cuentas contables" },
   { id: "nacional", label: "Consultar nacional" },
 ];
@@ -67,6 +70,14 @@ export interface CatalogoPageProps {
   ) => Promise<{ data?: CatalogoNacional; error?: string }>;
   readOnlyNacionalCreate?: boolean;
   listPropio: () => Promise<CatalogoNacional[]>;
+  listMenaje: () => Promise<CatalogoNacional[]>;
+  onCreateMenaje: (denominacion: string) => Promise<{ data?: CatalogoNacional; error?: string }>;
+  onUpdateMenaje: (
+    codigo: string,
+    denominacion: string,
+  ) => Promise<{ data?: CatalogoNacional; error?: string }>;
+  onDeleteMenaje: (codigo: string) => Promise<{ error?: string }>;
+  readOnlyMenaje?: boolean;
   onUpdatePropio: (
     codigo: string,
     input: UpdateCatalogoPropioInput,
@@ -103,6 +114,11 @@ export function CatalogoPage({
   onCreateNacional,
   readOnlyNacionalCreate = false,
   listPropio,
+  listMenaje,
+  onCreateMenaje,
+  onUpdateMenaje,
+  onDeleteMenaje,
+  readOnlyMenaje = false,
   onUpdatePropio,
   onDeletePropio,
   searchNacional,
@@ -116,6 +132,8 @@ export function CatalogoPage({
 }: CatalogoPageProps) {
   const [tab, setTab] = useState<CatalogoTab>("propio");
   const [propioReloadKey, setPropioReloadKey] = useState(0);
+  const [menajeReloadKey, setMenajeReloadKey] = useState(0);
+  const [showAltaMenaje, setShowAltaMenaje] = useState(false);
   const [cuentasReloadKey, setCuentasReloadKey] = useState(0);
   const [showAltaForm, setShowAltaForm] = useState(false);
   const [altaDenominacion, setAltaDenominacion] = useState(initialDenominacion);
@@ -234,6 +252,42 @@ export function CatalogoPage({
             reloadKey={propioReloadKey}
             readOnly={readOnlyPropio}
             onAddNew={readOnlyPropio || showAltaForm ? undefined : () => openAltaPropio()}
+          />
+        </div>
+      ) : tab === "menaje" ? (
+        <div className="catalogo-tabla-card overflow-visible rounded-xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-semibold">Catálogo de menajes</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ítems del estudio para bienes de menaje (códigos MJ…). El código se asigna al crear.
+                Material, color y medidas se registran en cada existencia.
+              </p>
+            </div>
+            {!readOnlyMenaje && !showAltaMenaje && (
+              <Button type="button" size="sm" onClick={() => setShowAltaMenaje(true)}>
+                + Agregar uno nuevo
+              </Button>
+            )}
+          </div>
+          {showAltaMenaje && !readOnlyMenaje && (
+            <div className="mb-6">
+              <CatalogoMenajeAlta
+                onSubmit={onCreateMenaje}
+                onClose={() => setShowAltaMenaje(false)}
+                onItemCreated={() => {
+                  setMenajeReloadKey((key) => key + 1);
+                  setShowAltaMenaje(false);
+                }}
+              />
+            </div>
+          )}
+          <CatalogoMenajePanel
+            listItems={listMenaje}
+            onUpdate={onUpdateMenaje}
+            onDelete={onDeleteMenaje}
+            reloadKey={menajeReloadKey}
+            readOnly={readOnlyMenaje}
           />
         </div>
       ) : tab === "cuentas" ? (

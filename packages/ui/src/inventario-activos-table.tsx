@@ -100,13 +100,19 @@ function stickyCellProps(
   widthsPx?: readonly number[],
   baseZ = 12,
   lockWidth = true,
-  marker?: "codigo",
+  marker?: "codigo" | "editar",
 ): { className: string; style: CSSProperties } | undefined {
   if (index < 0 || index >= offsets.length) return undefined;
   const isLast = index === offsets.length - 1;
   const width = widthsPx?.[index];
+  const markerClass =
+    marker === "codigo"
+      ? " inventario-sticky-col--codigo"
+      : marker === "editar"
+        ? " inventario-sticky-col--editar"
+        : "";
   return {
-    className: `inventario-sticky-col${isLast ? " inventario-sticky-col--last" : ""}${marker === "codigo" ? " inventario-sticky-col--codigo" : ""}`,
+    className: `inventario-sticky-col${isLast ? " inventario-sticky-col--last" : ""}${markerClass}`,
     style: {
       left: offsets[index],
       zIndex: baseZ + index,
@@ -187,6 +193,8 @@ export interface ActivosInventarioTableProps<T extends Activo> {
   procedenciaPorActivo?: Record<string, string>;
   renderComprobante: (activo: T, meta?: { columnFiltered?: boolean }) => ReactNode;
   renderAcciones: (activo: T) => ReactNode;
+  /** Lápiz de editar, fijo a la izquierda. El resto de acciones sigue en la última columna. */
+  renderEditar?: (activo: T) => ReactNode;
   /** Guarda la serie del bien desde la celda. Sin esto, la celda sigue en solo lectura. */
   onCommitSerie?: (activo: T, serie: string) => Promise<{ error?: string } | void>;
   /** Por defecto se puede editar todo bien que no esté dado de baja. */
@@ -359,6 +367,24 @@ function filteredColClass(active: boolean, extra?: string): string {
   return [extra, active ? "inventario-col-filtered" : null].filter(Boolean).join(" ");
 }
 
+function inventarioStickyLayout(
+  withSelection: boolean,
+  columnaVisita: boolean,
+  columnaEditar: boolean,
+) {
+  const lead = (columnaEditar ? 1 : 0) + (withSelection ? 1 : 0);
+  return {
+    editarAt: columnaEditar ? 0 : -1,
+    selAt: withSelection ? (columnaEditar ? 1 : 0) : -1,
+    nAt: lead,
+    catAt: lead + 1,
+    codAt: lead + 2,
+    visitaAt: columnaVisita ? lead + 3 : -1,
+    nombreAt: lead + 3 + (columnaVisita ? 1 : 0),
+    stickyCount: lead + INVENTARIO_STICKY_DATA_COL_COUNT + (columnaVisita ? 1 : 0),
+  };
+}
+
 function TotalsFooter({
   activos,
   fechaCorte,
@@ -458,6 +484,7 @@ function FullTableBody<T extends Activo>({
   columnFilters,
   renderComprobante,
   renderAcciones,
+  renderEditar,
   renderVisita,
   procedenciaPorActivo,
   onCommitSerie,
@@ -472,9 +499,11 @@ function FullTableBody<T extends Activo>({
 }) {
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
   const columnaVisita = Boolean(renderVisita);
+  const columnaEditar = Boolean(renderEditar);
   const columnaProcedencia = procedenciaPorActivo != null;
-  const sel = selection?.withSelection ? 1 : 0;
-  const nombreStickyAt = sel + 3 + (columnaVisita ? 1 : 0);
+  const withSelection = Boolean(selection?.withSelection);
+  const layout = inventarioStickyLayout(withSelection, columnaVisita, columnaEditar);
+  const nombreStickyAt = layout.nombreAt;
   const f = columnFilters;
   const catOn = Boolean(f?.categoria);
   const nomOn = Boolean(f?.nombre.trim());
@@ -498,17 +527,26 @@ function FullTableBody<T extends Activo>({
         const rowIndex = rowOffset + index;
         const inactivo = activo.estado_registro === "DADO_DE_BAJA";
         const { periodo, depAcum, valorNeto } = inventarioDepreciacionFila(activo, inactivo, corte);
-        const stickySel = stickyCellProps(stickyOffsets, 0, stickyWidths);
-        const stickyN = stickyCellProps(stickyOffsets, sel, stickyWidths);
-        const stickyCat = stickyCellProps(stickyOffsets, sel + 1, stickyWidths);
-        const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths, 12, true, "codigo");
+        const stickyEditar = stickyCellProps(stickyOffsets, layout.editarAt, stickyWidths, 12, true, "editar");
+        const stickySel = stickyCellProps(stickyOffsets, layout.selAt, stickyWidths);
+        const stickyN = stickyCellProps(stickyOffsets, layout.nAt, stickyWidths);
+        const stickyCat = stickyCellProps(stickyOffsets, layout.catAt, stickyWidths);
+        const stickyCod = stickyCellProps(stickyOffsets, layout.codAt, stickyWidths, 12, true, "codigo");
         const stickyVisita = columnaVisita
-          ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths)
+          ? stickyCellProps(stickyOffsets, layout.visitaAt, stickyWidths)
           : undefined;
         const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths, 12, false);
 
         return (
           <tr key={activo.id} className={rowClassName(activo, rowIndex)}>
+            {columnaEditar && (
+              <td
+                className={`${inventarioTdAccionesClass} ${stickyEditar?.className ?? ""}`}
+                style={stickyEditar?.style}
+              >
+                <div className="flex items-center justify-center">{renderEditar?.(activo)}</div>
+              </td>
+            )}
             {selection?.withSelection && (
               <SelectionCell activo={activo} selection={selection} sticky={stickySel} />
             )}
@@ -650,6 +688,7 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
   } = props;
   const modoPreregistro = Boolean(mostrarPosibleAmbiente);
   const columnaVisita = Boolean(renderVisita);
+  const columnaEditar = Boolean(props.renderEditar);
   const columnaProcedencia = procedenciaPorActivo != null;
   const withSelection = selection?.withSelection ?? false;
   const colSpan =
@@ -666,7 +705,8 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
           : INVENTARIO_TABLE_COL_COUNT) +
     (withSelection ? 1 : 0) +
     (columnaVisita ? 1 : 0) +
-    (columnaProcedencia ? 1 : 0);
+    (columnaProcedencia ? 1 : 0) +
+    (columnaEditar ? 1 : 0);
   const tableClass = `${inventarioActivosTableClass}${modoPreregistro ? " inventario-activos-table--preregistro" : ""}${modoAdmin ? " inventario-activos-table--admin" : ""}${mostrarUbicacion ? " inventario-activos-table--ubicacion" : ""}`;
   const widthOptions = {
     modoPreregistro,
@@ -675,23 +715,23 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
     withSelection,
     columnaVisita,
     columnaProcedencia,
+    columnaEditar,
   };
   const widthValues = inventarioTableWidthValuesPx(widthOptions);
   const floorValues = inventarioTableFloorValuesPx(widthOptions);
   const tableMinWidth = inventarioTableMinWidthPx(widthOptions);
-  const stickyCount = (withSelection ? 1 : 0) + INVENTARIO_STICKY_DATA_COL_COUNT + (columnaVisita ? 1 : 0);
-  const stickyOffsets = inventarioStickyLeftOffsets(widthValues, stickyCount);
-  const stickyWidths = widthValues.slice(0, stickyCount);
-  const sel = withSelection ? 1 : 0;
-  const nombreStickyAt = sel + 3 + (columnaVisita ? 1 : 0);
-  const stickySel = stickyCellProps(stickyOffsets, 0, stickyWidths, 40);
-  const stickyN = stickyCellProps(stickyOffsets, sel, stickyWidths, 40);
-  const stickyCat = stickyCellProps(stickyOffsets, sel + 1, stickyWidths, 40);
-  const stickyCod = stickyCellProps(stickyOffsets, sel + 2, stickyWidths, 40, true, "codigo");
+  const sticky = inventarioStickyLayout(withSelection, columnaVisita, columnaEditar);
+  const stickyOffsets = inventarioStickyLeftOffsets(widthValues, sticky.stickyCount);
+  const stickyWidths = widthValues.slice(0, sticky.stickyCount);
+  const stickyEditar = stickyCellProps(stickyOffsets, sticky.editarAt, stickyWidths, 40, true, "editar");
+  const stickySel = stickyCellProps(stickyOffsets, sticky.selAt, stickyWidths, 40);
+  const stickyN = stickyCellProps(stickyOffsets, sticky.nAt, stickyWidths, 40);
+  const stickyCat = stickyCellProps(stickyOffsets, sticky.catAt, stickyWidths, 40);
+  const stickyCod = stickyCellProps(stickyOffsets, sticky.codAt, stickyWidths, 40, true, "codigo");
   const stickyVisita = columnaVisita
-    ? stickyCellProps(stickyOffsets, sel + 3, stickyWidths, 40)
+    ? stickyCellProps(stickyOffsets, sticky.visitaAt, stickyWidths, 40)
     : undefined;
-  const stickyNom = stickyCellProps(stickyOffsets, nombreStickyAt, stickyWidths, 40, false);
+  const stickyNom = stickyCellProps(stickyOffsets, sticky.nombreAt, stickyWidths, 40, false);
   const tableWrapClass = [
     embeddedInParentScroll
       ? `${panelDataTableWrapClass} ${panelDataTableWrapEmbeddedClass}`
@@ -717,11 +757,31 @@ export function ActivosInventarioTable<T extends Activo>(props: ActivosInventari
           <Colgroup
             widthsPx={widthValues}
             floorsPx={floorValues}
-            nameColIndex={nombreStickyAt}
-            codeColIndex={sel + 2}
+            nameColIndex={sticky.nombreAt}
+            codeColIndex={sticky.codAt}
           />
           <thead>
             <tr>
+              {columnaEditar && (
+                <Th
+                  className={`${inventarioThStd} normal-case ${stickyEditar?.className ?? ""}`}
+                  style={stickyEditar?.style}
+                  title="Editar"
+                >
+                  <span className="sr-only">Editar</span>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="mx-auto h-3.5 w-3.5"
+                    aria-hidden
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </Th>
+              )}
               {withSelection && selection && (
                 <SelectionHeader selection={selection} sticky={stickySel} />
               )}

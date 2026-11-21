@@ -217,12 +217,13 @@ export const BLOG_CONTENT: Record<
 };
 
 export const CONTACTO = {
-  heading: "Conversemos sobre las necesidades de su organización",
-  intro:
-    "Nuestro equipo está preparado para brindar asesoría especializada en materia contable, tributaria y de control patrimonial.",
+  heading: "Cuando nos necesites",
+  intro: "Escríbenos o llama. Es el mismo número, y respondemos desde Huancayo.",
   empresa: "B&D Consultores Global EIRL",
   direccion: "Huancayo, Junín - Perú",
-  telefono: "+51 XXX XXX XXX",
+  telefono: "954 008 717",
+  telefonoTel: "+51954008717",
+  whatsappUrl: "https://wa.me/51954008717",
   email: "contacto@bdconsultores.pe",
   cotizacion: {
     title: "Solicite una cotización",

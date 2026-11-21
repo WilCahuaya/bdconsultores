@@ -139,13 +139,21 @@ export function searchCatalog(query: string, limit = 20): CatalogoRow[] {
   if (trimmed.length < minCatalogoQueryLength(trimmed)) return [];
 
   const up = trimmed.toUpperCase();
-  const origen = up.startsWith("BD") ? "PROPIO" : /^\d+$/.test(trimmed) ? "NACIONAL" : null;
+  const origen = up.startsWith("MJ")
+    ? "MENAJE"
+    : up.startsWith("BD")
+      ? "PROPIO"
+      : /^\d+$/.test(trimmed)
+        ? "NACIONAL"
+        : null;
   const origenClause =
-    origen === "PROPIO"
-      ? "AND (origen = 'PROPIO' OR upper(trim(codigo)) LIKE 'BD%')"
-      : origen === "NACIONAL"
-        ? "AND COALESCE(origen, '') <> 'PROPIO' AND upper(trim(codigo)) NOT LIKE 'BD%'"
-        : "";
+    origen === "MENAJE"
+      ? "AND (origen = 'MENAJE' OR upper(trim(codigo)) LIKE 'MJ%')"
+      : origen === "PROPIO"
+        ? "AND (origen = 'PROPIO' OR upper(trim(codigo)) LIKE 'BD%')"
+        : origen === "NACIONAL"
+          ? "AND COALESCE(origen, '') = 'NACIONAL'"
+          : "AND COALESCE(origen, '') <> 'MENAJE' AND upper(trim(codigo)) NOT LIKE 'MJ%'";
 
   return db
     .prepare(
@@ -194,6 +202,20 @@ export function deleteCatalogRow(codigo: string): void {
   db.prepare("DELETE FROM catalogo_nacional WHERE codigo = @codigo").run({
     codigo: codigo.trim(),
   });
+}
+
+export function listCatalogoMenajeLocal(): CatalogoRow[] {
+  if (!db) throw new Error("Base de datos no inicializada");
+  return db
+    .prepare(
+      `
+      SELECT *
+      FROM catalogo_nacional
+      WHERE origen = 'MENAJE' OR upper(trim(codigo)) LIKE 'MJ%'
+      ORDER BY codigo
+    `,
+    )
+    .all() as CatalogoRow[];
 }
 
 export function listCatalogoPropioLocal(): CatalogoRow[] {

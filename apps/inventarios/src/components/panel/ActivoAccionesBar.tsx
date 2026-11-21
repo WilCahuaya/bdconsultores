@@ -40,6 +40,8 @@ interface ActivoAccionesBarProps {
   editarLabel?: string;
   modoAdmin?: boolean;
   onActivoEliminado?: (activoId: string) => void;
+  /** El lápiz se pinta en la columna izquierda de la tabla. */
+  ocultarEditar?: boolean;
 }
 
 export function ActivoAccionesBar({
@@ -56,6 +58,7 @@ export function ActivoAccionesBar({
   editarLabel = "Editar activo",
   modoAdmin = false,
   onActivoEliminado,
+  ocultarEditar = false,
 }: ActivoAccionesBarProps) {
   const router = useRouter();
   const [fotoOpen, setFotoOpen] = useState(false);
@@ -74,7 +77,7 @@ export function ActivoAccionesBar({
 
   const items = useMemo<TableActionItem[]>(() => {
     const list: TableActionItem[] = [];
-    if (!inactivo && onEdit) {
+    if (!ocultarEditar && !inactivo && onEdit) {
       list.push({
         id: "editar",
         label: editarLabel,
@@ -149,6 +152,7 @@ export function ActivoAccionesBar({
     mostrarValidar,
     onEdit,
     onIrAmbiente,
+    ocultarEditar,
   ]);
 
   return (
@@ -161,7 +165,7 @@ export function ActivoAccionesBar({
         />
       ) : (
         <div className={`flex flex-wrap items-center gap-1 ${className ?? ""}`}>
-          {!inactivo && onEdit && (
+          {!ocultarEditar && !inactivo && onEdit && (
             <ActivoIconButton
               label={editarLabel}
               variant={esPreregistrado ? "default" : "primary"}

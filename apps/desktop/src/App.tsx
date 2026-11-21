@@ -330,7 +330,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
   function goAmbientes(entidadIdTarget: string) {
     setMainNav("entidades");
     setEntidadId(entidadIdTarget);
-    setEntidadesFlow({ type: "ambientes", entidadId: entidadIdTarget });
+    setEntidadesFlow({ type: "ambientes", entidadId: entidadIdTarget, initialTab: "inventario" });
   }
 
   function goSedeAmbientes(entidadIdTarget: string, sedeId: string, sedeNombre: string) {

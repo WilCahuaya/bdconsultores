@@ -27,6 +27,7 @@ import {
   getCatalogByCodigo,
   getCatalogMeta,
   initCatalogDatabase,
+  listCatalogoMenajeLocal,
   listCatalogoPropioLocal,
   replaceCatalog,
   searchCatalog,
@@ -222,6 +223,10 @@ ipcMain.handle("catalog:delete", (_event, codigo: string) => {
 
 ipcMain.handle("catalog:listPropio", () => {
   return listCatalogoPropioLocal();
+});
+
+ipcMain.handle("catalog:listMenaje", () => {
+  return listCatalogoMenajeLocal();
 });
 
 ipcMain.handle("atributoVocab:replace", (_event, rows: AtributoVocabRow[]) => {

@@ -111,7 +111,7 @@ function parseInitialTab(value?: string): EntityTab {
   ) {
     return value;
   }
-  return "ambientes";
+  return "inventario";
 }
 
 type AmbienteRow = AmbienteConVisita;
@@ -195,7 +195,7 @@ export function AmbientesPanel({
   activos = [],
   visitasActivas: initialVisitasActivas = [],
   visitasHistorial: initialVisitasHistorial = [],
-  initialTab = "ambientes",
+  initialTab = "inventario",
   sedeFocus = null,
   panelMode = "contador",
 }: AmbientesPanelProps) {
@@ -216,7 +216,7 @@ export function AmbientesPanel({
     setTab(next);
     if (sedeFocus) return;
     const path = entidadHref;
-    router.replace(next === "ambientes" ? path : `${path}?tab=${next}`, { scroll: false });
+    router.replace(next === "inventario" ? path : `${path}?tab=${next}`, { scroll: false });
   }
 
   const [ambientes, setAmbientes] = useState(initial);
@@ -584,14 +584,14 @@ export function AmbientesPanel({
 
   function verAmbientesDeSede(sedeId: string) {
     setSedeFilterId(sedeId);
-    setTab("ambientes");
     setBusqueda("");
+    handleTabChange("ambientes");
   }
 
   const breadcrumbs = sedeFocus
     ? isAdmin
       ? [
-          { label: "Ambientes", href: entidadHref },
+          { label: "Ambientes", href: `${entidadHref}?tab=ambientes` },
           { label: sedeFocus.nombre },
         ]
       : [

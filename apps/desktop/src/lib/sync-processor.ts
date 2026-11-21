@@ -620,22 +620,24 @@ async function processMasterOp(
     }
 
     const updatePayload = payload.payload as Record<string, unknown>;
+    const origen = String(payload.origen ?? "PROPIO");
     const { error } = await supabase
       .from("catalogo_nacional")
       .update(updatePayload)
       .eq("codigo", codigo)
-      .eq("origen", "PROPIO");
+      .eq("origen", origen);
     if (error) throw new Error(error.message);
     return;
   }
 
   if (op === "catalogo:delete") {
     const codigo = String(payload.codigo);
+    const origen = String(payload.origen ?? "PROPIO");
     const { error } = await supabase
       .from("catalogo_nacional")
       .delete()
       .eq("codigo", codigo)
-      .eq("origen", "PROPIO");
+      .eq("origen", origen);
     if (error) throw new Error(error.message);
     return;
   }

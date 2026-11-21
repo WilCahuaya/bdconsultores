@@ -10,7 +10,11 @@ import {
   getNextCodigoCatalogoPropio,
   listCatalogoClases,
   listCatalogoGrupos,
+  createCatalogoMenaje,
+  deleteCatalogoMenaje,
+  listCatalogoMenaje,
   listCatalogoPropio,
+  updateCatalogoMenaje,
   registerCatalogoOpcionPersonalizada,
   searchCatalogoNacionalOficial,
   suggestCatalogoClase,
@@ -35,8 +39,7 @@ export function CatalogoView({ initialDenominacion = "" }: CatalogoViewProps) {
       <div>
         <h2 className="text-lg font-semibold">Catálogo</h2>
         <p className="text-sm text-muted-foreground">
-          Administree bienes de cuenta de orden (catálogo propio) y consulte el catálogo nacional
-          oficial.
+          Administre el catálogo propio, el de menajes y consulte el catálogo nacional oficial.
         </p>
       </div>
 
@@ -67,6 +70,10 @@ export function CatalogoView({ initialDenominacion = "" }: CatalogoViewProps) {
         onCreate={createCatalogoNacional}
         onCreateNacional={createCatalogoNacionalExtension}
         listPropio={listCatalogoPropio}
+        listMenaje={listCatalogoMenaje}
+        onCreateMenaje={createCatalogoMenaje}
+        onUpdateMenaje={updateCatalogoMenaje}
+        onDeleteMenaje={deleteCatalogoMenaje}
         onUpdatePropio={updateCatalogoPropio}
         onDeletePropio={deleteCatalogoPropio}
         searchNacional={searchCatalogoNacionalOficial}

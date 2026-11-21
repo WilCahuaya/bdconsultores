@@ -440,6 +440,13 @@ export function normalizeImportCodigoCatalogoRaw(
     return candidates;
   }
 
+  if (categoria === "MENAJE") {
+    const trimmed = text.replace(/\u00a0/g, " ").trim().toUpperCase();
+    const match = trimmed.match(/^MJ(\d{1,6})$/);
+    if (match) pushUnique(`MJ${match[1]!.padStart(6, "0")}`);
+    return candidates;
+  }
+
   if (categoria === "CUENTA_ORDEN") {
     const trimmed = text.replace(/\u00a0/g, " ").trim();
     if (!trimmed) return candidates;

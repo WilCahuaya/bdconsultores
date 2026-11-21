@@ -48,7 +48,7 @@ import {
   updateActivo,
   updateActivoSerie,
 } from "@/lib/actions/activos";
-import { getCatalogoByCodigo } from "@/lib/actions/catalogo";
+import { createCatalogoMenaje, getCatalogoByCodigo } from "@/lib/actions/catalogo";
 import { aplicarComprobantesMenaje } from "@/lib/menaje-comprobantes-client";
 import { getSignedStorageUrl } from "@/lib/storage-url";
 import { buscarCatalogoLocal, ensureCatalogoBusqueda } from "@/lib/catalogo-local";
@@ -426,7 +426,7 @@ export function ActivosAmbientePanel({
     return partes.length > 0 ? partes.join(" · ") : null;
   }, [esAmbientePreregistro, estadoRegistro, orden, fechaCorteText]);
 
-  const mostrarMenaje = !isAdmin && !esAmbientePreregistro && !esAmbienteFaltante;
+  const mostrarMenaje = !esAmbientePreregistro && !esAmbienteFaltante;
   const menajeLineas = useMemo(
     () =>
       activosList.filter(
@@ -444,7 +444,7 @@ export function ActivosAmbientePanel({
 
   const searchMenaje = useCallback(async (query: string, limit?: number) => {
     await ensureCatalogoBusqueda();
-    return buscarCatalogoLocal(query, limit);
+    return buscarCatalogoLocal(query, limit, "MENAJE");
   }, []);
 
   const reemplazarMenaje = useCallback((next: Activo) => {
@@ -560,6 +560,7 @@ export function ActivosAmbientePanel({
           bajas={menajeBajas}
           searchCatalogo={searchMenaje}
           resolveCodigo={getCatalogoByCodigo}
+          onCrearCatalogo={createCatalogoMenaje}
           onVerComprobante={(path) => {
             void getSignedStorageUrl("comprobantes-activos", path).then((result) => {
               if (result.url) window.open(result.url, "_blank", "noopener,noreferrer");
@@ -688,14 +689,18 @@ export function ActivosAmbientePanel({
             }
             return { error: result.error, aviso: result.aviso };
           }}
-          onEliminar={async (linea) => {
-            const result = await eliminarMenaje(linea.id);
-            if (!result.error) {
-              quitarActivos([linea.id]);
-              router.refresh();
-            }
-            return { error: result.error };
-          }}
+          onEliminar={
+            isAdmin
+              ? undefined
+              : async (linea) => {
+                  const result = await eliminarMenaje(linea.id);
+                  if (!result.error) {
+                    quitarActivos([linea.id]);
+                    router.refresh();
+                  }
+                  return { error: result.error };
+                }
+          }
         />
       ) : null}
 

@@ -7,8 +7,13 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://bdconsultores.org"),
   title: PLATFORM_NAME,
   description: `Plataforma de gestión — ${APP_CLIENT}`,
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png", sizes: "96x96" }],
+    apple: [{ url: "/apple-icon.png", type: "image/png", sizes: "180x180" }],
+  },
 };
 
 const themeScript = `

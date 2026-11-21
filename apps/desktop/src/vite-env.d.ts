@@ -73,6 +73,20 @@ interface Window {
       origen: string;
     }) => Promise<void>;
     deleteCatalogRow: (codigo: string) => Promise<void>;
+    listCatalogoMenajeLocal: () => Promise<
+      Array<{
+        codigo: string;
+        denominacion: string;
+        grupo: string | null;
+        clase: string | null;
+        cuenta_codigo: string | null;
+        contabilidad: string | null;
+        depreciacion: string | null;
+        resolucion: string | null;
+        estado: string | null;
+        origen: string;
+      }>
+    >;
     listCatalogoPropioLocal: () => Promise<
       Array<{
         codigo: string;

@@ -36,6 +36,7 @@ import { createActivosSimilares, type ActivoConUbicacion } from "../lib/activos"
 import { listAmbientes, listSedes } from "../lib/ubicacion";
 import type { AmbienteDestinoNavigation } from "./AgregarBienesSimilaresDialog";
 import { ActivosCampoAcciones } from "./ActivosCampoAcciones";
+import { ActivoIconButton, IconEditar } from "./activo-icons";
 import { ComprobanteCell } from "./ComprobanteCell";
 import { ComprobanteInline } from "./ComprobanteInline";
 
@@ -609,8 +610,21 @@ export function ActivosInventarioExcelView({
           puedeEliminarPreregistro={puedeEliminarPreregistro}
           compact
           variant="icons"
+          ocultarEditar
         />
       )}
+      renderEditar={(activo) =>
+        !onEditActivo || activo.estado_registro === "DADO_DE_BAJA" ? null : (
+          <ActivoIconButton
+            label={activo.estado_registro === "PREREGISTRADO" ? "Editar preregistro" : "Editar activo"}
+            variant={activo.estado_registro === "PREREGISTRADO" ? "default" : "primary"}
+            onClick={() => onEditActivo(activo)}
+            className="h-7 w-7"
+          >
+            <IconEditar />
+          </ActivoIconButton>
+        )
+      }
     />
   );
 

@@ -27,6 +27,8 @@ import {
   syncFechaInicioDepreciacionInput,
   valorActivoEfectivo,
   formatPorcentajeDepreciacion,
+  depreciacionEsCoeficiente,
+  normalizarDepreciacionEntrada,
   nombreRequiereEtiquetaOverride,
   parseFechaDDMMYYYY,
   parsePorcentajeDepreciacion,
@@ -39,6 +41,7 @@ import {
   vidaUtilMesesFromPorcentaje,
   debePersistirCuentaContableEnActivo,
   entidadMuestraSelectorSede,
+  isCatalogoMenaje,
   isCatalogoPropio,
   MAX_ACTIVOS_SIMILARES_CANTIDAD,
   sedeIdSinSelector,
@@ -50,6 +53,7 @@ import {
   ActivoAtributoAutocomplete,
   Button,
   CatalogoAltaPanel,
+  CatalogoMenajeAlta,
   CatalogoPicker,
   CategoriaBienSelector,
   ConfirmDialog,
@@ -79,6 +83,7 @@ import {
 import { suggestActivoAtributo } from "@/lib/actions/atributo-vocab";
 import { buscarCatalogoLocal, ensureCatalogoBusqueda } from "@/lib/catalogo-local";
 import {
+  createCatalogoMenaje,
   createCatalogoNacional,
   createCatalogoNacionalExtension,
   deleteCatalogoOpcionPersonalizada,
@@ -101,7 +106,7 @@ import type { ActivoEditScope } from "@inventario/ui/panel";
 import { panelFieldsetClass, panelLegendClass, panelModalClass } from "./panel-ui";
 
 type CatalogoAltaInline = {
-  variant: "nacional" | "propio";
+  variant: "nacional" | "propio" | "menaje";
   query: string;
 };
 
@@ -241,8 +246,17 @@ export function ActivoForm({
   }, [cargarCatalogoLocal]);
 
   const searchCatalogoByCategoria = useCallback(
-    (query: string, limit?: number) => Promise.resolve(buscarCatalogoLocal(query, limit)),
-    [catalogoEpoch],
+    (query: string, limit?: number) => {
+      const hits = buscarCatalogoLocal(
+        query,
+        limit,
+        categoria === "MENAJE" ? "MENAJE" : undefined,
+      );
+      return Promise.resolve(
+        categoria === "MENAJE" ? hits.filter(isCatalogoMenaje) : hits.filter((item) => !isCatalogoMenaje(item)),
+      );
+    },
+    [catalogoEpoch, categoria],
   );
 
   async function handleCatalogoSelect(item: CatalogoNacional) {
@@ -264,8 +278,11 @@ export function ActivoForm({
   function handleCategoriaChange(next: CategoriaBien) {
     setCategoria(next);
     if (!catalogo) return;
-    const esPropio = isCatalogoPropio(catalogo);
-    if (next === "ACTIVO" && esPropio) {
+    const incompatible =
+      (next === "MENAJE" && !isCatalogoMenaje(catalogo)) ||
+      (next !== "MENAJE" && isCatalogoMenaje(catalogo)) ||
+      (next === "ACTIVO" && isCatalogoPropio(catalogo));
+    if (incompatible) {
       setCatalogo(null);
       setNombre("");
       setNombreEtiqueta("");
@@ -377,8 +394,13 @@ export function ActivoForm({
     setMaterial(activo.material ?? "");
     setMedidas(activo.medidas ?? "");
     setDetalle(activo.caracteristicas ?? "");
-    setDepreciacion(activo.depreciacion ?? "");
-    setVidaUtilMeses(activo.vida_util_meses != null ? String(activo.vida_util_meses) : "");
+    setDepreciacion(normalizarDepreciacionEntrada(activo.depreciacion));
+    if (depreciacionEsCoeficiente(activo.depreciacion)) {
+      const pct = parsePorcentajeDepreciacion(normalizarDepreciacionEntrada(activo.depreciacion));
+      setVidaUtilMeses(pct ? String(vidaUtilMesesFromPorcentaje(pct)) : "");
+    } else {
+      setVidaUtilMeses(activo.vida_util_meses != null ? String(activo.vida_util_meses) : "");
+    }
     setValor(activo.valor_adquisicion != null ? String(activo.valor_adquisicion) : "");
     setIncrementoDetalle(activo.incremento_detalle ?? "");
     setValorIncremento(
@@ -427,14 +449,20 @@ export function ActivoForm({
     setPosibleAmbienteId(posibleAmbientePreset.ambienteId);
   }, [isEdit, posibleAmbientePreset]);
 
+  const omitirCatalogoInicialRef = useRef(isEdit);
   useEffect(() => {
-    if (catalogo) {
-      setNombre(catalogo.denominacion);
-      if (mostrarDepreciacion && catalogo.depreciacion) {
-        setDepreciacion(catalogo.depreciacion);
-        const pct = parsePorcentajeDepreciacion(catalogo.depreciacion);
-        if (pct) setVidaUtilMeses(String(vidaUtilMesesFromPorcentaje(pct)));
-      }
+    if (!catalogo) return;
+    // Al abrir la edición el catálogo llega después y no debe pisar la tasa ni el nombre del activo.
+    if (omitirCatalogoInicialRef.current) {
+      omitirCatalogoInicialRef.current = false;
+      return;
+    }
+    setNombre(catalogo.denominacion);
+    if (mostrarDepreciacion && catalogo.depreciacion) {
+      const texto = normalizarDepreciacionEntrada(catalogo.depreciacion);
+      setDepreciacion(texto);
+      const pct = parsePorcentajeDepreciacion(texto);
+      if (pct) setVidaUtilMeses(String(vidaUtilMesesFromPorcentaje(pct)));
     }
   }, [catalogo?.codigo, mostrarDepreciacion]);
 
@@ -531,12 +559,23 @@ export function ActivoForm({
   }
 
   useEffect(() => {
+    if (isEdit && activo?.codigo_barras) {
+      setCodigoBarrasPreview(activo.codigo_barras);
+      return;
+    }
     if (!entidadEfectiva || !catalogo?.codigo || !asignaCodigoInmediato || categoria === "MENAJE") {
       setCodigoBarrasPreview(null);
       return;
     }
     void previewCodigoBarras(entidadEfectiva, catalogo.codigo).then(setCodigoBarrasPreview);
-  }, [entidadEfectiva, catalogo?.codigo, asignaCodigoInmediato, categoria]);
+  }, [
+    entidadEfectiva,
+    catalogo?.codigo,
+    asignaCodigoInmediato,
+    categoria,
+    isEdit,
+    activo?.codigo_barras,
+  ]);
 
   const mostrarSelectorSede = entidadMuestraSelectorSede(sedes);
   const ambienteElegido = ambientes.find((a) => a.id === ambienteId) ?? null;
@@ -1002,6 +1041,16 @@ export function ActivoForm({
       if (categoria === "ACTIVO" && isCatalogoPropio(catalogo)) {
         setPending(false);
         setMessage("Para categoría Activo use un código del catálogo nacional.");
+        return;
+      }
+      if (categoria === "MENAJE" && !isCatalogoMenaje(catalogo)) {
+        setPending(false);
+        setMessage("Para menaje use un ítem del catálogo de menajes.");
+        return;
+      }
+      if (categoria !== "MENAJE" && isCatalogoMenaje(catalogo)) {
+        setPending(false);
+        setMessage("El catálogo de menajes solo se usa en bienes de menaje.");
         return;
       }
     }
@@ -1739,7 +1788,9 @@ export function ActivoForm({
         ) : null}
         {catalogoError ? <p className="text-xs text-destructive">{catalogoError}</p> : null}
         <CatalogoPicker
-          variant={categoria === "ACTIVO" ? "nacional" : "ambos"}
+          variant={
+            categoria === "MENAJE" ? "menaje" : categoria === "ACTIVO" ? "nacional" : "ambos"
+          }
           searchCatalogo={searchCatalogoByCategoria}
           searchEpoch={catalogoEpoch}
           debounceMs={0}
@@ -1769,6 +1820,14 @@ export function ActivoForm({
                   onClick={() => setCatalogoAlta({ variant: "nacional", query: q })}
                 >
                   Crear en catálogo nacional
+                </button>
+              ) : categoria === "MENAJE" ? (
+                <button
+                  type="button"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                  onClick={() => setCatalogoAlta({ variant: "menaje", query: q })}
+                >
+                  Crear en catálogo de menajes
                 </button>
               ) : (
                 <button
@@ -1808,9 +1867,11 @@ export function ActivoForm({
           <Input
             readOnly
             value={
-              asignaCodigoInmediato
-                ? codigoBarrasPreview ?? "Seleccione catálogo y entidad…"
-                : "Se asignará al validar (contador)"
+              isEdit && activo?.codigo_barras
+                ? activo.codigo_barras
+                : asignaCodigoInmediato
+                  ? codigoBarrasPreview ?? "Seleccione catálogo y entidad…"
+                  : "Se asignará al validar (contador)"
             }
             className="bg-muted font-mono text-sm"
           />
@@ -2501,18 +2562,35 @@ export function ActivoForm({
       title={
         catalogoAlta?.variant === "nacional"
           ? "Nuevo ítem del catálogo nacional"
-          : "Nuevo bien de cuenta de orden"
+          : catalogoAlta?.variant === "menaje"
+            ? "Nuevo ítem de menaje"
+            : "Nuevo bien de cuenta de orden"
       }
       description={
         catalogoAlta?.variant === "nacional"
           ? "Se agregará al catálogo SBN y quedará seleccionado en este activo."
-          : "Se agregará al catálogo propio y quedará seleccionado en este activo."
+          : catalogoAlta?.variant === "menaje"
+            ? "Se agregará al catálogo de menajes y quedará seleccionado."
+            : "Se agregará al catálogo propio y quedará seleccionado en este activo."
       }
       className={panelModalClass}
     >
-      {catalogoAlta && (
+      {catalogoAlta?.variant === "menaje" ? (
+        <CatalogoMenajeAlta
+          hideIntro
+          initialDenominacion={catalogoAlta.query}
+          onSubmit={createCatalogoMenaje}
+          onClose={() => setCatalogoAlta(null)}
+          onItemCreated={(item) => {
+            setCatalogo(item);
+            setNombre(item.denominacion);
+            setCatalogoAlta(null);
+            void cargarCatalogoLocal(true);
+          }}
+        />
+      ) : catalogoAlta && (
         <CatalogoAltaPanel
-          variant={catalogoAlta.variant}
+          variant={catalogoAlta.variant === "nacional" ? "nacional" : "propio"}
           hideIntro
           initialDenominacion={
             catalogoAlta.variant === "nacional"

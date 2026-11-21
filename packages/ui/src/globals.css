@@ -903,6 +903,12 @@
     box-shadow: 2px 0 0 0 hsl(var(--border) / 0.55);
   }
 
+  .inventario-activos-table th.inventario-sticky-col--editar,
+  .inventario-activos-table td.inventario-sticky-col--editar {
+    overflow: visible;
+    text-align: center;
+  }
+
   /* Fondos opacos: si son semitransparentes, el texto de columnas vecinas se ve encima. */
   .inventario-activos-table tbody tr.inventario-row-even td.inventario-sticky-col {
     background-color: hsl(var(--card));
@@ -946,7 +952,7 @@
 
   /* Sitio público (marketing) */
   .public-page {
-    @apply mx-auto w-full min-w-0 max-w-full overflow-x-clip px-4 py-8 sm:px-5 sm:py-9 md:px-6 md:py-10 lg:px-8 xl:px-10 2xl:px-12;
+    @apply mx-auto w-full min-w-0 max-w-full px-4 py-8 sm:px-5 sm:py-9 md:px-6 md:py-10 lg:px-8 xl:px-10 2xl:px-12;
   }
 
   .public-page img,
@@ -1300,8 +1306,8 @@
     }
 
     /* Nº, Cat. y Visita se van con el scroll. Código y nombre quedan fijos. */
-    html[data-bd-shell="web"] .inventario-activos-table th.inventario-sticky-col:not(.inventario-sticky-col--last):not(.inventario-sticky-col--codigo),
-    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col:not(.inventario-sticky-col--last):not(.inventario-sticky-col--codigo),
+    html[data-bd-shell="web"] .inventario-activos-table th.inventario-sticky-col:not(.inventario-sticky-col--last):not(.inventario-sticky-col--codigo):not(.inventario-sticky-col--editar),
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col:not(.inventario-sticky-col--last):not(.inventario-sticky-col--codigo):not(.inventario-sticky-col--editar),
     html[data-bd-shell="web"] .inventario-activos-table tfoot td.inventario-sticky-col {
       position: static !important;
       left: auto !important;
@@ -1350,6 +1356,36 @@
       white-space: nowrap;
       background: hsl(var(--card));
       box-shadow: 2px 0 0 hsl(var(--border) / 0.55);
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--editar,
+    html[data-bd-shell="web"] .inventario-activos-table tbody td.inventario-sticky-col--editar {
+      position: sticky !important;
+      left: 0 !important;
+      z-index: 4;
+      box-sizing: border-box;
+      width: 2.75rem !important;
+      min-width: 2.75rem !important;
+      max-width: 2.75rem !important;
+      overflow: visible;
+      background: hsl(var(--card));
+      box-shadow: none;
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--editar {
+      top: 0;
+      z-index: 5;
+      background: hsl(var(--muted));
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table:has(.inventario-sticky-col--editar) thead th.inventario-sticky-col--codigo,
+    html[data-bd-shell="web"] .inventario-activos-table:has(.inventario-sticky-col--editar) tbody td.inventario-sticky-col--codigo {
+      left: 2.75rem !important;
+    }
+
+    html[data-bd-shell="web"] .inventario-activos-table:has(.inventario-sticky-col--editar) thead th.inventario-sticky-col--last,
+    html[data-bd-shell="web"] .inventario-activos-table:has(.inventario-sticky-col--editar) tbody td.inventario-sticky-col--last {
+      left: calc(2.75rem + 9.5rem) !important;
     }
 
     html[data-bd-shell="web"] .inventario-activos-table thead th.inventario-sticky-col--codigo,

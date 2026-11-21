@@ -18,9 +18,6 @@ export function isPublicPath(pathname: string): boolean {
 
 export const PUBLIC_NAV = [
   { href: "/", label: "Inicio" },
-  { href: "/nosotros", label: "Nosotros" },
   { href: "/servicios", label: "Servicios" },
-  { href: "/clientes", label: "Clientes" },
-  { href: "/blog", label: "Blog" },
   { href: "/contacto", label: "Contacto" },
 ] as const;

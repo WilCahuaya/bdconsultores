@@ -10,6 +10,8 @@ export * from "./catalogo-nacional-form";
 export * from "./catalogo-alta-panel";
 export * from "./catalogo-page";
 export * from "./catalogo-propio-panel";
+export * from "./catalogo-menaje-panel";
+export * from "./catalogo-menaje-alta";
 export * from "./catalogo-nacional-consulta";
 export * from "./cuentas-contables-panel";
 export * from "./grupo-catalogo-combobox";
