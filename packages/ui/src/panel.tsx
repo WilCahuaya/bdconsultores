@@ -327,6 +327,7 @@ export * from "./activo-edit-scope-nav";
 export * from "./use-inventario-selection";
 export * from "./eliminar-preregistrados-bulk-dialog";
 export * from "./copiar-bienes-seleccion-dialog";
+export * from "./mover-bienes-seleccion-dialog";
 export * from "./preregistro-gestion-toolbar";
 export type { PreregistroGestionToolbarState } from "./preregistro-gestion-toolbar";
 export * from "./responsive-layout";

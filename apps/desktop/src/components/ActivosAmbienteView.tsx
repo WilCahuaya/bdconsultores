@@ -327,6 +327,7 @@ export function ActivosAmbienteView({
       }
       leyendaVisita={visita.activa ? visita.leyenda : null}
       renderVisita={visita.activa ? visita.renderCelda : undefined}
+      onMarcarSiVisita={visita.activa ? visita.marcarSiGrupo : undefined}
       procedenciaPorActivo={esFaltante ? procedenciaPorActivo : undefined}
       exportMeta={exportMeta}
       reportesExport={

@@ -48,6 +48,7 @@ export function useVisitaRevision({
   activa: boolean;
   leyenda: ReactNode;
   renderCelda: (activo: Activo) => ReactNode;
+  marcarSiGrupo: (lista: Activo[]) => Promise<{ error?: string; marcados?: number }>;
 } {
   const menuRef = useRef<HTMLDivElement>(null);
   const abiertoEn = useRef(0);
@@ -332,7 +333,44 @@ export function useVisitaRevision({
     </>
   ) : null;
 
-  return { activa, leyenda, renderCelda };
+  async function marcarSiGrupo(lista: Activo[]) {
+    const objetivos = lista.filter(
+      (activo) =>
+        activo.estado_registro === "REGISTRADO" && porActivo.get(activo.id)?.hallado !== true,
+    );
+    if (objetivos.length === 0) {
+      return { error: "Los bienes seleccionados ya están marcados como Sí." };
+    }
+    let marcados = 0;
+    for (const activo of objetivos) {
+      setPendingId(activo.id);
+      const result = await registrarRevisionVisita({
+        ambienteId,
+        activoId: activo.id,
+        hallado: true,
+        estadoBien: activo.estado_bien ?? "BUENO",
+      });
+      if (result.error) {
+        setPendingId(null);
+        await cargar();
+        onChanged?.();
+        return {
+          error:
+            marcados > 0
+              ? `${result.error} Se marcaron ${marcados} antes de detenerse.`
+              : result.error,
+          marcados,
+        };
+      }
+      marcados += 1;
+    }
+    setPendingId(null);
+    await cargar();
+    onChanged?.();
+    return { marcados };
+  }
+
+  return { activa, leyenda, renderCelda, marcarSiGrupo };
 }
 
 export type VisitaMarcaForm = "omitir" | "si" | "no";

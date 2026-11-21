@@ -781,6 +781,7 @@ export function ActivosAmbientePanel({
           fechaCorte={fechaCorte}
           leyendaVisita={visita.activa ? visita.leyenda : null}
           renderVisita={visita.activa ? visita.renderCelda : undefined}
+          onMarcarSiVisita={visita.activa ? visita.marcarSiGrupo : undefined}
           procedenciaPorActivo={esAmbienteFaltante ? procedenciaPorActivo : undefined}
           onCommitSerie={guardarSerie}
           puedeEditarSerie={puedeEditarSerie}

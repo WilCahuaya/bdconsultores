@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Activo, InventarioColumnFilterOptions, InventarioColumnFilters } from "@inventario/types";
 import { esActivoPreregistrado, formatActivoCodigoDisplay } from "@inventario/types";
@@ -10,6 +10,7 @@ import {
   CopiarBienesSeleccionDialog,
   EliminarPreregistradosBulkDialog,
   InventarioTablaLeyenda,
+  MoverBienesSeleccionDialog,
   PreregistroGestionToolbar,
   TablePagination,
   panelDataCardsWrapClass,
@@ -22,7 +23,7 @@ import {
   type EliminarPreregistradosBulkMode,
   type PreregistroGestionToolbarState,
 } from "@inventario/ui/panel";
-import { createActivosSimilares } from "@/lib/actions/activos";
+import { cambiarUbicacionActivo, createActivosSimilares } from "@/lib/actions/activos";
 import { listAmbientes, listSedes } from "@/lib/actions/ubicacion";
 import { ActivoAccionesBar } from "./ActivoAccionesBar";
 import { ActivoIconButton, IconEditar } from "./activo-icons";
@@ -69,6 +70,8 @@ interface ActivosInventarioExcelViewProps {
   fechaCorte?: Date;
   leyendaVisita?: ReactNode;
   renderVisita?: (activo: Activo) => ReactNode;
+  /** Durante una visita abierta, marca Sí en los bienes seleccionados. */
+  onMarcarSiVisita?: (activos: Activo[]) => Promise<{ error?: string; marcados?: number }>;
   procedenciaPorActivo?: Record<string, string>;
   onCommitSerie?: (activo: Activo, serie: string) => Promise<{ error?: string } | void>;
   puedeEditarSerie?: (activo: Activo) => boolean;
@@ -112,6 +115,7 @@ export function ActivosInventarioExcelView({
   fechaCorte,
   leyendaVisita,
   renderVisita,
+  onMarcarSiVisita,
   procedenciaPorActivo,
   onCommitSerie,
   puedeEditarSerie,
@@ -119,6 +123,7 @@ export function ActivosInventarioExcelView({
   const router = useRouter();
   const { pushToast } = useToast();
   const [copiarOpen, setCopiarOpen] = useState(false);
+  const [moverOpen, setMoverOpen] = useState(false);
   const paginationKey = useMemo(
     () => `${activos.length}:${activos[0]?.id ?? ""}`,
     [activos],
@@ -349,9 +354,79 @@ export function ActivosInventarioExcelView({
     [clearSelection, pushToast, router],
   );
 
+  const confirmarMovimiento = useCallback(
+    async (ubicacion: { sedeId: string; ambienteId: string }) => {
+      let movidos = 0;
+      for (const activo of selectedActivos) {
+        const result = await cambiarUbicacionActivo(
+          activo.id,
+          ubicacion.sedeId,
+          ubicacion.ambienteId,
+        );
+        if (result.error) {
+          return {
+            error:
+              movidos > 0
+                ? `${result.error} Se movieron ${movidos} antes de detenerse.`
+                : result.error,
+          };
+        }
+        movidos += 1;
+      }
+      clearSelection();
+      pushToast(
+        movidos === 1 ? "Se movió 1 bien." : `Se movieron ${movidos} bienes.`,
+        "success",
+      );
+      router.refresh();
+      return {};
+    },
+    [clearSelection, pushToast, router, selectedActivos],
+  );
+
+  const bienesSeleccion = selectedActivos.map((activo) => ({
+    id: activo.id,
+    nombre: activo.nombre,
+    codigo: formatActivoCodigoDisplay(activo),
+    entidadId: activo.entidad_id,
+  }));
+
+  const [marcandoSi, setMarcandoSi] = useState(false);
+  const selectedRef = useRef(selectedActivos);
+  selectedRef.current = selectedActivos;
+  const marcarSiRef = useRef(onMarcarSiVisita);
+  marcarSiRef.current = onMarcarSiVisita;
+  const marcarSiSeleccion = useCallback(async () => {
+    const marcar = marcarSiRef.current;
+    if (!marcar || marcandoSi) return;
+    setMarcandoSi(true);
+    const result = await marcar(selectedRef.current);
+    setMarcandoSi(false);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    const n = result.marcados ?? 0;
+    pushToast(n === 1 ? "Se marcó Sí en 1 bien." : `Se marcó Sí en ${n} bienes.`, "success");
+  }, [marcandoSi, pushToast]);
+
   const copiarBar =
     copiaEnabled && selectedActivos.length > 0 ? (
-      <div className="flex justify-end px-3 py-2">
+      <div className="flex justify-end gap-2 px-3 py-2">
+        {onMarcarSiVisita ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={marcandoSi}
+            onClick={() => void marcarSiSeleccion()}
+          >
+            {marcandoSi ? "Marcando…" : `Marcar Sí (${selectedActivos.length})`}
+          </Button>
+        ) : null}
+        <Button type="button" size="sm" variant="outline" onClick={() => setMoverOpen(true)}>
+          Mover ({selectedActivos.length})
+        </Button>
         <Button type="button" size="sm" onClick={() => setCopiarOpen(true)}>
           Copiar ({selectedActivos.length})
         </Button>
@@ -361,16 +436,25 @@ export function ActivosInventarioExcelView({
   const copiarDialog = copiaEnabled ? (
     <CopiarBienesSeleccionDialog
       open={copiarOpen}
-      bienes={selectedActivos.map((activo) => ({
-        id: activo.id,
-        nombre: activo.nombre,
-        codigo: formatActivoCodigoDisplay(activo),
-        entidadId: activo.entidad_id,
-      }))}
+      bienes={bienesSeleccion}
       onClose={() => setCopiarOpen(false)}
       onListSedes={listSedes}
       onListAmbientes={listAmbientes}
       onConfirm={confirmarCopia}
+    />
+  ) : null;
+
+  const moverDialog = copiaEnabled ? (
+    <MoverBienesSeleccionDialog
+      open={moverOpen}
+      bienes={bienesSeleccion}
+      onClose={() => setMoverOpen(false)}
+      onListSedes={listSedes}
+      onListAmbientes={async (sedeId) => {
+        const rows = await listAmbientes(sedeId);
+        return rows.filter((row) => !row.es_faltante);
+      }}
+      onConfirm={confirmarMovimiento}
     />
   ) : null;
 
@@ -417,6 +501,7 @@ export function ActivosInventarioExcelView({
         <div className={panelInventarioPaginationFooterClass}>{paginationBlock}</div>
         {bulkDialogNode}
         {copiarDialog}
+        {moverDialog}
       </>
     );
   }
@@ -431,6 +516,7 @@ export function ActivosInventarioExcelView({
       {paginationBlock}
       {bulkDialogNode}
       {copiarDialog}
+      {moverDialog}
     </div>
   );
 }

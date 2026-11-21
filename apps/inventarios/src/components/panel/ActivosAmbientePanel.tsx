@@ -791,13 +791,31 @@ export function ActivosAmbientePanel({
                     {filtrados.length} {filtrados.length === 1 ? "activo" : "activos"}
                   </span>
                   {copiarToolbar && (
-                    <button
-                      type="button"
-                      onClick={copiarToolbar.onOpen}
-                      className="inline-flex h-8 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90"
-                    >
-                      Copiar ({copiarToolbar.count})
-                    </button>
+                    <>
+                      {copiarToolbar.onMarcarSi && (
+                        <button
+                          type="button"
+                          onClick={copiarToolbar.onMarcarSi}
+                          className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                        >
+                          Marcar Sí ({copiarToolbar.count})
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={copiarToolbar.onMover}
+                        className="inline-flex h-8 shrink-0 items-center justify-center rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                      >
+                        Mover ({copiarToolbar.count})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={copiarToolbar.onOpen}
+                        className="inline-flex h-8 shrink-0 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:opacity-90"
+                      >
+                        Copiar ({copiarToolbar.count})
+                      </button>
+                    </>
                   )}
                   <Link
                     href={nuevoHref}
@@ -828,6 +846,7 @@ export function ActivosAmbientePanel({
           fechaCorte={fechaCorte}
           leyendaVisita={visita.activa ? visita.leyenda : null}
           renderVisita={visita.activa ? visita.renderCelda : undefined}
+          onMarcarSiVisita={visita.activa ? visita.marcarSiGrupo : undefined}
           procedenciaPorActivo={esAmbienteFaltante ? procedenciaPorActivo : undefined}
           onCopiarStateChange={handleCopiarState}
           onSeleccionChange={handleSeleccion}
