@@ -481,6 +481,60 @@ export async function getRevisionVisitaAmbiente(ambienteId: string): Promise<{
   };
 }
 
+/** Bienes registrados (no menaje) de la visita abierta que aún no tienen Sí/No. */
+export async function getPendientesRevisionVisitaEntidad(
+  entidadId: string,
+): Promise<{ visitaAbierta: boolean; pendienteIds: string[] }> {
+  const profile = await getProfile();
+  if (!profile || profile.rol !== "CONTADOR") {
+    return { visitaAbierta: false, pendienteIds: [] };
+  }
+
+  const supabase = await createClient();
+  const { data: visitas } = await supabase
+    .from("visitas_campo")
+    .select("id")
+    .eq("entidad_id", entidadId)
+    .eq("estado", "ABIERTO");
+
+  if (!visitas?.length) return { visitaAbierta: false, pendienteIds: [] };
+
+  const visitaIds = visitas.map((v) => v.id as string);
+  const { data: filasAmbiente } = await supabase
+    .from("visita_ambientes")
+    .select("visita_id, ambiente_id, ambientes!inner(es_preregistro, es_faltante)")
+    .in("visita_id", visitaIds);
+
+  const ambienteIds = [
+    ...new Set(
+      (filasAmbiente ?? [])
+        .filter((fila) => ambienteParticipaEnVisita(fila.ambientes))
+        .map((fila) => fila.ambiente_id as string),
+    ),
+  ];
+  if (ambienteIds.length === 0) return { visitaAbierta: true, pendienteIds: [] };
+
+  const [{ data: bienes }, { data: revisiones }] = await Promise.all([
+    supabase
+      .from("activos")
+      .select("id")
+      .eq("estado_registro", "REGISTRADO")
+      .neq("categoria", "MENAJE")
+      .in("ambiente_id", ambienteIds),
+    supabase
+      .from("visita_revisiones")
+      .select("activo_id")
+      .in("visita_id", visitaIds),
+  ]);
+
+  const revisados = new Set((revisiones ?? []).map((fila) => fila.activo_id as string));
+  const pendienteIds = (bienes ?? [])
+    .map((bien) => bien.id as string)
+    .filter((id) => !revisados.has(id));
+
+  return { visitaAbierta: true, pendienteIds };
+}
+
 export async function registrarRevisionVisita(input: {
   entidadId: string;
   ambienteId: string;

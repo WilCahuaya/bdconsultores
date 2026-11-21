@@ -25,6 +25,7 @@ import {
   type PreregistroGestionToolbarState,
 } from "@inventario/ui";
 import { deleteActivosPreregistrados, updateActivoSerie } from "@/lib/actions/activos";
+import { getPendientesRevisionVisitaEntidad } from "@/lib/actions/visitas-campo";
 import { ActivoForm } from "./ActivoForm";
 import { ActivosInventarioExcelView } from "./ActivosInventarioExcelView";
 import { useEjemplaresResumen } from "@/hooks/useEjemplaresResumen";
@@ -86,7 +87,9 @@ interface InventarioGlobalPanelProps {
   onOpenEliminarPorCodigos?: () => void;
 }
 
-const FILTROS_ESTADO: { value: "" | EstadoRegistro; label: string }[] = [
+type FiltroInventario = "" | EstadoRegistro | "PENDIENTE_VISITA";
+
+const FILTROS_ESTADO: { value: FiltroInventario; label: string }[] = [
   { value: "", label: "Todos" },
   { value: "REGISTRADO", label: "Registrados" },
   { value: "PREREGISTRADO", label: "Preregistrados" },
@@ -113,7 +116,9 @@ export function InventarioGlobalPanel({
   const [entidadId, setEntidadId] = useState(
     hasFixedEntidad ? (fixedEntidadId ?? "") : isAdmin ? (fixedEntidadId ?? "") : "",
   );
-  const [estadoRegistro, setEstadoRegistro] = useState<"" | EstadoRegistro>(initialEstado);
+  const [estadoRegistro, setEstadoRegistro] = useState<FiltroInventario>(initialEstado);
+  const [visitaAbierta, setVisitaAbierta] = useState(false);
+  const [pendienteVisitaIds, setPendienteVisitaIds] = useState<Set<string>>(() => new Set());
   const [columnFilters, setColumnFilters] = useState<InventarioColumnFilters>(() =>
     emptyInventarioColumnFilters(),
   );
@@ -198,6 +203,42 @@ export function InventarioGlobalPanel({
       ? (fixedEntidadId ?? "")
       : entidadId;
 
+  useEffect(() => {
+    let cancel = false;
+    if (isAdmin || !activeEntidadId) {
+      setVisitaAbierta(false);
+      setPendienteVisitaIds(new Set());
+      if (estadoRegistro === "PENDIENTE_VISITA") setEstadoRegistro("");
+      return;
+    }
+    void getPendientesRevisionVisitaEntidad(activeEntidadId).then((data) => {
+      if (cancel) return;
+      setVisitaAbierta(data.visitaAbierta);
+      setPendienteVisitaIds(new Set(data.pendienteIds));
+      if (!data.visitaAbierta && estadoRegistro === "PENDIENTE_VISITA") {
+        setEstadoRegistro("");
+      }
+    });
+    return () => {
+      cancel = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarga al refrescar activos; estadoRegistro solo para reset
+  }, [isAdmin, activeEntidadId, activosList]);
+
+  const filtrosEstado = useMemo(() => {
+    if (!visitaAbierta) return FILTROS_ESTADO;
+    return [
+      ...FILTROS_ESTADO,
+      {
+        value: "PENDIENTE_VISITA" as const,
+        label:
+          pendienteVisitaIds.size > 0
+            ? `Faltan marcar Sí (${pendienteVisitaIds.size})`
+            : "Faltan marcar Sí",
+      },
+    ];
+  }, [visitaAbierta, pendienteVisitaIds]);
+
   const activosScoped = useMemo(
     () => activosList.filter((a) => !activeEntidadId || a.entidad_id === activeEntidadId),
     [activosList, activeEntidadId],
@@ -276,11 +317,15 @@ export function InventarioGlobalPanel({
   const activosBase = useMemo(() => {
     const scoped = activosList.filter((a) => {
       if (activeEntidadId && a.entidad_id !== activeEntidadId) return false;
-      if (estadoRegistro && a.estado_registro !== estadoRegistro) return false;
+      if (estadoRegistro === "PENDIENTE_VISITA") {
+        if (!pendienteVisitaIds.has(a.id)) return false;
+      } else if (estadoRegistro && a.estado_registro !== estadoRegistro) {
+        return false;
+      }
       return matchesInventarioBusquedaMultiColumna(a, busqueda);
     });
     return filtrarActivosPorFechaCorte(scoped, fechaCorte);
-  }, [activosList, busqueda, activeEntidadId, estadoRegistro, fechaCorte]);
+  }, [activosList, busqueda, activeEntidadId, estadoRegistro, pendienteVisitaIds, fechaCorte]);
 
   const columnFilterOptions = useMemo(
     () =>
@@ -435,7 +480,7 @@ export function InventarioGlobalPanel({
 
               <div className={panelFilterRowClass} role="tablist" aria-label="Filtros de inventario">
                 <div className="inline-flex flex-wrap gap-0.5 rounded-md border border-border/60 bg-muted/30 p-0.5">
-                  {FILTROS_ESTADO.map((f) => (
+                  {filtrosEstado.map((f) => (
                     <button
                       key={f.value || "all"}
                       type="button"
