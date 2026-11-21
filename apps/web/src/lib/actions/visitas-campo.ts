@@ -509,6 +509,29 @@ export async function registrarRevisionVisita(input: {
   return { success: true };
 }
 
+/** Si hay visita abierta, marca el bien como hallado (Sí) tras editarlo. */
+export async function marcarHalladoSiVisitaAbierta(input: {
+  entidadId: string;
+  ambienteId: string;
+  activoId: string;
+  estadoBien: "BUENO" | "REGULAR" | "MALO" | null | undefined;
+  estadoRegistro?: string | null;
+  categoria?: string | null;
+}): Promise<void> {
+  if (input.estadoRegistro !== "REGISTRADO") return;
+  if (input.categoria === "MENAJE") return;
+  if (!input.estadoBien || !input.entidadId || !input.ambienteId || !input.activoId) return;
+  const data = await getRevisionVisitaAmbiente(input.ambienteId);
+  if (!data?.visitaId) return;
+  await registrarRevisionVisita({
+    entidadId: input.entidadId,
+    ambienteId: input.ambienteId,
+    activoId: input.activoId,
+    hallado: true,
+    estadoBien: input.estadoBien,
+  });
+}
+
 export async function anularRevisionVisitaSi(input: {
   entidadId: string;
   ambienteId: string;

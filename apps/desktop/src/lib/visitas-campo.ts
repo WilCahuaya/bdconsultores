@@ -742,6 +742,27 @@ export async function registrarRevisionVisita(input: {
   return { success: true };
 }
 
+/** Si hay visita abierta, marca el bien como hallado (Sí) tras editarlo. */
+export async function marcarHalladoSiVisitaAbierta(input: {
+  ambienteId: string;
+  activoId: string;
+  estadoBien: "BUENO" | "REGULAR" | "MALO" | null | undefined;
+  estadoRegistro?: string | null;
+  categoria?: string | null;
+}): Promise<void> {
+  if (input.estadoRegistro !== "REGISTRADO") return;
+  if (input.categoria === "MENAJE") return;
+  if (!input.estadoBien || !input.ambienteId || !input.activoId) return;
+  const data = await getRevisionVisitaAmbiente(input.ambienteId);
+  if (!data?.visitaId) return;
+  await registrarRevisionVisita({
+    ambienteId: input.ambienteId,
+    activoId: input.activoId,
+    hallado: true,
+    estadoBien: input.estadoBien,
+  });
+}
+
 export async function anularRevisionVisitaSi(input: { activoId: string }) {
   if (!isOnline()) return { error: "Sin conexión. La revisión de la visita requiere internet." };
   const profile = await fetchProfile();

@@ -80,6 +80,7 @@ import {
   updateActivosSimilares,
   type UpdateActivoInput,
 } from "@/lib/actions/activos";
+import { marcarHalladoSiVisitaAbierta } from "@/lib/actions/visitas-campo";
 import { suggestActivoAtributo } from "@/lib/actions/atributo-vocab";
 import { buscarCatalogoLocal, ensureCatalogoBusqueda } from "@/lib/catalogo-local";
 import {
@@ -927,6 +928,14 @@ export function ActivoForm({
       } else {
         setMessage("Bien actualizado correctamente.");
       }
+      await marcarHalladoSiVisitaAbierta({
+        entidadId: entidadEfectiva || activo.entidad_id,
+        ambienteId: ambienteId || activo.ambiente_id || "",
+        activoId: activo.id,
+        estadoBien: estadoBien ?? activo.estado_bien,
+        estadoRegistro: activo.estado_registro,
+        categoria: activo.categoria,
+      });
       onSuccess?.();
       return;
     }
@@ -1284,6 +1293,16 @@ export function ActivoForm({
           ? `${actualizados ?? ejemplaresTotal} ejemplares actualizados correctamente.`
           : "Activo actualizado correctamente.",
       );
+      if (activo) {
+        await marcarHalladoSiVisitaAbierta({
+          entidadId: entidadEfectiva || activo.entidad_id,
+          ambienteId: (fixedAmbienteId ?? ambienteId) || activo.ambiente_id || "",
+          activoId: activo.id,
+          estadoBien: estadoBien ?? activo.estado_bien,
+          estadoRegistro: activo.estado_registro,
+          categoria: activo.categoria ?? categoria,
+        });
+      }
     } else {
       const aviso = "aviso" in result && typeof result.aviso === "string" ? result.aviso : undefined;
       setMessage(

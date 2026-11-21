@@ -85,6 +85,7 @@ import {
 import { enqueueOfflineOp } from "../lib/master-cache";
 import { updateActivoPaths, uploadActivoFile } from "../lib/storage";
 import { suggestActivoAtributo, upsertLocalAtributosFromActivo } from "../lib/atributo-vocab";
+import { marcarHalladoSiVisitaAbierta } from "../lib/visitas-campo";
 import {
   createCatalogoMenaje,
   createCatalogoNacional,
@@ -1194,6 +1195,13 @@ export function ActivoFormDesktop({
       setMessage(
         `${(result.data as { actualizados?: number })?.actualizados ?? ejemplaresTotal} ejemplares actualizados correctamente.`,
       );
+      await marcarHalladoSiVisitaAbierta({
+        ambienteId: resolvedAmbienteId || activo.ambiente_id || "",
+        activoId: activo.id,
+        estadoBien: estadoBien ?? activo.estado_bien,
+        estadoRegistro: activo.estado_registro,
+        categoria: activo.categoria ?? categoria,
+      });
       onSuccess(activo);
       return;
     }
@@ -1215,6 +1223,15 @@ export function ActivoFormDesktop({
       medidas: payload.medidas,
       caracteristicas: payload.caracteristicas,
     });
+    if (isEdit && activo) {
+      await marcarHalladoSiVisitaAbierta({
+        ambienteId: resolvedAmbienteId || activo.ambiente_id || "",
+        activoId: activo.id,
+        estadoBien: estadoBien ?? activo.estado_bien,
+        estadoRegistro: activo.estado_registro,
+        categoria: activo.categoria ?? categoria,
+      });
+    }
     onSuccess(mapped);
     } finally {
       setPending(false);
