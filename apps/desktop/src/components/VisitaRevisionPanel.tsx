@@ -6,6 +6,7 @@ import { Button } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { listAmbientesPorEntidad } from "../lib/ubicacion";
 import {
+  anularRevisionVisitaSi,
   getRevisionVisitaAmbiente,
   registrarRevisionVisita,
   resolverBienFaltante,
@@ -135,6 +136,10 @@ export function useVisitaRevision({
       cerrarMenu();
       return;
     }
+    if (tipo === "si" && porActivo.get(activo.id)?.hallado === true) {
+      void anularSi(activo);
+      return;
+    }
     if (tipo === "si") setEstado(activo.estado_bien ?? "BUENO");
     const rect = button.getBoundingClientRect();
     const arriba = window.innerHeight - rect.bottom < 210;
@@ -145,6 +150,20 @@ export function useVisitaRevision({
     });
     abiertoEn.current = Date.now();
     setAbierto(key);
+  }
+
+  async function anularSi(activo: Activo) {
+    setPendingId(activo.id);
+    setError(null);
+    cerrarMenu();
+    const result = await anularRevisionVisitaSi({ activoId: activo.id });
+    setPendingId(null);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    await cargar();
+    onChanged?.();
   }
 
   async function guardar(activo: Activo, hallado: boolean, accion?: "BAJA" | "FALTANTE") {
@@ -178,7 +197,7 @@ export function useVisitaRevision({
     const siMarcado = revision?.hallado === true || abierto === `${activo.id}-si`;
     const noMarcado = Boolean(revision && !revision.hallado) || abierto === `${activo.id}-no`;
     const titulo = revision?.hallado
-      ? `Hallado · ${estadoBienLabel(activo.estado_bien)}`
+      ? `Hallado · ${estadoBienLabel(activo.estado_bien)} · Pulse Sí otra vez para quitar`
       : revision
         ? revision.accion === "BAJA"
           ? "No hallado · de baja"

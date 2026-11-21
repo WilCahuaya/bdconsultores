@@ -742,6 +742,20 @@ export async function registrarRevisionVisita(input: {
   return { success: true };
 }
 
+export async function anularRevisionVisitaSi(input: { activoId: string }) {
+  if (!isOnline()) return { error: "Sin conexión. La revisión de la visita requiere internet." };
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
+
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.rpc("anular_revision_visita_si", {
+    p_activo_id: input.activoId,
+  });
+
+  if (error) return { error: error.message };
+  return { success: true };
+}
+
 export async function resolverBienFaltante(input: {
   activoId: string;
   accion: "MOVER" | "BAJA";

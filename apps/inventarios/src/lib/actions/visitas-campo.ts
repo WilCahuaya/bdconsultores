@@ -511,6 +511,28 @@ export async function registrarRevisionVisita(input: {
   return { success: true };
 }
 
+export async function anularRevisionVisitaSi(input: {
+  entidadId: string;
+  ambienteId: string;
+  activoId: string;
+}) {
+  try {
+    await requireProfile("CONTADOR");
+  } catch {
+    return { error: "No autorizado." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("anular_revision_visita_si", {
+    p_activo_id: input.activoId,
+  });
+
+  if (error) return { error: error.message };
+  revalidateEntidadVisita(input.entidadId);
+  revalidatePath(`/contador/entidades/${input.entidadId}/ambientes/${input.ambienteId}`);
+  return { success: true };
+}
+
 export async function resolverBienFaltante(input: {
   entidadId: string;
   ambienteId: string;
