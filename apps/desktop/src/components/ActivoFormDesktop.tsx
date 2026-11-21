@@ -819,17 +819,19 @@ export function ActivoFormDesktop({
       categoria,
       cantidad: esMenajeCategoria ? Number(cantidad) : undefined,
       estado_bien: estadoBien,
-      marca: marca || undefined,
-      modelo: modelo || undefined,
-      serie: serie || undefined,
-      color: color || undefined,
+      marca: marca.trim(),
+      modelo: modelo.trim(),
+      serie: serie.trim(),
+      color: color.trim(),
       ...(esMenajeCategoria ? { material } : {}),
-      medidas: medidas || undefined,
-      caracteristicas: detalle.trim() || undefined,
-      ...(mostrarDepreciacion && {
-        depreciacion: depreciacion || undefined,
-        vida_util_meses: vidaUtilMeses ? Number(vidaUtilMeses) : undefined,
-      }),
+      medidas: medidas.trim(),
+      caracteristicas: detalle.trim(),
+      ...(mostrarDepreciacion
+        ? {
+            depreciacion: depreciacion.trim() || null,
+            vida_util_meses: vidaUtilMeses.trim() ? Number(vidaUtilMeses) : null,
+          }
+        : { depreciacion: null, vida_util_meses: null }),
       ...(mostrarCuentaContable &&
         debePersistirCuentaContableEnActivo({
           esEdicion: isEdit,
@@ -850,18 +852,18 @@ export function ActivoFormDesktop({
             cuenta_contable_nombre: cuentaPayload.cuenta_contable_nombre,
           };
         })()),
-      observacion: observacion || undefined,
-      valor_adquisicion: valor ? Number(valor) : undefined,
+      observacion: observacion.trim(),
+      valor_adquisicion: valor.trim() ? Number(valor) : null,
       valor_es_mercado: valorEsMercado,
-      fecha_adquisicion: parseFechaDDMMYYYY(fechaAdquisicion) || undefined,
-      fecha_inicio_depreciacion: fechaInicioDepreciacionIso || undefined,
+      fecha_adquisicion: parseFechaDDMMYYYY(fechaAdquisicion) || null,
+      fecha_inicio_depreciacion: fechaInicioDepreciacionIso || null,
       incremento_detalle: tieneIncremento ? incrementoDetalle.trim() || null : null,
       valor_incremento: tieneIncremento
         ? valorIncremento.trim()
           ? Number(valorIncremento)
           : null
         : null,
-      ...(!valorEsMercado && { comprobante_serie: comprobanteSerie.trim() || undefined }),
+      comprobante_serie: valorEsMercado ? null : comprobanteSerie.trim(),
       ...(mostrarPosibleAmbiente
         ? {
             posible_ambiente_id: posibleAmbienteId || null,

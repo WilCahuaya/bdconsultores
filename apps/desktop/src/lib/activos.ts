@@ -98,26 +98,26 @@ export interface CreateActivoInput {
   codigo_catalogo: string;
   nombre: string;
   nombre_etiqueta?: string | null;
-  descripcion?: string;
-  caracteristicas?: string;
+  descripcion?: string | null;
+  caracteristicas?: string | null;
   categoria?: CategoriaBien;
   estado_bien?: EstadoBien | null;
-  marca?: string;
-  modelo?: string;
-  serie?: string;
-  color?: string;
+  marca?: string | null;
+  modelo?: string | null;
+  serie?: string | null;
+  color?: string | null;
   material?: string;
-  medidas?: string;
-  depreciacion?: string;
-  observacion?: string;
-  valor_adquisicion?: number;
+  medidas?: string | null;
+  depreciacion?: string | null;
+  observacion?: string | null;
+  valor_adquisicion?: number | null;
   valor_es_mercado?: boolean;
-  fecha_adquisicion?: string;
-  fecha_inicio_depreciacion?: string;
+  fecha_adquisicion?: string | null;
+  fecha_inicio_depreciacion?: string | null;
   incremento_detalle?: string | null;
   valor_incremento?: number | null;
-  vida_util_meses?: number;
-  comprobante_serie?: string;
+  vida_util_meses?: number | null;
+  comprobante_serie?: string | null;
   cuenta_contable_codigo?: string | null;
   cuenta_contable_nombre?: string | null;
   /** Solo menaje: unidades de este código en el ambiente. */
@@ -556,6 +556,41 @@ export async function createActivo(
   return { data: data as Activo };
 }
 
+function colTexto(row: object, key: string): string | null {
+  const value = (row as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function colValor<T>(row: object, key: string): T | null {
+  const value = (row as Record<string, unknown>)[key];
+  return (value ?? null) as T | null;
+}
+
+function textoConservado(
+  value: string | null | undefined,
+  actual: string | null | undefined,
+): string | null {
+  if (value === undefined) return actual?.trim() || null;
+  if (value === null) return null;
+  return value.trim() || null;
+}
+
+function valorConservado<T>(
+  value: T | null | undefined,
+  actual: T | null | undefined,
+): T | null {
+  return value === undefined ? (actual ?? null) : value;
+}
+
+function fechaConservada(
+  value: string | null | undefined,
+  actual: string | null | undefined,
+): string | null {
+  if (value === undefined) return actual ?? null;
+  if (value === null) return null;
+  return value.trim() || null;
+}
+
 export async function updateActivo(
   activoId: string,
   input: UpdateActivoInput,
@@ -565,7 +600,7 @@ export async function updateActivo(
   const { data: existing } = await supabase
     .from("activos")
     .select(
-      "entidad_id, ambiente_id, estado_registro, posible_ambiente_id, estado_bien, observacion, material, color, medidas, caracteristicas",
+      "entidad_id, sede_id, ambiente_id, estado_registro, posible_ambiente_id, estado_bien, observacion, material, color, medidas, caracteristicas, categoria, codigo_catalogo, nombre, nombre_etiqueta, descripcion, marca, modelo, serie, depreciacion, valor_adquisicion, valor_es_mercado, fecha_adquisicion, fecha_inicio_depreciacion, incremento_detalle, valor_incremento, vida_util_meses, comprobante_serie",
     )
     .eq("id", activoId)
     .maybeSingle();
@@ -588,28 +623,49 @@ export async function updateActivo(
   const payload: Record<string, unknown> = {
     codigo_catalogo: input.codigo_catalogo.trim(),
     nombre: input.nombre.trim(),
-    nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
-    descripcion: input.descripcion?.trim() || null,
-    caracteristicas: input.caracteristicas?.trim() || null,
-    categoria: input.categoria ?? "ACTIVO",
-    estado_bien: input.estado_bien ?? null,
-    marca: input.marca?.trim() || null,
-    modelo: input.modelo?.trim() || null,
-    serie: input.serie?.trim() || null,
-    color: input.color?.trim() || null,
+    nombre_etiqueta: textoConservado(input.nombre_etiqueta, colTexto(existing ?? {}, "nombre_etiqueta")),
+    descripcion: textoConservado(input.descripcion, colTexto(existing ?? {}, "descripcion")),
+    caracteristicas: textoConservado(input.caracteristicas, colTexto(existing ?? {}, "caracteristicas")),
+    categoria: input.categoria ?? (existing?.categoria as CategoriaBien | undefined) ?? "ACTIVO",
+    estado_bien:
+      input.estado_bien !== undefined
+        ? input.estado_bien
+        : ((existing?.estado_bien as EstadoBien | null) ?? null),
+    marca: textoConservado(input.marca, colTexto(existing ?? {}, "marca")),
+    modelo: textoConservado(input.modelo, colTexto(existing ?? {}, "modelo")),
+    serie: textoConservado(input.serie, colTexto(existing ?? {}, "serie")),
+    color: textoConservado(input.color, colTexto(existing ?? {}, "color")),
     ...(input.material != null ? { material: input.material.trim() || null } : {}),
-    medidas: input.medidas?.trim() || null,
-    depreciacion: input.depreciacion?.trim() || null,
-    observacion: input.observacion?.trim() || null,
+    medidas: textoConservado(input.medidas, colTexto(existing ?? {}, "medidas")),
+    depreciacion: textoConservado(input.depreciacion, colTexto(existing ?? {}, "depreciacion")),
+    observacion: textoConservado(input.observacion, colTexto(existing ?? {}, "observacion")),
     responsable,
-    valor_adquisicion: input.valor_adquisicion ?? null,
-    valor_es_mercado: input.valor_es_mercado ?? false,
-    fecha_adquisicion: input.fecha_adquisicion || null,
-    fecha_inicio_depreciacion: input.fecha_inicio_depreciacion || null,
-    incremento_detalle: input.incremento_detalle?.trim() || null,
-    valor_incremento: input.valor_incremento ?? null,
-    vida_util_meses: input.vida_util_meses ?? null,
-    comprobante_serie: input.comprobante_serie?.trim() || null,
+    valor_adquisicion: valorConservado(
+      input.valor_adquisicion,
+      colValor<number>(existing ?? {}, "valor_adquisicion"),
+    ),
+    valor_es_mercado:
+      input.valor_es_mercado !== undefined
+        ? input.valor_es_mercado
+        : Boolean(colValor<boolean>(existing ?? {}, "valor_es_mercado")),
+    fecha_adquisicion: fechaConservada(input.fecha_adquisicion, colTexto(existing ?? {}, "fecha_adquisicion")),
+    fecha_inicio_depreciacion: fechaConservada(
+      input.fecha_inicio_depreciacion,
+      colTexto(existing ?? {}, "fecha_inicio_depreciacion"),
+    ),
+    incremento_detalle: textoConservado(input.incremento_detalle, colTexto(existing ?? {}, "incremento_detalle")),
+    valor_incremento: valorConservado(
+      input.valor_incremento,
+      colValor<number>(existing ?? {}, "valor_incremento"),
+    ),
+    vida_util_meses: valorConservado(
+      input.vida_util_meses,
+      colValor<number>(existing ?? {}, "vida_util_meses"),
+    ),
+    comprobante_serie:
+      input.valor_es_mercado === true
+        ? null
+        : textoConservado(input.comprobante_serie, colTexto(existing ?? {}, "comprobante_serie")),
   };
 
   const payloadFinal = applyCuentaContableToPayloadIfProvided(payload, input);

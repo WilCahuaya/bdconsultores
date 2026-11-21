@@ -41,35 +41,35 @@ export interface CreateActivoInput {
   codigo_catalogo: string;
   nombre: string;
   nombre_etiqueta?: string | null;
-  descripcion?: string;
-  caracteristicas?: string;
+  descripcion?: string | null;
+  caracteristicas?: string | null;
   categoria?: CategoriaBien;
   estado_bien?: EstadoBien | null;
-  marca?: string;
-  modelo?: string;
-  serie?: string;
-  color?: string;
+  marca?: string | null;
+  modelo?: string | null;
+  serie?: string | null;
+  color?: string | null;
   material?: string;
-  medidas?: string;
+  medidas?: string | null;
   medida_largo?: number;
   medida_ancho?: number;
   medida_altura?: number;
-  depreciacion?: string;
-  observacion?: string;
+  depreciacion?: string | null;
+  observacion?: string | null;
   responsable?: string;
-  valor_adquisicion?: number;
+  valor_adquisicion?: number | null;
   valor_es_mercado?: boolean;
-  fecha_adquisicion?: string;
-  fecha_inicio_depreciacion?: string;
+  fecha_adquisicion?: string | null;
+  fecha_inicio_depreciacion?: string | null;
   incremento_detalle?: string | null;
   valor_incremento?: number | null;
-  vida_util_meses?: number;
+  vida_util_meses?: number | null;
   sede_id?: string;
   ambiente_id?: string;
   posible_ambiente_id?: string | null;
   /** Solo contador: REGISTRADO = alta directa; omitir o PREREGISTRADO = preregistrar */
   estado_registro?: EstadoRegistro;
-  comprobante_serie?: string;
+  comprobante_serie?: string | null;
   cuenta_contable_codigo?: string | null;
   cuenta_contable_nombre?: string | null;
   /** Solo menaje: unidades de este código en el ambiente. */
@@ -318,6 +318,59 @@ function revalidateActivoPaths(entidadId: string, ambienteId: string | null) {
   revalidatePath("/admin");
 }
 
+function colTexto(row: object, key: string): string | null {
+  const value = (row as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function colValor<T>(row: object, key: string): T | null {
+  const value = (row as Record<string, unknown>)[key];
+  return (value ?? null) as T | null;
+}
+
+/** Si el campo no viene en el input, se conserva el valor guardado. */
+function textoConservado(
+  value: string | null | undefined,
+  actual: string | null | undefined,
+): string | null {
+  if (value === undefined) return actual?.trim() || null;
+  if (value === null) return null;
+  return value.trim() || null;
+}
+
+function valorConservado<T>(
+  value: T | null | undefined,
+  actual: T | null | undefined,
+): T | null {
+  return value === undefined ? (actual ?? null) : value;
+}
+
+function fechaConservada(
+  value: string | null | undefined,
+  actual: string | null | undefined,
+): string | null {
+  if (value === undefined) return actual ?? null;
+  if (value === null) return null;
+  return value.trim() || null;
+}
+
+function observacionConservada(
+  input: Pick<UpdateActivoInput, "observacion" | "observacion_admin">,
+  actual: string | null | undefined,
+  estadoAnterior: EstadoBien | null,
+  estadoNuevo: EstadoBien | null,
+): string | null {
+  if (input.observacion !== undefined) return input.observacion?.trim() || null;
+  if (input.observacion_admin !== undefined) {
+    const partes = splitObservacionActivo(actual);
+    return mergeObservacionActivo(
+      partes.contador,
+      resolveObservacionAdmin(input.observacion_admin ?? partes.admin, estadoAnterior, estadoNuevo),
+    );
+  }
+  return actual ?? null;
+}
+
 export async function updateActivo(activoId: string, input: UpdateActivoInput) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
@@ -327,7 +380,7 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
   const { data: existing, error: fetchError } = await supabase
     .from("activos")
     .select(
-      "entidad_id, ambiente_id, posible_ambiente_id, estado_registro, estado_bien, observacion, material, color, medidas, caracteristicas, categoria, codigo_catalogo, nombre",
+      "entidad_id, sede_id, ambiente_id, posible_ambiente_id, estado_registro, estado_bien, observacion, material, color, medidas, caracteristicas, categoria, codigo_catalogo, nombre, nombre_etiqueta, descripcion, marca, modelo, serie, medida_largo, medida_ancho, medida_altura, depreciacion, valor_adquisicion, valor_es_mercado, fecha_adquisicion, fecha_inicio_depreciacion, incremento_detalle, valor_incremento, vida_util_meses, comprobante_serie",
     )
     .eq("id", activoId)
     .maybeSingle();
@@ -411,32 +464,60 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
       payload = {
         codigo_catalogo: codigo,
         nombre,
-        nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
-        descripcion: input.descripcion?.trim() || null,
-        caracteristicas: input.caracteristicas?.trim() || null,
-        categoria: input.categoria ?? "ACTIVO",
-        estado_bien: input.estado_bien ?? null,
-        marca: input.marca?.trim() || null,
-        modelo: input.modelo?.trim() || null,
-        serie: input.serie?.trim() || null,
-        color: input.color?.trim() || null,
-    ...(input.material != null ? { material: input.material.trim() || null } : {}),
-        medidas: input.medidas?.trim() || null,
-        medida_largo: input.medida_largo ?? null,
-        medida_ancho: input.medida_ancho ?? null,
-        medida_altura: input.medida_altura ?? null,
+        nombre_etiqueta: textoConservado(input.nombre_etiqueta, colTexto(existing, "nombre_etiqueta")),
+        descripcion: textoConservado(input.descripcion, colTexto(existing, "descripcion")),
+        caracteristicas: textoConservado(input.caracteristicas, colTexto(existing, "caracteristicas")),
+        categoria: input.categoria ?? (existing.categoria as CategoriaBien) ?? "ACTIVO",
+        estado_bien:
+          input.estado_bien !== undefined
+            ? input.estado_bien
+            : (existing.estado_bien as EstadoBien | null),
+        marca: textoConservado(input.marca, colTexto(existing, "marca")),
+        modelo: textoConservado(input.modelo, colTexto(existing, "modelo")),
+        serie: textoConservado(input.serie, colTexto(existing, "serie")),
+        color: textoConservado(input.color, colTexto(existing, "color")),
+        ...(input.material != null ? { material: input.material.trim() || null } : {}),
+        medidas: textoConservado(input.medidas, colTexto(existing, "medidas")),
+        medida_largo: valorConservado(input.medida_largo, colValor<number>(existing, "medida_largo")),
+        medida_ancho: valorConservado(input.medida_ancho, colValor<number>(existing, "medida_ancho")),
+        medida_altura: valorConservado(input.medida_altura, colValor<number>(existing, "medida_altura")),
         depreciacion: null,
-        observacion: input.observacion?.trim() || null,
+        observacion: observacionConservada(
+          input,
+          colTexto(existing, "observacion"),
+          existing.estado_bien as EstadoBien | null,
+          input.estado_bien !== undefined
+            ? input.estado_bien
+            : (existing.estado_bien as EstadoBien | null),
+        ),
         responsable,
-        valor_adquisicion: input.valor_adquisicion ?? null,
-        valor_es_mercado: input.valor_es_mercado ?? false,
-        fecha_adquisicion: input.fecha_adquisicion || null,
-        fecha_inicio_depreciacion: input.fecha_inicio_depreciacion || null,
-        incremento_detalle: input.incremento_detalle?.trim() || null,
-        valor_incremento: input.valor_incremento ?? null,
+        valor_adquisicion: valorConservado(
+          input.valor_adquisicion,
+          colValor<number>(existing, "valor_adquisicion"),
+        ),
+        valor_es_mercado:
+          input.valor_es_mercado !== undefined
+            ? input.valor_es_mercado
+            : Boolean(colValor<boolean>(existing, "valor_es_mercado")),
+        fecha_adquisicion: fechaConservada(input.fecha_adquisicion, colTexto(existing, "fecha_adquisicion")),
+        fecha_inicio_depreciacion: fechaConservada(
+          input.fecha_inicio_depreciacion,
+          colTexto(existing, "fecha_inicio_depreciacion"),
+        ),
+        incremento_detalle: textoConservado(input.incremento_detalle, colTexto(existing, "incremento_detalle")),
+        valor_incremento: valorConservado(
+          input.valor_incremento,
+          colValor<number>(existing, "valor_incremento"),
+        ),
         vida_util_meses: null,
-        comprobante_serie: input.comprobante_serie?.trim() || null,
-        posible_ambiente_id: input.posible_ambiente_id ?? null,
+        comprobante_serie:
+          input.valor_es_mercado === true
+            ? null
+            : textoConservado(input.comprobante_serie, colTexto(existing, "comprobante_serie")),
+        posible_ambiente_id:
+          input.posible_ambiente_id !== undefined
+            ? input.posible_ambiente_id
+            : (input.ambiente_id ?? colTexto(existing, "posible_ambiente_id")),
         updated_by: profile.id,
       };
     } else {
@@ -489,78 +570,117 @@ export async function updateActivo(activoId: string, input: UpdateActivoInput) {
     responsable = input.responsable?.trim() || responsable;
 
     if (existing.estado_registro === "PREREGISTRADO") {
+      const estadoAnterior = existing.estado_bien as EstadoBien | null;
+      const estadoNuevo =
+        input.estado_bien !== undefined ? input.estado_bien : estadoAnterior;
       payload = {
         codigo_catalogo: input.codigo_catalogo.trim(),
         nombre: input.nombre.trim(),
-        nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
-        descripcion: input.descripcion?.trim() || null,
-        caracteristicas: input.caracteristicas?.trim() || null,
-        categoria: input.categoria ?? "ACTIVO",
-        estado_bien: input.estado_bien ?? null,
-        marca: input.marca?.trim() || null,
-        modelo: input.modelo?.trim() || null,
-        serie: input.serie?.trim() || null,
-        color: input.color?.trim() || null,
-    ...(input.material != null ? { material: input.material.trim() || null } : {}),
-        medidas: input.medidas?.trim() || null,
-        medida_largo: input.medida_largo ?? null,
-        medida_ancho: input.medida_ancho ?? null,
-        medida_altura: input.medida_altura ?? null,
-        depreciacion: input.depreciacion?.trim() || null,
-        observacion: input.observacion?.trim() || null,
+        nombre_etiqueta: textoConservado(input.nombre_etiqueta, colTexto(existing, "nombre_etiqueta")),
+        descripcion: textoConservado(input.descripcion, colTexto(existing, "descripcion")),
+        caracteristicas: textoConservado(input.caracteristicas, colTexto(existing, "caracteristicas")),
+        categoria: input.categoria ?? (existing.categoria as CategoriaBien) ?? "ACTIVO",
+        estado_bien: estadoNuevo,
+        marca: textoConservado(input.marca, colTexto(existing, "marca")),
+        modelo: textoConservado(input.modelo, colTexto(existing, "modelo")),
+        serie: textoConservado(input.serie, colTexto(existing, "serie")),
+        color: textoConservado(input.color, colTexto(existing, "color")),
+        ...(input.material != null ? { material: input.material.trim() || null } : {}),
+        medidas: textoConservado(input.medidas, colTexto(existing, "medidas")),
+        medida_largo: valorConservado(input.medida_largo, colValor<number>(existing, "medida_largo")),
+        medida_ancho: valorConservado(input.medida_ancho, colValor<number>(existing, "medida_ancho")),
+        medida_altura: valorConservado(input.medida_altura, colValor<number>(existing, "medida_altura")),
+        depreciacion: textoConservado(input.depreciacion, colTexto(existing, "depreciacion")),
+        observacion: observacionConservada(input, colTexto(existing, "observacion"), estadoAnterior, estadoNuevo),
         responsable,
-        valor_adquisicion: input.valor_adquisicion ?? null,
-        valor_es_mercado: input.valor_es_mercado ?? false,
-        fecha_adquisicion: input.fecha_adquisicion || null,
-        fecha_inicio_depreciacion: input.fecha_inicio_depreciacion || null,
-        incremento_detalle: input.incremento_detalle?.trim() || null,
-        valor_incremento: input.valor_incremento ?? null,
-        vida_util_meses: input.vida_util_meses ?? null,
-        comprobante_serie: input.comprobante_serie?.trim() || null,
-        posible_ambiente_id: input.posible_ambiente_id ?? null,
+        valor_adquisicion: valorConservado(
+          input.valor_adquisicion,
+          colValor<number>(existing, "valor_adquisicion"),
+        ),
+        valor_es_mercado:
+          input.valor_es_mercado !== undefined
+            ? input.valor_es_mercado
+            : Boolean(colValor<boolean>(existing, "valor_es_mercado")),
+        fecha_adquisicion: fechaConservada(input.fecha_adquisicion, colTexto(existing, "fecha_adquisicion")),
+        fecha_inicio_depreciacion: fechaConservada(
+          input.fecha_inicio_depreciacion,
+          colTexto(existing, "fecha_inicio_depreciacion"),
+        ),
+        incremento_detalle: textoConservado(input.incremento_detalle, colTexto(existing, "incremento_detalle")),
+        valor_incremento: valorConservado(
+          input.valor_incremento,
+          colValor<number>(existing, "valor_incremento"),
+        ),
+        vida_util_meses: valorConservado(input.vida_util_meses, colValor<number>(existing, "vida_util_meses")),
+        comprobante_serie:
+          input.valor_es_mercado === true
+            ? null
+            : textoConservado(input.comprobante_serie, colTexto(existing, "comprobante_serie")),
+        posible_ambiente_id:
+          input.posible_ambiente_id !== undefined
+            ? input.posible_ambiente_id
+            : (input.ambiente_id ?? colTexto(existing, "posible_ambiente_id")),
         updated_by: profile.id,
       };
       payload = applyCuentaContableToPayloadIfProvided(payload, {
         ...input,
-        categoria: input.categoria ?? "ACTIVO",
+        categoria: input.categoria ?? (existing.categoria as CategoriaBien) ?? "ACTIVO",
       });
     } else {
+      const estadoAnterior = existing.estado_bien as EstadoBien | null;
+      const estadoNuevo =
+        input.estado_bien !== undefined ? input.estado_bien : estadoAnterior;
       payload = {
         codigo_catalogo: input.codigo_catalogo.trim(),
         nombre: input.nombre.trim(),
-        nombre_etiqueta: input.nombre_etiqueta?.trim() || null,
-        descripcion: input.descripcion?.trim() || null,
-        caracteristicas: input.caracteristicas?.trim() || null,
-        categoria: input.categoria ?? "ACTIVO",
-        estado_bien: input.estado_bien ?? null,
-        marca: input.marca?.trim() || null,
-        modelo: input.modelo?.trim() || null,
-        serie: input.serie?.trim() || null,
-        color: input.color?.trim() || null,
-    ...(input.material != null ? { material: input.material.trim() || null } : {}),
-        medidas: input.medidas?.trim() || null,
-        medida_largo: input.medida_largo ?? null,
-        medida_ancho: input.medida_ancho ?? null,
-        medida_altura: input.medida_altura ?? null,
-        depreciacion: input.depreciacion?.trim() || null,
-        observacion: input.observacion?.trim() || null,
+        nombre_etiqueta: textoConservado(input.nombre_etiqueta, colTexto(existing, "nombre_etiqueta")),
+        descripcion: textoConservado(input.descripcion, colTexto(existing, "descripcion")),
+        caracteristicas: textoConservado(input.caracteristicas, colTexto(existing, "caracteristicas")),
+        categoria: input.categoria ?? (existing.categoria as CategoriaBien) ?? "ACTIVO",
+        estado_bien: estadoNuevo,
+        marca: textoConservado(input.marca, colTexto(existing, "marca")),
+        modelo: textoConservado(input.modelo, colTexto(existing, "modelo")),
+        serie: textoConservado(input.serie, colTexto(existing, "serie")),
+        color: textoConservado(input.color, colTexto(existing, "color")),
+        ...(input.material != null ? { material: input.material.trim() || null } : {}),
+        medidas: textoConservado(input.medidas, colTexto(existing, "medidas")),
+        medida_largo: valorConservado(input.medida_largo, colValor<number>(existing, "medida_largo")),
+        medida_ancho: valorConservado(input.medida_ancho, colValor<number>(existing, "medida_ancho")),
+        medida_altura: valorConservado(input.medida_altura, colValor<number>(existing, "medida_altura")),
+        depreciacion: textoConservado(input.depreciacion, colTexto(existing, "depreciacion")),
+        observacion: observacionConservada(input, colTexto(existing, "observacion"), estadoAnterior, estadoNuevo),
         responsable,
-        valor_adquisicion: input.valor_adquisicion ?? null,
-        valor_es_mercado: input.valor_es_mercado ?? false,
-        fecha_adquisicion: input.fecha_adquisicion || null,
-        fecha_inicio_depreciacion: input.fecha_inicio_depreciacion || null,
-        incremento_detalle: input.incremento_detalle?.trim() || null,
-        valor_incremento: input.valor_incremento ?? null,
-        vida_util_meses: input.vida_util_meses ?? null,
-        sede_id: input.sede_id || null,
+        valor_adquisicion: valorConservado(
+          input.valor_adquisicion,
+          colValor<number>(existing, "valor_adquisicion"),
+        ),
+        valor_es_mercado:
+          input.valor_es_mercado !== undefined
+            ? input.valor_es_mercado
+            : Boolean(colValor<boolean>(existing, "valor_es_mercado")),
+        fecha_adquisicion: fechaConservada(input.fecha_adquisicion, colTexto(existing, "fecha_adquisicion")),
+        fecha_inicio_depreciacion: fechaConservada(
+          input.fecha_inicio_depreciacion,
+          colTexto(existing, "fecha_inicio_depreciacion"),
+        ),
+        incremento_detalle: textoConservado(input.incremento_detalle, colTexto(existing, "incremento_detalle")),
+        valor_incremento: valorConservado(
+          input.valor_incremento,
+          colValor<number>(existing, "valor_incremento"),
+        ),
+        vida_util_meses: valorConservado(input.vida_util_meses, colValor<number>(existing, "vida_util_meses")),
+        sede_id: input.sede_id || colTexto(existing, "sede_id"),
         ambiente_id: ambienteId,
-        comprobante_serie: input.comprobante_serie?.trim() || null,
+        comprobante_serie:
+          input.valor_es_mercado === true
+            ? null
+            : textoConservado(input.comprobante_serie, colTexto(existing, "comprobante_serie")),
         updated_by: profile.id,
       };
 
       payload = applyCuentaContableToPayloadIfProvided(payload, {
         ...input,
-        categoria: input.categoria ?? "ACTIVO",
+        categoria: input.categoria ?? (existing.categoria as CategoriaBien) ?? "ACTIVO",
       });
 
       const codigo = payload.codigo_catalogo as string;

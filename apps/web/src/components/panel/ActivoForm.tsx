@@ -1027,18 +1027,18 @@ export function ActivoForm({
       categoria,
       cantidad: esMenajeCategoria ? Number(cantidad) : undefined,
       estado_bien: estadoBien,
-      marca: marca || undefined,
-      modelo: modelo || undefined,
-      serie: serie || undefined,
-      color: color || undefined,
+      marca: marca.trim(),
+      modelo: modelo.trim(),
+      serie: serie.trim(),
+      color: color.trim(),
       ...(esMenajeCategoria ? { material } : {}),
-      medidas: medidas || undefined,
-      caracteristicas: detalle.trim() || undefined,
-      observacion: observacion || undefined,
-      valor_adquisicion: valor ? Number(valor) : undefined,
+      medidas: medidas.trim(),
+      caracteristicas: detalle.trim(),
+      observacion: observacion.trim(),
+      valor_adquisicion: valor.trim() ? Number(valor) : null,
       valor_es_mercado: valorEsMercado,
-      fecha_adquisicion: fechaAdquisicionIso || undefined,
-      fecha_inicio_depreciacion: fechaInicioDepreciacionIso || undefined,
+      fecha_adquisicion: fechaAdquisicionIso || null,
+      fecha_inicio_depreciacion: fechaInicioDepreciacionIso || null,
       incremento_detalle: tieneIncremento ? incrementoDetalle.trim() || null : null,
       valor_incremento: tieneIncremento
         ? valorIncremento.trim()
@@ -1054,17 +1054,12 @@ export function ActivoForm({
       payload.ambiente_id = (fixedAmbienteId ?? ambienteId) || undefined;
     }
 
-    if (!valorEsMercado) {
-      Object.assign(payload, {
-        comprobante_serie: comprobanteSerie.trim() || undefined,
-      });
-    }
-    if (mostrarDepreciacion) {
-      Object.assign(payload, {
-        depreciacion: depreciacion || undefined,
-        vida_util_meses: vidaUtilMeses ? Number(vidaUtilMeses) : undefined,
-      });
-    }
+    Object.assign(payload, {
+      comprobante_serie: valorEsMercado ? null : comprobanteSerie.trim(),
+      depreciacion: mostrarDepreciacion ? depreciacion.trim() || null : null,
+      vida_util_meses:
+        mostrarDepreciacion && vidaUtilMeses.trim() ? Number(vidaUtilMeses) : null,
+    });
     if (
       mostrarCuentaContable &&
       debePersistirCuentaContableEnActivo({
