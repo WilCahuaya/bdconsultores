@@ -226,6 +226,10 @@ export async function exportReportePdf(
     addEntidadDisenoHeaderPdf(doc, ctx, activos.length);
   }
 
+  // El membrete se dibuja en la página 1. finalY es la altura de la última hoja:
+  // hay que volver a ella antes de colocar el resumen y las firmas.
+  doc.setPage(doc.getNumberOfPages());
+
   const finalY = (doc as JsPDFDoc & { lastAutoTable?: { finalY: number } }).lastAutoTable
     ?.finalY;
 
