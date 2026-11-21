@@ -453,10 +453,13 @@ export async function createActivo(
   const supabase = getSupabaseClient();
 
   // Con sede+ambiente se registra; sin ellos (o estado explícito) queda preregistro.
+  // El menaje nunca se preregistra: queda registrado en el ambiente.
+  const esMenajeAlta = esMenaje(input.categoria);
   const tieneUbicacion = Boolean(input.sede_id && input.ambiente_id);
   const esPreregistro =
-    input.estado_registro === "PREREGISTRADO" ||
-    (input.estado_registro !== "REGISTRADO" && !tieneUbicacion);
+    !esMenajeAlta &&
+    (input.estado_registro === "PREREGISTRADO" ||
+      (input.estado_registro !== "REGISTRADO" && !tieneUbicacion));
 
   let responsable: string | null = null;
   const ambienteResponsableId = esPreregistro ? input.posible_ambiente_id : input.ambiente_id;
@@ -505,9 +508,21 @@ export async function createActivo(
   } else {
     payloadFinal.estado_registro = "REGISTRADO";
     payloadFinal.sede_id = input.sede_id || null;
-    payloadFinal.ambiente_id = input.ambiente_id || null;
+    payloadFinal.ambiente_id = input.ambiente_id || input.posible_ambiente_id || null;
+    if (esMenajeAlta && !payloadFinal.sede_id && payloadFinal.ambiente_id) {
+      const { data: ambiente } = await supabase
+        .from("ambientes")
+        .select("sede_id")
+        .eq("id", String(payloadFinal.ambiente_id))
+        .maybeSingle();
+      payloadFinal.sede_id = ambiente?.sede_id ?? null;
+    }
     if (!payloadFinal.sede_id || !payloadFinal.ambiente_id) {
-      return { error: "Seleccione sede y ambiente para registrar el activo." };
+      return {
+        error: esMenajeAlta
+          ? "Seleccione el ambiente del menaje. El menaje no se preregistra."
+          : "Seleccione sede y ambiente para registrar el activo.",
+      };
     }
   }
 
