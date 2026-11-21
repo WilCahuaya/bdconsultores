@@ -78,8 +78,8 @@ import {
   updateActivosSimilares,
   type UpdateActivoInput,
 } from "@/lib/actions/activos";
-import { marcarHalladoSiVisitaAbierta } from "@/lib/actions/visitas-campo";
 import { suggestActivoAtributo } from "@/lib/actions/atributo-vocab";
+import { useVisitaMarcaEnEdicion, VisitaMarcaFormulario } from "./VisitaRevisionPanel";
 import {
   createCatalogoMenaje,
   createCatalogoNacional,
@@ -317,6 +317,15 @@ export function ActivoForm({
   const [labelWarnText, setLabelWarnText] = useState("");
 
   const entidadEfectiva = fixedEntidadId || entidadId || activo?.entidad_id || "";
+  const ambienteVisitaId = (fixedAmbienteId ?? ambienteId) || activo?.ambiente_id || "";
+  const visitaMarca = useVisitaMarcaEnEdicion({
+    entidadId: entidadEfectiva,
+    ambienteId: ambienteVisitaId,
+    activoId: isEdit ? activo?.id : null,
+    estadoRegistro: activo?.estado_registro,
+    categoria: activo?.categoria ?? categoria,
+    enabled: isEdit && !modoAdmin && !soloUbicacion,
+  });
   const entidadSeleccionada = useMemo(
     () => entidades.find((e) => e.id === entidadEfectiva),
     [entidades, entidadEfectiva],
@@ -888,14 +897,11 @@ export function ActivoForm({
       } else {
         setMessage("Bien actualizado correctamente.");
       }
-      await marcarHalladoSiVisitaAbierta({
-        entidadId: entidadEfectiva || activo.entidad_id,
-        ambienteId: ambienteId || activo.ambiente_id || "",
-        activoId: activo.id,
-        estadoBien: estadoBien ?? activo.estado_bien,
-        estadoRegistro: activo.estado_registro,
-        categoria: activo.categoria,
-      });
+      const visitaError = await visitaMarca.aplicarTrasGuardar(estadoBien ?? activo.estado_bien);
+      if (visitaError) {
+        setMessage(visitaError);
+        return;
+      }
       onSuccess?.();
       return;
     }
@@ -1219,14 +1225,11 @@ export function ActivoForm({
           : "Activo actualizado correctamente.",
       );
       if (activo) {
-        await marcarHalladoSiVisitaAbierta({
-          entidadId: entidadEfectiva || activo.entidad_id,
-          ambienteId: (fixedAmbienteId ?? ambienteId) || activo.ambiente_id || "",
-          activoId: activo.id,
-          estadoBien: estadoBien ?? activo.estado_bien,
-          estadoRegistro: activo.estado_registro,
-          categoria: activo.categoria ?? categoria,
-        });
+        const visitaError = await visitaMarca.aplicarTrasGuardar(estadoBien ?? activo.estado_bien);
+        if (visitaError) {
+          setMessage(visitaError);
+          return;
+        }
       }
     } else {
       const aviso = "aviso" in result && typeof result.aviso === "string" ? result.aviso : undefined;
@@ -2437,6 +2440,19 @@ export function ActivoForm({
           </fieldset>
         </>
       )}
+
+      {visitaMarca.disponible ? (
+        <div className={`col-span-1 ${colSpanFull}`}>
+          <VisitaMarcaFormulario
+            marca={visitaMarca.marca}
+            onMarcaChange={visitaMarca.setMarca}
+            noAccion={visitaMarca.noAccion}
+            onNoAccionChange={visitaMarca.setNoAccion}
+            motivo={visitaMarca.motivo}
+            onMotivoChange={visitaMarca.setMotivo}
+          />
+        </div>
+      ) : null}
 
       {message && !actionsBottomRight && (
         <p className={`col-span-1 text-sm ${colSpanFull} ${messageToneClass}`}>

@@ -341,6 +341,193 @@ export function useVisitaRevision({
   return { activa, leyenda, renderCelda };
 }
 
+export type VisitaMarcaForm = "omitir" | "si" | "no";
+
+export function useVisitaMarcaEnEdicion({
+  entidadId,
+  ambienteId,
+  activoId,
+  estadoRegistro,
+  categoria,
+  enabled = true,
+}: {
+  entidadId: string;
+  ambienteId: string | null | undefined;
+  activoId: string | null | undefined;
+  estadoRegistro?: string | null;
+  categoria?: string | null;
+  enabled?: boolean;
+}) {
+  const [disponible, setDisponible] = useState(false);
+  const [marca, setMarca] = useState<VisitaMarcaForm>("omitir");
+  const [noAccion, setNoAccion] = useState<"BAJA" | "FALTANTE" | null>(null);
+  const [motivo, setMotivo] = useState("");
+
+  useEffect(() => {
+    let cancel = false;
+    setDisponible(false);
+    setMarca("omitir");
+    setNoAccion(null);
+    setMotivo("");
+    if (
+      !enabled ||
+      !ambienteId ||
+      !activoId ||
+      estadoRegistro !== "REGISTRADO" ||
+      categoria === "MENAJE"
+    ) {
+      return;
+    }
+    void getRevisionVisitaAmbiente(ambienteId).then((data) => {
+      if (cancel || !data?.visitaId) return;
+      setDisponible(true);
+      const revision = data.items.find((item) => item.activo_id === activoId);
+      if (revision?.hallado === true) setMarca("si");
+      else if (revision) {
+        setMarca("no");
+        setNoAccion(revision.accion);
+      }
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [enabled, ambienteId, activoId, estadoRegistro, categoria]);
+
+  async function aplicarTrasGuardar(
+    estadoBien: EstadoBien | null | undefined,
+  ): Promise<string | null> {
+    if (!disponible || marca === "omitir" || !ambienteId || !activoId) return null;
+    if (marca === "si") {
+      if (!estadoBien) return "Indique el estado del bien para marcar Sí en la visita.";
+      const result = await registrarRevisionVisita({
+        entidadId,
+        ambienteId,
+        activoId,
+        hallado: true,
+        estadoBien,
+      });
+      return result.error ?? null;
+    }
+    if (!noAccion) return "Para marcar No, elija dar de baja o mover a Faltante.";
+    const result = await registrarRevisionVisita({
+      entidadId,
+      ambienteId,
+      activoId,
+      hallado: false,
+      accion: noAccion,
+      motivo,
+    });
+    return result.error ?? null;
+  }
+
+  return {
+    disponible,
+    marca,
+    setMarca,
+    noAccion,
+    setNoAccion,
+    motivo,
+    setMotivo,
+    aplicarTrasGuardar,
+  };
+}
+
+export function VisitaMarcaFormulario({
+  marca,
+  onMarcaChange,
+  noAccion,
+  onNoAccionChange,
+  motivo,
+  onMotivoChange,
+}: {
+  marca: VisitaMarcaForm;
+  onMarcaChange: (value: VisitaMarcaForm) => void;
+  noAccion: "BAJA" | "FALTANTE" | null;
+  onNoAccionChange: (value: "BAJA" | "FALTANTE") => void;
+  motivo: string;
+  onMotivoChange: (value: string) => void;
+}) {
+  return (
+    <fieldset className={`${panelCardClass} space-y-3 p-3`}>
+      <legend className="px-1 text-sm font-medium text-foreground">Revisión en visita</legend>
+      <p className="text-xs text-muted-foreground">
+        Al guardar puede marcar si el bien está en el ambiente o no se encuentra.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className={`inline-flex h-8 items-center rounded border px-2.5 text-xs font-semibold ${
+            marca === "omitir"
+              ? "border-foreground bg-foreground text-background"
+              : "border-input bg-background text-foreground hover:bg-accent"
+          }`}
+          aria-pressed={marca === "omitir"}
+          onClick={() => onMarcaChange("omitir")}
+        >
+          No marcar
+        </button>
+        <button
+          type="button"
+          className={`inline-flex h-8 min-w-[2.5rem] items-center justify-center rounded border px-2.5 text-xs font-semibold ${
+            marca === "si"
+              ? "border-emerald-600 bg-emerald-600 text-white"
+              : "border-input bg-background text-foreground hover:bg-accent"
+          }`}
+          aria-pressed={marca === "si"}
+          onClick={() => onMarcaChange("si")}
+        >
+          Sí
+        </button>
+        <button
+          type="button"
+          className={`inline-flex h-8 min-w-[2.5rem] items-center justify-center rounded border px-2.5 text-xs font-semibold ${
+            marca === "no"
+              ? "border-rose-600 bg-rose-600 text-white"
+              : "border-input bg-background text-foreground hover:bg-accent"
+          }`}
+          aria-pressed={marca === "no"}
+          onClick={() => onMarcaChange("no")}
+        >
+          No
+        </button>
+      </div>
+      {marca === "si" ? (
+        <p className="text-xs text-muted-foreground">
+          Se registrará como hallado con el estado del bien indicado arriba.
+        </p>
+      ) : null}
+      {marca === "no" ? (
+        <div className="flex flex-col gap-2">
+          <input
+            className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+            placeholder="Motivo de baja si está defectuoso"
+            value={motivo}
+            onChange={(event) => onMotivoChange(event.target.value)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={noAccion === "BAJA" ? "default" : "outline"}
+              onClick={() => onNoAccionChange("BAJA")}
+            >
+              Dar de baja
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={noAccion === "FALTANTE" ? "default" : "outline"}
+              onClick={() => onNoAccionChange("FALTANTE")}
+            >
+              Mover a Faltante
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </fieldset>
+  );
+}
+
 export function FaltanteBienesPanel({
   entidadId,
   ambienteId,

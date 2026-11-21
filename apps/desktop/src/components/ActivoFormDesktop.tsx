@@ -85,7 +85,7 @@ import {
 import { enqueueOfflineOp } from "../lib/master-cache";
 import { updateActivoPaths, uploadActivoFile } from "../lib/storage";
 import { suggestActivoAtributo, upsertLocalAtributosFromActivo } from "../lib/atributo-vocab";
-import { marcarHalladoSiVisitaAbierta } from "../lib/visitas-campo";
+import { useVisitaMarcaEnEdicion, VisitaMarcaFormulario } from "./VisitaRevisionPanel";
 import {
   createCatalogoMenaje,
   createCatalogoNacional,
@@ -283,6 +283,13 @@ export function ActivoFormDesktop({
   const [ambientes, setAmbientes] = useState<AmbienteConSede[]>([]);
   const [sedeId, setSedeId] = useState(fixedSedeId ?? activo?.sede_id ?? "");
   const [ambienteId, setAmbienteId] = useState(fixedAmbienteId ?? activo?.ambiente_id ?? "");
+  const visitaMarca = useVisitaMarcaEnEdicion({
+    ambienteId: (fixedAmbienteId ?? ambienteId) || activo?.ambiente_id || "",
+    activoId: isEdit ? activo?.id : null,
+    estadoRegistro: activo?.estado_registro,
+    categoria: activo?.categoria ?? categoria,
+    enabled: isEdit && !modoPreregistro,
+  });
   const [posibleSedeId, setPosibleSedeId] = useState(activo?.posible_sede_id ?? "");
   const [posibleAmbienteId, setPosibleAmbienteId] = useState(activo?.posible_ambiente_id ?? "");
   const [posibleAmbientes, setPosibleAmbientes] = useState<
@@ -1195,13 +1202,11 @@ export function ActivoFormDesktop({
       setMessage(
         `${(result.data as { actualizados?: number })?.actualizados ?? ejemplaresTotal} ejemplares actualizados correctamente.`,
       );
-      await marcarHalladoSiVisitaAbierta({
-        ambienteId: resolvedAmbienteId || activo.ambiente_id || "",
-        activoId: activo.id,
-        estadoBien: estadoBien ?? activo.estado_bien,
-        estadoRegistro: activo.estado_registro,
-        categoria: activo.categoria ?? categoria,
-      });
+      const visitaError = await visitaMarca.aplicarTrasGuardar(estadoBien ?? activo.estado_bien);
+      if (visitaError) {
+        setMessage(visitaError);
+        return;
+      }
       onSuccess(activo);
       return;
     }
@@ -1224,13 +1229,11 @@ export function ActivoFormDesktop({
       caracteristicas: payload.caracteristicas,
     });
     if (isEdit && activo) {
-      await marcarHalladoSiVisitaAbierta({
-        ambienteId: resolvedAmbienteId || activo.ambiente_id || "",
-        activoId: activo.id,
-        estadoBien: estadoBien ?? activo.estado_bien,
-        estadoRegistro: activo.estado_registro,
-        categoria: activo.categoria ?? categoria,
-      });
+      const visitaError = await visitaMarca.aplicarTrasGuardar(estadoBien ?? activo.estado_bien);
+      if (visitaError) {
+        setMessage(visitaError);
+        return;
+      }
     }
     onSuccess(mapped);
     } finally {
@@ -2219,6 +2222,19 @@ export function ActivoFormDesktop({
       )}
       </>
       )}
+
+      {visitaMarca.disponible ? (
+        <div className="col-span-1 lg:col-span-2">
+          <VisitaMarcaFormulario
+            marca={visitaMarca.marca}
+            onMarcaChange={visitaMarca.setMarca}
+            noAccion={visitaMarca.noAccion}
+            onNoAccionChange={visitaMarca.setNoAccion}
+            motivo={visitaMarca.motivo}
+            onMotivoChange={visitaMarca.setMotivo}
+          />
+        </div>
+      ) : null}
 
       <div className="col-span-1 flex flex-col items-end gap-2 lg:col-start-2">
         {message && <p className={`text-sm ${messageToneClass}`}>{message}</p>}
