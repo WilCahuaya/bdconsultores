@@ -32,15 +32,18 @@ interface CachedToken {
 const cache = new Map<string, CachedToken>();
 const inflight = new Map<string, Promise<string>>();
 
-export async function getAccessToken(row: SunatCredencialSecreto): Promise<string> {
-  const cacheKey = `${row.ruc}:${row.usuarioSol}:${row.clientId}`;
+export async function getAccessToken(
+  row: SunatCredencialSecreto,
+  scope: string = SCOPE,
+): Promise<string> {
+  const cacheKey = `${scope}:${row.ruc}:${row.usuarioSol}:${row.clientId}`;
   const hit = cache.get(cacheKey);
   if (hit && hit.expiresAt > Date.now()) return hit.accessToken;
 
   const pending = inflight.get(cacheKey);
   if (pending) return pending;
 
-  const promise = requestToken(row)
+  const promise = requestToken(row, scope)
     .then((token) => {
       cache.set(cacheKey, token);
       return token.accessToken;
@@ -51,12 +54,12 @@ export async function getAccessToken(row: SunatCredencialSecreto): Promise<strin
   return promise;
 }
 
-async function requestToken(row: SunatCredencialSecreto): Promise<CachedToken> {
+async function requestToken(row: SunatCredencialSecreto, scope: string): Promise<CachedToken> {
   const claveSol = decryptString(row.claveSolCifrada, row.entidadId);
   const clientSecret = decryptString(row.clientSecretCifrado, row.entidadId);
   const body = new URLSearchParams({
     grant_type: "password",
-    scope: SCOPE,
+    scope,
     client_id: row.clientId,
     client_secret: clientSecret,
     username: `${row.ruc}${row.usuarioSol}`,

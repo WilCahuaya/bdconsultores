@@ -40,6 +40,7 @@ export async function GET(request: Request) {
         periodo,
         empresa: datos.empresa ?? "",
         rucEmpresa: datos.rucEmpresa ?? "",
+        aviso: "El detalle de lo comprado se arma en el PDF de cada fila, que consulta el XML en SUNAT.",
       }),
     })),
   );

@@ -9,6 +9,8 @@ export interface CompraRce {
   razonSocialEmisor: string | null;
   fechaEmision: string | null;
   moneda: string | null;
+  base: number | null;
+  igv: number | null;
   total: number | null;
   car: string | null;
 }
@@ -17,14 +19,16 @@ const TIPOS = new Set<string>(["01", "02", "03"]);
 
 /** Columnas del TXT de propuesta RCE que publica SUNAT, separadas por |. */
 const COL = {
-  ruc: 0,
-  razon: 1,
   car: 3,
   fecha: 4,
   tipo: 6,
   serie: 7,
   numero: 9,
   numeroFinal: 10,
+  ruc: 12,
+  razon: 13,
+  base: 14,
+  igv: 15,
   total: 24,
   moneda: 25,
 } as const;
@@ -51,6 +55,8 @@ export function parseRce(contenido: string): CompraRce[] {
       razonSocialEmisor: (cols[COL.razon] ?? "").trim() || null,
       fechaEmision: toIso(cols[COL.fecha] ?? ""),
       moneda: (cols[COL.moneda] ?? "").trim() || null,
+      base: toNumber(cols[COL.base] ?? ""),
+      igv: toNumber(cols[COL.igv] ?? ""),
       total: toNumber(cols[COL.total] ?? ""),
       car: (cols[COL.car] ?? "").trim() || null,
     });

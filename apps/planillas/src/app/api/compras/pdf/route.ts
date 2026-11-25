@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { compraSunatParaPdf } from "@/lib/actions/compras-sunat";
+import { prepararPdfCompra } from "@/lib/actions/compras-sunat";
 import { nombrePdf, pdfCompra } from "@/lib/sunat/pdf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id")?.trim() ?? "";
   if (!id) return NextResponse.json({ error: "Falta el comprobante." }, { status: 400 });
 
-  const datos = await compraSunatParaPdf(id);
+  const datos = await prepararPdfCompra(id);
   if (datos.error || !datos.compra) {
     return NextResponse.json({ error: datos.error ?? "No se pudo armar el PDF." }, { status: 400 });
   }
@@ -24,10 +25,14 @@ export async function GET(request: Request) {
     razonSocialEmisor: compra.razon_social_emisor,
     fechaEmision: compra.fecha_emision,
     moneda: compra.moneda,
+    base: datos.base,
+    igv: datos.igv,
     total: compra.total,
     periodo: compra.periodo,
     empresa: compra.empresa,
     rucEmpresa: compra.rucEmpresa,
+    detalle: datos.detalle,
+    aviso: datos.aviso,
   });
   const filename = nombrePdf({
     tipo: compra.tipo,

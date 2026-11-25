@@ -133,7 +133,7 @@ async function leerArchivo(
   return { numTicket, nombreArchivo: nombre, contenido, texto: textoDeArchivo(contenido) };
 }
 
-function textoDeArchivo(contenido: Buffer): string {
+export function textoDeArchivo(contenido: Buffer): string {
   if (contenido.length >= 2 && contenido[0] === 0x50 && contenido[1] === 0x4b) {
     const files = unzipSync(new Uint8Array(contenido));
     const name = Object.keys(files).find((item) => /\.(txt|csv)$/i.test(item)) ?? Object.keys(files)[0];

@@ -6,9 +6,11 @@ import { requirePlanillasProfile } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
 import { decryptString, encryptString } from "@/lib/sunat/crypto";
 import { SunatError, SunatTicketPendienteError } from "@/lib/sunat/errors";
-import { parseRce } from "@/lib/sunat/parse-rce";
-import { descargarPropuestaRce } from "@/lib/sunat/sire";
+import { parseRce, type CompraRce } from "@/lib/sunat/parse-rce";
+import { descargarPropuestaRce, textoDeArchivo } from "@/lib/sunat/sire";
 import type { SunatCredencialSecreto } from "@/lib/sunat/auth";
+import { descargarXmlRecibido } from "@/lib/sunat/cpe";
+import { parseUbl, type ComprobanteUbl } from "@/lib/sunat/ubl";
 
 export interface CredencialSunatVista {
   configurada: boolean;
@@ -152,7 +154,12 @@ export async function listarComprasSunat(entidadId: string, periodo: string): Pr
     .order("serie", { ascending: true })
     .order("numero", { ascending: true });
   if (error) throw new Error(error.message);
-  return (data ?? []).map(normalizarCompra);
+  const filas = (data ?? []).map(normalizarCompra);
+  try {
+    return await corregirEmisores(supabase, entidadId, periodo, filas);
+  } catch {
+    return filas;
+  }
 }
 
 export async function estadoDescargaSunat(entidadId: string, periodo: string): Promise<DescargaSunatVista | null> {
@@ -297,9 +304,64 @@ export async function descargarComprasSunat(
   }
 }
 
-export async function compraSunatParaPdf(id: string): Promise<{
+export async function prepararPdfCompra(id: string): Promise<{
   error?: string;
   compra?: CompraSunatFila & { periodo: string; empresa: string; rucEmpresa: string };
+  base?: number | null;
+  igv?: number | null;
+  detalle?: ComprobanteUbl | null;
+  aviso?: string | null;
+}> {
+  const datos = await compraSunatParaPdf(id);
+  if (datos.error || !datos.compra) return { error: datos.error ?? "No se encontró el comprobante." };
+  const compra = datos.compra;
+  const supabase = await createClient();
+  const registro = await lineaDeRegistro(supabase, compra.entidadId, compra.periodo, compra);
+  if (registro && (registro.rucEmisor !== compra.ruc_emisor || registro.razonSocialEmisor !== compra.razon_social_emisor)) {
+    compra.ruc_emisor = registro.rucEmisor;
+    compra.razon_social_emisor = registro.razonSocialEmisor;
+    await supabase
+      .from("sunat_compras")
+      .update({ ruc_emisor: registro.rucEmisor, razon_social_emisor: registro.razonSocialEmisor })
+      .eq("id", compra.id);
+  }
+
+  const guardado = await xmlGuardado(supabase, compra);
+  let xml = guardado;
+  let aviso: string | null = null;
+  if (!xml && compra.ruc_emisor) {
+    const cred = await credencialSecreta(supabase, compra.entidadId);
+    if (cred) {
+      const bajado = await descargarXmlRecibido(cred, {
+        rucEmisor: compra.ruc_emisor,
+        tipo: compra.tipo,
+        serie: compra.serie,
+        numero: compra.numero,
+      }).catch(() => ({ xml: null, aviso: "SUNAT no respondió al pedir el XML." }));
+      xml = bajado.xml;
+      aviso = bajado.aviso;
+      if (xml) await guardarXml(supabase, compra, xml);
+    } else {
+      aviso = "Falta la credencial SOL para pedir el detalle a SUNAT.";
+    }
+  }
+
+  const detalle = xml ? parseUbl(xml) : null;
+  if (detalle?.esResumen) {
+    aviso = "Este comprobante se informó en un resumen diario y SUNAT no entrega el detalle de cada ítem.";
+  }
+  return {
+    compra,
+    base: registro?.base ?? null,
+    igv: registro?.igv ?? null,
+    detalle: detalle && (detalle.lineas.length > 0 || detalle.emisorNombre) ? detalle : null,
+    aviso,
+  };
+}
+
+export async function compraSunatParaPdf(id: string): Promise<{
+  error?: string;
+  compra?: CompraSunatFila & { periodo: string; empresa: string; rucEmpresa: string; entidadId: string };
 }> {
   const acceso = await exigirEstudio();
   if (!acceso.profile) return { error: acceso.error ?? "Sin permiso." };
@@ -321,7 +383,115 @@ export async function compraSunatParaPdf(id: string): Promise<{
       periodo: data.periodo as string,
       empresa: (entidad?.nombre as string) ?? "",
       rucEmpresa: (entidad?.ruc as string) ?? "",
+      entidadId: data.entidad_id as string,
     },
+  };
+}
+
+async function corregirEmisores(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entidadId: string,
+  periodo: string,
+  filas: CompraSunatFila[],
+): Promise<CompraSunatFila[]> {
+  const { data: entidad } = await supabase.from("entidades").select("ruc").eq("id", entidadId).maybeSingle();
+  const ruc = String(entidad?.ruc ?? "");
+  if (!ruc || !filas.some((fila) => fila.ruc_emisor === ruc)) return filas;
+  const lineas = await leerPropuesta(supabase, entidadId, periodo);
+  if (!lineas) return filas;
+  const porClave = new Map(lineas.map((linea) => [claveCompra(linea.tipo, linea.serie, linea.numero), linea]));
+  await Promise.all(
+    filas.map(async (fila) => {
+      const fresco = porClave.get(claveCompra(fila.tipo, fila.serie, fila.numero));
+      if (!fresco || (fresco.rucEmisor === fila.ruc_emisor && fresco.razonSocialEmisor === fila.razon_social_emisor)) return;
+      fila.ruc_emisor = fresco.rucEmisor;
+      fila.razon_social_emisor = fresco.razonSocialEmisor;
+      await supabase
+        .from("sunat_compras")
+        .update({ ruc_emisor: fresco.rucEmisor, razon_social_emisor: fresco.razonSocialEmisor })
+        .eq("id", fila.id);
+    }),
+  );
+  return filas;
+}
+
+async function lineaDeRegistro(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entidadId: string,
+  periodo: string,
+  compra: Pick<CompraSunatFila, "tipo" | "serie" | "numero">,
+): Promise<CompraRce | null> {
+  const lineas = await leerPropuesta(supabase, entidadId, periodo);
+  if (!lineas) return null;
+  return lineas.find((linea) => claveCompra(linea.tipo, linea.serie, linea.numero) === claveCompra(compra.tipo, compra.serie, compra.numero)) ?? null;
+}
+
+async function leerPropuesta(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entidadId: string,
+  periodo: string,
+): Promise<CompraRce[] | null> {
+  const { data: descarga } = await supabase
+    .from("sunat_descargas")
+    .select("archivo_path")
+    .eq("entidad_id", entidadId)
+    .eq("periodo", periodo)
+    .maybeSingle();
+  const path = (descarga?.archivo_path as string | null) ?? null;
+  if (!path) return null;
+  const { data, error } = await supabase.storage.from("sunat-compras").download(path);
+  if (error || !data) return null;
+  return parseRce(textoDeArchivo(Buffer.from(await data.arrayBuffer())));
+}
+
+function claveCompra(tipo: string, serie: string, numero: string): string {
+  return `${tipo}|${serie}|${numero}`;
+}
+
+function rutaXml(compra: { entidadId: string; periodo: string; tipo: string; serie: string; numero: string }): string {
+  const serie = compra.serie.replace(/[^\w.-]+/g, "_") || "SIN-SERIE";
+  const numero = compra.numero.replace(/[^\w.-]+/g, "_");
+  return `${compra.entidadId}/${compra.periodo}/xml/${compra.tipo}-${serie}-${numero}.xml`;
+}
+
+async function xmlGuardado(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  compra: { entidadId: string; periodo: string; tipo: string; serie: string; numero: string },
+): Promise<string | null> {
+  const { data, error } = await supabase.storage.from("sunat-compras").download(rutaXml(compra));
+  if (error || !data) return null;
+  const texto = Buffer.from(await data.arrayBuffer()).toString("utf8");
+  return texto.includes("<") ? texto : null;
+}
+
+async function guardarXml(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  compra: { entidadId: string; periodo: string; tipo: string; serie: string; numero: string },
+  xml: string,
+): Promise<void> {
+  await supabase.storage.from("sunat-compras").upload(rutaXml(compra), Buffer.from(xml), {
+    contentType: "application/octet-stream",
+    upsert: true,
+  });
+}
+
+async function credencialSecreta(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entidadId: string,
+): Promise<SunatCredencialSecreto | null> {
+  const { data } = await supabase
+    .from("sunat_credenciales")
+    .select("ruc, usuario_sol, client_id, clave_sol_cifrada, client_secret_cifrado")
+    .eq("entidad_id", entidadId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    entidadId,
+    ruc: data.ruc as string,
+    usuarioSol: data.usuario_sol as string,
+    clientId: data.client_id as string,
+    claveSolCifrada: data.clave_sol_cifrada as string,
+    clientSecretCifrado: data.client_secret_cifrado as string,
   };
 }
 

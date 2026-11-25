@@ -138,7 +138,7 @@ export function ComprasSunatPanel({
         </div>
         {descarga?.mensaje ? <p className="text-sm text-muted-foreground">{descarga.mensaje}</p> : null}
         <p className="text-sm text-muted-foreground">
-          Entran facturas, boletas electrónicas y recibos por honorarios. El PDF es un resumen para la computadora; el XML del emisor no viene en esta descarga.
+          Entran facturas, boletas electrónicas y recibos por honorarios. El PDF de una fila pide el XML a SUNAT y lista lo que se compró. El ZIP del mes no consulta cada XML.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
