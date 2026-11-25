@@ -3,6 +3,7 @@ export interface LineaComprobante {
   unidad: string;
   descripcion: string;
   valorUnitario: string;
+  descuento: string;
   importe: string;
 }
 
@@ -16,6 +17,7 @@ export interface ComprobanteUbl {
   clienteNombre: string;
   clienteRuc: string;
   clienteDireccion: string;
+  observacion: string;
   lineas: LineaComprobante[];
   gravado: string | null;
   igv: string | null;
@@ -49,6 +51,7 @@ export function parseUbl(xml: string): ComprobanteUbl | null {
     clienteNombre: texto(cliente, "RegistrationName") || texto(cliente, "Name"),
     clienteRuc: documento(cliente),
     clienteDireccion: direccion(cliente),
+    observacion: notas(cabeza).find((nota) => !/^son\b/i.test(nota)) ?? "",
     lineas: lineas.filter((linea) => linea.descripcion || linea.importe),
     gravado: texto(monetario, "LineExtensionAmount") || null,
     igv: texto(impuesto, "TaxAmount") || null,
@@ -65,8 +68,27 @@ function lineaDe(xml: string): LineaComprobante {
     unidad: atributo(xml, "InvoicedQuantity", "unitCode") || atributo(xml, "CreditedQuantity", "unitCode"),
     descripcion: texto(item, "Description"),
     valorUnitario: texto(precio, "PriceAmount"),
+    descuento: descuentoDe(xml),
     importe: texto(xml, "LineExtensionAmount"),
   };
+}
+
+function descuentoDe(xml: string): string {
+  let total = 0;
+  let hubo = false;
+  for (const cargo of bloques(xml, "AllowanceCharge")) {
+    if (texto(cargo, "ChargeIndicator").toLowerCase() === "true") continue;
+    const monto = Number(texto(cargo, "Amount"));
+    if (!Number.isFinite(monto)) continue;
+    total += monto;
+    hubo = true;
+  }
+  return hubo ? total.toFixed(2) : "0.00";
+}
+
+function notas(xml: string): string[] {
+  const re = /<(?:[\w.-]+:)?Note\b[^>]*>([^<]*)<\/(?:[\w.-]+:)?Note>/gi;
+  return [...xml.matchAll(re)].map((match) => decodificar(match[1] ?? "").trim()).filter(Boolean);
 }
 
 function documento(party: string): string {
@@ -82,9 +104,14 @@ function documento(party: string): string {
 
 function direccion(party: string): string {
   const domicilio = bloque(party, "RegistrationAddress") || bloque(party, "PostalAddress");
-  return [texto(domicilio, "Line"), texto(domicilio, "CityName"), texto(domicilio, "District")]
+  return [
+    texto(domicilio, "Line"),
+    texto(domicilio, "CitySubdivisionName"),
+    texto(domicilio, "District"),
+    texto(domicilio, "CityName"),
+  ]
     .filter(Boolean)
-    .join(", ");
+    .join(" ");
 }
 
 function bloque(xml: string, local: string): string {
