@@ -9,6 +9,7 @@ export interface CompraRce {
   razonSocialEmisor: string | null;
   fechaEmision: string | null;
   moneda: string | null;
+  tipoCambio: number | null;
   base: number | null;
   igv: number | null;
   total: number | null;
@@ -29,8 +30,13 @@ const COL = {
   razon: 13,
   base: 14,
   igv: 15,
+  baseDgng: 16,
+  igvDgng: 17,
+  baseDng: 18,
+  igvDng: 19,
   total: 24,
   moneda: 25,
+  tipoCambio: 26,
 } as const;
 
 export function parseRce(contenido: string): CompraRce[] {
@@ -55,8 +61,9 @@ export function parseRce(contenido: string): CompraRce[] {
       razonSocialEmisor: (cols[COL.razon] ?? "").trim() || null,
       fechaEmision: toIso(cols[COL.fecha] ?? ""),
       moneda: (cols[COL.moneda] ?? "").trim() || null,
-      base: toNumber(cols[COL.base] ?? ""),
-      igv: toNumber(cols[COL.igv] ?? ""),
+      tipoCambio: toNumber(cols[COL.tipoCambio] ?? ""),
+      base: suma(toNumber(cols[COL.base] ?? ""), toNumber(cols[COL.baseDgng] ?? ""), toNumber(cols[COL.baseDng] ?? "")),
+      igv: suma(toNumber(cols[COL.igv] ?? ""), toNumber(cols[COL.igvDgng] ?? ""), toNumber(cols[COL.igvDng] ?? "")),
       total: toNumber(cols[COL.total] ?? ""),
       car: (cols[COL.car] ?? "").trim() || null,
     });
@@ -117,4 +124,10 @@ function toNumber(value: string): number | null {
     : text.replace(/,/g, "");
   const amount = Number(normalized);
   return Number.isFinite(amount) ? amount : null;
+}
+
+function suma(...valores: Array<number | null>): number | null {
+  const numeros = valores.filter((valor): valor is number => valor != null);
+  if (numeros.length === 0) return null;
+  return Math.round(numeros.reduce((total, valor) => total + valor, 0) * 100) / 100;
 }

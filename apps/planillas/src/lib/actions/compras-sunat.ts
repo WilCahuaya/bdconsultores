@@ -9,7 +9,7 @@ import { SunatError, SunatTicketPendienteError } from "@/lib/sunat/errors";
 import { parseRce, type CompraRce } from "@/lib/sunat/parse-rce";
 import { descargarPropuestaRce, textoDeArchivo } from "@/lib/sunat/sire";
 import type { SunatCredencialSecreto } from "@/lib/sunat/auth";
-import { descargarXmlRecibido } from "@/lib/sunat/cpe";
+import { descargarXmlRecibido, descargarCdrRecibido } from "@/lib/sunat/cpe";
 import { parseUbl, type ComprobanteUbl } from "@/lib/sunat/ubl";
 
 export interface CredencialSunatVista {
@@ -29,7 +29,11 @@ export interface CompraSunatFila {
   razon_social_emisor: string | null;
   fecha_emision: string | null;
   moneda: string | null;
+  tipo_cambio: number | null;
+  base: number | null;
+  igv: number | null;
   total: number | null;
+  estado: string;
 }
 
 export interface DescargaSunatVista {
@@ -42,8 +46,20 @@ const SELECT_COMPRA =
   "id, tipo, serie, numero, numero_final, ruc_emisor, razon_social_emisor, fecha_emision, moneda, total";
 
 function normalizarCompra(row: CompraSunatFila): CompraSunatFila {
-  const total = row.total == null ? null : Number(row.total);
-  return { ...row, total: total != null && Number.isFinite(total) ? total : null };
+  return {
+    ...row,
+    total: monto(row.total),
+    base: monto(row.base),
+    igv: monto(row.igv),
+    tipo_cambio: monto(row.tipo_cambio),
+    estado: row.estado || "ACEPTADO",
+  };
+}
+
+function monto(valor: number | null | undefined): number | null {
+  if (valor == null) return null;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : null;
 }
 
 async function exigirEstudio() {
@@ -154,9 +170,17 @@ export async function listarComprasSunat(entidadId: string, periodo: string): Pr
     .order("serie", { ascending: true })
     .order("numero", { ascending: true });
   if (error) throw new Error(error.message);
-  const filas = (data ?? []).map(normalizarCompra);
+  const filas = (data ?? []).map((row) =>
+    normalizarCompra({
+      ...(row as CompraSunatFila),
+      base: null,
+      igv: null,
+      tipo_cambio: null,
+      estado: "ACEPTADO",
+    }),
+  );
   try {
-    return await corregirEmisores(supabase, entidadId, periodo, filas);
+    return await completarFilas(supabase, entidadId, periodo, filas);
   } catch {
     return filas;
   }
@@ -388,22 +412,23 @@ export async function compraSunatParaPdf(id: string): Promise<{
   };
 }
 
-async function corregirEmisores(
+async function completarFilas(
   supabase: Awaited<ReturnType<typeof createClient>>,
   entidadId: string,
   periodo: string,
   filas: CompraSunatFila[],
 ): Promise<CompraSunatFila[]> {
-  const { data: entidad } = await supabase.from("entidades").select("ruc").eq("id", entidadId).maybeSingle();
-  const ruc = String(entidad?.ruc ?? "");
-  if (!ruc || !filas.some((fila) => fila.ruc_emisor === ruc)) return filas;
   const lineas = await leerPropuesta(supabase, entidadId, periodo);
   if (!lineas) return filas;
   const porClave = new Map(lineas.map((linea) => [claveCompra(linea.tipo, linea.serie, linea.numero), linea]));
   await Promise.all(
     filas.map(async (fila) => {
       const fresco = porClave.get(claveCompra(fila.tipo, fila.serie, fila.numero));
-      if (!fresco || (fresco.rucEmisor === fila.ruc_emisor && fresco.razonSocialEmisor === fila.razon_social_emisor)) return;
+      if (!fresco) return;
+      fila.base = fresco.base;
+      fila.igv = fresco.igv;
+      fila.tipo_cambio = fresco.tipoCambio ?? (fila.moneda === "PEN" ? 1 : null);
+      if (fresco.rucEmisor === fila.ruc_emisor && fresco.razonSocialEmisor === fila.razon_social_emisor) return;
       fila.ruc_emisor = fresco.rucEmisor;
       fila.razon_social_emisor = fresco.razonSocialEmisor;
       await supabase
@@ -492,6 +517,71 @@ async function credencialSecreta(
     clientId: data.client_id as string,
     claveSolCifrada: data.clave_sol_cifrada as string,
     clientSecretCifrado: data.client_secret_cifrado as string,
+  };
+}
+
+function rutaCdr(compra: { entidadId: string; periodo: string; tipo: string; serie: string; numero: string }): string {
+  return rutaXml(compra).replace(/\.xml$/, ".cdr");
+}
+
+export async function archivoCompraSunat(
+  id: string,
+  clase: "xml" | "cdr",
+): Promise<{ error?: string; filename?: string; contentType?: string; bytes?: Uint8Array }> {
+  const datos = await compraSunatParaPdf(id);
+  if (datos.error || !datos.compra) return { error: datos.error ?? "No se encontró el comprobante." };
+  const compra = datos.compra;
+  const supabase = await createClient();
+  const registro = await lineaDeRegistro(supabase, compra.entidadId, compra.periodo, compra);
+  if (registro?.rucEmisor) compra.ruc_emisor = registro.rucEmisor;
+  if (!compra.ruc_emisor) return { error: "Falta el RUC del proveedor." };
+  const cred = await credencialSecreta(supabase, compra.entidadId);
+  if (!cred) return { error: "Falta la credencial SOL." };
+  const pedido = {
+    rucEmisor: compra.ruc_emisor,
+    tipo: compra.tipo,
+    serie: compra.serie,
+    numero: compra.numero,
+  };
+  const base = `${compra.tipo}-${compra.serie || "SIN-SERIE"}-${compra.numero}`.replace(/[^\w.-]+/g, "_");
+
+  if (clase === "xml") {
+    let xml = await xmlGuardado(supabase, compra);
+    if (!xml) {
+      const bajado = await descargarXmlRecibido(cred, pedido).catch(() => ({
+        xml: null,
+        aviso: "SUNAT no respondió al pedir el XML.",
+      }));
+      xml = bajado.xml;
+      if (!xml) return { error: bajado.aviso ?? "SUNAT no entregó el XML." };
+      await guardarXml(supabase, compra, xml);
+    }
+    return { filename: `${base}.xml`, contentType: "application/xml", bytes: Buffer.from(xml) };
+  }
+
+  const guardado = await supabase.storage.from("sunat-compras").download(rutaCdr(compra));
+  if (guardado.data) {
+    const bytes = new Uint8Array(await guardado.data.arrayBuffer());
+    return archivoCdr(base, bytes);
+  }
+  const bajado = await descargarCdrRecibido(cred, pedido).catch(() => ({
+    bytes: null,
+    aviso: "SUNAT no respondió al pedir el CDR.",
+  }));
+  if (!bajado.bytes) return { error: bajado.aviso ?? "SUNAT no entregó el CDR." };
+  await supabase.storage.from("sunat-compras").upload(rutaCdr(compra), bajado.bytes, {
+    contentType: "application/octet-stream",
+    upsert: true,
+  });
+  return archivoCdr(base, bajado.bytes);
+}
+
+function archivoCdr(base: string, bytes: Uint8Array): { filename: string; contentType: string; bytes: Uint8Array } {
+  const zip = bytes[0] === 0x50 && bytes[1] === 0x4b;
+  return {
+    filename: `${base}.cdr.${zip ? "zip" : "xml"}`,
+    contentType: zip ? "application/zip" : "application/xml",
+    bytes,
   };
 }
 

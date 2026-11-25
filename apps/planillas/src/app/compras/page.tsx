@@ -61,6 +61,7 @@ export default async function ComprasSunatPage({
             periodo={periodo}
             compras={compras}
             descarga={descarga}
+            empresaNombre={entidades.find((entidad) => entidad.id === selectedId)?.nombre ?? ""}
           />
         )}
       </div>

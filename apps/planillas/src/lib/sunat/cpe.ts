@@ -31,15 +31,7 @@ export async function descargarXmlRecibido(
 
   const numero = compra.numero.replace(/^0+(?=\d)/, "");
   const serie = encodeURIComponent(compra.serie);
-  const id = `${compra.rucEmisor}-${compra.tipo}-${serie}-${numero}`;
-  const base = "https://api-cpe.sunat.gob.pe/v1/contribuyente/consultacpe";
-  const urls = [
-    `${base}/${compra.rucEmisor}/${compra.tipo}/${serie}/${numero}/2/02`,
-    `${base}/${compra.rucEmisor}/${compra.tipo}/${serie}/${numero}/11/02`,
-    `${base}/comprobantes/${id}/02`,
-    `${base}/comprobantes/${id}`,
-    `${base}/${compra.rucEmisor}/${compra.tipo}/${serie}/${numero}`,
-  ];
+  const urls = urlsConsulta(compra.rucEmisor, compra.tipo, serie, numero, "02");
   const orden = plantillaOk == null ? urls.map((_, index) => index) : [plantillaOk];
 
   let aviso = AVISO_SIN_XML;
@@ -71,6 +63,41 @@ export async function descargarXmlRecibido(
 
   if (plantillaOk == null && soloNoEncontrado) sinXmlHasta = Date.now() + 10 * 60_000;
   return { xml: null, aviso };
+}
+
+export async function descargarCdrRecibido(
+  cred: SunatCredencialSecreto,
+  compra: { rucEmisor: string; tipo: string; serie: string; numero: string },
+): Promise<{ bytes: Uint8Array | null; aviso: string | null }> {
+  if (!/^\d{11}$/.test(compra.rucEmisor)) {
+    return { bytes: null, aviso: "El registro no trae el RUC del proveedor." };
+  }
+  const token = await tokenDeConsulta(cred);
+  if (!token) return { bytes: null, aviso: "SUNAT no autorizó la consulta del CDR." };
+  const numero = compra.numero.replace(/^0+(?=\d)/, "");
+  const serie = encodeURIComponent(compra.serie);
+  for (const url of urlsConsulta(compra.rucEmisor, compra.tipo, serie, numero, "03")) {
+    const res = await pedirUna(url, token);
+    if (!res.ok) continue;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    if (buf.length < 8) continue;
+    const esZip = buf[0] === 0x50 && buf[1] === 0x4b;
+    const texto = new TextDecoder().decode(buf.slice(0, 200));
+    if (esZip || texto.includes("<")) return { bytes: buf, aviso: null };
+  }
+  return { bytes: null, aviso: "SUNAT no entregó el CDR de este comprobante." };
+}
+
+function urlsConsulta(emisor: string, tipo: string, serie: string, numero: string, archivo: "02" | "03"): string[] {
+  const id = `${emisor}-${tipo}-${serie}-${numero}`;
+  const base = "https://api-cpe.sunat.gob.pe/v1/contribuyente/consultacpe";
+  return [
+    `${base}/${emisor}/${tipo}/${serie}/${numero}/2/${archivo}`,
+    `${base}/${emisor}/${tipo}/${serie}/${numero}/11/${archivo}`,
+    `${base}/comprobantes/${id}/${archivo}`,
+    `${base}/comprobantes/${id}`,
+    `${base}/${emisor}/${tipo}/${serie}/${numero}`,
+  ];
 }
 
 function mensajeSunat(texto: string): string | null {

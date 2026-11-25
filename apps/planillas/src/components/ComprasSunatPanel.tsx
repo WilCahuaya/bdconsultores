@@ -6,6 +6,7 @@ import { Button, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
 import { webAppById } from "@bd/config";
 import { Field } from "@/components/fields";
+import { ComprasDetalleDialog } from "@/components/ComprasDetalleDialog";
 import {
   descargarComprasSunat,
   guardarCredencialSunat,
@@ -14,29 +15,26 @@ import {
   type DescargaSunatVista,
 } from "@/lib/actions/compras-sunat";
 
-const TIPO: Record<CompraSunatFila["tipo"], string> = {
-  "01": "Factura",
-  "02": "Recibo por honorarios",
-  "03": "Boleta electrónica",
-};
-
 export function ComprasSunatPanel({
   entidadId,
   credencial,
   periodo,
   compras,
   descarga,
+  empresaNombre,
 }: {
   entidadId: string;
   credencial: CredencialSunatVista;
   periodo: string;
   compras: CompraSunatFila[];
   descarga: DescargaSunatVista | null;
+  empresaNombre: string;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [guardando, setGuardando] = useState(false);
   const [descargando, setDescargando] = useState(false);
+  const [seleccion, setSeleccion] = useState<CompraSunatFila | null>(null);
   const mes = `${periodo.slice(0, 4)}-${periodo.slice(4, 6)}`;
   const api = webAppById("planillas").basePath;
 
@@ -138,52 +136,65 @@ export function ComprasSunatPanel({
         </div>
         {descarga?.mensaje ? <p className="text-sm text-muted-foreground">{descarga.mensaje}</p> : null}
         <p className="text-sm text-muted-foreground">
-          Entran facturas, boletas electrónicas y recibos por honorarios. El PDF de una fila pide el XML a SUNAT y lista lo que se compró. El ZIP del mes no consulta cada XML.
+          Elija una fila para ver el detalle. Desde ahí se descarga el PDF, el XML y el CDR.
         </p>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-sm">
-            <thead className="border-b text-muted-foreground">
+          <table className="w-full min-w-[1100px] text-left text-sm">
+            <thead className="border-b text-xs text-muted-foreground">
               <tr>
+                <th className="px-2 py-2 font-medium">F. emisión</th>
+                <th className="px-2 py-2 font-medium">Nro. RUC</th>
+                <th className="px-2 py-2 font-medium">Razón social</th>
                 <th className="px-2 py-2 font-medium">Tipo</th>
-                <th className="px-2 py-2 font-medium">Serie y número</th>
-                <th className="px-2 py-2 font-medium">Emisor</th>
-                <th className="px-2 py-2 font-medium">Fecha</th>
-                <th className="px-2 py-2 font-medium text-right">Total</th>
-                <th className="px-2 py-2 font-medium" />
+                <th className="px-2 py-2 font-medium">Serie</th>
+                <th className="px-2 py-2 font-medium">Número</th>
+                <th className="px-2 py-2 font-medium">Mon.</th>
+                <th className="px-2 py-2 text-right font-medium">T.C.</th>
+                <th className="px-2 py-2 text-right font-medium">Gravada</th>
+                <th className="px-2 py-2 text-right font-medium">IGV</th>
+                <th className="px-2 py-2 text-right font-medium">Total</th>
+                <th className="px-2 py-2 font-medium">Estado</th>
               </tr>
             </thead>
             <tbody>
               {compras.length === 0 ? (
                 <tr>
-                  <td className="px-2 py-8 text-muted-foreground" colSpan={6}>
+                  <td className="px-2 py-8 text-muted-foreground" colSpan={12}>
                     Todavía no hay comprobantes de este mes.
                   </td>
                 </tr>
               ) : (
                 compras.map((compra) => (
-                  <tr key={compra.id} className="border-b last:border-0">
-                    <td className="px-2 py-2">{TIPO[compra.tipo]}</td>
-                    <td className="px-2 py-2 font-mono">
-                      {compra.serie} {compra.numero}
-                      {compra.numero_final ? `–${compra.numero_final}` : ""}
-                    </td>
-                    <td className="px-2 py-2">
-                      <div>{compra.razon_social_emisor || "—"}</div>
-                      <div className="font-mono text-xs text-muted-foreground">{compra.ruc_emisor}</div>
-                    </td>
-                    <td className="px-2 py-2">{fecha(compra.fecha_emision)}</td>
-                    <td className="px-2 py-2 text-right font-mono">{importe(compra.total, compra.moneda)}</td>
-                    <td className="px-2 py-2 text-right">
-                      <a className="text-sm font-medium text-primary hover:underline" href={`${api}/api/compras/pdf?id=${compra.id}`}>
-                        PDF
-                      </a>
-                    </td>
+                  <tr
+                    key={compra.id}
+                    className="cursor-pointer border-b last:border-0 hover:bg-muted/50"
+                    onClick={() => setSeleccion(compra)}
+                  >
+                    <td className="px-2 py-2 whitespace-nowrap">{fecha(compra.fecha_emision)}</td>
+                    <td className="px-2 py-2 font-mono">{compra.ruc_emisor || "—"}</td>
+                    <td className="px-2 py-2">{compra.razon_social_emisor || "—"}</td>
+                    <td className="px-2 py-2 font-mono">{compra.tipo}</td>
+                    <td className="px-2 py-2 font-mono">{compra.serie}</td>
+                    <td className="px-2 py-2 font-mono">{compra.numero.padStart(10, "0")}</td>
+                    <td className="px-2 py-2">{compra.moneda || "PEN"}</td>
+                    <td className="px-2 py-2 text-right font-mono">{cambio(compra.tipo_cambio, compra.moneda)}</td>
+                    <td className="px-2 py-2 text-right font-mono">{importe(compra.base)}</td>
+                    <td className="px-2 py-2 text-right font-mono">{importe(compra.igv)}</td>
+                    <td className="px-2 py-2 text-right font-mono">{importe(compra.total)}</td>
+                    <td className="px-2 py-2">{compra.estado}</td>
                   </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+        <ComprasDetalleDialog
+          compra={seleccion}
+          empresa={empresaNombre}
+          rucEmpresa={credencial.ruc}
+          api={api}
+          onClose={() => setSeleccion(null)}
+        />
       </section>
     </div>
   );
@@ -195,7 +206,13 @@ function fecha(iso: string | null): string {
   return match ? `${match[3]}/${match[2]}/${match[1]}` : iso;
 }
 
-function importe(total: number | null, moneda: string | null): string {
+function importe(total: number | null): string {
   if (total == null) return "—";
-  return `${moneda || "PEN"} ${total.toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const [entero, decimal] = total.toFixed(2).split(".");
+  return `${entero.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${decimal}`;
+}
+
+function cambio(tipoCambio: number | null, moneda: string | null): string {
+  const valor = tipoCambio ?? ((moneda || "PEN").toUpperCase() === "PEN" ? 1 : null);
+  return valor == null ? "—" : valor.toFixed(3);
 }
