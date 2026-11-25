@@ -214,6 +214,9 @@ importers:
       docx:
         specifier: ^9.7.1
         version: 9.7.1
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       mammoth:
         specifier: ^1.13.0
         version: 1.13.0

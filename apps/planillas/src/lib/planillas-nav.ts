@@ -15,6 +15,7 @@ export function planillasNavSections(opts: {
   ];
   if (esEstudio) {
     tramites.push({ href: withEntidad("/vida-ley", entidadId), label: "Vida Ley", icon: "inventory" });
+    tramites.push({ href: withEntidad("/compras", entidadId), label: "Compras SUNAT", icon: "reports" });
   }
   tramites.push(
     { href: withEntidad("/asistencias", entidadId), label: "Asistencias", icon: "dashboard" },
