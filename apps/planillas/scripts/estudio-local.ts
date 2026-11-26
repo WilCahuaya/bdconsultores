@@ -1,8 +1,22 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { abrirNavegador } from "../src/lib/sunat/navegador";
 
 const envFile = new URL("../.env.local", import.meta.url);
-const sesionFile = new URL("../.sunat-session.json", import.meta.url);
+
+function archivoSesion(): string {
+  const marcada = process.env.SUNAT_SESION_FILE?.trim();
+  if (marcada) return marcada;
+  return fileURLToPath(new URL("../.sunat-session.json", import.meta.url));
+}
+
+function guardarSesion(tokens: { access_token: string; refresh_token: string }): void {
+  const archivo = archivoSesion();
+  mkdirSync(dirname(archivo), { recursive: true });
+  writeFileSync(archivo, JSON.stringify(tokens));
+}
 
 export function cargarEnv(): void {
   if (!existsSync(envFile)) return;
@@ -50,10 +64,7 @@ export async function renovarSesion(supabase: SupabaseClient): Promise<boolean> 
   if (!guardada) return false;
   const { data, error } = await supabase.auth.refreshSession({ refresh_token: guardada.refresh_token });
   if (error || !data.session) return false;
-  writeFileSync(
-    sesionFile,
-    JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }),
-  );
+  guardarSesion({ access_token: data.session.access_token, refresh_token: data.session.refresh_token });
   return true;
 }
 
@@ -62,18 +73,14 @@ export async function entrar(supabase: SupabaseClient, portal: string): Promise<
   if (guardada) {
     const { data, error } = await supabase.auth.refreshSession({ refresh_token: guardada.refresh_token });
     if (!error && data.session) {
-      writeFileSync(
-        sesionFile,
-        JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }),
-      );
+      guardarSesion({ access_token: data.session.access_token, refresh_token: data.session.refresh_token });
       return;
     }
   }
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({ headless: false });
+  const browser = await abrirNavegador();
   try {
     const page = await browser.newPage();
-    console.log(`Entra con Google en la ventana. ${portal}/login`);
+    console.log("Se abrió el navegador. Entra con la cuenta de Google del estudio. Cuando termines, se cierra solo.");
     await page.goto(`${portal}/login`, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {
       throw new Error(`No pude abrir ${portal}/login. Revisa la conexión de esta PC.`);
     });
@@ -87,16 +94,17 @@ export async function entrar(supabase: SupabaseClient, portal: string): Promise<
     if (!tokens) throw new Error("No se inició la sesión. Entra con la cuenta del estudio.");
     const { error } = await supabase.auth.setSession(tokens);
     if (error) throw new Error(error.message);
-    writeFileSync(sesionFile, JSON.stringify(tokens));
+    guardarSesion(tokens);
   } finally {
     await browser.close();
   }
 }
 
 function leerSesion(): { access_token: string; refresh_token: string } | null {
-  if (!existsSync(sesionFile)) return null;
+  const archivo = archivoSesion();
+  if (!existsSync(archivo)) return null;
   try {
-    const json = JSON.parse(readFileSync(sesionFile, "utf8")) as { access_token?: string; refresh_token?: string };
+    const json = JSON.parse(readFileSync(archivo, "utf8")) as { access_token?: string; refresh_token?: string };
     if (!json.access_token || !json.refresh_token) return null;
     return { access_token: json.access_token, refresh_token: json.refresh_token };
   } catch {

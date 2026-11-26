@@ -24,6 +24,11 @@ supabase/.temp/
 
 # Electron
 apps/desktop/release/
+apps/bajada-sunat/release/
+apps/bajada-sunat/bundle/
+apps/bajada-sunat/vendor/
+apps/bajada-sunat/browsers/
+apps/bajada-sunat/embebido.env
 
 # IDE
 .idea/

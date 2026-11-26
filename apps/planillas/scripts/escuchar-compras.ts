@@ -115,12 +115,20 @@ async function tomarPedido(): Promise<{ entidadId: string; periodo: string; ruc:
 }
 
 function correr(ruc: string, periodo: string): Promise<number> {
+  const script = process.env.BAJADA_BAJAR?.trim();
   return new Promise((resolve, reject) => {
-    const child = spawn("pnpm", ["sunat:bajar", "--", "--ruc", ruc, "--periodo", periodo, "--solo-xml"], {
-      cwd: repo,
-      stdio: "inherit",
-      shell: true,
-    });
+    const child = spawn(
+      script ? process.execPath : "pnpm",
+      script
+        ? [script, "--ruc", ruc, "--periodo", periodo, "--solo-xml"]
+        : ["sunat:bajar", "--", "--ruc", ruc, "--periodo", periodo, "--solo-xml"],
+      {
+        cwd: script ? undefined : repo,
+        stdio: "inherit",
+        shell: !script,
+        env: process.env,
+      },
+    );
     child.on("error", reject);
     child.on("exit", (codigo) => resolve(codigo ?? 1));
   });

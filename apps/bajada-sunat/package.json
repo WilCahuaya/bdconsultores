@@ -1,0 +1,62 @@
+{
+  "name": "@bd/bajada-sunat",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bajada SUNAT. PC de la oficina",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "start": "tsc -p tsconfig.json && electron .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:installer": "node scripts/empaquetar.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "electronVersion": "33.4.11",
+    "appId": "pe.bdconsultores.bajada-sunat",
+    "productName": "Bajada SUNAT",
+    "directories": {
+      "output": "release"
+    },
+    "npmRebuild": false,
+    "files": [
+      "dist-electron/**/*",
+      "index.html",
+      "embebido.env",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bundle",
+        "to": "bundle"
+      },
+      {
+        "from": "browsers",
+        "to": "browsers"
+      },
+      {
+        "from": "vendor/node_modules",
+        "to": "node_modules"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "Bajada-SUNAT-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bajada SUNAT"
+    }
+  }
+}

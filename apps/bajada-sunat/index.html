@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Bajada SUNAT</title>
+    <style>
+      :root {
+        color: #1c1915;
+        background: #f4f1ea;
+        font-family: "Segoe UI", sans-serif;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        padding: 22px 24px 8px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+        font-weight: 650;
+      }
+      p {
+        margin: 8px 0 0;
+        line-height: 1.45;
+        color: #4a433a;
+      }
+      .estado {
+        display: inline-block;
+        margin-top: 14px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #e7e1d6;
+        font-size: 13px;
+      }
+      .estado.escuchando { background: #d9ead3; }
+      .estado.bajando { background: #fce8b2; }
+      .estado.error, .estado.detenido { background: #f4c7c3; }
+      label {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin: 16px 24px 0;
+        font-size: 14px;
+      }
+      pre {
+        flex: 1;
+        margin: 16px 24px 24px;
+        padding: 14px;
+        overflow: auto;
+        border-radius: 12px;
+        background: #1c1915;
+        color: #f4f1ea;
+        font-family: Consolas, monospace;
+        font-size: 12.5px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Bajada SUNAT</h1>
+      <p>La primera vez se abre el navegador: entra con la cuenta de Google del estudio. Después deja esta ventana abierta. Si SUNAT muestra un captcha, escríbelo en ese navegador.</p>
+      <span id="estado" class="estado">Abriendo…</span>
+    </header>
+    <label>
+      <input id="inicio" type="checkbox" />
+      Abrir al iniciar Windows
+    </label>
+    <pre id="log"></pre>
+    <script>
+      const estado = document.getElementById("estado");
+      const log = document.getElementById("log");
+      const inicio = document.getElementById("inicio");
+      const textos = {
+        escuchando: "Escuchando pedidos",
+        bajando: "Bajando XML",
+        error: "El último pedido se detuvo",
+        detenido: "Detenido",
+      };
+      window.bajada.alEstado((valor) => {
+        estado.textContent = textos[valor] || valor;
+        estado.className = "estado " + valor;
+      });
+      window.bajada.alLinea((linea) => {
+        log.textContent += (log.textContent ? "\n" : "") + linea;
+        log.scrollTop = log.scrollHeight;
+      });
+      window.bajada.alIniciar().then((abrir) => {
+        inicio.checked = abrir;
+      });
+      inicio.addEventListener("change", () => {
+        window.bajada.fijarInicio(inicio.checked);
+      });
+    </script>
+  </body>
+</html>

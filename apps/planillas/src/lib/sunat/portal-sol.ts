@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { unzipSync, strFromU8 } from "fflate";
 import type { BrowserContext, Download, Frame, Locator, Page } from "playwright";
+import { abrirNavegador } from "./navegador";
 
 const LOGIN = "https://e-menu.sunat.gob.pe/cl-ti-itmenu/MenuInternet.htm";
 const MENU = ["Empresas", "Comprobantes de pago"];
@@ -29,8 +30,7 @@ export async function bajarFacturasSol(
   onUna: (factura: FacturaSol, archivos: ArchivosSol) => Promise<void>,
   log: (mensaje: string) => void,
 ): Promise<void> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({ headless: false });
+  const browser = await abrirNavegador();
   try {
     const context = await browser.newContext();
     await context.addInitScript(() => {
