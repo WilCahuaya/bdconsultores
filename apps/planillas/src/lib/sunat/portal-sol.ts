@@ -19,6 +19,7 @@ export interface FacturaSol {
 export interface ArchivosSol {
   xml: string | null;
   cdr: Uint8Array | null;
+  pdf: Uint8Array | null;
   aviso: string | null;
 }
 
@@ -33,7 +34,21 @@ export async function bajarFacturasSol(
   try {
     const context = await browser.newContext();
     await context.addInitScript(() => {
-      window.print = () => undefined;
+      const noop = () => undefined;
+      const bloquear = (ventana: Window) => {
+        try {
+          Object.defineProperty(ventana, "print", { configurable: true, writable: true, value: noop });
+        } catch {
+          ventana.print = noop;
+        }
+      };
+      bloquear(window);
+      const abrir = window.open.bind(window);
+      window.open = (...args: Parameters<Window["open"]>) => {
+        const hija = abrir(...args);
+        if (hija) bloquear(hija);
+        return hija;
+      };
     });
     const page = await context.newPage();
     vigilarImpresion(context, page);
@@ -50,7 +65,7 @@ export async function bajarFacturasSol(
         await onUna(factura, archivos);
       } catch (error) {
         const aviso = error instanceof Error ? error.message : "No se pudo consultar este comprobante.";
-        await onUna(factura, { xml: null, cdr: null, aviso });
+        await onUna(factura, { xml: null, cdr: null, pdf: null, aviso });
       }
       await page.waitForTimeout(2_000).catch(() => undefined);
       if (page.isClosed()) break;
@@ -217,29 +232,30 @@ async function abrirConsulta(page: Page, log: (mensaje: string) => void): Promis
 async function consultarUna(page: Page, factura: FacturaSol): Promise<ArchivosSol> {
   for (let intento = 0; intento < 2; intento++) {
     const frame = await esperarFrame(page, 15_000);
-    if (!frame) return { xml: null, cdr: null, aviso: "No está abierta la consulta de comprobantes." };
+    if (!frame) return { xml: null, cdr: null, pdf: null, aviso: "No está abierta la consulta de comprobantes." };
     const aviso = await buscar(page, frame, factura);
     if (aviso === "servidor" && intento === 0) {
       await page.waitForTimeout(20_000);
       continue;
     }
     if (aviso === "vacio") {
-      return { xml: null, cdr: null, aviso: "SUNAT no tiene el XML de este comprobante para quien lo recibió." };
+      return { xml: null, cdr: null, pdf: null, aviso: "SUNAT no tiene el XML de este comprobante para quien lo recibió." };
     }
-    if (aviso) return { xml: null, cdr: null, aviso };
+    if (aviso) return { xml: null, cdr: null, pdf: null, aviso };
     const xmlBajada = await bajar(page, frame, "XML");
     const cdrBajada = await bajar(page, frame, "CDR");
+    const xml = xmlBajada.bytes ? xmlDeArchivo(xmlBajada.bytes) : null;
+    const cdrBytes = cdrBajada.bytes;
+    const pdf = xml || cdrBytes ? null : await bajarRepresentacion(page, frame);
     await cerrarRepresentacionesAbiertas(page);
     await page.keyboard.press("Escape").catch(() => undefined);
     await cerrarResultado(frame);
-    const xmlBytes = xmlBajada.bytes;
-    const cdrBytes = cdrBajada.bytes;
-    const xml = xmlBytes ? xmlDeArchivo(xmlBytes) : null;
-    if (!xml && !cdrBytes) {
+    if (!xml && !cdrBytes && !pdf) {
       if (xmlBajada.previo || cdrBajada.previo) {
         return {
           xml: null,
           cdr: null,
+          pdf: null,
           aviso: "SUNAT ya había descargado este archivo y no lo volvió a enviar.",
         };
       }
@@ -247,13 +263,13 @@ async function consultarUna(page: Page, factura: FacturaSol): Promise<ArchivosSo
       console.log(`Resultado: ${texto.slice(0, 280)}`);
       await page.screenshot({ path: "C:/Users/Willl/AppData/Local/Temp/sunat-resultado.png" }).catch(() => undefined);
       if (/no hay resultados|no se encontr|sin resultado/i.test(texto)) {
-        return { xml: null, cdr: null, aviso: "SUNAT no tiene el XML de este comprobante para quien lo recibió." };
+        return { xml: null, cdr: null, pdf: null, aviso: "SUNAT no tiene el XML de este comprobante para quien lo recibió." };
       }
-      return { xml: null, cdr: null, aviso: "No encontré el XML en la respuesta de SUNAT." };
+      return { xml: null, cdr: null, pdf: null, aviso: "No encontré el XML en la respuesta de SUNAT." };
     }
-    return { xml, cdr: cdrBytes, aviso: xml ? null : "SUNAT entregó el CDR y no el XML." };
+    return { xml, cdr: cdrBytes, pdf, aviso: xml ? null : pdf ? null : "SUNAT entregó el CDR y no el XML." };
   }
-  return { xml: null, cdr: null, aviso: "SUNAT no respondió la consulta de este comprobante." };
+  return { xml: null, cdr: null, pdf: null, aviso: "SUNAT no respondió la consulta de este comprobante." };
 }
 
 async function quitarEspera(frame: Frame): Promise<void> {
@@ -597,8 +613,103 @@ async function aceptarSiDescargaPrevia(page: Page): Promise<boolean> {
 function vigilarImpresion(context: BrowserContext, principal: Page): void {
   context.on("page", (popup) => {
     if (popup === principal) return;
-    void cerrarRepresentacion(popup);
+    void popup.waitForLoadState("domcontentloaded", { timeout: 8_000 }).catch(() => undefined);
   });
+}
+
+async function bajarRepresentacion(page: Page, frame: Frame): Promise<Uint8Array | null> {
+  console.log("SUNAT no dio CDR. Armo el PDF con la factura que ya está en Resultado, sin pulsar Imprimir.");
+  await taparImpresion(page);
+  const delPanel = await pdfDeResultado(page, frame);
+  if (delPanel) return delPanel;
+  if (await hayIconoPdf(frame)) {
+    const bajada = await clicDescarga(page, async () => {
+      await taparImpresion(page);
+      await hayIconoPdf(frame, true);
+    });
+    await taparImpresion(page);
+    if (bajada.bytes && esPdf(bajada.bytes)) return bajada.bytes;
+  }
+  return null;
+}
+
+async function taparImpresion(page: Page): Promise<void> {
+  for (const frame of page.frames()) {
+    await frame
+      .evaluate(() => {
+        const noop = () => undefined;
+        try {
+          Object.defineProperty(window, "print", { configurable: true, writable: true, value: noop });
+        } catch {
+          window.print = noop;
+        }
+      })
+      .catch(() => undefined);
+  }
+  await page.keyboard.press("Escape").catch(() => undefined);
+}
+
+async function pdfDeResultado(page: Page, frame: Frame): Promise<Uint8Array | null> {
+  const html = await frame
+    .evaluate(() => {
+      const nodos = [...document.querySelectorAll("div, section, table")].filter((el) => {
+        const texto = el.textContent ?? "";
+        return /FACTURA ELECTR|BOLETA DE VENTA|RECIBO POR HONORARIOS/i.test(texto) && /SON:/i.test(texto);
+      });
+      nodos.sort((a, b) => (a.textContent?.length ?? 0) - (b.textContent?.length ?? 0));
+      const nodo = nodos[0];
+      if (!nodo) return "";
+      const estilos = [...document.querySelectorAll("style")].map((n) => n.outerHTML).join("");
+      return `<!DOCTYPE html><html><head><meta charset="utf-8">${estilos}<style>body{margin:12px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#000}table{border-collapse:collapse}</style></head><body>${nodo.outerHTML}</body></html>`;
+    })
+    .catch(() => "");
+  if (!html) return null;
+  const hoja = await page.context().newPage();
+  try {
+    await hoja.setContent(html, { waitUntil: "load" });
+    const bytes = await hoja.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "10mm", bottom: "10mm", left: "8mm", right: "8mm" },
+    });
+    return esPdf(bytes) ? bytes : null;
+  } catch {
+    return null;
+  } finally {
+    await hoja.close().catch(() => undefined);
+  }
+}
+
+async function hayIconoPdf(frame: Frame, pulsar = false): Promise<boolean> {
+  return frame
+    .evaluate((hacerClic) => {
+      for (const nodo of document.querySelectorAll("a, button, img")) {
+        if (!(nodo instanceof HTMLElement)) continue;
+        const destino = nodo.closest("a, button");
+        const icono = destino instanceof HTMLElement ? destino : nodo;
+        const pista = [
+          icono.getAttribute("title"),
+          icono.getAttribute("aria-label"),
+          icono.getAttribute("alt"),
+          icono.getAttribute("href"),
+          icono.getAttribute("src"),
+          icono.getAttribute("onclick"),
+          String(icono.className),
+        ]
+          .filter(Boolean)
+          .join(" ");
+        if (/imprim|print|correo|mail|e-?mail/i.test(pista)) continue;
+        if (!/\bpdf\b|acrobat|\.pdf/i.test(pista)) continue;
+        if (hacerClic) icono.click();
+        return true;
+      }
+      return false;
+    }, pulsar)
+    .catch(() => false);
+}
+
+function esPdf(bytes: Uint8Array): boolean {
+  return bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
 }
 
 async function cerrarRepresentacionesAbiertas(page: Page): Promise<void> {

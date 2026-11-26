@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prepararPdfCompra } from "@/lib/actions/compras-sunat";
 import { nombrePdf, pdfCompra } from "@/lib/sunat/pdf";
+import { rutaPdf } from "@/lib/sunat/rutas";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +18,31 @@ export async function GET(request: Request) {
   }
 
   const compra = datos.compra;
+  const supabase = await createClient();
+  const guardado = await supabase.storage.from("sunat-compras").download(
+    rutaPdf({
+      entidadId: compra.entidadId,
+      periodo: compra.periodo,
+      tipo: compra.tipo,
+      serie: compra.serie,
+      numero: compra.numero,
+    }),
+  );
+  if (guardado.data) {
+    const filename = nombrePdf({
+      tipo: compra.tipo,
+      serie: compra.serie,
+      numero: compra.numero,
+      numeroFinal: compra.numero_final,
+    });
+    return new NextResponse(Buffer.from(await guardado.data.arrayBuffer()), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  }
   const bytes = await pdfCompra({
     tipo: compra.tipo,
     serie: compra.serie,

@@ -2,8 +2,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SunatCredencialSecreto } from "../src/lib/sunat/auth";
 import { decryptString } from "../src/lib/sunat/crypto";
 import { SunatError, SunatTicketPendienteError } from "../src/lib/sunat/errors";
-import { guardarPropuesta, marcarArchivo, registrarDescarga, subirCdr, subirXml } from "../src/lib/sunat/persistir";
+import { guardarPropuesta, marcarArchivo, registrarDescarga, subirCdr, subirPdf, subirXml } from "../src/lib/sunat/persistir";
 import { bajarFacturasSol, type FacturaSol, type TipoSol } from "../src/lib/sunat/portal-sol";
+import { rutaPdf } from "../src/lib/sunat/rutas";
 import { descargarPropuestaRce } from "../src/lib/sunat/sire";
 import { cargarEnv, crearCliente, entrar, portalDe } from "./estudio-local";
 
@@ -65,13 +66,23 @@ async function main(): Promise<void> {
       };
       if (archivos.xml) await subirXml(supabase, compra, archivos.xml);
       if (archivos.cdr) await subirCdr(supabase, compra, archivos.cdr);
+      if (archivos.pdf) await subirPdf(supabase, compra, archivos.pdf);
       const sinXml = !archivos.xml && /no tiene el XML|no entregó el XML/i.test(archivos.aviso ?? "");
+      const sinCdr = !archivos.cdr && (Boolean(archivos.xml) || Boolean(archivos.pdf));
       await marcarArchivo(supabase, compra, {
-        xmlEstado: archivos.xml ? "LISTO" : sinXml ? "SIN_XML" : "ERROR",
+        xmlEstado: archivos.xml ? "LISTO" : archivos.pdf || sinXml ? "SIN_XML" : "ERROR",
         cdrEstado: archivos.cdr ? "LISTO" : "SIN_XML",
-        mensaje: archivos.aviso,
+        mensaje: archivos.aviso ?? (sinCdr ? "SUNAT no entregó CDR. Quedó la representación impresa." : null),
       });
-      console.log(archivos.xml ? "  XML guardado" : `  ${archivos.aviso ?? "Sin XML"}`);
+      console.log(
+        archivos.xml
+          ? archivos.cdr
+            ? "  XML y CDR guardados"
+            : "  XML guardado, sin CDR"
+          : archivos.pdf
+            ? "  Sin CDR. Guardé el PDF de SUNAT."
+            : `  ${archivos.aviso ?? "Sin XML"}`,
+      );
     },
     (mensaje) => console.log(mensaje),
   );
@@ -132,9 +143,21 @@ async function facturasPendientes(supabase: SupabaseClient, entidadId: string, p
     .eq("entidad_id", entidadId)
     .eq("periodo", periodo)
     .in("tipo", TIPOS_XML);
+  const conPdf = await pdfsGuardados(supabase, entidadId, periodo);
   const listos = new Set(
     (estados ?? [])
-      .filter((fila) => fila.xml_estado === "LISTO" || fila.xml_estado === "SIN_XML")
+      .filter((fila) => {
+        if (fila.xml_estado === "LISTO") return true;
+        if (fila.xml_estado !== "SIN_XML") return false;
+        const nombre = rutaPdf({
+          entidadId,
+          periodo,
+          tipo: String(fila.tipo),
+          serie: String(fila.serie),
+          numero: String(fila.numero),
+        }).split("/").pop();
+        return nombre != null && conPdf.has(nombre);
+      })
       .map((fila) => `${fila.tipo}|${fila.serie}|${fila.numero}`),
   );
   const pendientes: FacturaSol[] = [];
@@ -158,6 +181,20 @@ async function facturasPendientes(supabase: SupabaseClient, entidadId: string, p
     });
   }
   return pendientes;
+}
+
+async function pdfsGuardados(supabase: SupabaseClient, entidadId: string, periodo: string): Promise<Set<string>> {
+  const carpeta = `${entidadId}/${periodo}/xml`;
+  const nombres = new Set<string>();
+  for (let offset = 0; offset < 5_000; offset += 100) {
+    const { data, error } = await supabase.storage.from("sunat-compras").list(carpeta, { limit: 100, offset });
+    if (error) throw new Error(error.message);
+    for (const archivo of data ?? []) {
+      if (archivo.name.toLowerCase().endsWith(".pdf")) nombres.add(archivo.name);
+    }
+    if ((data ?? []).length < 100) break;
+  }
+  return nombres;
 }
 
 async function credencialDe(supabase: SupabaseClient, ruc: string) {

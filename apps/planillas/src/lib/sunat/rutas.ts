@@ -15,3 +15,7 @@ export function rutaXml(compra: RutaCompra): string {
 export function rutaCdr(compra: RutaCompra): string {
   return rutaXml(compra).replace(/\.xml$/, ".cdr");
 }
+
+export function rutaPdf(compra: RutaCompra): string {
+  return rutaXml(compra).replace(/\.xml$/, ".pdf");
+}

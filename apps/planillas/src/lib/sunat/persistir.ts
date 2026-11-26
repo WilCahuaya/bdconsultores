@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { parseRce } from "./parse-rce";
-import { rutaCdr, rutaXml, type RutaCompra } from "./rutas";
+import { rutaCdr, rutaPdf, rutaXml, type RutaCompra } from "./rutas";
 
 const BUCKET = "sunat-compras";
 
@@ -120,6 +120,14 @@ export async function marcarArchivo(
 export async function subirXml(supabase: SupabaseClient, compra: RutaCompra, xml: string): Promise<void> {
   const { error } = await supabase.storage.from(BUCKET).upload(rutaXml(compra), Buffer.from(xml), {
     contentType: "application/octet-stream",
+    upsert: true,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function subirPdf(supabase: SupabaseClient, compra: RutaCompra, bytes: Uint8Array): Promise<void> {
+  const { error } = await supabase.storage.from(BUCKET).upload(rutaPdf(compra), bytes, {
+    contentType: "application/pdf",
     upsert: true,
   });
   if (error) throw new Error(error.message);
