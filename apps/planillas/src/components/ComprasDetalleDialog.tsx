@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Dialog } from "@inventario/ui";
 import { prepararPdfCompra } from "@/lib/actions/compras-sunat";
 import type { CompraSunatFila } from "@/lib/actions/compras-sunat";
-import type { ComprobanteUbl } from "@/lib/sunat/ubl";
+import type { ComprobanteUbl, TotalesComprobante } from "@/lib/sunat/ubl";
 
 const TIPO: Record<CompraSunatFila["tipo"], string> = {
   "01": "FACTURA ELECTRÓNICA",
@@ -91,12 +91,12 @@ export function ComprasDetalleDialog({
             <table className="w-full min-w-[720px] text-left text-sm">
               <thead className="border-b bg-muted/60 text-xs">
                 <tr>
-                  <th className="px-2 py-2 font-medium">Cantidad</th>
-                  <th className="px-2 py-2 font-medium">U.M.</th>
+                  <th className="px-2 py-2 text-right font-medium">Cantidad</th>
+                  <th className="px-2 py-2 text-center font-medium">Unidad medida</th>
+                  <th className="px-2 py-2 text-center font-medium">Código</th>
                   <th className="px-2 py-2 font-medium">Descripción</th>
-                  <th className="px-2 py-2 text-right font-medium">Valor unit.</th>
-                  <th className="px-2 py-2 text-right font-medium">Descuento</th>
-                  <th className="px-2 py-2 text-right font-medium">Valor venta</th>
+                  <th className="px-2 py-2 text-right font-medium">Valor unitario</th>
+                  <th className="px-2 py-2 text-right font-medium">ICBPER</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,13 +112,13 @@ export function ComprasDetalleDialog({
                   </tr>
                 ) : (
                   lineas.map((linea, index) => (
-                    <tr key={`${linea.descripcion}-${index}`} className="border-b last:border-0">
-                      <td className="px-2 py-1.5 font-mono">{cantidad(linea.cantidad)}</td>
-                      <td className="px-2 py-1.5">{unidad(linea.unidad)}</td>
+                    <tr key={`${linea.codigo}-${linea.descripcion}-${index}`} className="border-b last:border-0">
+                      <td className="px-2 py-1.5 text-right font-mono">{decimal(linea.cantidad, 6)}</td>
+                      <td className="px-2 py-1.5 text-center">{unidad(linea.unidad)}</td>
+                      <td className="px-2 py-1.5 text-center font-mono">{linea.codigo || "—"}</td>
                       <td className="px-2 py-1.5">{linea.descripcion || "—"}</td>
-                      <td className="px-2 py-1.5 text-right font-mono">{monto(linea.valorUnitario)}</td>
-                      <td className="px-2 py-1.5 text-right font-mono">{monto(linea.descuento || "0")}</td>
-                      <td className="px-2 py-1.5 text-right font-mono">{monto(linea.importe)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono">{decimal(linea.valorUnitario, 8)}</td>
+                      <td className="px-2 py-1.5 text-right font-mono">{monto(linea.icbper || "0")}</td>
                     </tr>
                   ))
                 )}
@@ -127,14 +127,18 @@ export function ComprasDetalleDialog({
           </div>
 
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <p className="max-w-md text-sm font-medium">{total == null ? "" : letras(total, compra.moneda)}</p>
+            <div className="max-w-md space-y-2 text-sm">
+              <p className="font-medium">{total == null ? "" : `SON: ${letras(total, compra.moneda)}`}</p>
+              <p className="text-xs text-muted-foreground">* Descuento global que afecta la base imponible</p>
+              <p className="text-xs text-muted-foreground">** Descuento global que no afecta la base imponible</p>
+            </div>
             <dl className="grid grid-cols-[auto_auto] gap-x-6 gap-y-1 text-sm">
-              <dt>Sub total</dt>
-              <dd className="text-right font-mono">{monto(gravada)}</dd>
-              <dt>IGV</dt>
-              <dd className="text-right font-mono">{monto(igv)}</dd>
-              <dt className="font-semibold">Imp. total</dt>
-              <dd className="text-right font-mono font-semibold">{monto(total)}</dd>
+              {filasTotal(detalle?.totales, gravada, igv, total, simbolo(detalle?.moneda || compra.moneda)).map(([etiqueta, valor, fuerte]) => (
+                <div key={etiqueta} className="contents">
+                  <dt className={fuerte ? "font-semibold" : undefined}>{etiqueta}</dt>
+                  <dd className={`text-right font-mono ${fuerte ? "font-semibold" : ""}`}>{valor}</dd>
+                </div>
+              ))}
             </dl>
           </div>
 
@@ -171,9 +175,44 @@ function monto(valor: string | number | null | undefined): string {
   return `${entero.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${decimal}`;
 }
 
-function cantidad(valor: string): string {
+function decimal(valor: string, max: number): string {
   const n = numero(valor);
-  return n == null ? "—" : n.toFixed(2);
+  if (n == null) return "—";
+  return n.toFixed(max).replace(/\.?0+$/, "");
+}
+
+function filasTotal(
+  totales: TotalesComprobante | undefined,
+  gravada: number | null,
+  igv: number | null,
+  total: number | null,
+  simboloMoneda: string,
+): Array<[string, string, boolean]> {
+  const dinero = (valor: number | null) => (valor == null ? "—" : `${simboloMoneda} ${valor.toFixed(2)}`);
+  if (!totales) {
+    return [
+      ["Total valor venta gravado", dinero(gravada), false],
+      ["Sumatoria IGV", dinero(igv), false],
+      ["Importe total", dinero(total), true],
+    ];
+  }
+  const filas: Array<[string, number, boolean]> = [
+    ["Descuento global *", totales.descuentoAfecta, false],
+    ["Total valor venta gravado", totales.gravado, false],
+    ["Total valor venta inafecto", totales.inafecto, false],
+    ["Total valor venta exonerado", totales.exonerado, false],
+    ["Total valor venta gratuito", totales.gratuito, false],
+    ["Total valor venta exportación", totales.exportacion, false],
+    ["Descuento global **", totales.descuentoNoAfecta, false],
+    ["Total descuentos", totales.descuentos, false],
+    ["Sumatoria otros tributos", totales.otrosTributos, false],
+    ["Sumatoria otros cargos", totales.otrosCargos, false],
+    ["Sumatoria ISC", totales.isc, false],
+    ["Sumatoria IGV", totales.igv, false],
+    ["Sumatoria ICBPER", totales.icbper, false],
+    ["Importe total", totales.total || total || 0, true],
+  ];
+  return filas.map(([etiqueta, valor, fuerte]) => [etiqueta, dinero(valor), fuerte]);
 }
 
 function unidad(codigo: string): string {

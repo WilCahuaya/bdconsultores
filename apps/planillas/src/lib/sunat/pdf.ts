@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { zipSync } from "fflate";
-import type { ComprobanteUbl, LineaComprobante } from "./ubl";
+import type { ComprobanteUbl, TotalesComprobante } from "./ubl";
 
 export interface CompraPdf {
   tipo: "01" | "02" | "03";
@@ -29,21 +29,12 @@ const TIPO: Record<CompraPdf["tipo"], string> = {
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN = 28;
-const ink = rgb(0.1, 0.12, 0.16);
-const muted = rgb(0.28, 0.34, 0.38);
-const line = rgb(0.75, 0.78, 0.8);
-const header = rgb(0.9, 0.93, 0.94);
-const box = rgb(0.07, 0.45, 0.48);
-
-const COL = {
-  cant: 32,
-  um: 72,
-  desc: 118,
-  unit: 392,
-  dto: 462,
-  venta: 524,
-};
+const MARGIN = 22;
+const ink = rgb(0, 0, 0);
+const hair = rgb(0, 0, 0);
+const header = rgb(0.93, 0.93, 0.93);
+const COLON = 128;
+const ALTO_TOTAL = 12.4;
 
 export function etiquetaTipo(tipo: CompraPdf["tipo"]): string {
   return TIPO[tipo];
@@ -61,77 +52,46 @@ export async function pdfCompra(compra: CompraPdf): Promise<Uint8Array> {
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const detalle = compra.detalle;
   const moneda = (detalle?.moneda || compra.moneda || "PEN").toUpperCase();
-  const serieNumero = detalle?.serieNumero || numeroVisible(compra);
-  const emisor = detalle?.emisorNombre || compra.razonSocialEmisor || "-";
-  const rucEmisor = detalle?.emisorRuc || compra.rucEmisor || "-";
-  const cliente = detalle?.clienteNombre || compra.empresa || "-";
-  const rucCliente = detalle?.clienteRuc || compra.rucEmpresa || "-";
-  const fecha = fechaLegible(detalle?.fecha || compra.fechaEmision);
-  const gravado = monto(detalle?.gravado, compra.base);
-  const igv = monto(detalle?.igv, compra.igv);
-  const total = monto(detalle?.total, compra.total);
-  const simbolo = simboloDe(moneda);
+  const totales = totalesVisibles(compra);
+  const columnas = columnasTabla();
 
   let page = doc.addPage([PAGE_W, PAGE_H]);
-  let y = PAGE_H - 36;
-  y = dibujarFicha(page, bold, font, y, {
-    titulo: TIPO[compra.tipo],
-    serieNumero,
-    rucEmisor,
-    emisor,
-    direccion: detalle?.emisorDireccion || "",
-    rucCliente,
-    cliente,
-    observacion: detalle?.observacion || "-",
-    fecha,
-    moneda,
-    simbolo,
-  });
+  let y = dibujarCabecera(page, bold, font, compra);
+  let tope = y;
+  y = encabezadoTabla(page, bold, y, columnas);
 
-  y -= 8;
-  y = encabezadoTabla(page, bold, y);
   const lineas = detalle?.lineas ?? [];
   if (lineas.length === 0) {
     const texto = compra.aviso || "SUNAT no entregó el detalle de lo que se compró en este comprobante.";
-    y = dibujarTexto(page, font, win(texto), COL.desc, y, 250, 8, muted) - 6;
+    y = filaTabla(page, font, y, columnas, ["", "", "", texto, "", ""], false);
   } else {
     for (const linea of lineas) {
-      const alto = Math.max(14, contarLineas(win(linea.descripcion || "-"), font, 8, 250) * 11);
-      if (y - alto < 90) {
+      const celdas = [
+        decimalVisible(linea.cantidad, 6),
+        unidadLegible(linea.unidad),
+        linea.codigo || "",
+        linea.descripcion || "",
+        decimalVisible(linea.valorUnitario, 8),
+        dineroPlano(numeroDe(linea.icbper) ?? 0),
+      ];
+      const alto = altoFila(font, celdas, columnas);
+      if (y - alto < MARGIN + 28) {
+        cerrarTabla(page, tope, y, columnas);
         page = doc.addPage([PAGE_W, PAGE_H]);
-        y = PAGE_H - 36;
-        y = encabezadoTabla(page, bold, y);
+        y = PAGE_H - 28;
+        tope = y;
+        y = encabezadoTabla(page, bold, y, columnas);
       }
-      y = dibujarLinea(page, font, y, linea);
+      y = filaTabla(page, font, y, columnas, celdas, false);
     }
   }
+  cerrarTabla(page, tope, y, columnas);
 
-  if (y < 120) {
+  if (y - ALTO_TOTAL * FILAS_TOTAL.length < MARGIN + 8) {
     page = doc.addPage([PAGE_W, PAGE_H]);
-    y = PAGE_H - 36;
+    y = PAGE_H - 28;
   }
-  y -= 10;
-  page.drawLine({
-    start: { x: MARGIN, y: y + 8 },
-    end: { x: PAGE_W - MARGIN, y: y + 8 },
-    thickness: 0.6,
-    color: line,
-  });
-  const letras = total == null ? "" : montoEnLetras(total, moneda);
-  dibujarTexto(page, bold, win(letras), MARGIN, y, 320, 8, ink);
-  y = totalFila(page, font, y, "SUB TOTAL", gravado);
-  y = totalFila(page, bold, y, "IGV", igv);
-  y = totalFila(page, bold, y, "IMP. TOTAL", total);
-
-  if (!detalle?.lineas.length && compra.aviso) {
-    page.drawText(win("Los totales salen del registro de compras."), {
-      x: MARGIN,
-      y: 36,
-      size: 7,
-      font,
-      color: muted,
-    });
-  }
+  dibujarTotales(page, bold, font, y, totales, moneda);
   return doc.save();
 }
 
@@ -141,102 +101,218 @@ export async function zipPdfs(archivos: Array<{ nombre: string; bytes: Uint8Arra
   return zipSync(entries, { level: 6 });
 }
 
-function dibujarFicha(
-  page: PDFPage,
-  bold: PDFFont,
-  font: PDFFont,
-  y: number,
-  datos: {
-    titulo: string;
-    serieNumero: string;
-    rucEmisor: string;
-    emisor: string;
-    direccion: string;
-    rucCliente: string;
-    cliente: string;
-    observacion: string;
-    fecha: string;
-    moneda: string;
-    simbolo: string;
-  },
-): number {
-  const cajaX = 360;
-  const cajaW = PAGE_W - MARGIN - cajaX;
-  page.drawRectangle({ x: cajaX, y: y - 62, width: cajaW, height: 70, borderColor: box, borderWidth: 1.2 });
-  page.drawText(win(datos.titulo), { x: cajaX + 8, y: y - 4, size: 8, font: bold, color: box });
-  page.drawText(win(`RUC: ${datos.rucEmisor}`), { x: cajaX + 8, y: y - 20, size: 8, font, color: ink });
-  page.drawText(win(datos.serieNumero), { x: cajaX + 8, y: y - 40, size: 12, font: bold, color: ink });
+const FILAS_TOTAL: Array<[string, keyof TotalesComprobante]> = [
+  ["Descuento Global *", "descuentoAfecta"],
+  ["Total valor venta gravado", "gravado"],
+  ["Total valor venta inafecto", "inafecto"],
+  ["Total valor venta exonerado", "exonerado"],
+  ["Total valor venta gratuito", "gratuito"],
+  ["Total valor venta exportación", "exportacion"],
+  ["Descuento Global **", "descuentoNoAfecta"],
+  ["Total descuentos", "descuentos"],
+  ["Sumatoria otros tributos", "otrosTributos"],
+  ["Sumatoria otros cargos", "otrosCargos"],
+  ["Sumatoria ISC", "isc"],
+  ["Sumatoria IGV", "igv"],
+  ["Sumatoria ICBPER", "icbper"],
+  ["Importe total", "total"],
+];
 
-  page.drawText("DATOS DEL PROVEEDOR", { x: MARGIN, y, size: 8, font: bold, color: box });
-  let cursor = y - 14;
-  cursor = campo(page, bold, font, cursor, "RUC", datos.rucEmisor, 320);
-  cursor = campo(page, bold, font, cursor, "RAZÓN SOCIAL", datos.emisor, 320);
-  cursor = campo(page, bold, font, cursor, "DIRECCIÓN", datos.direccion || "-", 320);
-
-  const clienteY = Math.min(cursor - 10, y - 78);
-  page.drawText("DATOS DEL CLIENTE", { x: MARGIN, y: clienteY, size: 8, font: bold, color: box });
-  page.drawText(win(`FECHA:  ${datos.fecha}`), { x: cajaX, y: clienteY, size: 8, font, color: ink });
-  page.drawText(win(`MONEDA:  ${datos.moneda}`), { x: cajaX, y: clienteY - 14, size: 8, font, color: ink });
-  page.drawText(win(`SÍMBOLO:  ${datos.simbolo}`), { x: cajaX, y: clienteY - 28, size: 8, font, color: ink });
-  cursor = clienteY - 14;
-  cursor = campo(page, bold, font, cursor, "RUC", datos.rucCliente, 320);
-  cursor = campo(page, bold, font, cursor, "RAZÓN SOCIAL", datos.cliente, 320);
-  cursor = campo(page, bold, font, cursor, "OBSERVACIÓN", datos.observacion, 320);
-  return cursor - 8;
+interface Columna {
+  titulo: string;
+  ancho: number;
+  alinear: "left" | "right" | "center";
 }
 
-function campo(
-  page: PDFPage,
-  bold: PDFFont,
-  font: PDFFont,
-  y: number,
-  etiqueta: string,
-  valor: string,
-  ancho: number,
-): number {
-  const label = `${etiqueta}:`;
-  page.drawText(win(label), { x: MARGIN, y, size: 8, font: bold, color: ink });
-  const x = MARGIN + font.widthOfTextAtSize(label, 8) + 4;
-  return dibujarTexto(page, font, win(valor), x, y, ancho - (x - MARGIN), 8, ink);
-}
-
-function encabezadoTabla(page: PDFPage, font: PDFFont, y: number): number {
-  page.drawRectangle({ x: MARGIN, y: y - 6, width: PAGE_W - MARGIN * 2, height: 16, color: header });
-  const celdas: Array<[string, number]> = [
-    ["CANTIDAD", COL.cant],
-    ["U.M.", COL.um],
-    ["DESCRIPCIÓN", COL.desc],
-    ["VALOR UNIT.", COL.unit],
-    ["DESCUENTO", COL.dto],
-    ["VALOR VENTA", COL.venta],
+function columnasTabla(): Columna[] {
+  const fijos = 50 + 70 + 54 + 78 + 50;
+  const descripcion = PAGE_W - MARGIN * 2 - fijos;
+  return [
+    { titulo: "Cantidad", ancho: 50, alinear: "right" },
+    { titulo: "Unidad Medida", ancho: 70, alinear: "center" },
+    { titulo: "Código", ancho: 54, alinear: "center" },
+    { titulo: "Descripción", ancho: descripcion, alinear: "left" },
+    { titulo: "Valor Unitario", ancho: 78, alinear: "right" },
+    { titulo: "ICBPER", ancho: 50, alinear: "right" },
   ];
-  for (const [texto, x] of celdas) {
-    page.drawText(texto, { x, y, size: 7, font, color: ink });
+}
+
+function dibujarCabecera(page: PDFPage, bold: PDFFont, font: PDFFont, compra: CompraPdf): number {
+  const detalle = compra.detalle;
+  const y0 = PAGE_H - 32;
+  const cajaX = 338;
+  const cajaW = PAGE_W - MARGIN - cajaX;
+  const cajaH = 62;
+  page.drawRectangle({
+    x: cajaX,
+    y: y0 - cajaH + 12,
+    width: cajaW,
+    height: cajaH,
+    borderColor: hair,
+    borderWidth: 1.4,
+  });
+  const titulo = TIPO[compra.tipo];
+  const tamTitulo = font.widthOfTextAtSize(win(titulo), 9) > cajaW - 12 ? 7.5 : 9;
+  centrar(page, bold, titulo, cajaX, y0 - 6, cajaW, tamTitulo);
+  centrar(page, bold, `RUC: ${detalle?.emisorRuc || compra.rucEmisor || "-"}`, cajaX, y0 - 22, cajaW, 9);
+  centrar(page, bold, serieVisible(detalle?.serieNumero || "", compra), cajaX, y0 - 40, cajaW, 11);
+
+  const comercial = (detalle?.nombreComercial || "").trim();
+  const legal = (detalle?.emisorNombre || compra.razonSocialEmisor || "").trim();
+  const nombres = [comercial, legal && legal.toUpperCase() !== comercial.toUpperCase() ? legal : ""].filter(Boolean);
+  const anchoNombre = cajaX - MARGIN - 12;
+  let y = y0;
+  for (const [index, nombre] of nombres.entries()) {
+    y = dibujarTexto(page, index === 0 ? bold : font, win(nombre), MARGIN, y, anchoNombre, 8, ink);
   }
-  return y - 18;
+  if (detalle?.emisorDireccion) y = dibujarTexto(page, font, win(detalle.emisorDireccion), MARGIN, y, anchoNombre, 8, ink);
+  if (detalle?.emisorLugar) y = dibujarTexto(page, font, win(detalle.emisorLugar), MARGIN, y, anchoNombre, 8, ink);
+
+  y = Math.min(y - 8, y0 - cajaH - 4);
+  page.drawLine({ start: { x: MARGIN, y: y + 6 }, end: { x: PAGE_W - MARGIN, y: y + 6 }, thickness: 0.6, color: hair });
+  const moneda = (detalle?.moneda || compra.moneda || "PEN").toUpperCase();
+  const fechaY = y - 4;
+  dato(page, font, fechaY, "Fecha de Emisión", fechaLegible(detalle?.fecha || compra.fechaEmision), 150);
+  page.drawText(win("Forma de pago"), { x: 360, y: fechaY, size: 8, font, color: ink });
+  page.drawText(":", { x: 432, y: fechaY, size: 8, font, color: ink });
+  page.drawText(win(detalle?.formaPago || "Contado"), { x: 442, y: fechaY, size: 8, font, color: ink });
+  y = fechaY - 12;
+  y = dato(page, font, y, "Señor(es)", detalle?.clienteNombre || compra.empresa || "-", 420);
+  y = dato(page, font, y, "RUC", detalle?.clienteRuc || compra.rucEmpresa || "-", 200);
+  y = dato(page, font, y, "Dirección del Cliente", detalle?.clienteDireccion || "-", 420);
+  y = dato(page, font, y, "Tipo de Moneda", nombreMoneda(moneda), 160);
+  y = dato(page, font, y, "Observación", observacionVisible(detalle?.observacion || ""), 420);
+  return y - 4;
 }
 
-function dibujarLinea(page: PDFPage, font: PDFFont, y: number, linea: LineaComprobante): number {
-  const desc = win(linea.descripcion || "-");
-  page.drawText(cantidadTexto(linea.cantidad), { x: COL.cant, y, size: 8, font, color: ink });
-  page.drawText(win(unidadLegible(linea.unidad)), { x: COL.um, y, size: 7, font, color: ink });
-  const siguiente = dibujarTexto(page, font, desc, COL.desc, y, 250, 8, ink);
-  alinear(page, font, numero(numeroDe(linea.valorUnitario)), COL.unit, 64, y);
-  alinear(page, font, numero(numeroDe(linea.descuento) ?? 0), COL.dto, 56, y);
-  alinear(page, font, numero(numeroDe(linea.importe)), COL.venta, 48, y);
-  return Math.min(siguiente, y - 12) - 2;
+function dato(page: PDFPage, font: PDFFont, y: number, etiqueta: string, valor: string, ancho: number): number {
+  page.drawText(win(etiqueta), { x: MARGIN, y, size: 8, font, color: ink });
+  page.drawText(":", { x: COLON, y, size: 8, font, color: ink });
+  return dibujarTexto(page, font, win(valor || "-"), COLON + 12, y, ancho, 8, ink);
 }
 
-function totalFila(page: PDFPage, font: PDFFont, y: number, etiqueta: string, valor: number | null): number {
-  page.drawText(etiqueta, { x: 400, y, size: 8, font, color: ink });
-  alinear(page, font, numero(valor), 500, 68, y);
-  return y - 14;
-}
-
-function alinear(page: PDFPage, font: PDFFont, texto: string, x: number, ancho: number, y: number) {
+function centrar(page: PDFPage, font: PDFFont, texto: string, x: number, y: number, ancho: number, size: number) {
   const safe = win(texto);
-  const dx = Math.max(0, ancho - font.widthOfTextAtSize(safe, 8));
-  page.drawText(safe, { x: x + dx, y, size: 8, font, color: ink });
+  const dx = Math.max(0, (ancho - font.widthOfTextAtSize(safe, size)) / 2);
+  page.drawText(safe, { x: x + dx, y, size, font, color: ink });
+}
+
+function encabezadoTabla(page: PDFPage, font: PDFFont, y: number, columnas: Columna[]): number {
+  return filaTabla(page, font, y, columnas, columnas.map((columna) => columna.titulo), true);
+}
+
+function filaTabla(page: PDFPage, font: PDFFont, y: number, columnas: Columna[], valores: string[], encabezado: boolean): number {
+  const size = encabezado ? 7 : 7;
+  const altoTexto = valores.reduce((max, valor, index) => {
+    const columna = columnas[index];
+    if (!columna) return max;
+    return Math.max(max, contarLineas(win(valor), font, size, columna.ancho - 6));
+  }, 1);
+  const alto = Math.max(encabezado ? 14 : 11, altoTexto * (size + 2) + 3);
+  let x = MARGIN;
+  if (encabezado) {
+    page.drawRectangle({ x: MARGIN, y: y - alto + 9, width: PAGE_W - MARGIN * 2, height: alto, color: header });
+  }
+  valores.forEach((valor, index) => {
+    const columna = columnas[index];
+    if (!columna) return;
+    const lineas = partir(win(valor), font, size, columna.ancho - 6);
+    let cursor = y;
+    for (const linea of lineas) {
+      const ancho = font.widthOfTextAtSize(linea, size);
+      const dx = columna.alinear === "right" ? columna.ancho - 4 - ancho : columna.alinear === "center" ? (columna.ancho - ancho) / 2 : 3;
+      page.drawText(linea, { x: x + dx, y: cursor, size, font, color: ink });
+      cursor -= size + 2;
+    }
+    x += columna.ancho;
+  });
+  page.drawLine({
+    start: { x: MARGIN, y: y - alto + 9 },
+    end: { x: PAGE_W - MARGIN, y: y - alto + 9 },
+    thickness: 0.4,
+    color: hair,
+  });
+  return y - alto;
+}
+
+function cerrarTabla(page: PDFPage, arriba: number, abajo: number, columnas: Columna[]) {
+  const top = arriba + 9;
+  const bottom = abajo + 9;
+  if (top - bottom < 4) return;
+  page.drawRectangle({
+    x: MARGIN,
+    y: bottom,
+    width: PAGE_W - MARGIN * 2,
+    height: top - bottom,
+    borderColor: hair,
+    borderWidth: 0.6,
+  });
+  let x = MARGIN;
+  for (const columna of columnas.slice(0, -1)) {
+    x += columna.ancho;
+    page.drawLine({ start: { x, y: top }, end: { x, y: bottom }, thickness: 0.3, color: hair });
+  }
+}
+
+function dibujarTotales(
+  page: PDFPage,
+  bold: PDFFont,
+  font: PDFFont,
+  y: number,
+  totales: import("./ubl").TotalesComprobante,
+  moneda: string,
+) {
+  const alto = ALTO_TOTAL * FILAS_TOTAL.length;
+  const xCorte = PAGE_W - MARGIN - 232;
+  const top = y + 9;
+  const bottom = top - alto;
+  page.drawRectangle({ x: MARGIN, y: bottom, width: PAGE_W - MARGIN * 2, height: alto, borderColor: hair, borderWidth: 0.7 });
+  page.drawLine({ start: { x: xCorte, y: top }, end: { x: xCorte, y: bottom }, thickness: 0.5, color: hair });
+  const xMonto = xCorte + 158;
+  page.drawLine({ start: { x: xMonto, y: top }, end: { x: xMonto, y: bottom }, thickness: 0.5, color: hair });
+
+  FILAS_TOTAL.forEach(([etiqueta, clave], index) => {
+    const filaY = top - ALTO_TOTAL * (index + 1);
+    if (index < FILAS_TOTAL.length - 1) {
+      page.drawLine({ start: { x: xCorte, y: filaY }, end: { x: PAGE_W - MARGIN, y: filaY }, thickness: 0.3, color: hair });
+    }
+    const textoY = filaY + 3;
+    const fuente = clave === "total" ? bold : font;
+    const label = win(etiqueta);
+    const ancho = fuente.widthOfTextAtSize(label, 7);
+    page.drawText(label, { x: xMonto - 8 - ancho, y: textoY, size: 7, font: fuente, color: ink });
+    page.drawText(":", { x: xMonto - 6, y: textoY, size: 7, font: fuente, color: ink });
+    const monto = dinero(totales[clave], moneda);
+    const anchoMonto = fuente.widthOfTextAtSize(monto, 7);
+    page.drawText(monto, { x: PAGE_W - MARGIN - 4 - anchoMonto, y: textoY, size: 7, font: fuente, color: ink });
+  });
+
+  const son = `SON: ${montoEnLetras(totales.total, moneda)}`;
+  const sonY = bottom + 58;
+  dibujarTexto(page, bold, win(son), MARGIN + 6, sonY, xCorte - MARGIN - 14, 7.5, ink);
+  page.drawText(win("* Descuento Global que Afecta la Base Imponible"), { x: MARGIN + 6, y: bottom + 28, size: 6.5, font, color: ink });
+  page.drawText(win("** Descuento Global que no Afecta la Base Imponible"), { x: MARGIN + 6, y: bottom + 16, size: 6.5, font, color: ink });
+}
+
+function totalesVisibles(compra: CompraPdf): TotalesComprobante {
+  const totales = compra.detalle?.totales;
+  if (totales && (totales.total || totales.gravado || totales.igv || totales.inafecto || totales.exonerado)) return totales;
+  return {
+    descuentoAfecta: 0,
+    descuentoNoAfecta: 0,
+    gravado: compra.base ?? 0,
+    inafecto: 0,
+    exonerado: 0,
+    gratuito: 0,
+    exportacion: 0,
+    descuentos: 0,
+    otrosTributos: 0,
+    otrosCargos: 0,
+    isc: 0,
+    igv: compra.igv ?? 0,
+    icbper: 0,
+    total: compra.total ?? numeroDe(compra.detalle?.total) ?? 0,
+  };
 }
 
 function dibujarTexto(
@@ -293,10 +369,64 @@ function numeroVisible(compra: CompraPdf): string {
   return `${serie}-${numero}`.replace(/^-/, "");
 }
 
-function cantidadTexto(valor: string): string {
+function serieVisible(id: string, compra: CompraPdf): string {
+  const raw = (id || numeroVisible(compra)).trim();
+  const match = raw.match(/^(.*?)[- ](\d+)$/);
+  if (!match) return raw;
+  return `${match[1]}-${String(Number(match[2]))}`;
+}
+
+function observacionVisible(nota: string): string {
+  const limpia = nota.replace(/\s+/g, " ").trim();
+  if (!limpia || /see-?sfs|facturador sunat|elaborado por sistema de emi/i.test(limpia)) return "-";
+  return limpia;
+}
+
+function nombreMoneda(moneda: string): string {
+  if (moneda === "USD") return "DOLAR";
+  if (moneda === "EUR") return "EURO";
+  return "SOL";
+}
+
+function partir(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const palabras = text.split(/\s+/).filter(Boolean);
+  if (palabras.length === 0) return [""];
+  const lineas: string[] = [];
+  let linea = "";
+  for (const palabra of palabras) {
+    const candidata = linea ? `${linea} ${palabra}` : palabra;
+    if (font.widthOfTextAtSize(candidata, size) > maxWidth && linea) {
+      lineas.push(linea);
+      linea = palabra;
+    } else {
+      linea = candidata;
+    }
+  }
+  if (linea) lineas.push(linea);
+  return lineas;
+}
+
+function altoFila(font: PDFFont, valores: string[], columnas: Columna[]): number {
+  const lineas = valores.reduce((max, valor, index) => {
+    const columna = columnas[index];
+    return columna ? Math.max(max, contarLineas(win(valor), font, 7, columna.ancho - 6)) : max;
+  }, 1);
+  return Math.max(11, lineas * 9 + 3);
+}
+
+function decimalVisible(valor: string, max: number): string {
   const n = numeroDe(valor);
-  if (n == null) return "-";
-  return n.toFixed(2);
+  if (n == null) return "";
+  return n.toFixed(max).replace(/\.?0+$/, "");
+}
+
+function dineroPlano(valor: number): string {
+  return valor.toFixed(2);
+}
+
+function dinero(valor: number, moneda: string): string {
+  const simbolo = moneda === "USD" ? "US$" : moneda === "EUR" ? "EUR" : "S/";
+  return `${simbolo} ${valor.toFixed(2)}`;
 }
 
 function unidadLegible(codigo: string): string {
@@ -316,30 +446,11 @@ function unidadLegible(codigo: string): string {
   return mapa[clave] || clave || "-";
 }
 
-function simboloDe(moneda: string): string {
-  if (moneda === "USD") return "US$";
-  if (moneda === "EUR") return "EUR";
-  return "S/";
-}
-
-function monto(texto: string | null | undefined, respaldo: number | null | undefined): number | null {
-  const desdeXml = numeroDe(texto);
-  if (desdeXml != null) return desdeXml;
-  return respaldo ?? null;
-}
-
 function numeroDe(value: string | number | null | undefined): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (!value) return null;
   const amount = Number(value.replace(/,/g, ""));
   return Number.isFinite(amount) ? amount : null;
-}
-
-function numero(total: number | null): string {
-  if (total == null) return "-";
-  const [entero, decimal] = total.toFixed(2).split(".");
-  const conMiles = entero.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return `${conMiles}.${decimal}`;
 }
 
 function fechaLegible(iso: string | null): string {

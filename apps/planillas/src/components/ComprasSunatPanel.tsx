@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
-import { panelCardClass } from "@inventario/ui/panel";
+import { panelCardClass, PanelSearchInput } from "@inventario/ui/panel";
 import { webAppById } from "@bd/config";
 import { Field } from "@/components/fields";
 import { ComprasDetalleDialog } from "@/components/ComprasDetalleDialog";
@@ -47,8 +47,11 @@ export function ComprasSunatPanel({
     return () => window.clearInterval(id);
   }, [bajando, router]);
   const [seleccion, setSeleccion] = useState<CompraSunatFila | null>(null);
+  const [consulta, setConsulta] = useState("");
   const mes = `${periodo.slice(0, 4)}-${periodo.slice(4, 6)}`;
   const api = webAppById("planillas").basePath;
+  const visibles = useMemo(() => compras.filter((compra) => coincide(compra, consulta)), [compras, consulta]);
+  const buscando = consulta.trim().length > 0;
 
   function ir(siguiente: string) {
     const params = new URLSearchParams({ entidadId, periodo: siguiente });
@@ -167,6 +170,20 @@ export function ComprasSunatPanel({
           Pedir XML avisa a la PC del estudio. Esa PC baja facturas, boletas y recibos cuando el programa está abierto.
           Si SUNAT pide un captcha, se escribe ahí. Elija una fila para ver el detalle.
         </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="w-full min-w-[16rem] sm:w-96">
+            <PanelSearchInput
+              value={consulta}
+              onChange={setConsulta}
+              placeholder="Buscar RUC, razón social, serie o número…"
+            />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {buscando
+              ? `${visibles.length} de ${compras.length}`
+              : `${compras.length} ${compras.length === 1 ? "comprobante" : "comprobantes"}`}
+          </p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="border-b text-xs text-muted-foreground">
@@ -187,14 +204,16 @@ export function ComprasSunatPanel({
               </tr>
             </thead>
             <tbody>
-              {compras.length === 0 ? (
+              {visibles.length === 0 ? (
                 <tr>
                   <td className="px-2 py-8 text-muted-foreground" colSpan={13}>
-                    Todavía no hay comprobantes de este mes.
+                    {compras.length === 0
+                      ? "Todavía no hay comprobantes de este mes."
+                      : "Ningún comprobante coincide con la búsqueda."}
                   </td>
                 </tr>
               ) : (
-                compras.map((compra) => (
+                visibles.map((compra) => (
                   <tr
                     key={compra.id}
                     className="cursor-pointer border-b last:border-0 hover:bg-muted/50"
@@ -229,6 +248,54 @@ export function ComprasSunatPanel({
       </section>
     </div>
   );
+}
+
+const NOMBRE_TIPO: Record<CompraSunatFila["tipo"], string> = {
+  "01": "factura",
+  "02": "recibo por honorarios",
+  "03": "boleta",
+};
+
+function textoBusqueda(valor: string): string {
+  return valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function compacto(valor: string): string {
+  return textoBusqueda(valor).replace(/[^a-z0-9]/g, "");
+}
+
+function coincide(compra: CompraSunatFila, consulta: string): boolean {
+  const tokens = consulta.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const numero = compra.numero.replace(/^0+(?=\d)/, "") || "0";
+  const numero10 = compra.numero.padStart(10, "0");
+  const campos = [
+    fecha(compra.fecha_emision),
+    compra.fecha_emision,
+    compra.ruc_emisor,
+    compra.razon_social_emisor,
+    compra.tipo,
+    NOMBRE_TIPO[compra.tipo],
+    compra.serie,
+    numero,
+    numero10,
+    `${compra.serie}-${numero}`,
+    `${compra.serie}-${numero10}`,
+    compra.moneda,
+    compra.estado,
+    etiquetaXml(compra.xml_estado, compra.tipo),
+    compra.total != null ? importe(compra.total) : null,
+  ].filter((campo): campo is string => Boolean(campo));
+  const texto = textoBusqueda(campos.join(" "));
+  const plano = compacto(campos.join(" "));
+  return tokens.every((token) => {
+    const normal = textoBusqueda(token);
+    const sinSignos = compacto(token);
+    return texto.includes(normal) || (sinSignos.length > 0 && plano.includes(sinSignos));
+  });
 }
 
 function fecha(iso: string | null): string {
