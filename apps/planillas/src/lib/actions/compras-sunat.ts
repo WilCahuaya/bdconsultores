@@ -321,7 +321,7 @@ export async function descargarComprasSunat(
 
 export async function prepararPdfCompra(id: string): Promise<{
   error?: string;
-  compra?: CompraSunatFila & { periodo: string; empresa: string; rucEmpresa: string };
+  compra?: CompraSunatFila & { periodo: string; empresa: string; rucEmpresa: string; entidadId: string };
   base?: number | null;
   igv?: number | null;
   detalle?: ComprobanteUbl | null;
