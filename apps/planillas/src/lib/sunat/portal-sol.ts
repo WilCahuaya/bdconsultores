@@ -97,7 +97,7 @@ async function abrirConsulta(page: Page, log: (mensaje: string) => void): Promis
   const consulta =
     (await clickQueContiene(page, "Nueva Consulta de comprobantes de pago")) ||
     (await clickQueContiene(page, "Consulta de Comprobantes de Pago")) ||
-    (await clickVisible(page, "Consulta de", true));
+    (await clickConsultaComprobantes(page));
   if (!consulta) throw new Error("No encontré la consulta de comprobantes en el menú de SUNAT.");
   await page.waitForTimeout(1_000);
   if (!(await esperarFrame(page, 4_000))) {
@@ -321,6 +321,44 @@ async function cerrarAvisos(page: Page): Promise<void> {
       })
       .catch(() => undefined);
   }
+}
+
+async function clickConsultaComprobantes(page: Page): Promise<boolean> {
+  const vence = Date.now() + 8_000;
+  while (Date.now() < vence) {
+    for (const frame of page.frames()) {
+      const texto = await frame
+        .evaluate(() => {
+          const normal = (valor: string | null) => (valor ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+          const otra = /facturas|declaraciones|valores|tributarias|aduaneras/;
+          const candidatos = Array.from(document.querySelectorAll("a, button, span, div, li, td")).filter(
+            (el): el is HTMLElement => {
+              if (!(el instanceof HTMLElement)) return false;
+              const limpio = normal(el.innerText);
+              if (otra.test(limpio)) return false;
+              return limpio === "consulta de" || limpio.startsWith("consulta de comprobantes");
+            },
+          );
+          candidatos.sort((a, b) => normal(a.innerText).length - normal(b.innerText).length);
+          const elegido = candidatos.find((el) => {
+            const caja = el.getBoundingClientRect();
+            const estilo = window.getComputedStyle(el);
+            return caja.width > 2 && caja.height > 2 && estilo.visibility !== "hidden" && estilo.display !== "none";
+          });
+          if (!elegido) return "";
+          const destino = elegido.closest("a, button");
+          (destino instanceof HTMLElement ? destino : elegido).click();
+          return normal(elegido.innerText).slice(0, 80);
+        })
+        .catch(() => "");
+      if (texto) {
+        console.log(`Clic en «${texto}».`);
+        return true;
+      }
+    }
+    await page.waitForTimeout(400);
+  }
+  return false;
 }
 
 async function clickQueContiene(page: Page, frase: string): Promise<boolean> {
