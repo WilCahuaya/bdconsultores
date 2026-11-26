@@ -126,18 +126,18 @@ export function ComprasSunatPanel({
           if (!guardando) setCredencialAbierta(false);
         }}
         title={credencial.configurada ? "Editar credencial" : "Guardar credencial"}
-        className="max-w-2xl"
+        style={{
+          width: "min(36rem, calc(100vw - 2rem))",
+          maxWidth: "36rem",
+          height: "auto",
+          alignSelf: "center",
+        }}
       >
         <form
           key={`${credencial.configurada}-${credencial.usuarioSol}-${credencial.clientId}`}
           action={onGuardar}
           className="grid gap-4 sm:grid-cols-2"
         >
-          <p className="text-sm text-muted-foreground sm:col-span-2">
-            Cada empresa la crea en su SOL: aplicación con la casilla MIGE RCE y RVIE - SIRE y alcance Desktop.
-            Aquí van el usuario SOL secundario, la clave SOL, el client id y el client secret de ese RUC.
-            La clave y el secret se guardan cifrados.
-          </p>
           <Field label="Usuario SOL" name="usuarioSol" defaultValue={credencial.usuarioSol} required autoComplete="off" />
           <Field label="Client ID" name="clientId" defaultValue={credencial.clientId} required autoComplete="off" />
           <Field
@@ -220,7 +220,6 @@ export function ComprasSunatPanel({
                 <th className="px-2 py-2 font-medium">Serie</th>
                 <th className="px-2 py-2 font-medium">Número</th>
                 <th className="px-2 py-2 font-medium">Mon.</th>
-                <th className="px-2 py-2 text-right font-medium">T.C.</th>
                 <th className="px-2 py-2 text-right font-medium">Gravada</th>
                 <th className="px-2 py-2 text-right font-medium">IGV</th>
                 <th className="px-2 py-2 text-right font-medium">Total</th>
@@ -231,7 +230,7 @@ export function ComprasSunatPanel({
             <tbody>
               {visibles.length === 0 ? (
                 <tr>
-                  <td className="px-2 py-8 text-muted-foreground" colSpan={13}>
+                  <td className="px-2 py-8 text-muted-foreground" colSpan={12}>
                     {compras.length === 0
                       ? "Todavía no hay comprobantes de este mes."
                       : "Ningún comprobante coincide con la búsqueda."}
@@ -251,7 +250,6 @@ export function ComprasSunatPanel({
                     <td className="px-2 py-2 font-mono">{compra.serie}</td>
                     <td className="px-2 py-2 font-mono">{compra.numero.padStart(10, "0")}</td>
                     <td className="px-2 py-2">{compra.moneda || "PEN"}</td>
-                    <td className="px-2 py-2 text-right font-mono">{cambio(compra.tipo_cambio, compra.moneda)}</td>
                     <td className="px-2 py-2 text-right font-mono">{importe(compra.base)}</td>
                     <td className="px-2 py-2 text-right font-mono">{importe(compra.igv)}</td>
                     <td className="px-2 py-2 text-right font-mono">{importe(compra.total)}</td>
@@ -344,7 +342,3 @@ function etiquetaXml(estado: string | null, tipo: string): string {
   return "Pendiente";
 }
 
-function cambio(tipoCambio: number | null, moneda: string | null): string {
-  const valor = tipoCambio ?? ((moneda || "PEN").toUpperCase() === "PEN" ? 1 : null);
-  return valor == null ? "—" : valor.toFixed(3);
-}

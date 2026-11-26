@@ -59,11 +59,25 @@ export function ComprasDetalleDialog({
   const total = numero(detalle?.total) ?? compra?.total ?? null;
 
   return (
-    <Dialog open={compra != null} onClose={onClose} title="Detalle del comprobante" className="max-w-5xl">
+    <Dialog
+      open={compra != null}
+      onClose={onClose}
+      title="Detalle del comprobante"
+      style={{
+        width: "min(210mm, calc(100vw - 1rem))",
+        maxWidth: "210mm",
+        height: "auto",
+        maxHeight: "min(297mm, 100dvh)",
+        alignSelf: "center",
+        backgroundColor: "#ffffff",
+        color: "#171717",
+      }}
+    >
       {compra ? (
+        <article className="box-border text-[12px] leading-snug text-neutral-950" style={{ minHeight: "297mm" }}>
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-[1fr_220px]">
-            <div className="space-y-3 text-sm">
+          <div className="grid gap-4 sm:grid-cols-[1fr_46mm]">
+            <div className="space-y-3">
               <div>
                 <p className="text-xs font-semibold tracking-wide text-teal-800">DATOS DEL PROVEEDOR</p>
                 <p><span className="font-medium">RUC:</span> {detalle?.emisorRuc || compra.ruc_emisor || "—"}</p>
@@ -77,7 +91,7 @@ export function ComprasDetalleDialog({
                 <p><span className="font-medium">Observación:</span> {detalle?.observacion || "—"}</p>
               </div>
             </div>
-            <div className="space-y-2 rounded-md border border-teal-700 p-3 text-sm">
+            <div className="space-y-2 rounded-md border border-teal-700 p-3">
               <p className="font-semibold text-teal-800">{TIPO[compra.tipo]}</p>
               <p>RUC: {detalle?.emisorRuc || compra.ruc_emisor || "—"}</p>
               <p className="text-base font-semibold">{detalle?.serieNumero || serieNumero}</p>
@@ -88,37 +102,37 @@ export function ComprasDetalleDialog({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b bg-muted/60 text-xs">
+            <table className="w-full table-fixed text-left text-[11px] leading-tight">
+              <thead className="border-b border-neutral-300 bg-neutral-100">
                 <tr>
-                  <th className="px-2 py-2 text-right font-medium">Cantidad</th>
-                  <th className="px-2 py-2 text-center font-medium">Unidad medida</th>
-                  <th className="px-2 py-2 text-center font-medium">Código</th>
-                  <th className="px-2 py-2 font-medium">Descripción</th>
-                  <th className="px-2 py-2 text-right font-medium">Valor unitario</th>
-                  <th className="px-2 py-2 text-right font-medium">ICBPER</th>
+                  <th className="w-[12%] px-1 py-1.5 text-right font-medium">Cantidad</th>
+                  <th className="w-[14%] px-1 py-1.5 text-center font-medium">Unidad</th>
+                  <th className="w-[12%] px-1 py-1.5 text-center font-medium">Código</th>
+                  <th className="px-1 py-1.5 font-medium">Descripción</th>
+                  <th className="w-[16%] px-1 py-1.5 text-right font-medium">Valor unitario</th>
+                  <th className="w-[12%] px-1 py-1.5 text-right font-medium">ICBPER</th>
                 </tr>
               </thead>
               <tbody>
                 {cargando ? (
                   <tr>
-                    <td className="px-2 py-6 text-muted-foreground" colSpan={6}>Consultando el detalle en SUNAT…</td>
+                    <td className="px-1 py-6 text-neutral-600" colSpan={6}>Consultando el detalle en SUNAT…</td>
                   </tr>
                 ) : lineas.length === 0 ? (
                   <tr>
-                    <td className="px-2 py-6 text-muted-foreground" colSpan={6}>
+                    <td className="px-1 py-6 text-neutral-600" colSpan={6}>
                       {aviso || "SUNAT no entregó las líneas de este comprobante."}
                     </td>
                   </tr>
                 ) : (
                   lineas.map((linea, index) => (
                     <tr key={`${linea.codigo}-${linea.descripcion}-${index}`} className="border-b last:border-0">
-                      <td className="px-2 py-1.5 text-right font-mono">{decimal(linea.cantidad, 6)}</td>
-                      <td className="px-2 py-1.5 text-center">{unidad(linea.unidad)}</td>
-                      <td className="px-2 py-1.5 text-center font-mono">{linea.codigo || "—"}</td>
-                      <td className="px-2 py-1.5">{linea.descripcion || "—"}</td>
-                      <td className="px-2 py-1.5 text-right font-mono">{decimal(linea.valorUnitario, 8)}</td>
-                      <td className="px-2 py-1.5 text-right font-mono">{monto(linea.icbper || "0")}</td>
+                      <td className="px-1 py-1.5 text-right font-mono">{decimal(linea.cantidad, 6)}</td>
+                      <td className="px-1 py-1.5 text-center">{unidad(linea.unidad)}</td>
+                      <td className="break-all px-1 py-1.5 text-center font-mono">{linea.codigo || "—"}</td>
+                      <td className="break-words px-1 py-1.5">{linea.descripcion || "—"}</td>
+                      <td className="px-1 py-1.5 text-right font-mono">{decimal(linea.valorUnitario, 8)}</td>
+                      <td className="px-1 py-1.5 text-right font-mono">{monto(linea.icbper || "0")}</td>
                     </tr>
                   ))
                 )}
@@ -127,12 +141,12 @@ export function ComprasDetalleDialog({
           </div>
 
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="max-w-md space-y-2 text-sm">
+            <div className="min-w-0 flex-1 space-y-2">
               <p className="font-medium">{total == null ? "" : `SON: ${letras(total, compra.moneda)}`}</p>
-              <p className="text-xs text-muted-foreground">* Descuento global que afecta la base imponible</p>
-              <p className="text-xs text-muted-foreground">** Descuento global que no afecta la base imponible</p>
+              <p className="text-[10px] text-neutral-600">* Descuento global que afecta la base imponible</p>
+              <p className="text-[10px] text-neutral-600">** Descuento global que no afecta la base imponible</p>
             </div>
-            <dl className="grid grid-cols-[auto_auto] gap-x-6 gap-y-1 text-sm">
+            <dl className="grid grid-cols-[auto_auto] gap-x-4 gap-y-1">
               {filasTotal(detalle?.totales, gravada, igv, total, simbolo(detalle?.moneda || compra.moneda)).map(([etiqueta, valor, fuerte]) => (
                 <div key={etiqueta} className="contents">
                   <dt className={fuerte ? "font-semibold" : undefined}>{etiqueta}</dt>
@@ -148,12 +162,13 @@ export function ComprasDetalleDialog({
             <a className={boton} href={`${api}/api/compras/cdr?id=${compra.id}`}>CDR</a>
           </div>
         </div>
+        </article>
       ) : null}
     </Dialog>
   );
 }
 
-const boton = "inline-flex h-9 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent";
+const boton = "inline-flex h-8 items-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-900 hover:bg-neutral-100";
 
 function fecha(iso: string | null): string {
   if (!iso) return "—";
