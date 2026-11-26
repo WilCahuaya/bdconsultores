@@ -43,7 +43,7 @@ async function escuchar(): Promise<void> {
     await anotar(pedido.entidadId, pedido.periodo, {
       estado: bien ? "LISTO" : "ERROR",
       mensaje: bien
-        ? "XML y CDR guardados. Ya se pueden abrir las facturas."
+        ? "Pedido terminado. En Planillas se ve qué comprobante tiene XML y cuál tiene el PDF."
         : "La bajada se detuvo. En la PC del estudio revisa la ventana de SUNAT.",
     });
     console.log(bien ? "Pedido listo." : "Pedido con error.");
@@ -116,7 +116,7 @@ async function tomarPedido(): Promise<{ entidadId: string; periodo: string; ruc:
 
 function correr(ruc: string, periodo: string): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn("pnpm", ["sunat:bajar", "--", "--ruc", ruc, "--periodo", periodo], {
+    const child = spawn("pnpm", ["sunat:bajar", "--", "--ruc", ruc, "--periodo", periodo, "--solo-xml"], {
       cwd: repo,
       stdio: "inherit",
       shell: true,

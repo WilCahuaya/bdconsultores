@@ -649,6 +649,13 @@ async function taparImpresion(page: Page): Promise<void> {
   await page.keyboard.press("Escape").catch(() => undefined);
 }
 
+function escalaParaA4(anchoPx: number): number {
+  const hoja = (210 / 25.4) * 96;
+  const margenes = (12 / 25.4) * 96;
+  const cabe = Math.max(1, hoja - margenes);
+  return Math.min(1, Math.max(0.1, cabe / Math.max(anchoPx, 1)));
+}
+
 async function pdfDeResultado(page: Page, frame: Frame): Promise<Uint8Array | null> {
   const html = await frame
     .evaluate(() => {
@@ -660,17 +667,34 @@ async function pdfDeResultado(page: Page, frame: Frame): Promise<Uint8Array | nu
       const nodo = nodos[0];
       if (!nodo) return "";
       const estilos = [...document.querySelectorAll("style")].map((n) => n.outerHTML).join("");
-      return `<!DOCTYPE html><html><head><meta charset="utf-8">${estilos}<style>body{margin:12px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#000}table{border-collapse:collapse}</style></head><body>${nodo.outerHTML}</body></html>`;
+      return `<!DOCTYPE html><html><head><meta charset="utf-8">${estilos}<style>html,body{margin:0;padding:8px;width:max-content !important;overflow:visible !important;background:#fff;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#000}body *{overflow:visible !important}table{border-collapse:collapse}</style></head><body>${nodo.outerHTML}</body></html>`;
     })
     .catch(() => "");
   if (!html) return null;
   const hoja = await page.context().newPage();
   try {
+    await hoja.setViewportSize({ width: 1800, height: 2400 });
     await hoja.setContent(html, { waitUntil: "load" });
+    const ancho = await hoja.evaluate(() => {
+      const range = document.createRange();
+      let right = 0;
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let nodo: Node | null = walker.nextNode();
+      while (nodo) {
+        if (nodo.textContent?.trim()) {
+          range.selectNodeContents(nodo);
+          const box = range.getBoundingClientRect();
+          if (box.right > right) right = box.right;
+        }
+        nodo = walker.nextNode();
+      }
+      return Math.ceil(Math.max(right, document.body.scrollWidth) + 16);
+    });
     const bytes = await hoja.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: "10mm", bottom: "10mm", left: "8mm", right: "8mm" },
+      scale: escalaParaA4(ancho),
+      margin: { top: "8mm", bottom: "8mm", left: "6mm", right: "6mm" },
     });
     return esPdf(bytes) ? bytes : null;
   } catch {

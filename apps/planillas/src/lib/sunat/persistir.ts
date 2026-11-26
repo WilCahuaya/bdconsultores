@@ -125,6 +125,11 @@ export async function subirXml(supabase: SupabaseClient, compra: RutaCompra, xml
   if (error) throw new Error(error.message);
 }
 
+export async function borrarPdf(supabase: SupabaseClient, compra: RutaCompra): Promise<void> {
+  const { error } = await supabase.storage.from(BUCKET).remove([rutaPdf(compra)]);
+  if (error) throw new Error(error.message);
+}
+
 export async function subirPdf(supabase: SupabaseClient, compra: RutaCompra, bytes: Uint8Array): Promise<void> {
   const { error } = await supabase.storage.from(BUCKET).upload(rutaPdf(compra), bytes, {
     contentType: "application/pdf",
