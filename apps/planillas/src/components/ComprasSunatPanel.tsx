@@ -164,7 +164,7 @@ export function ComprasSunatPanel({
         {descarga?.mensaje ? <p className="text-sm text-muted-foreground">{descarga.mensaje}</p> : null}
         {pedido?.mensaje ? <p className="text-sm text-muted-foreground">{pedido.mensaje}</p> : null}
         <p className="text-sm text-muted-foreground">
-          Pedir XML avisa a la PC del estudio. Esa PC baja las facturas cuando el programa está abierto.
+          Pedir XML avisa a la PC del estudio. Esa PC baja facturas, boletas y recibos cuando el programa está abierto.
           Si SUNAT pide un captcha, se escribe ahí. Elija una fila para ver el detalle.
         </p>
         <div className="overflow-x-auto">
@@ -244,7 +244,7 @@ function importe(total: number | null): string {
 }
 
 function etiquetaXml(estado: string | null, tipo: string): string {
-  if (tipo !== "01") return "—";
+  if (tipo !== "01" && tipo !== "02" && tipo !== "03") return "—";
   if (estado === "LISTO") return "Listo";
   if (estado === "EN_PEDIDO") return "Bajando";
   if (estado === "SIN_XML") return "Sin XML";

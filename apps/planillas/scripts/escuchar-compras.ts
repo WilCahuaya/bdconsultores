@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { cargarEnv, crearCliente, entrar, portalDe } from "./estudio-local";
+import { cargarEnv, crearCliente, entrar, portalDe, renovarSesion } from "./estudio-local";
 
 cargarEnv();
 const supabase = crearCliente();
@@ -23,7 +23,16 @@ async function escuchar(): Promise<void> {
     .eq("estado", "EN_PROCESO");
   console.log("Listo. Deja esta ventana abierta. El contador pide el XML desde Planillas.");
   for (;;) {
-    const pedido = await tomarPedido();
+    await renovarSesion(supabase);
+    let pedido: { entidadId: string; periodo: string; ruc: string } | null;
+    try {
+      pedido = await tomarPedido();
+    } catch (error) {
+      const mensaje = error instanceof Error ? error.message : "";
+      if (!/permission denied|jwt/i.test(mensaje)) throw error;
+      if (!(await renovarSesion(supabase))) await entrar(supabase, portalDe());
+      continue;
+    }
     if (!pedido) {
       await esperar(8_000);
       continue;
@@ -31,19 +40,34 @@ async function escuchar(): Promise<void> {
     console.log(`Bajando ${pedido.ruc} ${pedido.periodo}`);
     const codigo = await correr(pedido.ruc, pedido.periodo);
     const bien = codigo === 0;
-    await supabase
-      .from("sunat_pedidos")
-      .update({
-        estado: bien ? "LISTO" : "ERROR",
-        mensaje: bien
-          ? "XML y CDR guardados. Ya se pueden abrir las facturas."
-          : "La bajada se detuvo. En la PC del estudio revisa la ventana de SUNAT.",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("entidad_id", pedido.entidadId)
-      .eq("periodo", pedido.periodo);
+    await anotar(pedido.entidadId, pedido.periodo, {
+      estado: bien ? "LISTO" : "ERROR",
+      mensaje: bien
+        ? "XML y CDR guardados. Ya se pueden abrir las facturas."
+        : "La bajada se detuvo. En la PC del estudio revisa la ventana de SUNAT.",
+    });
     console.log(bien ? "Pedido listo." : "Pedido con error.");
   }
+}
+
+async function anotar(
+  entidadId: string,
+  periodo: string,
+  cambio: { estado: string; mensaje: string },
+): Promise<void> {
+  const escribir = () =>
+    supabase
+      .from("sunat_pedidos")
+      .update({ ...cambio, updated_at: new Date().toISOString() })
+      .eq("entidad_id", entidadId)
+      .eq("periodo", periodo);
+  let { error } = await escribir();
+  if (error && /permission denied|jwt/i.test(error.message)) {
+    const renovada = await renovarSesion(supabase);
+    if (!renovada) await entrar(supabase, portalDe());
+    ({ error } = await escribir());
+  }
+  if (error) throw new Error(error.message);
 }
 
 async function tomarPedido(): Promise<{ entidadId: string; periodo: string; ruc: string } | null> {

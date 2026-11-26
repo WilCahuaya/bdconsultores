@@ -40,10 +40,10 @@ export async function guardarPropuesta(
     if (insertError) throw new Error(insertError.message);
   }
 
-  const facturas = compras.filter((compra) => compra.tipo === "01");
-  if (facturas.length > 0) {
+  const conXml = compras.filter((compra) => compra.tipo === "01" || compra.tipo === "02" || compra.tipo === "03");
+  if (conXml.length > 0) {
     const { error: estadoError } = await supabase.from("sunat_compra_archivos").upsert(
-      facturas.map((compra) => ({
+      conXml.map((compra) => ({
         entidad_id: entidadId,
         periodo,
         tipo: compra.tipo,

@@ -344,7 +344,7 @@ export async function prepararPdfCompra(id: string): Promise<{
   const xml = await xmlGuardado(supabase, compra);
   let aviso = xml
     ? null
-    : "El detalle de esta factura todavía no está en el almacén. En la PC del estudio se baja con pnpm sunat:bajar.";
+    : "El detalle de este comprobante todavía no está en el almacén. Pide el XML desde Planillas.";
 
   const detalle = xml ? parseUbl(xml) : null;
   if (detalle?.esResumen) {

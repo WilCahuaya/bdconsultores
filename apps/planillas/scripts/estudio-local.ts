@@ -20,14 +20,41 @@ export function requerido(nombre: string): string {
   return valor;
 }
 
+const PORTAL_PUBLICO = "https://www.bdconsultores.org";
+
 export function portalDe(pedido?: string): string {
-  return (pedido || process.env.NEXT_PUBLIC_PORTAL_ORIGIN || "http://127.0.0.1:3010").replace(/\/$/, "");
+  const explicito = pedido?.trim();
+  if (explicito) return explicito.replace(/\/$/, "");
+  const configurado = process.env.NEXT_PUBLIC_PORTAL_ORIGIN?.trim() ?? "";
+  if (configurado && !esLocal(configurado)) return configurado.replace(/\/$/, "");
+  return PORTAL_PUBLICO;
+}
+
+function esLocal(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  } catch {
+    return false;
+  }
 }
 
 export function crearCliente(): SupabaseClient {
   return createClient(requerido("NEXT_PUBLIC_SUPABASE_URL"), requerido("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {
-    auth: { persistSession: false, autoRefreshToken: false },
+    auth: { persistSession: false, autoRefreshToken: true },
   });
+}
+
+export async function renovarSesion(supabase: SupabaseClient): Promise<boolean> {
+  const guardada = leerSesion();
+  if (!guardada) return false;
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token: guardada.refresh_token });
+  if (error || !data.session) return false;
+  writeFileSync(
+    sesionFile,
+    JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }),
+  );
+  return true;
 }
 
 export async function entrar(supabase: SupabaseClient, portal: string): Promise<void> {
@@ -48,7 +75,7 @@ export async function entrar(supabase: SupabaseClient, portal: string): Promise<
     const page = await browser.newPage();
     console.log(`Entra con Google en la ventana. ${portal}/login`);
     await page.goto(`${portal}/login`, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {
-      throw new Error(`No pude abrir ${portal}/login. Si el portal es local, inícialo con pnpm dev:portal.`);
+      throw new Error(`No pude abrir ${portal}/login. Revisa la conexión de esta PC.`);
     });
     const ref = new URL(requerido("NEXT_PUBLIC_SUPABASE_URL")).hostname.split(".")[0];
     const vence = Date.now() + 5 * 60_000;
