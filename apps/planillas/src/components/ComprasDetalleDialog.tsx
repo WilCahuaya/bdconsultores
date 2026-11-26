@@ -67,14 +67,14 @@ export function ComprasDetalleDialog({
         width: "min(210mm, calc(100vw - 1rem))",
         maxWidth: "210mm",
         height: "auto",
-        maxHeight: "min(297mm, 100dvh)",
+        maxHeight: "90vh",
         alignSelf: "center",
         backgroundColor: "#ffffff",
         color: "#171717",
       }}
     >
       {compra ? (
-        <article className="box-border text-[12px] leading-snug text-neutral-950" style={{ minHeight: "297mm" }}>
+        <article className="text-[12px] leading-snug text-neutral-950">
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-[1fr_46mm]">
             <div className="space-y-3">
@@ -156,7 +156,7 @@ export function ComprasDetalleDialog({
             </dl>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 border-t border-neutral-300 pt-3">
             <a className={boton} href={`${api}/api/compras/pdf?id=${compra.id}`}>PDF</a>
             <a className={boton} href={`${api}/api/compras/xml?id=${compra.id}`}>XML</a>
             <a className={boton} href={`${api}/api/compras/cdr?id=${compra.id}`}>CDR</a>
@@ -168,7 +168,7 @@ export function ComprasDetalleDialog({
   );
 }
 
-const boton = "inline-flex h-8 items-center rounded-md border border-neutral-300 bg-white px-3 text-xs font-medium text-neutral-900 hover:bg-neutral-100";
+const boton = "inline-flex h-8 items-center rounded-md bg-teal-800 px-3 text-xs font-medium text-white hover:bg-teal-900";
 
 function fecha(iso: string | null): string {
   if (!iso) return "—";
