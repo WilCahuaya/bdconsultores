@@ -50,9 +50,27 @@ export async function bajarFacturasSol(
 }
 
 async function entrar(page: Page, cred: { ruc: string; usuario: string; clave: string }, log: (mensaje: string) => void): Promise<void> {
-  const ruc = await campo(page, ["#txtRuc", "input[name='txtRuc']", "input[id*='ruc' i]"]);
-  const usuario = await campo(page, ["#txtUsuario", "input[name='txtUsuario']", "input[id*='usuario' i]"]);
-  const clave = await campo(page, ["#txtContrasena", "input[name='txtContrasena']", "input[type='password']"]);
+  const venceFormulario = Date.now() + 25_000;
+  let ruc = null as Awaited<ReturnType<typeof campo>>;
+  let usuario = null as Awaited<ReturnType<typeof campo>>;
+  let clave = null as Awaited<ReturnType<typeof campo>>;
+  while (Date.now() < venceFormulario) {
+    await cerrarAvisos(page);
+    if (await menuVisible(page)) return;
+    const direccion = page.url();
+    const titulo = await page.title().catch(() => "");
+    if (/api-seguridad\.sunat\.gob\.pe/i.test(direccion) || /bienvenid/i.test(titulo)) {
+      await page.goto(LOGIN, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => undefined);
+      await page.waitForTimeout(1_500);
+      continue;
+    }
+    ruc = await campo(page, ["#txtRuc", "input[name='txtRuc']", "input[id*='ruc' i]"]);
+    usuario = await campo(page, ["#txtUsuario", "input[name='txtUsuario']", "input[id*='usuario' i]"]);
+    clave = await campo(page, ["#txtContrasena", "input[name='txtContrasena']", "input[type='password']"]);
+    if (ruc && usuario && clave) break;
+    await page.waitForTimeout(1_000);
+  }
+  if (await menuVisible(page)) return;
   if (!ruc || !usuario || !clave) {
     throw new Error("SUNAT no mostró el formulario de la clave SOL.");
   }
@@ -78,13 +96,18 @@ async function entrar(page: Page, cred: { ruc: string; usuario: string; clave: s
       await page.waitForTimeout(1_500);
       continue;
     }
-    for (const frame of page.frames()) {
-      const texto = await frame.locator("body").innerText().catch(() => "");
-      if (/\bEmpresas\b/.test(texto) && !/valida tus datos de contacto/i.test(texto)) return;
-    }
+    if (await menuVisible(page)) return;
     await page.waitForTimeout(1_000);
   }
   throw new Error("No se pudo entrar a Operaciones en Línea. Revisa el captcha, el usuario y la clave SOL.");
+}
+
+async function menuVisible(page: Page): Promise<boolean> {
+  for (const frame of page.frames()) {
+    const texto = await frame.locator("body").innerText().catch(() => "");
+    if (/\bEmpresas\b/.test(texto) && !/valida tus datos de contacto/i.test(texto)) return true;
+  }
+  return false;
 }
 
 async function abrirConsulta(page: Page, log: (mensaje: string) => void): Promise<void> {
