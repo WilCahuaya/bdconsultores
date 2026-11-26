@@ -689,18 +689,14 @@ export function ActivosAmbientePanel({
             }
             return { error: result.error, aviso: result.aviso };
           }}
-          onEliminar={
-            isAdmin
-              ? undefined
-              : async (linea) => {
-                  const result = await eliminarMenaje(linea.id);
-                  if (!result.error) {
-                    quitarActivos([linea.id]);
-                    router.refresh();
-                  }
-                  return { error: result.error };
-                }
-          }
+          onEliminar={async (linea) => {
+            const result = await eliminarMenaje(linea.id);
+            if (!result.error) {
+              quitarActivos([linea.id]);
+              router.refresh();
+            }
+            return { error: result.error };
+          }}
         />
       ) : null}
 

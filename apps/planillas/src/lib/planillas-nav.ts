@@ -15,12 +15,15 @@ export function planillasNavSections(opts: {
   ];
   if (esEstudio) {
     tramites.push({ href: withEntidad("/vida-ley", entidadId), label: "Vida Ley", icon: "inventory" });
-    tramites.push({ href: withEntidad("/compras", entidadId), label: "Compras SUNAT", icon: "reports" });
   }
   tramites.push(
     { href: withEntidad("/asistencias", entidadId), label: "Asistencias", icon: "dashboard" },
     { href: withEntidad("/vacaciones", entidadId), label: "Vacaciones", icon: "reports" },
   );
+
+  const compras: PanelNavSection["items"] = esEstudio
+    ? [{ href: withEntidad("/compras", entidadId), label: "Compras SUNAT", icon: "reports" }]
+    : [];
 
   const expediente: PanelNavSection["items"] = [
     { href: withEntidad("/", entidadId), label: "Trabajadores", icon: "users" },
@@ -38,6 +41,7 @@ export function planillasNavSections(opts: {
       label: "Trámites",
       items: tramites,
     },
+    ...(compras.length > 0 ? [{ label: "Compras", items: compras }] : []),
   ];
 }
 

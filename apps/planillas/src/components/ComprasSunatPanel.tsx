@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, useToast } from "@inventario/ui";
+import { Button, Dialog, useToast } from "@inventario/ui";
 import { panelCardClass, PanelSearchInput } from "@inventario/ui/panel";
 import { webAppById } from "@bd/config";
 import { Field } from "@/components/fields";
@@ -37,6 +37,7 @@ export function ComprasSunatPanel({
   const router = useRouter();
   const { pushToast } = useToast();
   const [guardando, setGuardando] = useState(false);
+  const [credencialAbierta, setCredencialAbierta] = useState(false);
   const [descargando, setDescargando] = useState(false);
   const [pidiendo, setPidiendo] = useState(false);
   const bajando = pedido?.estado === "PEDIDO" || pedido?.estado === "EN_PROCESO";
@@ -67,6 +68,7 @@ export function ComprasSunatPanel({
       return;
     }
     pushToast("Credencial guardada.");
+    setCredencialAbierta(false);
     router.refresh();
   }
 
@@ -101,16 +103,41 @@ export function ComprasSunatPanel({
 
   return (
     <div className="space-y-6">
-      <section className={`${panelCardClass} space-y-4 p-4`}>
+      <section className={`${panelCardClass} flex flex-wrap items-center justify-between gap-3 p-4`}>
         <div>
           <h2 className="text-base font-semibold">Credencial de la API SUNAT</h2>
           <p className="mt-1 text-sm text-muted-foreground">
+            {credencial.configurada
+              ? `Registrada con el usuario SOL ${credencial.usuarioSol}.`
+              : "Esta empresa todavía no tiene credencial."}
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant={credencial.configurada ? "outline" : "default"}
+          onClick={() => setCredencialAbierta(true)}
+        >
+          {credencial.configurada ? "Editar" : "Guardar credencial"}
+        </Button>
+      </section>
+      <Dialog
+        open={credencialAbierta}
+        onClose={() => {
+          if (!guardando) setCredencialAbierta(false);
+        }}
+        title={credencial.configurada ? "Editar credencial" : "Guardar credencial"}
+        className="max-w-2xl"
+      >
+        <form
+          key={`${credencial.configurada}-${credencial.usuarioSol}-${credencial.clientId}`}
+          action={onGuardar}
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          <p className="text-sm text-muted-foreground sm:col-span-2">
             Cada empresa la crea en su SOL: aplicación con la casilla MIGE RCE y RVIE - SIRE y alcance Desktop.
             Aquí van el usuario SOL secundario, la clave SOL, el client id y el client secret de ese RUC.
             La clave y el secret se guardan cifrados.
           </p>
-        </div>
-        <form action={onGuardar} className="grid gap-4 sm:grid-cols-2">
           <Field label="Usuario SOL" name="usuarioSol" defaultValue={credencial.usuarioSol} required autoComplete="off" />
           <Field label="Client ID" name="clientId" defaultValue={credencial.clientId} required autoComplete="off" />
           <Field
@@ -129,15 +156,15 @@ export function ComprasSunatPanel({
           />
           <div className="sm:col-span-2">
             <Button type="submit" disabled={guardando}>
-              {guardando ? "Guardando…" : "Guardar credencial"}
+              {guardando ? "Guardando…" : credencial.configurada ? "Guardar cambios" : "Guardar credencial"}
             </Button>
           </div>
         </form>
-      </section>
+      </Dialog>
 
-      <section className={`${panelCardClass} space-y-4 p-4`}>
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <label className="block space-y-1.5">
+      <section className={`${panelCardClass} space-y-3 p-4`}>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2">
             <span className="text-sm font-medium">Mes</span>
             <input
               type="month"
@@ -149,7 +176,19 @@ export function ComprasSunatPanel({
               }}
             />
           </label>
-          <div className="flex flex-wrap gap-2">
+          <div className="w-full min-w-[16rem] flex-1 sm:max-w-md">
+            <PanelSearchInput
+              value={consulta}
+              onChange={setConsulta}
+              placeholder="Buscar RUC, razón social, serie o número…"
+            />
+          </div>
+          <p className="text-sm text-muted-foreground whitespace-nowrap">
+            {buscando
+              ? `${visibles.length} de ${compras.length}`
+              : `${compras.length} ${compras.length === 1 ? "comprobante" : "comprobantes"}`}
+          </p>
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
             <Button type="button" onClick={onDescargar} disabled={descargando || !credencial.configurada}>
               {descargando ? "Consultando SUNAT…" : "Descargar mes"}
             </Button>
@@ -164,26 +203,12 @@ export function ComprasSunatPanel({
             </a>
           </div>
         </div>
-        {descarga?.mensaje ? <p className="text-sm text-muted-foreground">{descarga.mensaje}</p> : null}
-        {pedido?.mensaje ? <p className="text-sm text-muted-foreground">{pedido.mensaje}</p> : null}
-        <p className="text-sm text-muted-foreground">
-          Pedir XML avisa a la PC del estudio. Esa PC baja facturas, boletas y recibos cuando el programa está abierto.
-          Si SUNAT pide un captcha, se escribe ahí. Elija una fila para ver el detalle.
-        </p>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="w-full min-w-[16rem] sm:w-96">
-            <PanelSearchInput
-              value={consulta}
-              onChange={setConsulta}
-              placeholder="Buscar RUC, razón social, serie o número…"
-            />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {buscando
-              ? `${visibles.length} de ${compras.length}`
-              : `${compras.length} ${compras.length === 1 ? "comprobante" : "comprobantes"}`}
-          </p>
-        </div>
+        {descarga?.mensaje && descarga.estado !== "LISTO" ? (
+          <p className="text-sm text-muted-foreground">{descarga.mensaje}</p>
+        ) : null}
+        {pedido?.mensaje && pedido.estado !== "LISTO" ? (
+          <p className="text-sm text-muted-foreground">{pedido.mensaje}</p>
+        ) : null}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-sm">
             <thead className="border-b text-xs text-muted-foreground">

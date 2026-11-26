@@ -932,8 +932,8 @@ export async function darDeBajaMenaje(activoId: string, motivo: string, cantidad
 export async function eliminarMenaje(activoId: string) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
-  if (profile.rol !== "CONTADOR") {
-    return { error: "Solo el contador puede eliminar menaje." };
+  if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
+    return { error: "No autorizado." };
   }
 
   const supabase = await createClient();
@@ -947,6 +947,9 @@ export async function eliminarMenaje(activoId: string) {
   }
   if (!esMenaje(existing.categoria)) {
     return { error: "Esta acción es solo para menaje." };
+  }
+  if (profile.rol === "ADMIN_ENTIDAD" && existing.entidad_id !== profile.entidad_id) {
+    return { error: "No autorizado." };
   }
   if (existing.estado_registro === "DADO_DE_BAJA") {
     return { error: "Un menaje dado de baja no se elimina. Ya quedó en el historial de bajas." };
