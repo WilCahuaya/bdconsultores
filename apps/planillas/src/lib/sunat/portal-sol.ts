@@ -331,8 +331,8 @@ async function clickQueContiene(page: Page, frase: string): Promise<boolean> {
       const ok = await frame
         .evaluate((buscado) => {
           const normal = (valor: string | null) => (valor ?? "").replace(/\s+/g, " ").trim().toLowerCase();
-          const candidatos = Array.from(document.querySelectorAll("a, button, span, div, li, td")).filter((el) =>
-            normal(el.innerText).includes(buscado),
+          const candidatos = Array.from(document.querySelectorAll("a, button, span, div, li, td")).filter(
+            (el): el is HTMLElement => el instanceof HTMLElement && normal(el.innerText).includes(buscado),
           );
           candidatos.sort((a, b) => normal(a.innerText).length - normal(b.innerText).length);
           const elegido = candidatos.find((el) => {
