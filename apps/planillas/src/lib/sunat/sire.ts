@@ -1,4 +1,3 @@
-import "server-only";
 import { unzipSync, strFromU8 } from "fflate";
 import { getAccessToken, type SunatCredencialSecreto } from "./auth";
 import { SunatError, SunatTicketPendienteError } from "./errors";
@@ -43,13 +42,15 @@ export interface PropuestaRce {
 export async function descargarPropuestaRce(
   cred: SunatCredencialSecreto,
   periodo: string,
-  options?: { numTicket?: string },
+  options?: { numTicket?: string; maxIntentos?: number; esperaMs?: number; onEspera?: (intento: number, codigo: string) => void },
 ): Promise<PropuestaRce> {
   if (!/^[0-9]{6}$/.test(periodo)) {
     throw new SunatError("El periodo debe ser AAAAMM.", "PERIODO");
   }
+  const maxIntentos = options?.maxIntentos ?? 8;
+  const esperaMs = options?.esperaMs ?? 4_000;
   const numTicket = options?.numTicket ?? (await solicitar(cred, periodo));
-  for (let intento = 0; intento < 8; intento++) {
+  for (let intento = 0; intento < maxIntentos; intento++) {
     const registro = await consultar(cred, periodo, numTicket);
     const codigo = registro.codEstadoProceso ?? "";
     const descripcion = registro.desEstadoProceso ?? "";
@@ -59,8 +60,9 @@ export async function descargarPropuestaRce(
     if (FALLO.has(codigo) || /error/i.test(descripcion)) {
       throw new SunatError(`SUNAT no generó el archivo: ${codigo} ${descripcion}`.trim(), codigo);
     }
-    if (intento < 7 && (EN_PROCESO.has(codigo) || !codigo)) {
-      await new Promise((resolve) => setTimeout(resolve, 4_000));
+    if (intento < maxIntentos - 1 && (EN_PROCESO.has(codigo) || !codigo)) {
+      options?.onEspera?.(intento + 1, codigo);
+      await new Promise((resolve) => setTimeout(resolve, esperaMs));
       continue;
     }
     throw new SunatTicketPendienteError(numTicket, codigo, descripcion);

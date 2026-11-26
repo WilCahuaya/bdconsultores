@@ -4,12 +4,13 @@ import { revalidatePath } from "next/cache";
 import { esPersonalEstudio } from "@inventario/types";
 import { requirePlanillasProfile } from "@/lib/auth/access";
 import { createClient } from "@/lib/supabase/server";
+import type { SunatCredencialSecreto } from "@/lib/sunat/auth";
 import { decryptString, encryptString } from "@/lib/sunat/crypto";
 import { SunatError, SunatTicketPendienteError } from "@/lib/sunat/errors";
 import { parseRce, type CompraRce } from "@/lib/sunat/parse-rce";
+import { guardarPropuesta, registrarDescarga } from "@/lib/sunat/persistir";
+import { rutaCdr, rutaXml } from "@/lib/sunat/rutas";
 import { descargarPropuestaRce, textoDeArchivo } from "@/lib/sunat/sire";
-import type { SunatCredencialSecreto } from "@/lib/sunat/auth";
-import { descargarXmlRecibido, descargarCdrRecibido } from "@/lib/sunat/cpe";
 import { parseUbl, type ComprobanteUbl } from "@/lib/sunat/ubl";
 
 export interface CredencialSunatVista {
@@ -34,6 +35,7 @@ export interface CompraSunatFila {
   igv: number | null;
   total: number | null;
   estado: string;
+  xml_estado: string | null;
 }
 
 export interface DescargaSunatVista {
@@ -53,6 +55,7 @@ function normalizarCompra(row: CompraSunatFila): CompraSunatFila {
     igv: monto(row.igv),
     tipo_cambio: monto(row.tipo_cambio),
     estado: row.estado || "ACEPTADO",
+    xml_estado: row.xml_estado ?? null,
   };
 }
 
@@ -177,10 +180,12 @@ export async function listarComprasSunat(entidadId: string, periodo: string): Pr
       igv: null,
       tipo_cambio: null,
       estado: "ACEPTADO",
+      xml_estado: null,
     }),
   );
   try {
-    return await completarFilas(supabase, entidadId, periodo, filas);
+    const completas = await completarFilas(supabase, entidadId, periodo, filas);
+    return await adjuntarXml(supabase, entidadId, periodo, completas);
   } catch {
     return filas;
   }
@@ -247,83 +252,21 @@ export async function descargarComprasSunat(
 
   try {
     const propuesta = await descargarPropuestaRce(secreto, periodo, { numTicket: ticketPrevio });
-    const compras = parseRce(propuesta.texto);
-    const path = `${entidadId}/${periodo}/propuesta.zip`;
-    const { error: uploadError } = await supabase.storage.from("sunat-compras").upload(path, propuesta.contenido, {
-      contentType: "application/octet-stream",
-      upsert: true,
-    });
-
-    const { error: borrarError } = await supabase
-      .from("sunat_compras")
-      .delete()
-      .eq("entidad_id", entidadId)
-      .eq("periodo", periodo);
-    if (borrarError) return { error: borrarError.message };
-
-    if (compras.length > 0) {
-      const { error: insertError } = await supabase.from("sunat_compras").insert(
-        compras.map((compra) => ({
-          entidad_id: entidadId,
-          periodo,
-          tipo: compra.tipo,
-          serie: compra.serie,
-          numero: compra.numero,
-          numero_final: compra.numeroFinal,
-          ruc_emisor: compra.rucEmisor,
-          razon_social_emisor: compra.razonSocialEmisor,
-          fecha_emision: compra.fechaEmision,
-          moneda: compra.moneda,
-          total: compra.total,
-          car: compra.car,
-        })),
-      );
-      if (insertError) return { error: insertError.message };
-    }
-
-    await supabase.from("sunat_descargas").upsert(
-      {
-        entidad_id: entidadId,
-        periodo,
-        num_ticket: propuesta.numTicket,
-        estado: "LISTO",
-        mensaje: uploadError
-          ? `${compras.length} comprobantes guardados. No se archivó el ZIP de SUNAT: ${uploadError.message}`
-          : `${compras.length} comprobantes de factura, boleta electrónica y recibo por honorarios.`,
-        archivo_path: uploadError ? null : path,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "entidad_id,periodo" },
-    );
+    const { total } = await guardarPropuesta(supabase, entidadId, periodo, propuesta);
     revalidatePath("/compras");
-    return { total: compras.length };
+    return { total };
   } catch (error) {
     if (error instanceof SunatTicketPendienteError) {
-      await supabase.from("sunat_descargas").upsert(
-        {
-          entidad_id: entidadId,
-          periodo,
-          num_ticket: error.numTicket,
-          estado: "EN_PROCESO",
-          mensaje: error.message,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "entidad_id,periodo" },
-      );
+      await registrarDescarga(supabase, entidadId, periodo, {
+        numTicket: error.numTicket,
+        estado: "EN_PROCESO",
+        mensaje: error.message,
+      });
       revalidatePath("/compras");
       return { error: error.message, pendiente: true };
     }
     const message = error instanceof SunatError ? error.message : "No se pudo descargar el mes desde SUNAT.";
-    await supabase.from("sunat_descargas").upsert(
-      {
-        entidad_id: entidadId,
-        periodo,
-        estado: "ERROR",
-        mensaje: message,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "entidad_id,periodo" },
-    );
+    await registrarDescarga(supabase, entidadId, periodo, { estado: "ERROR", mensaje: message });
     return { error: message };
   }
 }
@@ -350,25 +293,10 @@ export async function prepararPdfCompra(id: string): Promise<{
       .eq("id", compra.id);
   }
 
-  const guardado = await xmlGuardado(supabase, compra);
-  let xml = guardado;
-  let aviso: string | null = null;
-  if (!xml && compra.ruc_emisor) {
-    const cred = await credencialSecreta(supabase, compra.entidadId);
-    if (cred) {
-      const bajado = await descargarXmlRecibido(cred, {
-        rucEmisor: compra.ruc_emisor,
-        tipo: compra.tipo,
-        serie: compra.serie,
-        numero: compra.numero,
-      }).catch(() => ({ xml: null, aviso: "SUNAT no respondió al pedir el XML." }));
-      xml = bajado.xml;
-      aviso = bajado.aviso;
-      if (xml) await guardarXml(supabase, compra, xml);
-    } else {
-      aviso = "Falta la credencial SOL para pedir el detalle a SUNAT.";
-    }
-  }
+  const xml = await xmlGuardado(supabase, compra);
+  let aviso = xml
+    ? null
+    : "El detalle de esta factura todavía no está en el almacén. En la PC del estudio se baja con pnpm sunat:bajar.";
 
   const detalle = xml ? parseUbl(xml) : null;
   if (detalle?.esResumen) {
@@ -476,14 +404,25 @@ async function leerPropuesta(
   return parseRce(textoDeArchivo(Buffer.from(await data.arrayBuffer())));
 }
 
-function claveCompra(tipo: string, serie: string, numero: string): string {
-  return `${tipo}|${serie}|${numero}`;
+async function adjuntarXml(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entidadId: string,
+  periodo: string,
+  filas: CompraSunatFila[],
+): Promise<CompraSunatFila[]> {
+  const { data, error } = await supabase
+    .from("sunat_compra_archivos")
+    .select("tipo, serie, numero, xml_estado")
+    .eq("entidad_id", entidadId)
+    .eq("periodo", periodo);
+  if (error || !data) return filas;
+  const porClave = new Map(data.map((fila) => [claveCompra(fila.tipo as string, fila.serie as string, fila.numero as string), fila.xml_estado as string]));
+  for (const fila of filas) fila.xml_estado = porClave.get(claveCompra(fila.tipo, fila.serie, fila.numero)) ?? null;
+  return filas;
 }
 
-function rutaXml(compra: { entidadId: string; periodo: string; tipo: string; serie: string; numero: string }): string {
-  const serie = compra.serie.replace(/[^\w.-]+/g, "_") || "SIN-SERIE";
-  const numero = compra.numero.replace(/[^\w.-]+/g, "_");
-  return `${compra.entidadId}/${compra.periodo}/xml/${compra.tipo}-${serie}-${numero}.xml`;
+function claveCompra(tipo: string, serie: string, numero: string): string {
+  return `${tipo}|${serie}|${numero}`;
 }
 
 async function xmlGuardado(
@@ -496,40 +435,7 @@ async function xmlGuardado(
   return texto.includes("<") ? texto : null;
 }
 
-async function guardarXml(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  compra: { entidadId: string; periodo: string; tipo: string; serie: string; numero: string },
-  xml: string,
-): Promise<void> {
-  await supabase.storage.from("sunat-compras").upload(rutaXml(compra), Buffer.from(xml), {
-    contentType: "application/octet-stream",
-    upsert: true,
-  });
-}
-
-async function credencialSecreta(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  entidadId: string,
-): Promise<SunatCredencialSecreto | null> {
-  const { data } = await supabase
-    .from("sunat_credenciales")
-    .select("ruc, usuario_sol, client_id, clave_sol_cifrada, client_secret_cifrado")
-    .eq("entidad_id", entidadId)
-    .maybeSingle();
-  if (!data) return null;
-  return {
-    entidadId,
-    ruc: data.ruc as string,
-    usuarioSol: data.usuario_sol as string,
-    clientId: data.client_id as string,
-    claveSolCifrada: data.clave_sol_cifrada as string,
-    clientSecretCifrado: data.client_secret_cifrado as string,
-  };
-}
-
-function rutaCdr(compra: { entidadId: string; periodo: string; tipo: string; serie: string; numero: string }): string {
-  return rutaXml(compra).replace(/\.xml$/, ".cdr");
-}
+const FALTA_ARCHIVO = "Ese archivo todavía no está en el almacén. En la PC del estudio se baja con pnpm sunat:bajar.";
 
 export async function archivoCompraSunat(
   id: string,
@@ -539,48 +445,17 @@ export async function archivoCompraSunat(
   if (datos.error || !datos.compra) return { error: datos.error ?? "No se encontró el comprobante." };
   const compra = datos.compra;
   const supabase = await createClient();
-  const registro = await lineaDeRegistro(supabase, compra.entidadId, compra.periodo, compra);
-  if (registro?.rucEmisor) compra.ruc_emisor = registro.rucEmisor;
-  if (!compra.ruc_emisor) return { error: "Falta el RUC del proveedor." };
-  const cred = await credencialSecreta(supabase, compra.entidadId);
-  if (!cred) return { error: "Falta la credencial SOL." };
-  const pedido = {
-    rucEmisor: compra.ruc_emisor,
-    tipo: compra.tipo,
-    serie: compra.serie,
-    numero: compra.numero,
-  };
   const base = `${compra.tipo}-${compra.serie || "SIN-SERIE"}-${compra.numero}`.replace(/[^\w.-]+/g, "_");
 
   if (clase === "xml") {
-    let xml = await xmlGuardado(supabase, compra);
-    if (!xml) {
-      const bajado = await descargarXmlRecibido(cred, pedido).catch(() => ({
-        xml: null,
-        aviso: "SUNAT no respondió al pedir el XML.",
-      }));
-      xml = bajado.xml;
-      if (!xml) return { error: bajado.aviso ?? "SUNAT no entregó el XML." };
-      await guardarXml(supabase, compra, xml);
-    }
+    const xml = await xmlGuardado(supabase, compra);
+    if (!xml) return { error: FALTA_ARCHIVO };
     return { filename: `${base}.xml`, contentType: "application/xml", bytes: Buffer.from(xml) };
   }
 
   const guardado = await supabase.storage.from("sunat-compras").download(rutaCdr(compra));
-  if (guardado.data) {
-    const bytes = new Uint8Array(await guardado.data.arrayBuffer());
-    return archivoCdr(base, bytes);
-  }
-  const bajado = await descargarCdrRecibido(cred, pedido).catch(() => ({
-    bytes: null,
-    aviso: "SUNAT no respondió al pedir el CDR.",
-  }));
-  if (!bajado.bytes) return { error: bajado.aviso ?? "SUNAT no entregó el CDR." };
-  await supabase.storage.from("sunat-compras").upload(rutaCdr(compra), bajado.bytes, {
-    contentType: "application/octet-stream",
-    upsert: true,
-  });
-  return archivoCdr(base, bajado.bytes);
+  if (!guardado.data) return { error: FALTA_ARCHIVO };
+  return archivoCdr(base, new Uint8Array(await guardado.data.arrayBuffer()));
 }
 
 function archivoCdr(base: string, bytes: Uint8Array): { filename: string; contentType: string; bytes: Uint8Array } {

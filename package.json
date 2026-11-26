@@ -13,6 +13,7 @@
     "dev:portal": "pnpm --filter @bd/portal dev",
     "dev:inventarios": "pnpm --filter @bd/inventarios dev",
     "dev:planillas": "pnpm --filter @bd/planillas dev",
+    "sunat:bajar": "pnpm --filter @bd/planillas sunat:bajar",
     "dev:plataforma": "turbo dev --filter=@bd/portal --filter=@bd/inventarios --filter=@bd/planillas",
     "build:web": "pnpm --filter @inventario/web build",
     "build:desktop": "pnpm --filter @inventario/desktop build",

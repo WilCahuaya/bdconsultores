@@ -1,4 +1,3 @@
-import "server-only";
 import { decryptString } from "./crypto";
 import { SunatCredencialesInvalidasError, SunatError } from "./errors";
 import { sunatFetch } from "./http";

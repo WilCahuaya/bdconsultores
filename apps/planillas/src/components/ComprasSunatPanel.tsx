@@ -136,7 +136,9 @@ export function ComprasSunatPanel({
         </div>
         {descarga?.mensaje ? <p className="text-sm text-muted-foreground">{descarga.mensaje}</p> : null}
         <p className="text-sm text-muted-foreground">
-          Elija una fila para ver el detalle. Desde ahí se descarga el PDF, el XML y el CDR.
+          Elija una fila para ver el detalle. El XML y el CDR de cada factura se bajan en la PC del estudio, y aquí los ve todo el personal:
+          {" "}
+          <span className="break-all font-mono text-xs">pnpm sunat:bajar -- --ruc {credencial.ruc} --periodo {periodo}</span>
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-sm">
@@ -154,12 +156,13 @@ export function ComprasSunatPanel({
                 <th className="px-2 py-2 text-right font-medium">IGV</th>
                 <th className="px-2 py-2 text-right font-medium">Total</th>
                 <th className="px-2 py-2 font-medium">Estado</th>
+                <th className="px-2 py-2 font-medium">XML</th>
               </tr>
             </thead>
             <tbody>
               {compras.length === 0 ? (
                 <tr>
-                  <td className="px-2 py-8 text-muted-foreground" colSpan={12}>
+                  <td className="px-2 py-8 text-muted-foreground" colSpan={13}>
                     Todavía no hay comprobantes de este mes.
                   </td>
                 </tr>
@@ -182,6 +185,7 @@ export function ComprasSunatPanel({
                     <td className="px-2 py-2 text-right font-mono">{importe(compra.igv)}</td>
                     <td className="px-2 py-2 text-right font-mono">{importe(compra.total)}</td>
                     <td className="px-2 py-2">{compra.estado}</td>
+                    <td className="px-2 py-2">{etiquetaXml(compra.xml_estado, compra.tipo)}</td>
                   </tr>
                 ))
               )}
@@ -210,6 +214,15 @@ function importe(total: number | null): string {
   if (total == null) return "—";
   const [entero, decimal] = total.toFixed(2).split(".");
   return `${entero.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}.${decimal}`;
+}
+
+function etiquetaXml(estado: string | null, tipo: string): string {
+  if (tipo !== "01") return "—";
+  if (estado === "LISTO") return "Listo";
+  if (estado === "EN_PEDIDO") return "Bajando";
+  if (estado === "SIN_XML") return "Sin XML";
+  if (estado === "ERROR") return "Error";
+  return "Pendiente";
 }
 
 function cambio(tipoCambio: number | null, moneda: string | null): string {
