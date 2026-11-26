@@ -441,6 +441,14 @@ async function bajar(
   frame: Frame,
   etiqueta: "XML" | "CDR",
 ): Promise<{ bytes: Uint8Array | null; previo: boolean }> {
+  const marcado = await pulsarIcono(frame, etiqueta, false);
+  if (marcado === "sin-cdr") return { bytes: null, previo: false };
+  if (marcado) {
+    const bajada = await clicDescarga(page, () => pulsarIcono(frame, etiqueta, true));
+    if (bajada.previo) return bajada;
+    if (bajada.bytes && etiqueta === "XML" && !xmlDeArchivo(bajada.bytes)) return { bytes: null, previo: false };
+    return bajada;
+  }
   const selector = [
     `[title*='${etiqueta}' i]`,
     `[aria-label*='${etiqueta}' i]`,
@@ -462,12 +470,7 @@ async function bajar(
       if (bajada.bytes && (etiqueta === "CDR" || xmlDeArchivo(bajada.bytes))) return bajada;
     }
   }
-  const marcado = await pulsarIcono(frame, etiqueta, false);
-  if (!marcado) return { bytes: null, previo: false };
-  const bajada = await clicDescarga(page, () => pulsarIcono(frame, etiqueta, true));
-  if (bajada.previo) return bajada;
-  if (bajada.bytes && etiqueta === "XML" && !xmlDeArchivo(bajada.bytes)) return { bytes: null, previo: false };
-  return bajada;
+  return { bytes: null, previo: false };
 }
 
 async function esIconoDeImpresion(boton: Locator): Promise<boolean> {
@@ -486,17 +489,29 @@ async function pulsarIcono(frame: Frame, etiqueta: "XML" | "CDR", pulsar: boolea
   const info = await frame
     .evaluate(
       ({ buscado, hacerClic }) => {
+        const titulo = [...document.querySelectorAll("div, span, h1, h2, h3, h4, p, strong, label, a")].find((nodo) => {
+          if (!(nodo instanceof HTMLElement)) return false;
+          const propio = [...nodo.childNodes]
+            .filter((hijo) => hijo.nodeType === Node.TEXT_NODE)
+            .map((hijo) => hijo.textContent ?? "")
+            .join(" ")
+            .replace(/\s+/g, " ")
+            .trim();
+          if (propio !== "Resultado") return false;
+          const caja = nodo.getBoundingClientRect();
+          return caja.height > 0 && caja.height < 48 && caja.width < 240;
+        });
+        if (!(titulo instanceof HTMLElement)) return "";
+        const techo = titulo.getBoundingClientRect().bottom;
         const vistos = new Set<HTMLElement>();
         const iconos: HTMLElement[] = [];
-        for (const nodo of document.querySelectorAll("a, button, img, i, span")) {
+        for (const nodo of document.querySelectorAll("a, button, img")) {
           if (!(nodo instanceof HTMLElement)) continue;
           const caja = nodo.getBoundingClientRect();
-          if (caja.width < 8 || caja.width > 80 || caja.height < 8 || caja.height > 80) continue;
+          if (caja.top < techo - 4 || caja.top > techo + 90) continue;
+          if (caja.width < 8 || caja.width > 64 || caja.height < 8 || caja.height > 64) continue;
           const estilo = window.getComputedStyle(nodo);
           if (estilo.display === "none" || estilo.visibility === "hidden" || Number(estilo.opacity) === 0) continue;
-          if (/\bopacidad-60\b|\bopacidad\b|disabled/i.test(String(nodo.className)) || nodo.getAttribute("disabled") !== null) continue;
-          const texto = (nodo.innerText || "").replace(/\s+/g, " ").trim();
-          if (texto.length > 3) continue;
           const destino = nodo.closest("a, button");
           const icono = destino instanceof HTMLElement ? destino : nodo;
           if (/\bopacidad-60\b|disabled/i.test(String(icono.className)) || icono.getAttribute("disabled") !== null) continue;
@@ -504,54 +519,20 @@ async function pulsarIcono(frame: Frame, etiqueta: "XML" | "CDR", pulsar: boolea
           vistos.add(icono);
           iconos.push(icono);
         }
-        const grupos = new Map<number, HTMLElement[]>();
-        for (const icono of iconos) {
-          const top = Math.round(icono.getBoundingClientRect().top / 8) * 8;
-          const grupo = grupos.get(top) ?? [];
-          grupo.push(icono);
-          grupos.set(top, grupo);
-        }
-        let fila: HTMLElement[] = [];
-        for (const grupo of grupos.values()) {
-          grupo.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
-          if (grupo.length > fila.length) fila = grupo;
-        }
-        const rotulado = fila.find((item) => {
-          const pista = pistaDe(item);
-          return new RegExp(`\\b${buscado}\\b`, "i").test(pista) && !esPdfOImpresion(pista);
-        });
-        const indice = buscado === "XML" ? 1 : 2;
-        const porLugar = buscado === "CDR" && fila.length < 5 ? undefined : fila[indice];
-        const icono = rotulado ?? (porLugar && !esPdfOImpresion(pistaDe(porLugar)) ? porLugar : undefined);
+        iconos.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+        if (iconos.length !== 4 && iconos.length !== 5) return "";
+        if (buscado === "CDR" && iconos.length === 4) return "sin-cdr";
+        const icono = iconos[buscado === "XML" ? 1 : 2];
         if (!(icono instanceof HTMLElement)) return "";
         if (hacerClic) icono.click();
-        const lugar = fila.indexOf(icono) + 1;
-        return `${rotulado ? "nombre" : "lugar"} ${lugar}/${fila.length} ${pistaDe(icono)}`.replace(/\s+/g, " ").trim().slice(0, 120);
-        function esPdfOImpresion(pista: string): boolean {
-          if (/\b(?:xml|cdr)\b/i.test(pista)) return false;
-          return /imprim|print|pdf|acrobat|representa|correo|\bmail\b|email/i.test(pista);
-        }
-        function pistaDe(item: HTMLElement): string {
-          const padre = item.parentElement;
-          return [
-            item.getAttribute("title"),
-            item.getAttribute("aria-label"),
-            item.getAttribute("alt"),
-            item.getAttribute("src"),
-            item.getAttribute("onclick"),
-            item.id,
-            String(item.className),
-            padre?.getAttribute("title"),
-            padre?.getAttribute("onclick"),
-          ]
-            .filter(Boolean)
-            .join(" ");
-        }
+        const puesto = buscado === "XML" ? 2 : 3;
+        return `${iconos.length} iconos, puesto ${puesto}. Los dos últimos son imprimir y correo.`;
       },
       { buscado: etiqueta, hacerClic: pulsar },
     )
     .catch(() => "");
-  if (pulsar && info) console.log(`Icono ${etiqueta}: ${info}`);
+  if (pulsar && info && info !== "sin-cdr") console.log(`Icono ${etiqueta}: ${info}`);
+  if (!pulsar && info === "sin-cdr") console.log("Resultado tiene 4 iconos: XML y no CDR.");
   return info;
 }
 
