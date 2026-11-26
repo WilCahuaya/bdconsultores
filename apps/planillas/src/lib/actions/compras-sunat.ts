@@ -396,18 +396,25 @@ export async function compraSunatParaPdf(id: string): Promise<{
     .eq("id", id)
     .maybeSingle();
   if (error || !data) return { error: "No se encontró el comprobante." };
+  const { periodo, entidad_id: entidadId, ...fila } = data;
   const { data: entidad } = await supabase
     .from("entidades")
     .select("nombre, ruc")
-    .eq("id", data.entidad_id as string)
+    .eq("id", entidadId as string)
     .maybeSingle();
   return {
     compra: {
-      ...normalizarCompra(data as CompraSunatFila),
-      periodo: data.periodo as string,
+      ...normalizarCompra({
+        ...(fila as CompraSunatFila),
+        base: null,
+        igv: null,
+        tipo_cambio: null,
+        estado: "ACEPTADO",
+      }),
+      periodo: periodo as string,
       empresa: (entidad?.nombre as string) ?? "",
       rucEmpresa: (entidad?.ruc as string) ?? "",
-      entidadId: data.entidad_id as string,
+      entidadId: entidadId as string,
     },
   };
 }
