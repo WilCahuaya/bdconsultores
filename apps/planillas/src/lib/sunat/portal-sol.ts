@@ -458,12 +458,16 @@ async function bajar(
       if (!(await boton.isVisible().catch(() => false))) continue;
       if (await esIconoDeImpresion(boton)) continue;
       const bajada = await clicDescarga(page, () => boton.click({ force: true }));
-      if (bajada.bytes || bajada.previo) return bajada;
+      if (bajada.previo) return bajada;
+      if (bajada.bytes && (etiqueta === "CDR" || xmlDeArchivo(bajada.bytes))) return bajada;
     }
   }
   const marcado = await pulsarIcono(frame, etiqueta, false);
   if (!marcado) return { bytes: null, previo: false };
-  return clicDescarga(page, () => pulsarIcono(frame, etiqueta, true));
+  const bajada = await clicDescarga(page, () => pulsarIcono(frame, etiqueta, true));
+  if (bajada.previo) return bajada;
+  if (bajada.bytes && etiqueta === "XML" && !xmlDeArchivo(bajada.bytes)) return { bytes: null, previo: false };
+  return bajada;
 }
 
 async function esIconoDeImpresion(boton: Locator): Promise<boolean> {
@@ -487,7 +491,7 @@ async function pulsarIcono(frame: Frame, etiqueta: "XML" | "CDR", pulsar: boolea
         for (const nodo of document.querySelectorAll("a, button, img, i, span")) {
           if (!(nodo instanceof HTMLElement)) continue;
           const caja = nodo.getBoundingClientRect();
-          if (caja.width < 12 || caja.width > 56 || caja.height < 12 || caja.height > 56) continue;
+          if (caja.width < 8 || caja.width > 80 || caja.height < 8 || caja.height > 80) continue;
           const estilo = window.getComputedStyle(nodo);
           if (estilo.display === "none" || estilo.visibility === "hidden" || Number(estilo.opacity) === 0) continue;
           if (/\bopacidad-60\b|\bopacidad\b|disabled/i.test(String(nodo.className)) || nodo.getAttribute("disabled") !== null) continue;
@@ -512,14 +516,21 @@ async function pulsarIcono(frame: Frame, etiqueta: "XML" | "CDR", pulsar: boolea
           grupo.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
           if (grupo.length > fila.length) fila = grupo;
         }
-        const icono = fila.find((item) => {
+        const rotulado = fila.find((item) => {
           const pista = pistaDe(item);
-          const esImpresion = /imprim|print|pdf|representa/i.test(pista) && !/\b(?:xml|cdr)\b/i.test(pista);
-          return new RegExp(`\\b${buscado}\\b`, "i").test(pista) && !esImpresion;
+          return new RegExp(`\\b${buscado}\\b`, "i").test(pista) && !esPdfOImpresion(pista);
         });
+        const indice = buscado === "XML" ? 1 : 2;
+        const porLugar = buscado === "CDR" && fila.length < 5 ? undefined : fila[indice];
+        const icono = rotulado ?? (porLugar && !esPdfOImpresion(pistaDe(porLugar)) ? porLugar : undefined);
         if (!(icono instanceof HTMLElement)) return "";
         if (hacerClic) icono.click();
-        return pistaDe(icono).replace(/\s+/g, " ").trim().slice(0, 80);
+        const lugar = fila.indexOf(icono) + 1;
+        return `${rotulado ? "nombre" : "lugar"} ${lugar}/${fila.length} ${pistaDe(icono)}`.replace(/\s+/g, " ").trim().slice(0, 120);
+        function esPdfOImpresion(pista: string): boolean {
+          if (/\b(?:xml|cdr)\b/i.test(pista)) return false;
+          return /imprim|print|pdf|acrobat|representa|correo|\bmail\b|email/i.test(pista);
+        }
         function pistaDe(item: HTMLElement): string {
           const padre = item.parentElement;
           return [
@@ -766,10 +777,8 @@ async function leerDescarga(descarga: Download): Promise<Uint8Array> {
 }
 
 export function xmlDeArchivo(bytes: Uint8Array): string | null {
-  if (bytes[0] === 0x3c) {
-    const texto = new TextDecoder().decode(bytes);
-    return texto.includes("<") ? texto : null;
-  }
+  const directo = textoXml(bytes);
+  if (directo) return directo;
   if (!(bytes[0] === 0x50 && bytes[1] === 0x4b)) return null;
   let files: Record<string, Uint8Array>;
   try {
@@ -777,13 +786,25 @@ export function xmlDeArchivo(bytes: Uint8Array): string | null {
   } catch {
     return null;
   }
-  const nombres = Object.keys(files);
-  const nombre =
-    nombres.find((item) => item.toLowerCase().endsWith(".xml") && !item.toLowerCase().includes("cdr")) ??
-    nombres.find((item) => item.toLowerCase().endsWith(".xml"));
-  if (!nombre) return null;
-  const texto = strFromU8(files[nombre]);
-  return texto.includes("<") ? texto : null;
+  const nombres = Object.keys(files).filter((item) => !item.endsWith("/"));
+  const ordenados = [
+    ...nombres.filter((item) => item.toLowerCase().endsWith(".xml") && !/cdr/i.test(item)),
+    ...nombres.filter((item) => item.toLowerCase().endsWith(".xml")),
+    ...nombres,
+  ];
+  for (const nombre of ordenados) {
+    const texto = textoXml(files[nombre]);
+    if (texto) return texto;
+  }
+  return null;
+}
+
+function textoXml(bytes: Uint8Array): string | null {
+  let inicio = 0;
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) inicio = 3;
+  const texto = new TextDecoder().decode(bytes.subarray(inicio)).replace(/^\uFEFF/, "").trim();
+  if (!texto.startsWith("<")) return null;
+  return /<(?:[\w.-]+:)?(?:Invoice|CreditNote|DebitNote)\b/.test(texto) ? texto : null;
 }
 
 async function campo(page: Page, selectores: string[]) {
