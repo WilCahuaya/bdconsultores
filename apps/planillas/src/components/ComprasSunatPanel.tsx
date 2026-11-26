@@ -151,7 +151,7 @@ export function ComprasSunatPanel({
               {descargando ? "Consultando SUNAT…" : "Descargar mes"}
             </Button>
             <Button type="button" onClick={onPedirXml} disabled={pidiendo || bajando || !credencial.configurada}>
-              {bajando ? "Bajando XML…" : pidiendo ? "Enviando pedido…" : "Bajar XML"}
+              {bajando ? "Bajando XML…" : pidiendo ? "Enviando pedido…" : "Pedir XML"}
             </Button>
             <a
               className="inline-flex h-10 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent"
@@ -164,8 +164,8 @@ export function ComprasSunatPanel({
         {descarga?.mensaje ? <p className="text-sm text-muted-foreground">{descarga.mensaje}</p> : null}
         {pedido?.mensaje ? <p className="text-sm text-muted-foreground">{pedido.mensaje}</p> : null}
         <p className="text-sm text-muted-foreground">
-          Bajar XML pide los archivos a la PC del estudio. Esa PC tiene que estar encendida, con el programa de bajada abierto.
-          Si SUNAT pide un captcha, se escribe en esa PC. Elija una fila para ver el detalle.
+          Pedir XML avisa a la PC del estudio. Esa PC baja las facturas cuando el programa está abierto.
+          Si SUNAT pide un captcha, se escribe ahí. Elija una fila para ver el detalle.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-sm">
