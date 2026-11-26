@@ -44,6 +44,11 @@ export interface DescargaSunatVista {
   numTicket: string | null;
 }
 
+export interface PedidoXmlVista {
+  estado: string;
+  mensaje: string | null;
+}
+
 const SELECT_COMPRA =
   "id, tipo, serie, numero, numero_final, ruc_emisor, razon_social_emisor, fecha_emision, moneda, total";
 
@@ -207,6 +212,49 @@ export async function estadoDescargaSunat(entidadId: string, periodo: string): P
     mensaje: (data.mensaje as string | null) ?? null,
     numTicket: (data.num_ticket as string | null) ?? null,
   };
+}
+
+export async function estadoPedidoXml(entidadId: string, periodo: string): Promise<PedidoXmlVista | null> {
+  const acceso = await exigirEstudio();
+  if (!acceso.profile || !/^[0-9]{6}$/.test(periodo)) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("sunat_pedidos")
+    .select("estado, mensaje")
+    .eq("entidad_id", entidadId)
+    .eq("periodo", periodo)
+    .maybeSingle();
+  if (!data) return null;
+  return { estado: data.estado as string, mensaje: (data.mensaje as string | null) ?? null };
+}
+
+export async function pedirXmlCompras(entidadId: string, periodo: string): Promise<{ error?: string }> {
+  const acceso = await exigirEstudio();
+  if (!acceso.profile) return { error: acceso.error ?? "Sin permiso." };
+  if (!/^[0-9]{6}$/.test(periodo)) return { error: "Elija un mes válido." };
+  const supabase = await createClient();
+  const { data: credencial } = await supabase.from("sunat_credenciales").select("entidad_id").eq("entidad_id", entidadId).maybeSingle();
+  if (!credencial) return { error: "Guarde primero la credencial SOL de esta empresa." };
+  const { data: actual } = await supabase
+    .from("sunat_pedidos")
+    .select("estado")
+    .eq("entidad_id", entidadId)
+    .eq("periodo", periodo)
+    .maybeSingle();
+  if (actual?.estado === "EN_PROCESO") return { error: "La PC del estudio ya está bajando este mes." };
+  const { error } = await supabase.from("sunat_pedidos").upsert(
+    {
+      entidad_id: entidadId,
+      periodo,
+      estado: "PEDIDO",
+      mensaje: "Pedido recibido. La PC del estudio lo baja si está encendida y con el programa abierto.",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "entidad_id,periodo" },
+  );
+  if (error) return { error: error.message };
+  revalidatePath("/compras");
+  return {};
 }
 
 export async function descargarComprasSunat(

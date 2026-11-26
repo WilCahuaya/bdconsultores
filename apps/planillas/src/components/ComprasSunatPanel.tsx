@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useToast } from "@inventario/ui";
 import { panelCardClass } from "@inventario/ui/panel";
@@ -10,9 +10,11 @@ import { ComprasDetalleDialog } from "@/components/ComprasDetalleDialog";
 import {
   descargarComprasSunat,
   guardarCredencialSunat,
+  pedirXmlCompras,
   type CompraSunatFila,
   type CredencialSunatVista,
   type DescargaSunatVista,
+  type PedidoXmlVista,
 } from "@/lib/actions/compras-sunat";
 
 export function ComprasSunatPanel({
@@ -21,6 +23,7 @@ export function ComprasSunatPanel({
   periodo,
   compras,
   descarga,
+  pedido,
   empresaNombre,
 }: {
   entidadId: string;
@@ -28,12 +31,21 @@ export function ComprasSunatPanel({
   periodo: string;
   compras: CompraSunatFila[];
   descarga: DescargaSunatVista | null;
+  pedido: PedidoXmlVista | null;
   empresaNombre: string;
 }) {
   const router = useRouter();
   const { pushToast } = useToast();
   const [guardando, setGuardando] = useState(false);
   const [descargando, setDescargando] = useState(false);
+  const [pidiendo, setPidiendo] = useState(false);
+  const bajando = pedido?.estado === "PEDIDO" || pedido?.estado === "EN_PROCESO";
+
+  useEffect(() => {
+    if (!bajando) return;
+    const id = window.setInterval(() => router.refresh(), 8_000);
+    return () => window.clearInterval(id);
+  }, [bajando, router]);
   const [seleccion, setSeleccion] = useState<CompraSunatFila | null>(null);
   const mes = `${periodo.slice(0, 4)}-${periodo.slice(4, 6)}`;
   const api = webAppById("planillas").basePath;
@@ -69,6 +81,18 @@ export function ComprasSunatPanel({
         ? `SUNAT devolvió ${result.total} comprobantes.`
         : "SUNAT no tiene facturas, boletas electrónicas ni recibos en ese mes.",
     );
+    router.refresh();
+  }
+
+  async function onPedirXml() {
+    setPidiendo(true);
+    const result = await pedirXmlCompras(entidadId, periodo);
+    setPidiendo(false);
+    if (result.error) {
+      pushToast(result.error, "error");
+      return;
+    }
+    pushToast("Pedido enviado a la PC del estudio.");
     router.refresh();
   }
 
@@ -126,6 +150,9 @@ export function ComprasSunatPanel({
             <Button type="button" onClick={onDescargar} disabled={descargando || !credencial.configurada}>
               {descargando ? "Consultando SUNAT…" : "Descargar mes"}
             </Button>
+            <Button type="button" onClick={onPedirXml} disabled={pidiendo || bajando || !credencial.configurada}>
+              {bajando ? "Bajando XML…" : pidiendo ? "Enviando pedido…" : "Bajar XML"}
+            </Button>
             <a
               className="inline-flex h-10 items-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-accent"
               href={`${api}/api/compras/zip?entidadId=${entidadId}&periodo=${periodo}`}
@@ -135,10 +162,10 @@ export function ComprasSunatPanel({
           </div>
         </div>
         {descarga?.mensaje ? <p className="text-sm text-muted-foreground">{descarga.mensaje}</p> : null}
+        {pedido?.mensaje ? <p className="text-sm text-muted-foreground">{pedido.mensaje}</p> : null}
         <p className="text-sm text-muted-foreground">
-          Elija una fila para ver el detalle. El XML y el CDR de cada factura se bajan en la PC del estudio, y aquí los ve todo el personal:
-          {" "}
-          <span className="break-all font-mono text-xs">pnpm sunat:bajar -- --ruc {credencial.ruc} --periodo {periodo}</span>
+          Bajar XML pide los archivos a la PC del estudio. Esa PC tiene que estar encendida, con el programa de bajada abierto.
+          Si SUNAT pide un captcha, se escribe en esa PC. Elija una fila para ver el detalle.
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1100px] text-left text-sm">

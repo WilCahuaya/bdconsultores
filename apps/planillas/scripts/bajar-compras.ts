@@ -1,16 +1,13 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SunatCredencialSecreto } from "../src/lib/sunat/auth";
 import { decryptString } from "../src/lib/sunat/crypto";
 import { SunatError, SunatTicketPendienteError } from "../src/lib/sunat/errors";
 import { guardarPropuesta, marcarArchivo, registrarDescarga, subirCdr, subirXml } from "../src/lib/sunat/persistir";
 import { bajarFacturasSol, type FacturaSol } from "../src/lib/sunat/portal-sol";
 import { descargarPropuestaRce } from "../src/lib/sunat/sire";
+import { cargarEnv, crearCliente, entrar, portalDe } from "./estudio-local";
 
-const envFile = new URL("../.env.local", import.meta.url);
-const sesionFile = new URL("../.sunat-session.json", import.meta.url);
-
-cargarEnv(envFile);
+cargarEnv();
 
 const args = leerArgs(process.argv.slice(2));
 if (args.help || !args.ruc || !args.periodo) {
@@ -31,11 +28,8 @@ if (!/^\d{11}$/.test(ruc) || !/^\d{6}$/.test(periodo)) {
   process.exit(1);
 }
 
-const url = requerido("NEXT_PUBLIC_SUPABASE_URL");
-const anon = requerido("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-const portalFlag = typeof args.portal === "string" ? args.portal : "";
-const portal = (portalFlag || process.env.NEXT_PUBLIC_PORTAL_ORIGIN || "http://127.0.0.1:3010").replace(/\/$/, "");
-const supabase = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
+const portal = portalDe(typeof args.portal === "string" ? args.portal : "");
+const supabase = crearCliente();
 
 main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : "No se pudo bajar las compras.");
@@ -177,70 +171,6 @@ function secretoDe(credencial: { entidad_id: string; ruc: string; usuario_sol: s
   };
 }
 
-async function entrar(supabase: SupabaseClient, portal: string): Promise<void> {
-  const guardada = leerSesion();
-  if (guardada) {
-    const { data, error } = await supabase.auth.refreshSession({ refresh_token: guardada.refresh_token });
-    if (!error && data.session) {
-      writeFileSync(sesionFile, JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }));
-      return;
-    }
-  }
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch({ headless: false });
-  try {
-    const page = await browser.newPage();
-    console.log(`Entra con Google en la ventana. ${portal}/login`);
-    await page.goto(`${portal}/login`, { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => {
-      throw new Error(`No pude abrir ${portal}/login. Si el portal es local, inícialo con pnpm dev:portal.`);
-    });
-    const ref = new URL(requerido("NEXT_PUBLIC_SUPABASE_URL")).hostname.split(".")[0];
-    const vence = Date.now() + 5 * 60_000;
-    let tokens: { access_token: string; refresh_token: string } | null = null;
-    while (Date.now() < vence && !tokens) {
-      tokens = tokensDeCookies(await page.context().cookies(), ref);
-      if (!tokens) await page.waitForTimeout(1_000);
-    }
-    if (!tokens) throw new Error("No se inició la sesión. Entra con la cuenta del estudio.");
-    const { error } = await supabase.auth.setSession(tokens);
-    if (error) throw new Error(error.message);
-    writeFileSync(sesionFile, JSON.stringify(tokens));
-  } finally {
-    await browser.close();
-  }
-}
-
-function tokensDeCookies(
-  cookies: { name: string; value: string }[],
-  ref: string,
-): { access_token: string; refresh_token: string } | null {
-  const key = `sb-${ref}-auth-token`;
-  const partes = cookies.filter((cookie) => cookie.name === key || cookie.name.startsWith(`${key}.`));
-  const trozos = partes.filter((cookie) => cookie.name.startsWith(`${key}.`));
-  const lista = (trozos.length > 0 ? trozos : partes).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-  if (lista.length === 0) return null;
-  let raw = lista.map((cookie) => cookie.value).join("");
-  if (raw.startsWith("base64-")) raw = Buffer.from(raw.slice("base64-".length), "base64url").toString("utf8");
-  try {
-    const json = JSON.parse(raw) as { access_token?: string; refresh_token?: string };
-    if (!json.access_token || !json.refresh_token) return null;
-    return { access_token: json.access_token, refresh_token: json.refresh_token };
-  } catch {
-    return null;
-  }
-}
-
-function leerSesion(): { access_token: string; refresh_token: string } | null {
-  if (!existsSync(sesionFile)) return null;
-  try {
-    const json = JSON.parse(readFileSync(sesionFile, "utf8")) as { access_token?: string; refresh_token?: string };
-    if (!json.access_token || !json.refresh_token) return null;
-    return { access_token: json.access_token, refresh_token: json.refresh_token };
-  } catch {
-    return null;
-  }
-}
-
 function leerArgs(argv: string[]): Record<string, string | true> {
   const out: Record<string, string | true> = {};
   for (let i = 0; i < argv.length; i++) {
@@ -255,20 +185,4 @@ function leerArgs(argv: string[]): Record<string, string | true> {
     }
   }
   return out;
-}
-
-function cargarEnv(file: URL): void {
-  if (!existsSync(file)) return;
-  for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (!match) continue;
-    const value = match[2].trim().replace(/^['"]|['"]$/g, "");
-    if (!process.env[match[1]]) process.env[match[1]] = value;
-  }
-}
-
-function requerido(nombre: string): string {
-  const valor = process.env[nombre]?.trim();
-  if (!valor) throw new Error(`Falta ${nombre} en apps/planillas/.env.local.`);
-  return valor;
 }

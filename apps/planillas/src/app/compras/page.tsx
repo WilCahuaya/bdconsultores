@@ -8,6 +8,7 @@ import { listEntidadesPlanillas } from "@/lib/actions/entidades";
 import {
   credencialSunat,
   estadoDescargaSunat,
+  estadoPedidoXml,
   listarComprasSunat,
 } from "@/lib/actions/compras-sunat";
 
@@ -35,13 +36,14 @@ export default async function ComprasSunatPage({
       ? searchParams.entidadId
       : entidades[0]?.id ?? "";
   const periodo = periodoInicial(searchParams.periodo);
-  const [credencial, compras, descarga] = selectedId
+  const [credencial, compras, descarga, pedido] = selectedId
     ? await Promise.all([
         credencialSunat(selectedId),
         listarComprasSunat(selectedId, periodo),
         estadoDescargaSunat(selectedId, periodo),
+        estadoPedidoXml(selectedId, periodo),
       ])
-    : [null, [], null];
+    : [null, [], null, null];
 
   return (
     <PlanillasShell profile={profile} entidadId={selectedId}>
@@ -61,6 +63,7 @@ export default async function ComprasSunatPage({
             periodo={periodo}
             compras={compras}
             descarga={descarga}
+            pedido={pedido}
             empresaNombre={entidades.find((entidad) => entidad.id === selectedId)?.nombre ?? ""}
           />
         )}

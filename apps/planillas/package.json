@@ -8,7 +8,8 @@
     "start": "node ../../node_modules/next/dist/bin/next start --port 3012",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "sunat:bajar": "tsx scripts/bajar-compras.ts"
+    "sunat:bajar": "tsx scripts/bajar-compras.ts",
+    "sunat:escuchar": "tsx scripts/escuchar-compras.ts"
   },
   "dependencies": {
     "@bd/auth": "workspace:*",
