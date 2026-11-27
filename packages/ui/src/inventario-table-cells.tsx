@@ -170,7 +170,7 @@ export function InventarioTablaLeyenda({
 }
 
 const tdBase =
-  "max-w-0 overflow-hidden border-b border-r border-border/40 px-2.5 py-2 text-xs leading-snug text-foreground last:border-r-0";
+  "max-w-0 overflow-hidden border-b border-r border-border/40 px-2.5 py-2 text-xs uppercase leading-snug text-foreground last:border-r-0";
 
 export const inventarioThStd =
   "inventario-th-std max-w-0 border-b border-r border-border/50 px-2.5 py-2 text-center align-middle text-[11px] font-semibold uppercase tracking-wide text-foreground/80 last:border-r-0";
@@ -196,7 +196,7 @@ export function EstadoBienBadge({ estado }: { estado: EstadoBien | null | undefi
 
   return (
     <span
-      className={`inline-block max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold sm:text-xs ${className}`}
+      className={`inline-block max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase sm:text-xs ${className}`}
     >
       {label}
     </span>

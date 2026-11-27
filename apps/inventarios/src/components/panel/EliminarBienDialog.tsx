@@ -56,7 +56,7 @@ export function EliminarBienDialog({
     <Dialog open={open} onClose={onClose} title="Eliminar bien">
       <div className="space-y-4">
         <p className="text-sm text-foreground">
-          <span className="font-medium">{activo.nombre}</span>
+          <span className="font-medium uppercase">{activo.nombre}</span>
         </p>
         <p className="text-sm text-muted-foreground">
           El bien se borra de forma permanente. No se puede deshacer.

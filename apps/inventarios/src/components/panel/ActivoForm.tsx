@@ -58,6 +58,7 @@ import {
   CategoriaBienSelector,
   ConfirmDialog,
   CuentaContableFields,
+  datosBienMayusculaClass,
   Dialog,
   FechaDdMmYyyyInput,
   FileInput,
@@ -1377,8 +1378,8 @@ export function ActivoForm({
       onSubmit={handleSubmit}
       className={
         isGridForm
-          ? `${formGridClass} relative min-w-0 w-full max-w-full`
-          : "relative space-y-6 overflow-visible rounded-xl border border-border/70 bg-card p-6 shadow-sm"
+          ? `${formGridClass} ${datosBienMayusculaClass} relative min-w-0 w-full max-w-full`
+          : `relative space-y-6 overflow-visible rounded-xl border border-border/70 bg-card p-6 shadow-sm ${datosBienMayusculaClass}`
       }
     >
       {variant === "page" && !onCancel && (
@@ -1408,7 +1409,7 @@ export function ActivoForm({
 
       {soloUbicacionEdit && activo && (
         <div className={`col-span-1 space-y-1 rounded-lg border border-border/50 bg-muted/20 p-4 ${colSpanFull}`}>
-          <p className="font-semibold text-foreground">{activo.nombre}</p>
+          <p className="font-semibold uppercase text-foreground">{activo.nombre}</p>
           <p className="font-mono text-xs text-muted-foreground">
             {activo.codigo_barras ?? activo.codigo_catalogo}
           </p>
@@ -1423,7 +1424,7 @@ export function ActivoForm({
       {(esBulkContador || esBulkAdminPreregistro) && activo && (
       <>
       <div className="col-span-1 space-y-1 rounded-lg border border-border/50 bg-muted/20 p-4 lg:col-span-2">
-        <p className="font-semibold text-foreground">{activo.nombre}</p>
+        <p className="font-semibold uppercase text-foreground">{activo.nombre}</p>
         <p className="font-mono text-xs text-muted-foreground">
           {activo.codigo_catalogo}
           {activo.codigo_barras ? ` · ${activo.codigo_barras}` : ""}

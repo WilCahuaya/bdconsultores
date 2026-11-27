@@ -85,7 +85,7 @@ export function ActivosListPanel({
             <article key={activo.id} className={`${panelCardClass} flex flex-col`}>
               <div className="flex items-start justify-between gap-2 border-b border-border/50 px-4 py-3">
                 <div className="min-w-0">
-                  <h3 className="truncate font-semibold text-foreground">{activo.nombre}</h3>
+                  <h3 className="truncate font-semibold uppercase text-foreground">{activo.nombre}</h3>
                   <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                     {activo.codigo_barras ?? activo.codigo_catalogo}
                   </p>

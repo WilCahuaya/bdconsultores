@@ -1580,6 +1580,37 @@ function caracteristicasPartes(
   return partes;
 }
 
+/**
+ * Columna Descripción de los reportes: marca, modelo, serie, color, medidas,
+ * características y, si el menaje lo tiene, material. Solo entran los campos con dato, en mayúsculas.
+ */
+export function descripcionColumnaReporte(activo: {
+  marca?: string | null;
+  modelo?: string | null;
+  serie?: string | null;
+  color?: string | null;
+  medidas?: string | null;
+  caracteristicas?: string | null;
+  material?: string | null;
+}): string {
+  const campos: Array<[string, string | null | undefined]> = [
+    ["MARCA", activo.marca],
+    ["MODELO", activo.modelo],
+    ["SERIE", activo.serie],
+    ["COLOR", activo.color],
+    ["MEDIDAS", activo.medidas],
+    ["CARACTERÍSTICAS", activo.caracteristicas],
+    ["MATERIAL", activo.material],
+  ];
+  return campos
+    .flatMap(([etiqueta, valor]) => {
+      const texto = valor?.trim();
+      if (!texto) return [];
+      return [`${etiqueta}: ${texto.toLocaleUpperCase("es")}`];
+    })
+    .join(", ");
+}
+
 /** Marca, modelo, serie, color y medidas en un solo texto (sin nombre del bien). */
 export function buildDescripcionBien(
   marca?: string | null,

@@ -88,14 +88,14 @@ function CambioRow({
       <p className="mt-1 text-foreground">
         {anterior && nuevo ? (
           <>
-            <span className="text-muted-foreground line-through">{anterior}</span>
+            <span className="text-muted-foreground line-through uppercase">{anterior}</span>
             <span className="mx-1.5 text-muted-foreground">→</span>
-            <span className="font-medium">{nuevo}</span>
+            <span className="font-medium uppercase">{nuevo}</span>
           </>
         ) : nuevo ? (
-          <span className="font-medium">{nuevo}</span>
+          <span className="font-medium uppercase">{nuevo}</span>
         ) : anterior ? (
-          <span className="text-muted-foreground">{anterior}</span>
+          <span className="uppercase text-muted-foreground">{anterior}</span>
         ) : (
           "—"
         )}

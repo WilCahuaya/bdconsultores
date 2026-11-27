@@ -1,6 +1,6 @@
 import type { EstadoRegistro } from "@inventario/types";
 import { attachCatalogoNacionalPorCodigo, resolveCuentaContableActivo } from "@inventario/types";
-import { REPORTES } from "@reportes/types";
+import { REPORTES, esReporteMenaje } from "@reportes/types";
 import type { ActivoReporte } from "@reportes/types";
 import {
   anioEjercicioAdquisicion,
@@ -114,6 +114,12 @@ function filtrarActivosReporteCache(
     filtered = filtered.filter((a) => a.estado_registro === ("REGISTRADO" as EstadoRegistro));
   }
 
+  if (esReporteMenaje(input.reporteId)) {
+    filtered = filtered.filter((a) => a.categoria === "MENAJE");
+  } else {
+    filtered = filtered.filter((a) => a.categoria !== "MENAJE");
+  }
+
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
   if (
     corteISO &&
@@ -192,6 +198,9 @@ export async function cargarActivosReporte(
     query = query.eq("estado_registro", "REGISTRADO" as EstadoRegistro);
   }
 
+  if (esReporteMenaje(input.reporteId)) query = query.eq("categoria", "MENAJE");
+  else query = query.neq("categoria", "MENAJE");
+
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
   if (corteISO && aplicaFiltroAdquisicionFechaCorte(input.reporteId as ReporteId, input.fechaCorte)) {
     query = query.or(`fecha_adquisicion.is.null,fecha_adquisicion.lte.${corteISO}`);
@@ -227,6 +236,7 @@ export {
   esReporteAdquiridosEjercicio,
   exportReporte,
   reporteHeaders,
+  reportePreviewColumnas,
   reportesDisponiblesParaRol,
   reportesAmbienteParaRol,
 } from "@reportes";

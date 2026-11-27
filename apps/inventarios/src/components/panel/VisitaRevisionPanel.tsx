@@ -20,7 +20,8 @@ const ESTADOS: EstadoBien[] = ["BUENO", "REGULAR", "MALO"];
 
 function etiquetaBien(activo: Activo): string {
   const codigo = activo.codigo_barras?.trim();
-  return codigo ? `${activo.nombre} · ${codigo}` : activo.nombre;
+  const nombre = activo.nombre.trim().toLocaleUpperCase("es");
+  return codigo ? `${nombre} · ${codigo.toLocaleUpperCase("es")}` : nombre;
 }
 
 function botonVisitaClass(activo: boolean, tono: "si" | "no"): string {

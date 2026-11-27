@@ -1,12 +1,13 @@
 import { formatFechaISOToDDMMYYYY, labelFechaCorte, labelFechaEmision } from "@inventario/types";
 import type { ReporteContexto, ReporteId } from "./types";
 
+export const FICHA_ASIGNACION_BIENES_TITULO = "FICHA DE ASIGNACION DE BIENES AL USUARIO";
+export const FICHA_ASIGNACION_MENAJE_TITULO = "FICHA DE ASIGNACION DE MENAJES";
 export const FICHA_ASIGNACION_TITULO =
   "FICHA DE LEVANTAMIENTO DE INFORMACIÓN DE BIENES PATRIMONIALES";
-export const INVENTARIO_ACTIVOS_FIJOS_AMBIENTE_TITULO =
-  "INVENTARIO DE ACTIVOS FIJOS POR AMBIENTE";
+export const INVENTARIO_ACTIVOS_FIJOS_AMBIENTE_TITULO = "INVENTARIO DE BIENES POR AMBIENTE";
 export const INVENTARIO_ACTIVOS_VALORIZADOS_AMBIENTE_TITULO =
-  "INVENTARIO DE ACTIVOS VALORIZADOS POR AMBIENTE";
+  "INVENTARIO VALORIZADO DE BIENES POR AMBIENTE";
 
 export const FICHA_TABLE_HEAD_RGB: [number, number, number] = [29, 78, 137];
 export const FICHA_TABLE_ALT_ROW_RGB: [number, number, number] = [248, 248, 248];
@@ -14,9 +15,11 @@ export const FICHA_TABLE_ALT_ROW_RGB: [number, number, number] = [248, 248, 248]
 /** Informes por ambiente con diseño extendido (no membrete institucional). */
 export function esReporteAmbienteDiseno(reporteId: ReporteId): boolean {
   return (
+    reporteId === "ficha_asignacion_ambiente" ||
     reporteId === "inventario_ambiente_sin_valores" ||
     reporteId === "inventario_ambiente_activos_fijos" ||
-    reporteId === "inventario_ambiente_valorizado"
+    reporteId === "inventario_ambiente_valorizado" ||
+    reporteId === "ficha_asignacion_menaje"
   );
 }
 
@@ -26,6 +29,12 @@ export function esReporteAmbienteFicha(reporteId: ReporteId): boolean {
 }
 
 export function tituloReporteAmbienteDiseno(reporteId: ReporteId): string {
+  if (reporteId === "ficha_asignacion_ambiente") {
+    return FICHA_ASIGNACION_BIENES_TITULO;
+  }
+  if (reporteId === "ficha_asignacion_menaje") {
+    return FICHA_ASIGNACION_MENAJE_TITULO;
+  }
   if (reporteId === "inventario_ambiente_activos_fijos") {
     return INVENTARIO_ACTIVOS_FIJOS_AMBIENTE_TITULO;
   }
@@ -39,9 +48,9 @@ export function esFichaLevantamiento(reporteId: ReporteId): boolean {
   return reporteId === "inventario_ambiente_sin_valores";
 }
 
-/** La ficha de levantamiento no lleva bloque de firmas. */
-export function reporteAmbienteIncluyeFirmas(_reporteId: ReporteId): boolean {
-  return false;
+/** Firmas del administrador y del responsable en las fichas por ambiente. */
+export function reporteAmbienteIncluyeFirmas(reporteId: ReporteId): boolean {
+  return esFichaLevantamiento(reporteId) || reporteId === "ficha_asignacion_ambiente" || reporteId === "ficha_asignacion_menaje";
 }
 
 export function buildFichaActualizacionLabel(fechaCorte: string): string {
@@ -58,7 +67,11 @@ export function ambienteDisenoExportFilename(ctx: ReporteContexto): string {
     .slice(0, 48);
   const fecha = ctx.fechaGeneracion.toISOString().slice(0, 10);
   const prefix =
-    ctx.reporteId === "inventario_ambiente_activos_fijos"
+    ctx.reporteId === "ficha_asignacion_ambiente"
+      ? "ficha-asignacion"
+      : ctx.reporteId === "ficha_asignacion_menaje"
+        ? "ficha-asignacion-menajes"
+      : ctx.reporteId === "inventario_ambiente_activos_fijos"
       ? "inventario-activos-fijos"
       : ctx.reporteId === "inventario_ambiente_valorizado"
         ? "inventario-activos-valorizados"

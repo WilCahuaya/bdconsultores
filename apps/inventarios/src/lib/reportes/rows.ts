@@ -1,8 +1,6 @@
 import {
-  buildDescripcionBien,
   cantidadInventarioBien,
-  descripcionMenaje,
-  esMenaje,
+  descripcionColumnaReporte,
   nombreEnReporteBaja,
   calcPeriodoMesesHasta,
   calcValorizacionActivo,
@@ -135,6 +133,38 @@ const HEADERS_LEVANTAMIENTO: ReporteTableHeaderDef[] = [
   { key: "estado", line1: "Estado" },
   { key: "observacion", line1: "Observación" },
 ];
+
+function headersMenaje(reporteId: ReporteId): ReporteTableHeaderDef[] {
+  const headers: ReporteTableHeaderDef[] = [
+    { key: KEY_NUM, line1: "N°" },
+    { key: KEY_CANT, line1: "Cant." },
+    { key: "und", line1: "Und" },
+    { key: "codigo", line1: "Código" },
+    { key: "nombre", line1: "Nombre del bien" },
+    { key: "descripcion", line1: "Descripción" },
+    { key: "estado", line1: "Estado" },
+    { key: "observacion", line1: "Observación" },
+  ];
+  if (!omitUbicacionEnTabla(reporteId)) {
+    headers.push({ key: "ubicacion", line1: columnaUbicacionLabel(reporteId) });
+  }
+  return headers;
+}
+
+function filaMenaje(activo: ActivoReporte, index: number, reporteId: ReporteId): string[] {
+  const fila = [
+    String(index + 1),
+    String(cantidadInventarioBien(activo)),
+    "Und",
+    formatActivoCodigoDisplay(activo),
+    activo.nombre,
+    descripcionColumnaReporte(activo) || "—",
+    estadoBienLabel(activo.estado_bien),
+    activo.observacion?.trim() || "—",
+  ];
+  if (!omitUbicacionEnTabla(reporteId)) fila.push(ubicacionReporteLabel(activo, reporteId));
+  return fila;
+}
 
 const HEADERS_SIN_VALORES_BASE = [
   "N°",
@@ -384,6 +414,7 @@ export function reporteTableHeaderDefs(
   valorizado: boolean,
 ): readonly ReporteTableHeaderDef[] {
   if (esPlantilla(reporteId, "ficha_ambiente")) return HEADERS_LEVANTAMIENTO;
+  if (esPlantilla(reporteId, "ficha_menaje", "inventario_menaje")) return headersMenaje(reporteId);
   if (esPlantilla(reporteId, "bajas")) {
     return headerDefFromStrings([...HEADERS_BAJAS, columnaUbicacionLabel(reporteId)]);
   }
@@ -440,6 +471,12 @@ const AMBIENTE_VALORIZADO_COL_WEIGHTS = [
 /** Pesos relativos (ficha de levantamiento patrimonial). */
 const LEVANTAMIENTO_COL_WEIGHTS = [5, 6, 6, 18, 52, 32, 8, 18] as const;
 
+/** Pesos relativos (ficha de menajes por ambiente). */
+const MENAJE_AMBIENTE_COL_WEIGHTS = [5, 6, 6, 16, 28, 28, 8, 16] as const;
+
+/** Pesos relativos (inventario de menajes de la entidad). */
+const MENAJE_ENTIDAD_COL_WEIGHTS = [5, 6, 6, 14, 22, 22, 8, 14, 18] as const;
+
 /** Pesos relativos (inventario de bienes por ambiente, sin valores). */
 const AMBIENTE_SIN_VALOR_COL_WEIGHTS = [
   4, 4, 4, 5, 8, 6, 16, 22, 8, 7, 12,
@@ -488,6 +525,27 @@ export function reporteDisenoPdfColumnStyles(
   return pdfColumnStylesFromWeights(tableWidthMm, pesos.weights, pesos.leftAlign);
 }
 
+export interface ReportePreviewColumna {
+  widthPct: number;
+  align: "left" | "center";
+}
+
+/** Mismos anchos y alineaciones que la tabla del PDF, en porcentaje. */
+export function reportePreviewColumnas(reporteId: ReporteId): ReportePreviewColumna[] | null {
+  const styles = reporteDisenoPdfColumnStyles(100, reporteId);
+  if (!styles) return null;
+  return Object.keys(styles)
+    .map((key) => Number(key))
+    .sort((a, b) => a - b)
+    .map((index) => {
+      const style = styles[index];
+      return {
+        widthPct: style?.cellWidth ?? 0,
+        align: style?.halign === "left" ? "left" : "center",
+      };
+    });
+}
+
 /** @deprecated Use reporteDisenoPdfColumnStyles */
 export function ambienteDisenoPdfColumnStyles(
   tableWidthMm: number,
@@ -507,6 +565,11 @@ function pesosColumnasDiseno(reporteId: ReporteId): {
       return { weights: AMBIENTE_VALORIZADO_COL_WEIGHTS, leftAlign: [5, 6] };
     case "ficha_ambiente":
       return { weights: LEVANTAMIENTO_COL_WEIGHTS, leftAlign: [4, 5, 7] };
+    case "ficha_menaje":
+      return { weights: MENAJE_AMBIENTE_COL_WEIGHTS, leftAlign: [4, 5, 7] };
+    case "inventario_menaje":
+      return { weights: MENAJE_ENTIDAD_COL_WEIGHTS, leftAlign: [4, 5, 7, 8] };
+    case "ficha_asignacion":
     case "inventario_ambiente":
       return { weights: AMBIENTE_SIN_VALOR_COL_WEIGHTS, leftAlign: [6, 7, 10] };
     case "acta_entidad":
@@ -546,6 +609,10 @@ export function ambienteValorizadoPdfColumnStyles(
   return ambienteDisenoPdfColumnStyles(tableWidthMm, "inventario_ambiente_valorizado")!;
 }
 
+function filasReporteMayusculas(filas: string[][]): string[][] {
+  return filas.map((fila) => fila.map((celda) => (celda ? celda.toLocaleUpperCase("es") : celda)));
+}
+
 export function buildReporteRows(
   activos: ActivoReporte[],
   reporteId: ReporteId,
@@ -554,17 +621,13 @@ export function buildReporteRows(
 ): string[][] {
   const ordenados = ordenarActivosParaReporte(activos, reporteId);
 
+  if (esPlantilla(reporteId, "ficha_menaje", "inventario_menaje")) {
+    return filasReporteMayusculas(ordenados.map((activo, index) => filaMenaje(activo, index, reporteId)));
+  }
+
   if (esPlantilla(reporteId, "ficha_ambiente")) {
-    return ordenados.map((activo, index) => {
-      const descripcion = esMenaje(activo.categoria)
-        ? descripcionMenaje(activo)
-        : buildDescripcionBien(
-            activo.marca,
-            activo.modelo,
-            activo.serie,
-            activo.color,
-            activo.medidas,
-          );
+    return filasReporteMayusculas(ordenados.map((activo, index) => {
+      const descripcion = descripcionColumnaReporte(activo);
       return [
         String(index + 1),
         String(cantidadInventarioBien(activo)),
@@ -575,11 +638,11 @@ export function buildReporteRows(
         estadoBienLabel(activo.estado_bien),
         activo.observacion?.trim() || "—",
       ];
-    });
+    }));
   }
 
   if (esPlantilla(reporteId, "bajas")) {
-    return ordenados.map((activo, index) => [
+    return filasReporteMayusculas(ordenados.map((activo, index) => [
       String(index + 1),
       activo.codigo_barras ?? activo.codigo_catalogo,
       formatCorrelativoDisplay(activo.correlativo),
@@ -587,7 +650,7 @@ export function buildReporteRows(
       activo.motivo_baja?.trim() || "—",
       formatFechaISOToDDMMYYYY(activo.updated_at.slice(0, 10)) || "—",
       ubicacionReporteLabel(activo, reporteId),
-    ]);
+    ]));
   }
 
   if (esPlantilla(reporteId, "faltantes")) {
@@ -596,26 +659,18 @@ export function buildReporteRows(
       if (origen !== 0) return origen;
       return a.nombre.localeCompare(b.nombre, "es");
     });
-    return porOrigen.map((activo, index) => [
+    return filasReporteMayusculas(porOrigen.map((activo, index) => [
       String(index + 1),
       activo.codigo_barras ?? activo.codigo_catalogo,
       formatCorrelativoDisplay(activo.correlativo),
       activo.nombre,
       estadoBienLabel(activo.estado_bien),
       activo.procedencia?.trim() || "—",
-    ]);
+    ]));
   }
 
-  return ordenados.map((activo, index) => {
-    const descripcion = esMenaje(activo.categoria)
-      ? descripcionMenaje(activo)
-      : buildDescripcionBien(
-          activo.marca,
-          activo.modelo,
-          activo.serie,
-          activo.color,
-          activo.medidas,
-        );
+  return filasReporteMayusculas(ordenados.map((activo, index) => {
+    const descripcion = descripcionColumnaReporte(activo);
 
     const sinUbicacion = omitUbicacionEnTabla(reporteId);
     const tablaValorizadoAmbiente = valorizado && esReporteValorizadoTablaAmbiente(reporteId);
@@ -662,7 +717,7 @@ export function buildReporteRows(
     const fila = [...comun, ...colaComun, activo.observacion?.trim() || "—"];
     if (!sinUbicacion) fila.push(ubicacionReporteLabel(activo, reporteId));
     return fila;
-  });
+  }));
 }
 
 export function reporteTitulo(

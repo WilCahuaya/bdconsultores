@@ -19,7 +19,6 @@ import {
   measureEntidadDisenoHeaderEndY,
   reporteEntidadIncluyeFirmas,
 } from "./inventario-entidad-diseno";
-import { addPdfLogoWatermark, getBrandLogoPngDataUrl } from "./logo-watermark";
 import {
   buildPdfTableHead,
   buildReporteRows,
@@ -151,12 +150,6 @@ export async function exportReportePdf(
     unit: "mm",
     format: "a4",
   });
-  let logoPng: string | null = null;
-  try {
-    logoPng = await getBrandLogoPngDataUrl();
-  } catch {
-    /* sin marca de agua si falla la rasterización del SVG */
-  }
 
   const startY = useAmbienteDiseno
     ? measureAmbienteDisenoHeaderEndY(ctx)
@@ -309,9 +302,6 @@ export async function exportReportePdf(
     addEntidadInventarioFirmasPdf(doc, firmasY, ctx);
   }
 
-  if (logoPng) {
-    addPdfLogoWatermark(doc, logoPng);
-  }
   if (!useDisenoExtendido) {
     addPageNumbers(doc);
   }

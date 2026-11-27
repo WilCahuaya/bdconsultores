@@ -5,7 +5,7 @@ import { attachCatalogoNacionalPorCodigo, resolveCuentaContableActivo } from "@i
 import { createClient } from "@/lib/supabase/server";
 import { getProfile, requireProfile } from "@/lib/auth/profile";
 import type { ActivoReporte } from "@/lib/reportes/types";
-import { REPORTES, reportePermitidoParaRol, type ReporteId } from "@/lib/reportes/types";
+import { REPORTES, esReporteMenaje, reportePermitidoParaRol, type ReporteId } from "@/lib/reportes/types";
 import {
   anioEjercicioAdquisicion,
   esReporteAdquiridosEjercicio,
@@ -111,8 +111,8 @@ export async function cargarActivosReporte(
     query = query.eq("estado_registro", "REGISTRADO" as EstadoRegistro);
   }
 
-  const definicion = REPORTES.find((r) => r.id === input.reporteId);
-  if (definicion?.valorizado) query = query.neq("categoria", "MENAJE");
+  if (esReporteMenaje(input.reporteId)) query = query.eq("categoria", "MENAJE");
+  else query = query.neq("categoria", "MENAJE");
 
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
   if (corteISO && aplicaFiltroAdquisicionFechaCorte(input.reporteId as ReporteId, input.fechaCorte)) {

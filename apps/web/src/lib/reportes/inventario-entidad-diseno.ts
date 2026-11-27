@@ -10,18 +10,17 @@ import {
 import type { ReporteContexto, ReporteId } from "./types";
 import { esReporteAdquiridosEjercicio, tituloReporteAdquiridosEjercicio } from "./ejercicio";
 
-export const ACTA_DE_INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO =
-  "ACTA DE INVENTARIO DE ACTIVOS FIJOS GENERAL";
+export const ACTA_DE_INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO = "ACTA DE INVENTARIO DE BIENES";
 
-export const INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO =
-  "INVENTARIO DE ACTIVOS FIJOS GENERAL";
+export const INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO = "INVENTARIO DE BIENES";
 
-export const INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO =
-  "INVENTARIO DE ACTIVOS VALORIZADOS GENERAL";
+export const INVENTARIO_MENAJES_TITULO = "INVENTARIO DE MENAJES";
 
-export const REPORTE_BAJAS_TITULO = "REPORTE DE BAJAS DE ACTIVOS FIJOS";
+export const INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO = "INVENTARIO VALORIZADO DE BIENES";
 
-export const REPORTE_ACTIVOS_ESTADO_MALO_TITULO = "REPORTE DE ACTIVOS EN ESTADO MALO";
+export const REPORTE_BAJAS_TITULO = "REPORTE DE BAJAS";
+
+export const REPORTE_ACTIVOS_ESTADO_MALO_TITULO = "BIENES EN ESTADO MALO";
 
 const REPORTES_ENTIDAD_DISENO: ReporteId[] = [
   "inventario_entidad_sin_valores",
@@ -31,6 +30,7 @@ const REPORTES_ENTIDAD_DISENO: ReporteId[] = [
   "reporte_activos_estado_malo",
   "reporte_adquiridos_ejercicio_actual",
   "reporte_adquiridos_ejercicio_anterior",
+  "inventario_menaje_entidad",
 ];
 
 export function esReporteEntidadDiseno(reporteId: ReporteId): boolean {
@@ -52,6 +52,9 @@ export function tituloReporteEntidadDiseno(reporteId: ReporteId, fechaCorte?: st
   }
   if (reporteId === "inventario_entidad_valorizado") {
     return INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO;
+  }
+  if (reporteId === "inventario_menaje_entidad") {
+    return INVENTARIO_MENAJES_TITULO;
   }
   return INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO;
 }
@@ -77,6 +80,7 @@ export function entidadDisenoExportFilename(ctx: ReporteContexto): string {
     inventario_entidad_sin_valores: "acta-inventario-activos-fijos-general",
     inventario_entidad_activos_fijos: "inventario-activos-fijos-general",
     inventario_entidad_valorizado: "inventario-activos-valorizados-general",
+    inventario_menaje_entidad: "inventario-menajes",
     reporte_bajas: "reporte-bajas",
     reporte_activos_estado_malo: "reporte-activos-estado-malo",
     reporte_adquiridos_ejercicio_actual: "adquiridos-ejercicio-actual",

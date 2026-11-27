@@ -6,8 +6,8 @@ export * from "./types";
 export { REPORTES } from "./types";
 export * from "./ejercicio";
 export * from "./fecha-corte";
-export { buildReporteRows, reporteHeaders, reporteTableHeaderDefs, reporteTitulo } from "./rows";
-export type { ReporteTableHeaderDef } from "./rows";
+export { buildReporteRows, reporteHeaders, reportePreviewColumnas, reporteTableHeaderDefs, reporteTitulo } from "./rows";
+export type { ReportePreviewColumna, ReporteTableHeaderDef } from "./rows";
 export {
   REPORTE_PREVIEW_MAX_ROWS,
   buildReporteResumenPreview,

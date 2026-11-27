@@ -1,6 +1,5 @@
 import { estadoBienLabel, labelFechaEmision, type VisitaCampoHistorial, type VisitaCampoReporte, type VisitaCampoReporteItem } from "@inventario/types";
 import { EMPRESA } from "./branding";
-import { addPdfLogoWatermark, getBrandLogoPngDataUrl } from "./logo-watermark";
 
 type JsPDFDoc = import("jspdf").jsPDF;
 
@@ -81,13 +80,6 @@ export async function exportVisitaCampoReportePdf(input: {
     unit: "mm",
     format: "a4",
   });
-
-  let logoPng: string | null = null;
-  try {
-    logoPng = await getBrandLogoPngDataUrl();
-  } catch {
-    logoPng = null;
-  }
 
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 10;
@@ -189,7 +181,6 @@ export async function exportVisitaCampoReportePdf(input: {
     y += 8;
   }
 
-  if (logoPng) addPdfLogoWatermark(doc, logoPng);
   addPageNumbers(doc);
 
   const nombre = slugFilename(`${entidadNombre}-visita-${visita.numero}`) || `visita-${visita.numero}`;

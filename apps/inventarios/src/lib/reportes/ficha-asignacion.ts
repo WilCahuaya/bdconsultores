@@ -22,9 +22,9 @@ export function esFichaLevantamiento(reporteId: ReporteId): boolean {
   return plantillaReporte(reporteId) === "ficha_ambiente";
 }
 
-/** La ficha de levantamiento no lleva bloque de firmas. */
-export function reporteAmbienteIncluyeFirmas(_reporteId: ReporteId): boolean {
-  return false;
+/** Firmas del administrador y del responsable en las fichas por ambiente. */
+export function reporteAmbienteIncluyeFirmas(reporteId: ReporteId): boolean {
+  return esFichaLevantamiento(reporteId) || plantillaReporte(reporteId) === "ficha_asignacion" || plantillaReporte(reporteId) === "ficha_menaje";
 }
 
 export function subtituloInventarioPatrimonial(ctx: ReporteContexto): string {

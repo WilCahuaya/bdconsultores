@@ -1,35 +1,31 @@
-import type { Activo, CategoriaBien, RolUsuario } from "@inventario/types";
+import type { Activo, RolUsuario } from "@inventario/types";
 
 export type ReporteId =
+  | "ficha_asignacion_ambiente"
   | "inventario_ambiente_sin_valores"
   | "inventario_ambiente_activos_fijos"
-  | "inventario_ambiente_activo"
-  | "inventario_ambiente_cuenta_orden"
   | "inventario_entidad_sin_valores"
-  | "inventario_entidad_acta_activo"
-  | "inventario_entidad_acta_cuenta_orden"
   | "inventario_entidad_activos_fijos"
-  | "inventario_entidad_activo"
-  | "inventario_entidad_cuenta_orden"
   | "inventario_ambiente_valorizado"
-  | "inventario_ambiente_valorizado_activo"
-  | "inventario_ambiente_valorizado_cuenta_orden"
+  | "ficha_asignacion_menaje"
+  | "inventario_menaje_entidad"
   | "inventario_entidad_valorizado"
-  | "inventario_entidad_valorizado_activo"
-  | "inventario_entidad_valorizado_cuenta_orden"
   | "reporte_bajas"
   | "reporte_activos_estado_malo"
   | "reporte_faltantes"
   | "reporte_adquiridos_ejercicio_actual"
   | "reporte_adquiridos_ejercicio_anterior";
 
-/** Formato del documento. Las variantes por categoría comparten plantilla. */
+/** Formato del documento. */
 export type ReportePlantilla =
+  | "ficha_asignacion"
   | "ficha_ambiente"
   | "inventario_ambiente"
   | "acta_entidad"
   | "inventario_entidad"
   | "valorizado_ambiente"
+  | "ficha_menaje"
+  | "inventario_menaje"
   | "valorizado_entidad"
   | "bajas"
   | "estado_malo"
@@ -41,7 +37,7 @@ export type ReporteFormato = "pdf" | "excel";
 
 export type ReporteScope = "ambiente" | "entidad";
 
-export type ReporteGrupo = "ambiente" | "entidad" | "situacion";
+export type ReporteGrupo = "ambiente" | "entidad" | "situacion" | "menaje";
 
 export interface ReporteDefinicion {
   id: ReporteId;
@@ -57,11 +53,21 @@ export interface ReporteDefinicion {
   titulo: string;
   /** Prefijo del archivo descargado. */
   archivo: string;
-  /** Si se omite, el reporte incluye activos fijos y cuenta de orden. */
-  categoria?: CategoriaBien;
 }
 
 export const REPORTES: ReporteDefinicion[] = [
+  {
+    id: "ficha_asignacion_ambiente",
+    label: "Ficha de asignación por ambiente",
+    descripcion: "Ficha de asignación de bienes al usuario responsable, sin valores.",
+    scope: "ambiente",
+    valorizado: false,
+    formatos: ["pdf", "excel"],
+    grupo: "ambiente",
+    plantilla: "ficha_asignacion",
+    titulo: "FICHA DE ASIGNACION DE BIENES AL USUARIO",
+    archivo: "ficha-asignacion",
+  },
   {
     id: "inventario_ambiente_sin_valores",
     label: "Ficha de levantamiento patrimonial",
@@ -78,7 +84,7 @@ export const REPORTES: ReporteDefinicion[] = [
   {
     id: "inventario_ambiente_activos_fijos",
     label: "Inventario de bienes por ambiente",
-    descripcion: "Listado del ambiente con activos fijos y cuenta de orden, sin valores.",
+    descripcion: "Listado de bienes del ambiente, sin valores.",
     scope: "ambiente",
     valorizado: false,
     formatos: ["pdf", "excel"],
@@ -88,36 +94,9 @@ export const REPORTES: ReporteDefinicion[] = [
     archivo: "inventario-bienes-ambiente",
   },
   {
-    id: "inventario_ambiente_activo",
-    label: "Inventario de activos fijos por ambiente",
-    descripcion: "Listado del ambiente solo con activos fijos, sin valores.",
-    scope: "ambiente",
-    valorizado: false,
-    formatos: ["pdf", "excel"],
-    grupo: "ambiente",
-    plantilla: "inventario_ambiente",
-    titulo: "INVENTARIO DE ACTIVOS FIJOS POR AMBIENTE",
-    archivo: "inventario-activos-fijos-ambiente",
-    categoria: "ACTIVO",
-  },
-  {
-    id: "inventario_ambiente_cuenta_orden",
-    label: "Inventario de cuenta de orden por ambiente",
-    descripcion: "Listado del ambiente solo con bienes de cuenta de orden, sin valores.",
-    scope: "ambiente",
-    valorizado: false,
-    formatos: ["pdf", "excel"],
-    grupo: "ambiente",
-    plantilla: "inventario_ambiente",
-    titulo: "INVENTARIO DE CUENTA DE ORDEN POR AMBIENTE",
-    archivo: "inventario-cuenta-orden-ambiente",
-    categoria: "CUENTA_ORDEN",
-  },
-  {
     id: "inventario_ambiente_valorizado",
     label: "Inventario valorizado de bienes por ambiente",
-    descripcion:
-      "Listado del ambiente con precio, depreciación y valor neto. Incluye activos fijos y cuenta de orden.",
+    descripcion: "Listado de bienes del ambiente con precio, depreciación y valor neto.",
     scope: "ambiente",
     valorizado: true,
     formatos: ["pdf", "excel"],
@@ -128,39 +107,33 @@ export const REPORTES: ReporteDefinicion[] = [
     archivo: "inventario-valorizado-bienes-ambiente",
   },
   {
-    id: "inventario_ambiente_valorizado_activo",
-    label: "Inventario valorizado de activos fijos por ambiente",
-    descripcion: "Listado valorizado del ambiente solo con activos fijos.",
+    id: "ficha_asignacion_menaje",
+    label: "Ficha de asignación de menajes por ambiente",
+    descripcion: "Ficha de asignación de menajes al usuario responsable del ambiente.",
     scope: "ambiente",
-    valorizado: true,
+    valorizado: false,
     formatos: ["pdf", "excel"],
-    soloContador: true,
-    grupo: "ambiente",
-    plantilla: "valorizado_ambiente",
-    titulo: "INVENTARIO VALORIZADO DE ACTIVOS FIJOS POR AMBIENTE",
-    archivo: "inventario-valorizado-activos-fijos-ambiente",
-    categoria: "ACTIVO",
+    grupo: "menaje",
+    plantilla: "ficha_menaje",
+    titulo: "FICHA DE ASIGNACION DE MENAJES",
+    archivo: "ficha-asignacion-menajes",
   },
   {
-    id: "inventario_ambiente_valorizado_cuenta_orden",
-    label: "Inventario valorizado de cuenta de orden por ambiente",
-    descripcion:
-      "Listado valorizado del ambiente solo con cuenta de orden. Esos bienes no se deprecian.",
-    scope: "ambiente",
-    valorizado: true,
+    id: "inventario_menaje_entidad",
+    label: "Menajes de la entidad",
+    descripcion: "Listado de todos los menajes registrados de la entidad, con sede y ambiente.",
+    scope: "entidad",
+    valorizado: false,
     formatos: ["pdf", "excel"],
-    soloContador: true,
-    grupo: "ambiente",
-    plantilla: "valorizado_ambiente",
-    titulo: "INVENTARIO VALORIZADO DE CUENTA DE ORDEN POR AMBIENTE",
-    archivo: "inventario-valorizado-cuenta-orden-ambiente",
-    categoria: "CUENTA_ORDEN",
+    grupo: "menaje",
+    plantilla: "inventario_menaje",
+    titulo: "INVENTARIO DE MENAJES",
+    archivo: "inventario-menajes",
   },
   {
     id: "inventario_entidad_sin_valores",
     label: "Acta de inventario de bienes",
-    descripcion:
-      "Acta de la entidad con activos fijos y cuenta de orden, sin valores y con firmas.",
+    descripcion: "Acta de bienes de la entidad, sin valores y con firmas.",
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
@@ -171,37 +144,9 @@ export const REPORTES: ReporteDefinicion[] = [
     archivo: "acta-inventario-bienes",
   },
   {
-    id: "inventario_entidad_acta_activo",
-    label: "Acta de inventario de activos fijos",
-    descripcion: "Acta de la entidad solo con activos fijos, sin valores y con firmas.",
-    scope: "entidad",
-    valorizado: false,
-    formatos: ["pdf", "excel"],
-    soloContador: true,
-    grupo: "entidad",
-    plantilla: "acta_entidad",
-    titulo: "ACTA DE INVENTARIO DE ACTIVOS FIJOS",
-    archivo: "acta-inventario-activos-fijos",
-    categoria: "ACTIVO",
-  },
-  {
-    id: "inventario_entidad_acta_cuenta_orden",
-    label: "Acta de inventario de cuenta de orden",
-    descripcion: "Acta de la entidad solo con cuenta de orden, sin valores y con firmas.",
-    scope: "entidad",
-    valorizado: false,
-    formatos: ["pdf", "excel"],
-    soloContador: true,
-    grupo: "entidad",
-    plantilla: "acta_entidad",
-    titulo: "ACTA DE INVENTARIO DE CUENTA DE ORDEN",
-    archivo: "acta-inventario-cuenta-orden",
-    categoria: "CUENTA_ORDEN",
-  },
-  {
     id: "inventario_entidad_activos_fijos",
     label: "Inventario de bienes",
-    descripcion: "Listado de la entidad con activos fijos y cuenta de orden, sin valores.",
+    descripcion: "Listado de bienes de la entidad, sin valores.",
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
@@ -211,36 +156,9 @@ export const REPORTES: ReporteDefinicion[] = [
     archivo: "inventario-bienes",
   },
   {
-    id: "inventario_entidad_activo",
-    label: "Inventario de activos fijos",
-    descripcion: "Listado de la entidad solo con activos fijos, sin valores.",
-    scope: "entidad",
-    valorizado: false,
-    formatos: ["pdf", "excel"],
-    grupo: "entidad",
-    plantilla: "inventario_entidad",
-    titulo: "INVENTARIO DE ACTIVOS FIJOS",
-    archivo: "inventario-activos-fijos",
-    categoria: "ACTIVO",
-  },
-  {
-    id: "inventario_entidad_cuenta_orden",
-    label: "Inventario de cuenta de orden",
-    descripcion: "Listado de la entidad solo con bienes de cuenta de orden, sin valores.",
-    scope: "entidad",
-    valorizado: false,
-    formatos: ["pdf", "excel"],
-    grupo: "entidad",
-    plantilla: "inventario_entidad",
-    titulo: "INVENTARIO DE CUENTA DE ORDEN",
-    archivo: "inventario-cuenta-orden",
-    categoria: "CUENTA_ORDEN",
-  },
-  {
     id: "inventario_entidad_valorizado",
     label: "Inventario valorizado de bienes",
-    descripcion:
-      "Inventario de la entidad con valores. Incluye activos fijos y cuenta de orden.",
+    descripcion: "Inventario de bienes de la entidad con valores.",
     scope: "entidad",
     valorizado: true,
     formatos: ["pdf", "excel"],
@@ -251,38 +169,9 @@ export const REPORTES: ReporteDefinicion[] = [
     archivo: "inventario-valorizado-bienes",
   },
   {
-    id: "inventario_entidad_valorizado_activo",
-    label: "Inventario valorizado de activos fijos",
-    descripcion: "Inventario valorizado de la entidad solo con activos fijos.",
-    scope: "entidad",
-    valorizado: true,
-    formatos: ["pdf", "excel"],
-    soloContador: true,
-    grupo: "entidad",
-    plantilla: "valorizado_entidad",
-    titulo: "INVENTARIO VALORIZADO DE ACTIVOS FIJOS",
-    archivo: "inventario-valorizado-activos-fijos",
-    categoria: "ACTIVO",
-  },
-  {
-    id: "inventario_entidad_valorizado_cuenta_orden",
-    label: "Inventario valorizado de cuenta de orden",
-    descripcion:
-      "Inventario valorizado de la entidad solo con cuenta de orden. Esos bienes no se deprecian.",
-    scope: "entidad",
-    valorizado: true,
-    formatos: ["pdf", "excel"],
-    soloContador: true,
-    grupo: "entidad",
-    plantilla: "valorizado_entidad",
-    titulo: "INVENTARIO VALORIZADO DE CUENTA DE ORDEN",
-    archivo: "inventario-valorizado-cuenta-orden",
-    categoria: "CUENTA_ORDEN",
-  },
-  {
     id: "reporte_bajas",
     label: "Reporte de bajas",
-    descripcion: "Bienes dados de baja, activos fijos y cuenta de orden, con motivo y fecha.",
+    descripcion: "Bienes dados de baja, con motivo y fecha.",
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],

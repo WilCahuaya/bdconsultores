@@ -54,6 +54,7 @@ import {
   CategoriaBienSelector,
   ConfirmDialog,
   CuentaContableFields,
+  datosBienMayusculaClass,
   Dialog,
   FechaDdMmYyyyInput,
   FileInput,
@@ -1274,7 +1275,7 @@ export function ActivoFormDesktop({
     <>
     <form
       onSubmit={(e) => void handleSubmit(e)}
-      className="grid grid-cols-1 gap-4 md:gap-5 lg:grid-cols-2"
+      className={`grid grid-cols-1 gap-4 md:gap-5 lg:grid-cols-2 ${datosBienMayusculaClass}`}
     >
       {esEdicionMasiva && (
         <div className="col-span-1 rounded-lg border border-primary/25 bg-primary/5 p-4 text-sm text-foreground lg:col-span-2">
@@ -1287,7 +1288,7 @@ export function ActivoFormDesktop({
       {esEdicionMasiva && activo && (
       <>
       <div className="col-span-1 space-y-1 rounded-lg border border-border/50 bg-muted/20 p-4 lg:col-span-2">
-        <p className="font-semibold text-foreground">{activo.nombre}</p>
+        <p className="font-semibold uppercase text-foreground">{activo.nombre}</p>
         <p className="font-mono text-xs text-muted-foreground">
           {activo.codigo_catalogo}
           {activo.codigo_barras ? ` · ${activo.codigo_barras}` : ""}
