@@ -4,6 +4,7 @@ import {
   addAmbienteDisenoHeaderPdf,
   addFichaAsignacionFirmasPdf,
   ambienteDisenoExportFilename,
+  esFichaLevantamiento,
   esReporteAmbienteDiseno,
   FICHA_TABLE_ALT_ROW_RGB,
   FICHA_TABLE_HEAD_RGB,
@@ -133,6 +134,7 @@ export async function exportReportePdf(
   const def = REPORTES.find((r) => r.id === ctx.reporteId)!;
   const fechaCorte = fechaCorteCalculo(ctx);
   const useAmbienteDiseno = esReporteAmbienteDiseno(ctx.reporteId);
+  const formulario = esFichaLevantamiento(ctx.reporteId);
   const useEntidadDiseno = esReporteEntidadDiseno(ctx.reporteId);
   const useDisenoExtendido = esReporteDisenoExtendido(ctx.reporteId);
   const titulo = reporteTitulo(ctx.reporteId, def.valorizado, ctx.fechaCorte ?? undefined);
@@ -188,6 +190,14 @@ export async function exportReportePdf(
       ? reporteDisenoPdfColumnStyles(tableWidth, ctx.reporteId)
       : undefined,
     didParseCell: (data) => {
+      if (data.section === "head" && formulario) {
+        data.cell.styles.fillColor = [255, 255, 255];
+        data.cell.styles.textColor = [0, 0, 0];
+        data.cell.styles.fontStyle = "bold";
+        data.cell.styles.lineColor = [0, 0, 0];
+        data.cell.styles.lineWidth = 0.2;
+        return;
+      }
       if (data.section === "head" && useDisenoExtendido) {
         data.cell.styles.fillColor = FICHA_TABLE_HEAD_RGB;
         data.cell.styles.textColor = [255, 255, 255];
@@ -197,20 +207,26 @@ export async function exportReportePdf(
     styles: {
       fontSize: tableFontSize,
       cellPadding: tableCellPadding,
-      lineColor: [210, 210, 210],
-      lineWidth: useDisenoExtendido ? { top: 0.1, bottom: 0.1, left: 0, right: 0 } : 0.1,
+      lineColor: formulario ? [0, 0, 0] : [210, 210, 210],
+      lineWidth: formulario
+        ? 0.2
+        : useDisenoExtendido
+          ? { top: 0.1, bottom: 0.1, left: 0, right: 0 }
+          : 0.1,
     },
     headStyles: {
-      fillColor: useDisenoExtendido ? FICHA_TABLE_HEAD_RGB : [30, 64, 120],
+      fillColor: formulario ? [255, 255, 255] : useDisenoExtendido ? FICHA_TABLE_HEAD_RGB : [30, 64, 120],
       fontSize: ambienteValorizado ? 5.5 : tableFontSize,
-      textColor: [255, 255, 255],
+      textColor: formulario ? [0, 0, 0] : [255, 255, 255],
       halign: "center",
       valign: "middle",
       minCellHeight: useDisenoExtendido ? (multilineHead ? 11 : 8) : undefined,
       cellPadding: ambienteValorizado ? { top: 1.5, bottom: 1.5, left: 0.8, right: 0.8 } : tableCellPadding,
-      lineWidth: useDisenoExtendido ? { top: 0, bottom: 0.1, left: 0, right: 0 } : 0.1,
+      lineWidth: formulario ? 0.2 : useDisenoExtendido ? { top: 0, bottom: 0.1, left: 0, right: 0 } : 0.1,
+      lineColor: formulario ? [0, 0, 0] : undefined,
     },
-    alternateRowStyles: useDisenoExtendido ? { fillColor: FICHA_TABLE_ALT_ROW_RGB } : undefined,
+    alternateRowStyles:
+      useDisenoExtendido && !formulario ? { fillColor: FICHA_TABLE_ALT_ROW_RGB } : undefined,
     footStyles: {
       ...TOTAL_ROW_STYLES,
       halign: ambienteValorizado ? "center" : "left",

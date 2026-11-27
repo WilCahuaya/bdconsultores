@@ -1,5 +1,6 @@
 import {
   buildDescripcionBien,
+  cantidadInventarioBien,
   descripcionMenaje,
   esMenaje,
   nombreEnReporteBaja,
@@ -123,6 +124,17 @@ export function buildValorizacionTotalesFilaPdf(
   }
   return out;
 }
+
+const HEADERS_LEVANTAMIENTO: ReporteTableHeaderDef[] = [
+  { key: KEY_NUM, line1: "N°" },
+  { key: KEY_CANT, line1: "Cant." },
+  { key: "und", line1: "Und" },
+  { key: "codigo", line1: "Código patrimonial" },
+  { key: "nombre", line1: "Nombre del bien" },
+  { key: "descripcion", line1: "Descripción" },
+  { key: "estado", line1: "Estado" },
+  { key: "observacion", line1: "Observación" },
+];
 
 const HEADERS_SIN_VALORES_BASE = [
   "N°",
@@ -371,6 +383,7 @@ export function reporteTableHeaderDefs(
   reporteId: ReporteId,
   valorizado: boolean,
 ): readonly ReporteTableHeaderDef[] {
+  if (esPlantilla(reporteId, "ficha_ambiente")) return HEADERS_LEVANTAMIENTO;
   if (esPlantilla(reporteId, "bajas")) {
     return headerDefFromStrings([...HEADERS_BAJAS, columnaUbicacionLabel(reporteId)]);
   }
@@ -424,7 +437,10 @@ const AMBIENTE_VALORIZADO_COL_WEIGHTS = [
   4, 4, 4, 5, 10, 14, 18, 7, 10, 6, 10, 9, 9, 9, 9, 9,
 ] as const;
 
-/** Pesos relativos (ficha de asignación y activos fijos por ambiente). */
+/** Pesos relativos (ficha de levantamiento patrimonial). */
+const LEVANTAMIENTO_COL_WEIGHTS = [5, 6, 6, 18, 52, 32, 8, 18] as const;
+
+/** Pesos relativos (inventario de bienes por ambiente, sin valores). */
 const AMBIENTE_SIN_VALOR_COL_WEIGHTS = [
   4, 4, 4, 5, 8, 6, 16, 22, 8, 7, 12,
 ] as const;
@@ -490,6 +506,7 @@ function pesosColumnasDiseno(reporteId: ReporteId): {
     case "valorizado_ambiente":
       return { weights: AMBIENTE_VALORIZADO_COL_WEIGHTS, leftAlign: [5, 6] };
     case "ficha_ambiente":
+      return { weights: LEVANTAMIENTO_COL_WEIGHTS, leftAlign: [4, 5, 7] };
     case "inventario_ambiente":
       return { weights: AMBIENTE_SIN_VALOR_COL_WEIGHTS, leftAlign: [6, 7, 10] };
     case "acta_entidad":
@@ -536,6 +553,30 @@ export function buildReporteRows(
   fechaCorte: Date,
 ): string[][] {
   const ordenados = ordenarActivosParaReporte(activos, reporteId);
+
+  if (esPlantilla(reporteId, "ficha_ambiente")) {
+    return ordenados.map((activo, index) => {
+      const descripcion = esMenaje(activo.categoria)
+        ? descripcionMenaje(activo)
+        : buildDescripcionBien(
+            activo.marca,
+            activo.modelo,
+            activo.serie,
+            activo.color,
+            activo.medidas,
+          );
+      return [
+        String(index + 1),
+        String(cantidadInventarioBien(activo)),
+        "Und",
+        formatActivoCodigoDisplay(activo),
+        activo.nombre,
+        descripcion || "—",
+        estadoBienLabel(activo.estado_bien),
+        activo.observacion?.trim() || "—",
+      ];
+    });
+  }
 
   if (esPlantilla(reporteId, "bajas")) {
     return ordenados.map((activo, index) => [

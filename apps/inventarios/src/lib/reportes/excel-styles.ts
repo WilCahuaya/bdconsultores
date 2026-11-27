@@ -60,6 +60,31 @@ function borderThin() {
   return { top: side, bottom: side, left: side, right: side };
 }
 
+function borderGrid() {
+  const side = { style: "thin", color: { rgb: "000000" } };
+  return { top: side, bottom: side, left: side, right: side };
+}
+
+/** Cabecera de la ficha de levantamiento: texto negro sobre blanco, cuadrícula. */
+export const STYLE_FORM_TABLE_HEAD = {
+  font: { name: "Calibri", sz: 10, bold: true, color: { rgb: "000000" } },
+  fill: { fgColor: { rgb: "FFFFFF" }, patternType: "solid" },
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  border: borderGrid(),
+} as const;
+
+export const STYLE_FORM_BODY = {
+  font: { name: "Calibri", sz: 10, color: { rgb: "000000" } },
+  alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  border: borderGrid(),
+} as const;
+
+export const STYLE_FORM_BODY_LEFT = {
+  font: { name: "Calibri", sz: 10, color: { rgb: "000000" } },
+  alignment: { horizontal: "left", vertical: "center", wrapText: true },
+  border: borderGrid(),
+} as const;
+
 export function setCell(
   ws: WorkSheet,
   r: number,

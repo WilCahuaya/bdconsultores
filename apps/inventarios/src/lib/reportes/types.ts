@@ -64,15 +64,16 @@ export interface ReporteDefinicion {
 export const REPORTES: ReporteDefinicion[] = [
   {
     id: "inventario_ambiente_sin_valores",
-    label: "Ficha de asignación por ambiente",
-    descripcion: "Ficha de asignación de bienes al usuario responsable, sin valores.",
+    label: "Ficha de levantamiento patrimonial",
+    descripcion:
+      "Ficha de levantamiento de información de bienes patrimoniales del ambiente, sin valores.",
     scope: "ambiente",
     valorizado: false,
     formatos: ["pdf", "excel"],
     grupo: "ambiente",
     plantilla: "ficha_ambiente",
-    titulo: "FICHA DE ASIGNACION DE BIENES AL USUARIO",
-    archivo: "ficha-asignacion",
+    titulo: "FICHA DE LEVANTAMIENTO DE INFORMACIÓN DE BIENES PATRIMONIALES",
+    archivo: "inventario-patrimonial",
   },
   {
     id: "inventario_ambiente_activos_fijos",
