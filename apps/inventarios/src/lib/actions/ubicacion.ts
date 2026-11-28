@@ -222,6 +222,23 @@ export async function listAmbientesPorEntidad(
     }
   }
 
+  const edificioIds = [
+    ...new Set(mapped.map((a) => a.edificio_id).filter((id): id is string => Boolean(id))),
+  ];
+  if (edificioIds.length > 0) {
+    const { data: edificiosRows } = await supabase
+      .from("edificios")
+      .select("id, nombre")
+      .in("id", edificioIds);
+    const porEdificio = new Map(
+      (edificiosRows ?? []).map((e) => [e.id as string, ((e.nombre as string) ?? "").trim()]),
+    );
+    for (const amb of mapped) {
+      const nombre = amb.edificio_id ? porEdificio.get(amb.edificio_id) : undefined;
+      if (nombre) amb.edificio_nombre = nombre;
+    }
+  }
+
   const activoCounts = await activoCountByAmbienteIds(
     supabase,
     mapped.map((ambiente) => ambiente.id),
@@ -357,6 +374,7 @@ export interface CreateAmbienteInput {
   descripcion?: string;
   responsableId?: string | null;
   espacioId?: string | null;
+  edificioId?: string | null;
 }
 
 const ESPACIO_OCUPADO_MSG = "Ese espacio ya está ocupado por otro ambiente.";
@@ -397,7 +415,8 @@ export async function createAmbiente(input: CreateAmbienteInput) {
       nombre: trimmed,
       descripcion: input.descripcion?.trim() || null,
       responsable_id: input.responsableId || null,
-      espacio_id: input.espacioId || null,
+      espacio_id: input.edificioId ? null : input.espacioId || null,
+      edificio_id: input.edificioId || null,
     })
     .select()
     .single();
@@ -459,15 +478,14 @@ export async function updateAmbiente(
     }
   }
 
-  const espacioId = input.espacioId ?? null;
-
   const { error } = await supabase
     .from("ambientes")
     .update({
       nombre: trimmed,
       descripcion: input.descripcion?.trim() || null,
       responsable_id: input.responsableId ?? null,
-      espacio_id: espacioId,
+      espacio_id: input.edificioId ? null : (input.espacioId ?? null),
+      edificio_id: input.edificioId ?? null,
     })
     .eq("id", ambienteId);
 
@@ -846,14 +864,14 @@ export async function listEdificiosPorEntidad(entidadId: string): Promise<Edific
   });
 }
 
-export async function createEdificio(sedeId: string, nombre: string) {
+export async function createEdificio(sedeId: string, nombre: string, descripcion?: string) {
   const profile = await getProfile();
   if (!profile) return { error: "Sesión no válida." };
   if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
     return { error: "No autorizado." };
   }
   const trimmed = nombre.trim();
-  if (!trimmed) return { error: "Nombre de edificio obligatorio." };
+  if (!trimmed) return { error: "Nombre de pabellón obligatorio." };
 
   const supabase = await createClient();
   if (profile.rol === "ADMIN_ENTIDAD") {
@@ -873,18 +891,18 @@ export async function createEdificio(sedeId: string, nombre: string) {
     .eq("sede_id", sedeId)
     .eq("activo", true);
   if ((existentes ?? []).some((e) => e.nombre.trim().toLowerCase() === trimmed.toLowerCase())) {
-    return { error: "Ya existe un edificio con ese nombre en la sucursal." };
+    return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
   }
 
   const { data, error } = await supabase
     .from("edificios")
-    .insert({ sede_id: sedeId, nombre: trimmed })
+    .insert({ sede_id: sedeId, nombre: trimmed, descripcion: descripcion?.trim() ?? "" })
     .select()
     .single();
   if (error) {
     const msg = error.message.toLowerCase();
     if (msg.includes("duplicate") || msg.includes("idx_edificios_sede_nombre_activo")) {
-      return { error: "Ya existe un edificio con ese nombre en la sucursal." };
+      return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
     }
     return { error: error.message };
   }
@@ -892,6 +910,69 @@ export async function createEdificio(sedeId: string, nombre: string) {
   const { data: sede } = await supabase.from("sedes").select("entidad_id").eq("id", sedeId).single();
   if (sede?.entidad_id) revalidateEntidad(sede.entidad_id as string, sedeId);
   return { success: true, data: data as Edificio };
+}
+
+export async function updateEdificio(edificioId: string, nombre: string, descripcion?: string) {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
+    return { error: "No autorizado." };
+  }
+  const trimmed = nombre.trim();
+  if (!trimmed) return { error: "Nombre de pabellón obligatorio." };
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("edificios")
+    .select("id, sede_id")
+    .eq("id", edificioId)
+    .eq("activo", true)
+    .maybeSingle();
+  if (!existing) return { error: "Pabellón no encontrado." };
+
+  if (profile.rol === "ADMIN_ENTIDAD") {
+    const { data: sedeRow } = await supabase
+      .from("sedes")
+      .select("entidad_id")
+      .eq("id", existing.sede_id)
+      .maybeSingle();
+    if (!sedeRow || sedeRow.entidad_id !== profile.entidad_id) {
+      return { error: "No autorizado." };
+    }
+  }
+
+  const { data: hermanos } = await supabase
+    .from("edificios")
+    .select("id, nombre")
+    .eq("sede_id", existing.sede_id)
+    .eq("activo", true);
+  if (
+    (hermanos ?? []).some(
+      (e) => e.id !== edificioId && e.nombre.trim().toLowerCase() === trimmed.toLowerCase(),
+    )
+  ) {
+    return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
+  }
+
+  const { error } = await supabase
+    .from("edificios")
+    .update({ nombre: trimmed, descripcion: descripcion?.trim() ?? "" })
+    .eq("id", edificioId);
+  if (error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("duplicate") || msg.includes("idx_edificios_sede_nombre_activo")) {
+      return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
+    }
+    return { error: error.message };
+  }
+
+  const { data: sede } = await supabase
+    .from("sedes")
+    .select("entidad_id")
+    .eq("id", existing.sede_id)
+    .single();
+  if (sede?.entidad_id) revalidateEntidad(sede.entidad_id as string, existing.sede_id as string);
+  return { success: true as const };
 }
 
 export async function listPisos(sedeId: string): Promise<Piso[]> {

@@ -35,6 +35,7 @@ interface ActivosAmbienteViewProps {
   onPrintLabel: (activo: ActivoConUbicacion) => void;
   onPrintBatch?: (activos: ActivoConUbicacion[]) => void;
   onEditActivo?: (activo: ActivoConUbicacion) => void;
+  onEditarSeleccion?: (activos: ActivoConUbicacion[]) => void;
   onActivoUpdated: (activo: ActivoConUbicacion) => void;
   onActivoDeleted?: () => void;
   onAbrirAmbienteDestino?: (destino: AmbienteDestinoNavigation) => void;
@@ -60,6 +61,7 @@ export function ActivosAmbienteView({
   onPrintLabel,
   onPrintBatch,
   onEditActivo,
+  onEditarSeleccion,
   onActivoUpdated,
   onActivoDeleted,
   onAbrirAmbienteDestino,
@@ -354,6 +356,7 @@ export function ActivosAmbienteView({
       onPrintLabel={onPrintLabel}
       onPrintBatch={onPrintBatch}
       onEditActivo={onEditActivo}
+      onEditarSeleccion={onEditarSeleccion}
       onActivoUpdated={onActivoUpdated}
       onActivoDeleted={onActivoDeleted}
       onAbrirAmbienteDestino={onAbrirAmbienteDestino}

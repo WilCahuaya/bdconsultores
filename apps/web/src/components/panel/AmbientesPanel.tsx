@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Activo, CreateResponsableInput, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
 import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
-import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, ResponsablesPanel } from "@inventario/ui";
+import { Button, CrearResponsableDialog, Dialog, PabellonesGestionPanel, ResponsablesPanel } from "@inventario/ui";
 import {
   DeleteIcon,
   PanelDataTable,
@@ -38,20 +38,15 @@ import type { AmbienteConSede } from "@/lib/actions/ubicacion";
 import {
   createAmbiente,
   createEdificio,
-  createEspacio,
-  createPiso,
   deleteAmbiente,
-  deleteEspacio,
-  updateEspacio,
   listAmbientesPorEntidad,
   listEdificios,
-  listEspacios,
-  listPisos,
-  listEspaciosPorEntidad,
+  listEdificiosPorEntidad,
   listSedesConConteo,
   updateAmbiente,
+  updateEdificio,
 } from "@/lib/actions/ubicacion";
-import type { Espacio } from "@inventario/types";
+import type { Edificio } from "@inventario/types";
 import type { AmbienteConVisita } from "@/lib/actions/visitas-campo";
 import {
   abrirVisitaCampo,
@@ -68,7 +63,7 @@ import {
   setResponsableActivo,
   updateResponsable,
 } from "@/lib/actions/responsables";
-import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente, EspacioOcupaCelda } from "./AmbienteFormFields";
+import { AmbienteFormFields, ambienteFromForm, etiquetaPabellonAmbiente } from "./AmbienteFormFields";
 import { AmbientesImportDialog } from "./AmbientesImportDialog";
 import { InventarioImportDialog } from "./InventarioImportDialog";
 import {
@@ -94,7 +89,7 @@ type EntityTab = "inventario" | "ambientes" | "espacios" | "responsables" | "suc
 const ENTITY_TABS: { id: EntityTab; label: string }[] = [
   { id: "inventario", label: "Inventario" },
   { id: "ambientes", label: "Ambientes" },
-  { id: "espacios", label: "Ubicación física" },
+  { id: "espacios", label: "Pabellones" },
   { id: "responsables", label: "Responsables" },
   { id: "sucursales", label: "Sucursales" },
   { id: "visitas", label: "Visitas de campo" },
@@ -139,9 +134,10 @@ interface AmbienteCardProps {
 }
 
 function AmbienteCard({ ambiente, entidadNombre, activosHref, onEdit, onDelete }: AmbienteCardProps) {
-  const espacioLabel = etiquetaEspacioAmbiente({
+  const pabellonLabel = etiquetaPabellonAmbiente({
     esPreregistro: ambiente.es_preregistro,
-    espacioNombre: ambiente.espacio_nombre,
+    esFaltante: ambiente.es_faltante,
+    pabellonNombre: ambiente.edificio_nombre,
   });
   return (
     <article className={`${panelCardClass} flex flex-col overflow-hidden`}>
@@ -159,7 +155,7 @@ function AmbienteCard({ ambiente, entidadNombre, activosHref, onEdit, onDelete }
             {ambiente.responsable ?? "Sin responsable asignado"}
           </p>
           <p className="text-sm text-muted-foreground" title={ambiente.es_preregistro ? "Ambiente de preregistros: no es un local físico" : undefined}>
-            Espacio: {espacioLabel}
+            Pabellón: {pabellonLabel}
           </p>
           {ambiente.descripcion ? (
             <p className="text-muted-foreground">{ambiente.descripcion}</p>
@@ -225,12 +221,12 @@ export function AmbientesPanel({
   const [createOpen, setCreateOpen] = useState(false);
   const [createResponsableOpen, setCreateResponsableOpen] = useState(false);
   const [createResponsableId, setCreateResponsableId] = useState("");
-  const [createEspacioId, setCreateEspacioId] = useState("");
+  const [createPabellonId, setCreatePabellonId] = useState("");
   const [editResponsableOpen, setEditResponsableOpen] = useState(false);
   const [editResponsableId, setEditResponsableId] = useState("");
-  const [editEspacioId, setEditEspacioId] = useState("");
+  const [editPabellonId, setEditPabellonId] = useState("");
   const [editAmbiente, setEditAmbiente] = useState<AmbienteRow | null>(null);
-  const [espacios, setEspacios] = useState<Espacio[]>([]);
+  const [pabellones, setPabellones] = useState<Edificio[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useStoredViewMode("inventario-view-ambientes", "list");
@@ -247,7 +243,7 @@ export function AmbientesPanel({
     setResponsables(initialResponsables);
   }, [initialResponsables]);
   useEffect(() => {
-    void listEspaciosPorEntidad(entidad.id).then(setEspacios);
+    void listEdificiosPorEntidad(entidad.id).then(setPabellones);
   }, [entidad.id]);
   useEffect(() => {
     setVisitasActivas(initialVisitasActivas);
@@ -294,7 +290,7 @@ export function AmbientesPanel({
   useEffect(() => {
     if (editAmbiente) {
       setEditResponsableId(editAmbiente.responsable_id ?? "");
-      setEditEspacioId(editAmbiente.espacio_id ?? "");
+      setEditPabellonId(editAmbiente.edificio_id ?? "");
       setEditResponsableOpen(false);
     }
   }, [editAmbiente]);
@@ -303,7 +299,7 @@ export function AmbientesPanel({
     setCreateOpen(false);
     setCreateResponsableOpen(false);
     setCreateResponsableId("");
-    setCreateEspacioId("");
+    setCreatePabellonId("");
     setError(null);
   }
 
@@ -311,13 +307,13 @@ export function AmbientesPanel({
     setEditAmbiente(null);
     setEditResponsableOpen(false);
     setEditResponsableId("");
-    setEditEspacioId("");
+    setEditPabellonId("");
     setError(null);
   }
 
-  async function syncEspaciosEntidad() {
-    const list = await listEspaciosPorEntidad(entidad.id);
-    setEspacios(list);
+  async function syncPabellonesEntidad() {
+    const list = await listEdificiosPorEntidad(entidad.id);
+    setPabellones(list);
   }
 
   async function syncVisitaYAmbientes() {
@@ -338,13 +334,13 @@ export function AmbientesPanel({
       listAmbientesPorEntidad(entidad.id, sedeFocus?.id),
       listResponsables(entidad.id),
       listSedesConConteo(entidad.id),
-      listEspaciosPorEntidad(entidad.id),
+      listEdificiosPorEntidad(entidad.id),
     ]);
     const enriched = await attachVisitaEstadoToAmbientes(ambList, entidad.id);
     setAmbientes(enriched);
     setResponsables(respList);
     setSedes(sedeList);
-    setEspacios(espacioList);
+    setPabellones(espacioList);
     router.refresh();
   }
 
@@ -417,7 +413,7 @@ export function AmbientesPanel({
         a.nombre.toLowerCase().includes(q) ||
         (a.descripcion?.toLowerCase().includes(q) ?? false) ||
         (a.responsable?.toLowerCase().includes(q) ?? false) ||
-        (a.espacio_nombre?.toLowerCase().includes(q) ?? false) ||
+        (a.edificio_nombre?.toLowerCase().includes(q) ?? false) ||
         (entidadMultiplesSedes && !sedeFiltrada && a.sede_nombre.toLowerCase().includes(q)),
     );
   }, [ambientesBase, busqueda, entidadMultiplesSedes, sedeFiltrada]);
@@ -451,7 +447,7 @@ export function AmbientesPanel({
       nombre: input.nombre,
       descripcion: input.descripcion,
       responsableId: input.responsableId,
-      espacioId: input.espacioId,
+      edificioId: input.edificioId,
     });
 
     setPending(false);
@@ -460,13 +456,14 @@ export function AmbientesPanel({
       return;
     }
 
-    const espacioNombre =
-      espacios.find((e) => e.id === input.espacioId)?.nombre ?? null;
+    const pabellonNombre =
+      pabellones.find((e) => e.id === input.edificioId)?.nombre ?? null;
     const nuevo: AmbienteRow = {
       ...result.data!,
       sede_nombre: sede?.nombre ?? "",
       sede_es_principal: sede?.es_principal ?? false,
-      espacio_nombre: espacioNombre,
+      edificio_id: input.edificioId,
+      edificio_nombre: pabellonNombre,
       activo_count: 0,
       visita_estado: visitaAbierta ? "EN_PROCESO" : null,
       visita_revisados: visitaAbierta ? 0 : null,
@@ -491,7 +488,7 @@ export function AmbientesPanel({
     setCreateOpen(false);
     form.reset();
     setCreateResponsableId("");
-    setCreateEspacioId("");
+    setCreatePabellonId("");
     await syncAmbientesYResponsables();
     router.refresh();
   }
@@ -520,9 +517,9 @@ export function AmbientesPanel({
               descripcion: input.descripcion.trim() || null,
               responsable_id: input.responsableId,
               responsable: responsableNombreById(input.responsableId),
-              espacio_id: input.espacioId,
-              espacio_nombre:
-                espacios.find((e) => e.id === input.espacioId)?.nombre ?? null,
+              edificio_id: input.edificioId,
+              edificio_nombre:
+                pabellones.find((e) => e.id === input.edificioId)?.nombre ?? null,
             }
           : a,
       ),
@@ -674,39 +671,19 @@ export function AmbientesPanel({
           }}
         />
       ) : !sedeFocus && tab === "espacios" ? (
-        <EspaciosGestionPanel
+        <PabellonesGestionPanel
           sedes={sedes}
-          onList={listEspacios}
-          onCreate={async (sedeId, nombre, descripcion, ubicacion) => {
-            const result = await createEspacio(sedeId, nombre, descripcion, ubicacion);
+          onList={listEdificios}
+          onCreate={async (sedeId, nombre, descripcion) => {
+            const result = await createEdificio(sedeId, nombre, descripcion);
             if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
+            void syncPabellonesEntidad();
             return {};
           }}
-          onUpdateDescripcion={async (espacioId, descripcion, ubicacion) => {
-            const result = await updateEspacio(espacioId, descripcion, ubicacion);
+          onUpdate={async (edificioId, nombre, descripcion) => {
+            const result = await updateEdificio(edificioId, nombre, descripcion);
             if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
-            return {};
-          }}
-          onListEdificios={listEdificios}
-          onCreateEdificio={async (sedeId, nombre) => {
-            const result = await createEdificio(sedeId, nombre);
-            if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
-            return {};
-          }}
-          onListPisos={listPisos}
-          onCreatePiso={async (edificioId) => {
-            const result = await createPiso(edificioId);
-            if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
-            return {};
-          }}
-          onDelete={async (espacioId) => {
-            const result = await deleteEspacio(espacioId);
-            if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
+            void syncPabellonesEntidad();
             return {};
           }}
         />
@@ -805,7 +782,7 @@ export function AmbientesPanel({
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
               <PanelTableTh>Ambiente</PanelTableTh>
-              <PanelTableTh className={panelTableNowrapCellClass}>Espacio que ocupa</PanelTableTh>
+              <PanelTableTh className={panelTableNowrapCellClass}>Pabellón</PanelTableTh>
               <PanelTableTh>Responsable</PanelTableTh>
               <PanelTableTh>Descripción</PanelTableTh>
               {!ocultarSucursalEnLista && <PanelTableTh className={panelTableShrinkCellClass}>Sucursal</PanelTableTh>}
@@ -840,14 +817,11 @@ export function AmbientesPanel({
                   {amb.nombre}
                 </PanelTableTd>
                 <PanelTableTd className={panelTableNowrapCellClass}>
-                  <EspacioOcupaCelda
-                    esPreregistro={amb.es_preregistro}
-                    esFaltante={amb.es_faltante}
-                    espacioNombre={amb.espacio_local}
-                    piso={amb.piso}
-                    edificioNombre={amb.edificio_nombre}
-                    descripcion={amb.espacio_descripcion}
-                  />
+                  {etiquetaPabellonAmbiente({
+                    esPreregistro: amb.es_preregistro,
+                    esFaltante: amb.es_faltante,
+                    pabellonNombre: amb.edificio_nombre,
+                  })}
                 </PanelTableTd>
                 <PanelTableTd title={amb.responsable ?? undefined}>
                   {amb.responsable ?? "—"}
@@ -968,14 +942,14 @@ export function AmbientesPanel({
           <AmbienteFormFields
             sedes={sedes}
             responsables={responsables}
-            espacios={espacios}
+            pabellones={pabellones}
             defaultSedeId={sedeActivaId || sedeIdSinSelector(sedes) || undefined}
             showSedeSelect={entidadMultiplesSedes}
             responsableId={createResponsableId}
             onResponsableIdChange={setCreateResponsableId}
             onRequestCreateResponsable={() => setCreateResponsableOpen(true)}
-            espacioId={createEspacioId}
-            onEspacioIdChange={setCreateEspacioId}
+            pabellonId={createPabellonId}
+            onPabellonIdChange={setCreatePabellonId}
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -1011,12 +985,12 @@ export function AmbientesPanel({
               ambiente={editAmbiente}
               sedes={sedes}
               responsables={responsables}
-              espacios={espacios}
+              pabellones={pabellones}
               responsableId={editResponsableId}
               onResponsableIdChange={setEditResponsableId}
               onRequestCreateResponsable={() => setEditResponsableOpen(true)}
-              espacioId={editEspacioId}
-              onEspacioIdChange={setEditEspacioId}
+              pabellonId={editPabellonId}
+              onPabellonIdChange={setEditPabellonId}
               esPreregistro={editAmbiente.es_preregistro}
             />
             {error && <p className="text-sm text-destructive">{error}</p>}

@@ -132,6 +132,11 @@ export function ActivosAmbientePanel({
   const { pushToast } = useToast();
   const [activosList, setActivosList] = useState(activos);
   const [editActivo, setEditActivo] = useState<Activo | null>(null);
+  const [editSeleccionIds, setEditSeleccionIds] = useState<string[] | null>(null);
+  const cerrarEdicion = useCallback(() => {
+    setEditActivo(null);
+    setEditSeleccionIds(null);
+  }, []);
   const [editScope, setEditScope] = useState<ActivoEditScope>("single");
   const { resumen: ejemplaresResumen } = useEjemplaresResumen(editActivo?.id);
   const ejemplaresTotal = ejemplaresResumen?.total ?? 0;
@@ -433,7 +438,7 @@ export function ActivosAmbientePanel({
   }, []);
 
   function handleSuccess() {
-    setEditActivo(null);
+    cerrarEdicion();
     router.refresh();
   }
 
@@ -451,7 +456,7 @@ export function ActivosAmbientePanel({
           ...(isAdmin
             ? [{ label: "Ambientes", href: "/admin/activos" }]
             : [{ label: entidadNombre, href: `/contador/entidades/${entidadId}` }]),
-          { label: ambienteNombre, onClick: () => setEditActivo(null) },
+          { label: ambienteNombre, onClick: () => cerrarEdicion() },
           { label: editActivo.nombre },
           { label: editTitle },
         ],
@@ -466,11 +471,13 @@ export function ActivosAmbientePanel({
     return (
       <div className="space-y-5">
         <PanelPageHeader breadcrumbs={editBreadcrumbs} />
-        <ActivoEditScopeNav
-          scope={editScope}
-          ejemplaresTotal={ejemplaresTotal}
-          onScopeChange={setEditScope}
-        />
+        {!editSeleccionIds && (
+          <ActivoEditScopeNav
+            scope={editScope}
+            ejemplaresTotal={ejemplaresTotal}
+            onScopeChange={setEditScope}
+          />
+        )}
         <ActivoForm
           entidades={[]}
           fixedEntidadId={entidadId}
@@ -480,6 +487,7 @@ export function ActivosAmbientePanel({
           mode="edit"
           editScope={editScope}
           ejemplaresTotal={ejemplaresTotal}
+          seleccionIds={editSeleccionIds ?? undefined}
           submitLabel={
             editScope === "bulk" && ejemplaresTotal > 1
               ? `Guardar en ${ejemplaresTotal} ejemplares`
@@ -496,7 +504,7 @@ export function ActivosAmbientePanel({
           }
           variant="page"
           onSuccess={handleSuccess}
-          onCancel={() => setEditActivo(null)}
+          onCancel={() => cerrarEdicion()}
         />
       </div>
     );
@@ -760,7 +768,14 @@ export function ActivosAmbientePanel({
             </div>
           }
           activos={filtrados}
-          onEditActivo={setEditActivo}
+          onEditActivo={(activo) => {
+            setEditSeleccionIds(null);
+            setEditActivo(activo);
+          }}
+          onEditarSeleccion={(activos) => {
+            setEditSeleccionIds(activos.map((activo) => activo.id));
+            setEditActivo(activos[0] ?? null);
+          }}
           puedeDarDeBaja={!isAdmin && !esAmbientePreregistro}
           puedeValidarPreregistro={!isAdmin && esAmbientePreregistro}
           puedeEliminarPreregistro={esAmbientePreregistro}

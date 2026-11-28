@@ -70,10 +70,12 @@ import {
 import { panelFieldsetClass, panelLegendClass, panelModalClass, fechaAdquisicionToneClass } from "@inventario/ui/panel";
 import type { ActivoConUbicacion } from "../lib/activos";
 import {
+  applyActivosSeleccionPatchLocal,
   applyActivosSimilaresPatchLocal,
   createActivo,
   previewCodigoBarras,
   updateActivo,
+  updateActivosSeleccion,
   updateActivosSimilares,
 } from "../lib/activos";
 import { createAmbiente, listAmbientesPorEntidad, listSedes, type AmbienteConSede } from "../lib/ubicacion";
@@ -133,6 +135,8 @@ export interface ActivoFormDesktopProps {
   initialCatalogoCodigo?: string;
   editScope?: ActivoEditScope;
   ejemplaresTotal?: number;
+  /** Ids marcados con el mismo nombre. El guardado no mueve ubicación ni toca el resto del lote. */
+  seleccionIds?: string[];
   onSuccess: (activo: ActivoConUbicacion) => void;
   onCancel: () => void;
 }
@@ -168,16 +172,19 @@ export function ActivoFormDesktop({
   initialCatalogoCodigo,
   editScope = "single",
   ejemplaresTotal = 0,
+  seleccionIds = [],
   onSuccess,
   onCancel,
 }: ActivoFormDesktopProps) {
   const isEdit = Boolean(activo);
+  const esEdicionSeleccion = Boolean(isEdit && seleccionIds.length > 1);
   const esEdicionMasiva = Boolean(
-    isEdit && ejemplaresTotal > 1 && editScope === "bulk",
+    esEdicionSeleccion || (isEdit && ejemplaresTotal > 1 && editScope === "bulk"),
   );
   const mostrarPosibleAmbiente =
     modoPreregistro || (isEdit && activo?.estado_registro === "PREREGISTRADO");
-  const hideUbicacion = mostrarPosibleAmbiente || Boolean(fixedSedeId && fixedAmbienteId);
+  const hideUbicacion =
+    esEdicionSeleccion || mostrarPosibleAmbiente || Boolean(fixedSedeId && fixedAmbienteId);
   const [catalogo, setCatalogo] = useState<CatalogoNacional | null>(null);
   const [catalogoAlta, setCatalogoAlta] = useState<CatalogoAltaInline | null>(null);
   const [nombre, setNombre] = useState(activo?.nombre ?? "");
@@ -953,14 +960,28 @@ export function ActivoFormDesktop({
         files.fotoType = fotoFile.type;
       }
 
-      await enqueueOfflineOp("activos:updateSimilares", entidadId, {
-        activoId: activo.id,
-        patch: bulkPatch,
-        files: Object.keys(files).length > 0 ? files : undefined,
-      });
-      const actualizados = await applyActivosSimilaresPatchLocal(entidadId, activo, bulkPatch);
+      await enqueueOfflineOp(
+        esEdicionSeleccion ? "activos:updateSeleccion" : "activos:updateSimilares",
+        entidadId,
+        esEdicionSeleccion
+          ? {
+              ids: seleccionIds,
+              patch: bulkPatch,
+              files: Object.keys(files).length > 0 ? files : undefined,
+            }
+          : {
+              activoId: activo.id,
+              patch: bulkPatch,
+              files: Object.keys(files).length > 0 ? files : undefined,
+            },
+      );
+      const actualizados = esEdicionSeleccion
+        ? await applyActivosSeleccionPatchLocal(entidadId, seleccionIds, bulkPatch)
+        : await applyActivosSimilaresPatchLocal(entidadId, activo, bulkPatch);
+      const alcance = esEdicionSeleccion ? seleccionIds.length : ejemplaresTotal;
+      const unidad = esEdicionSeleccion ? "bienes" : "ejemplares";
       setMessage(
-        `${actualizados || ejemplaresTotal} ejemplares actualizados (guardado en cola offline, se sincronizarán al reconectar).`,
+        `${actualizados || alcance} ${unidad} actualizados (guardado en cola offline, se sincronizarán al reconectar).`,
       );
       onSuccess(activo);
       return;
@@ -1141,7 +1162,9 @@ export function ActivoFormDesktop({
     const result =
       isEdit && activo
         ? esEdicionMasiva && bulkPatch
-          ? await updateActivosSimilares(activo.id, bulkPatch)
+          ? esEdicionSeleccion
+            ? await updateActivosSeleccion(seleccionIds, bulkPatch)
+            : await updateActivosSimilares(activo.id, bulkPatch)
           : await updateActivo(activo.id, payload)
         : await createActivo({
             entidad_id: entidadId,
@@ -1203,7 +1226,7 @@ export function ActivoFormDesktop({
 
     if (esEdicionMasiva && activo) {
       setMessage(
-        `${(result.data as { actualizados?: number })?.actualizados ?? ejemplaresTotal} ejemplares actualizados correctamente.`,
+        `${(result.data as { actualizados?: number })?.actualizados ?? (esEdicionSeleccion ? seleccionIds.length : ejemplaresTotal)} ${esEdicionSeleccion ? "bienes" : "ejemplares"} actualizados correctamente.`,
       );
       const visitaError = await visitaMarca.aplicarTrasGuardar(estadoBien ?? activo.estado_bien);
       if (visitaError) {
@@ -1261,7 +1284,7 @@ export function ActivoFormDesktop({
           ? "Guardando…"
           : isEdit
             ? esEdicionMasiva
-              ? `Guardar en ${ejemplaresTotal} ejemplares`
+              ? `Guardar en ${esEdicionSeleccion ? seleccionIds.length : ejemplaresTotal} ${esEdicionSeleccion ? "bienes" : "ejemplares"}`
               : "Guardar cambios"
             : "Registrar activo"}
       </Button>
@@ -1279,9 +1302,19 @@ export function ActivoFormDesktop({
     >
       {esEdicionMasiva && (
         <div className="col-span-1 rounded-lg border border-primary/25 bg-primary/5 p-4 text-sm text-foreground lg:col-span-2">
-          Los cambios se aplicarán a los{" "}
-          <strong>{ejemplaresTotal} ejemplares</strong> de este lote de compra. Cada unidad
-          conserva su código de barras y serie propios.
+          {esEdicionSeleccion ? (
+            <>
+              Los cambios se aplicarán a los{" "}
+              <strong>{seleccionIds.length} bienes seleccionados</strong> con el mismo nombre.
+              Cada uno conserva su código, su serie y su ubicación.
+            </>
+          ) : (
+            <>
+              Los cambios se aplicarán a los{" "}
+              <strong>{ejemplaresTotal} ejemplares</strong> de este lote de compra. Cada unidad
+              conserva su código de barras y serie propios.
+            </>
+          )}
         </div>
       )}
 
@@ -1584,7 +1617,9 @@ export function ActivoFormDesktop({
                 checked={aplicarObservacionLote}
                 onChange={(e) => setAplicarObservacionLote(e.target.checked)}
               />
-              Aplicar observación a todos los ejemplares
+              {esEdicionSeleccion
+                ? "Aplicar observación a los bienes seleccionados"
+                : "Aplicar observación a todos los ejemplares"}
             </label>
           </fieldset>
 
@@ -2193,11 +2228,11 @@ export function ActivoFormDesktop({
                   piso: ambienteElegido.piso,
                   espacioNombre: ambienteElegido.espacio_local,
                   incluirSede: mostrarSelectorSede,
-                }) || "Sin espacio asignado"}
+                }) || "Sin pabellón"}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                La sucursal, el edificio y el piso salen del ambiente.
+                La sucursal y el pabellón salen del ambiente.
               </p>
             )}
             {sedeId && (

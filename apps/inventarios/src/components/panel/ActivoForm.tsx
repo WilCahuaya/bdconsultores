@@ -78,6 +78,7 @@ import {
   previewCodigoBarras,
   updateActivo,
   updateActivoPaths,
+  updateActivosSeleccion,
   updateActivosSimilares,
   type UpdateActivoInput,
 } from "@/lib/actions/activos";
@@ -131,6 +132,8 @@ interface ActivoFormProps {
   /** Alcance de edición cuando hay ejemplares similares */
   editScope?: ActivoEditScope;
   ejemplaresTotal?: number;
+  /** Ids marcados con el mismo nombre. El guardado no mueve ubicación ni toca el resto del lote. */
+  seleccionIds?: string[];
   variant?: "page" | "modal";
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -177,14 +180,16 @@ export function ActivoForm({
   modoAdmin = false,
   editScope = "single",
   ejemplaresTotal = 0,
+  seleccionIds = [],
   variant = "page",
   onSuccess,
   onCancel,
   initialCatalogoCodigo,
 }: ActivoFormProps) {
   const isEdit = mode === "edit" && Boolean(activo);
+  const esEdicionSeleccion = Boolean(isEdit && seleccionIds.length > 1);
   const esEdicionMasiva = Boolean(
-    isEdit && ejemplaresTotal > 1 && editScope === "bulk",
+    esEdicionSeleccion || (isEdit && ejemplaresTotal > 1 && editScope === "bulk"),
   );
   const formRef = useRef<HTMLFormElement>(null);
   const soloUbicacionEdit = isEdit && soloUbicacion;
@@ -891,6 +896,31 @@ export function ActivoForm({
 
     if (soloUbicacionEdit && activo) {
       setPending(true);
+      if (esEdicionSeleccion) {
+        const result = await updateActivosSeleccion(seleccionIds, {
+          estado_bien: estadoBien,
+          ...(aplicarObservacionAdminLote
+            ? { observacion_admin: observacionAdmin.trim() || null }
+            : {}),
+        });
+        setPending(false);
+        if (result.error) {
+          setMessage(result.error);
+          return;
+        }
+        const actualizados =
+          "data" in result && result.data
+            ? (result.data as { actualizados?: number }).actualizados
+            : seleccionIds.length;
+        setMessage(`${actualizados ?? seleccionIds.length} bienes actualizados.`);
+        const visitaError = await visitaMarca.aplicarTrasGuardar(estadoBien ?? activo.estado_bien);
+        if (visitaError) {
+          setMessage(visitaError);
+          return;
+        }
+        onSuccess?.();
+        return;
+      }
       if (!sedeId || !ambienteId) {
         setPending(false);
         setMessage("Seleccione sede y ambiente.");
@@ -1204,7 +1234,9 @@ export function ActivoForm({
     const result =
       isEdit && activo
         ? esEdicionMasiva && bulkPatch
-          ? await updateActivosSimilares(activo.id, bulkPatch)
+          ? esEdicionSeleccion
+            ? await updateActivosSeleccion(seleccionIds, bulkPatch)
+            : await updateActivosSimilares(activo.id, bulkPatch)
           : await updateActivo(activo.id, payload)
         : await createActivo({
           entidad_id: entidadEfectiva,
@@ -1292,7 +1324,7 @@ export function ActivoForm({
           : undefined;
       setMessage(
         esEdicionMasiva
-          ? `${actualizados ?? ejemplaresTotal} ejemplares actualizados correctamente.`
+          ? `${actualizados ?? (esEdicionSeleccion ? seleccionIds.length : ejemplaresTotal)} ${esEdicionSeleccion ? "bienes" : "ejemplares"} actualizados correctamente.`
           : "Activo actualizado correctamente.",
       );
       if (activo) {
@@ -1320,7 +1352,9 @@ export function ActivoForm({
   }
 
   const hideUbicacion =
-    mostrarPosibleAmbiente || (!soloUbicacionEdit && Boolean(fixedAmbienteId && fixedSedeId));
+    esEdicionSeleccion ||
+    mostrarPosibleAmbiente ||
+    (!soloUbicacionEdit && Boolean(fixedAmbienteId && fixedSedeId));
   const isGridForm = variant === "modal" || variant === "page";
   const formGridClass =
     isGridForm && soloUbicacionEdit
@@ -1359,7 +1393,7 @@ export function ActivoForm({
         {pending
           ? "Guardando…"
           : esEdicionMasiva
-            ? `Guardar en ${ejemplaresTotal} ejemplares`
+            ? `Guardar en ${esEdicionSeleccion ? seleccionIds.length : ejemplaresTotal} ${esEdicionSeleccion ? "bienes" : "ejemplares"}`
             : !isEdit && agregarSimilares
               ? `${esPreregistro ? "Preregistrar" : "Registrar"} y ${Math.max(0, Math.floor(Number(cantidadSimilares) || 0))} similares`
               : submitLabel}
@@ -1394,12 +1428,29 @@ export function ActivoForm({
 
       {(esBulkContador || esBulkAdminPreregistro) && (
         <div className="col-span-1 rounded-lg border border-primary/25 bg-primary/5 p-4 text-sm text-foreground lg:col-span-2">
-          Los cambios se aplicarán a los{" "}
-          <strong>{ejemplaresTotal} ejemplares</strong> de este lote de compra. Cada unidad
-          conserva su código de barras y serie propios.
+          {esEdicionSeleccion ? (
+            <>
+              Los cambios se aplicarán a los{" "}
+              <strong>{seleccionIds.length} bienes seleccionados</strong> con el mismo nombre.
+              Cada uno conserva su código, su serie y su ubicación.
+            </>
+          ) : (
+            <>
+              Los cambios se aplicarán a los{" "}
+              <strong>{ejemplaresTotal} ejemplares</strong> de este lote de compra. Cada unidad
+              conserva su código de barras y serie propios.
+            </>
+          )}
         </div>
       )}
-      {esBulkAdminRegistrado && (
+      {esEdicionSeleccion && soloUbicacionEdit && (
+        <div className="col-span-1 rounded-lg border border-primary/25 bg-primary/5 p-4 text-sm text-foreground lg:col-span-2">
+          El estado y la observación se aplican a los{" "}
+          <strong>{seleccionIds.length} bienes seleccionados</strong>. Para cambiar de ambiente
+          use Mover.
+        </div>
+      )}
+      {esBulkAdminRegistrado && !esEdicionSeleccion && (
         <div className="col-span-1 rounded-lg border border-primary/25 bg-primary/5 p-4 text-sm text-foreground lg:col-span-2">
           Se moverán los <strong>{ejemplaresTotal} ejemplares</strong> de este lote a la nueva
           ubicación. También puede actualizar el estado del bien y agregar una observación del
@@ -1414,9 +1465,11 @@ export function ActivoForm({
             {activo.codigo_barras ?? activo.codigo_catalogo}
           </p>
           <p className="text-xs text-muted-foreground">
-            {esEdicionMasiva
-              ? `Seleccione sede y ambiente. Se moverán los ${ejemplaresTotal} ejemplares.`
-              : "Puede cambiar ubicación, estado del bien y agregar observaciones del administrador."}
+            {esEdicionSeleccion
+              ? `Estado y observación de los ${seleccionIds.length} bienes seleccionados. La ubicación no cambia.`
+              : esEdicionMasiva
+                ? `Seleccione sede y ambiente. Se moverán los ${ejemplaresTotal} ejemplares.`
+                : "Puede cambiar ubicación, estado del bien y agregar observaciones del administrador."}
           </p>
         </div>
       )}
@@ -1706,10 +1759,12 @@ export function ActivoForm({
                 checked={aplicarObservacionLote}
                 onChange={(e) => setAplicarObservacionLote(e.target.checked)}
               />
-              Aplicar observación a todos los ejemplares
+              {esEdicionSeleccion ? "Aplicar observación a los bienes seleccionados" : "Aplicar observación a todos los ejemplares"}
             </label>
             <p className="mt-1 text-xs text-muted-foreground">
-              Si no marca esta opción, no se modificará la observación de cada unidad del lote.
+              {esEdicionSeleccion
+                ? "Si no marca esta opción, no se modificará la observación de cada bien seleccionado."
+                : "Si no marca esta opción, no se modificará la observación de cada unidad del lote."}
             </p>
           </fieldset>
 
@@ -2464,11 +2519,11 @@ export function ActivoForm({
                   piso: ambienteElegido.piso,
                   espacioNombre: ambienteElegido.espacio_local,
                   incluirSede: mostrarSelectorSede,
-                }) || "Sin espacio asignado"}
+                }) || "Sin pabellón"}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">
-                La sucursal, el edificio y el piso salen del ambiente.
+                La sucursal y el pabellón salen del ambiente.
               </p>
             )}
             {!soloUbicacionEdit && (
@@ -2538,10 +2593,12 @@ export function ActivoForm({
                       checked={aplicarObservacionAdminLote}
                       onChange={(e) => setAplicarObservacionAdminLote(e.target.checked)}
                     />
-                    Aplicar observación a todos los ejemplares
+                    {esEdicionSeleccion ? "Aplicar observación a los bienes seleccionados" : "Aplicar observación a todos los ejemplares"}
                   </label>
                   <p className="text-xs text-muted-foreground">
-                    Si no marca esta opción, no se modificará la observación de cada unidad del lote.
+                    {esEdicionSeleccion
+                ? "Si no marca esta opción, no se modificará la observación de cada bien seleccionado."
+                : "Si no marca esta opción, no se modificará la observación de cada unidad del lote."}
                   </p>
                 </>
               ) : (

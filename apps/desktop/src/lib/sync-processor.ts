@@ -321,6 +321,7 @@ async function processMasterOp(
       descripcion?: string | null;
       responsableId?: string | null;
       espacioId?: string | null;
+      edificioId?: string | null;
     };
     const { error } = await supabase.from("ambientes").insert({
       id: String(payload.id),
@@ -328,7 +329,8 @@ async function processMasterOp(
       nombre: input.nombre,
       descripcion: input.descripcion ?? null,
       responsable_id: input.responsableId ?? null,
-      espacio_id: input.espacioId ?? null,
+      espacio_id: input.edificioId ? null : (input.espacioId ?? null),
+      edificio_id: input.edificioId ?? null,
     });
     if (error && error.code !== "23505") throw new Error(error.message);
     return;
@@ -340,6 +342,7 @@ async function processMasterOp(
       descripcion?: string | null;
       responsableId?: string | null;
       espacioId?: string | null;
+      edificioId?: string | null;
     };
     const { error } = await supabase
       .from("ambientes")
@@ -347,7 +350,8 @@ async function processMasterOp(
         nombre: input.nombre,
         descripcion: input.descripcion ?? null,
         responsable_id: input.responsableId ?? null,
-        espacio_id: input.espacioId ?? null,
+        espacio_id: input.edificioId ? null : (input.espacioId ?? null),
+        edificio_id: input.edificioId ?? null,
       })
       .eq("id", String(payload.ambienteId));
     if (error) throw new Error(error.message);
@@ -377,7 +381,20 @@ async function processMasterOp(
       id: String(payload.id),
       sede_id: String(payload.sedeId),
       nombre: String(payload.nombre),
+      descripcion: String(payload.descripcion ?? "").trim(),
     });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (op === "edificio:update") {
+    const { error } = await supabase
+      .from("edificios")
+      .update({
+        nombre: String(payload.nombre),
+        descripcion: String(payload.descripcion ?? "").trim(),
+      })
+      .eq("id", String(payload.edificioId));
     if (error) throw new Error(error.message);
     return;
   }
@@ -557,6 +574,26 @@ async function processMasterOp(
     const serie = typeof raw === "string" && raw.trim() ? raw.trim() : null;
     const { error } = await supabase.from("activos").update({ serie }).eq("id", activoId);
     if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (op === "activos:updateSeleccion") {
+    const ids = payload.ids as string[];
+    const patch = payload.patch as Record<string, unknown>;
+    const { error } = await supabase.rpc("update_activos_seleccion", {
+      p_ids: ids,
+      p_patch: patch,
+    });
+    if (error) throw new Error(error.message);
+    const files = payload.files as QueuedFiles | undefined;
+    if (files && ids[0]) {
+      await uploadQueuedFiles(
+        item.entidad_id,
+        ids[0],
+        files,
+        typeof patch.comprobante_serie === "string" ? patch.comprobante_serie : undefined,
+      );
+    }
     return;
   }
 

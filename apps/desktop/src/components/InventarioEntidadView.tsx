@@ -13,6 +13,7 @@ interface InventarioEntidadViewProps {
   onPrintLabel: (activo: ActivoConUbicacion) => void;
   onPrintBatch?: (activos: ActivoConUbicacion[]) => void;
   onEditActivo?: (activo: ActivoConUbicacion) => void;
+  onEditarSeleccion?: (activos: ActivoConUbicacion[]) => void;
   onIrAmbiente?: (activo: ActivoConUbicacion) => void;
   onAbrirAmbienteDestino?: (destino: AmbienteDestinoNavigation) => void;
   onActivoUpdated: (activo: ActivoConUbicacion) => void;
@@ -29,6 +30,7 @@ export function InventarioEntidadView({
   onPrintLabel,
   onPrintBatch,
   onEditActivo,
+  onEditarSeleccion,
   onIrAmbiente,
   onAbrirAmbienteDestino,
   onActivoUpdated,
@@ -61,6 +63,7 @@ export function InventarioEntidadView({
       onPrintLabel={onPrintLabel}
       onPrintBatch={onPrintBatch}
       onEditActivo={onEditActivo}
+      onEditarSeleccion={onEditarSeleccion}
       onIrAmbiente={onIrAmbiente}
       onAbrirAmbienteDestino={onAbrirAmbienteDestino}
       onActivoUpdated={onActivoUpdated}

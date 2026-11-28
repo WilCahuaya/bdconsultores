@@ -223,6 +223,8 @@ export interface Edificio {
   id: string;
   sede_id: string;
   nombre: string;
+  /** Descripción opcional del pabellón. */
+  descripcion?: string | null;
   orden: number;
   activo: boolean;
   created_at: string;
@@ -406,8 +408,10 @@ export interface Ambiente {
   descripcion: string | null;
   responsable_id: string | null;
   responsable: string | null;
-  /** Espacio físico opcional que ocupa el ambiente (misma sucursal). */
+  /** Espacio físico heredado. Tras la migración el ambiente apunta al pabellón. */
   espacio_id: string | null;
+  /** Pabellón (edificio) de la misma sucursal. Vacío en preregistro, faltante y ambientes sin pabellón. */
+  edificio_id?: string | null;
   es_preregistro: boolean;
   /** Bienes no hallados en visita. Uno por entidad, no es un local físico. */
   es_faltante?: boolean;
@@ -1140,6 +1144,19 @@ export function formatActivoCodigoDisplay(activo: {
   const completo = formatCorrelativoCompleto(activo.codigo_catalogo, activo.correlativo ?? null);
   if (completo) return completo;
   return activo.codigo_catalogo?.trim() || "—";
+}
+
+/** Varios bienes se pueden editar juntos solo si comparten nombre y estado de registro. */
+export function bienesSeleccionMismoNombre(
+  activos: Array<{ nombre: string; estado_registro?: string | null }>,
+): boolean {
+  if (activos.length < 2) return false;
+  const nombre = activos[0].nombre.trim();
+  if (!nombre) return false;
+  const estado = activos[0].estado_registro ?? "";
+  return activos.every(
+    (activo) => activo.nombre.trim() === nombre && (activo.estado_registro ?? "") === estado,
+  );
 }
 
 /** Código de cuenta contable: 1 a 6 dígitos. */

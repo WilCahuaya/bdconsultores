@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Activo } from "@inventario/types";
 import {
+  bienesSeleccionMismoNombre,
   formatActivoCodigoDisplay,
   formatFechaISOToCortoES,
   formatMonedaPE,
@@ -310,6 +311,8 @@ interface ActivosInventarioExcelViewProps {
   onActivoDeleted?: () => void;
   onPrintBatch?: (activos: ActivoConUbicacion[]) => void;
   onEditActivo?: (activo: ActivoConUbicacion) => void;
+  /** Editar los bienes marcados cuando todos tienen el mismo nombre. */
+  onEditarSeleccion?: (activos: ActivoConUbicacion[]) => void;
   onIrAmbiente?: (activo: ActivoConUbicacion) => void;
   onAbrirAmbienteDestino?: (destino: AmbienteDestinoNavigation) => void;
   onSelectionChange?: (selected: ActivoConUbicacion[]) => void;
@@ -346,6 +349,7 @@ export function ActivosInventarioExcelView({
   onActivoDeleted,
   onPrintBatch,
   onEditActivo,
+  onEditarSeleccion,
   onIrAmbiente,
   onAbrirAmbienteDestino,
   onSelectionChange,
@@ -587,6 +591,16 @@ export function ActivosInventarioExcelView({
             onClick={() => void marcarSiSeleccion()}
           >
             {marcandoSi ? "Marcando…" : `Marcar Sí (${selectedActivos.length})`}
+          </Button>
+        ) : null}
+        {onEditarSeleccion && bienesSeleccionMismoNombre(selectedActivos) ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onEditarSeleccion(selectedActivos)}
+          >
+            Editar ({selectedActivos.length})
           </Button>
         ) : null}
         <Button type="button" size="sm" variant="outline" onClick={() => setMoverOpen(true)}>

@@ -81,6 +81,7 @@ interface ActivosCampoListProps {
   onPrintLabel: (activo: ActivoConUbicacion) => void;
   onPrintBatch?: (activos: ActivoConUbicacion[]) => void;
   onEditActivo?: (activo: ActivoConUbicacion) => void;
+  onEditarSeleccion?: (activos: ActivoConUbicacion[]) => void;
   onIrAmbiente?: (activo: ActivoConUbicacion) => void;
   onAbrirAmbienteDestino?: (destino: AmbienteDestinoNavigation) => void;
   onActivoUpdated: (activo: ActivoConUbicacion) => void;
@@ -114,6 +115,7 @@ export function ActivosCampoList({
   onPrintLabel,
   onPrintBatch,
   onEditActivo,
+  onEditarSeleccion,
   onIrAmbiente,
   onAbrirAmbienteDestino,
   onActivoUpdated,
@@ -763,6 +765,7 @@ export function ActivosCampoList({
           onActivoDeleted={onActivoDeleted}
           onPrintBatch={onPrintBatch}
           onEditActivo={onEditActivo}
+          onEditarSeleccion={onEditarSeleccion}
           onIrAmbiente={isGlobal || isEntityInventario ? onIrAmbiente : undefined}
           onAbrirAmbienteDestino={onAbrirAmbienteDestino}
           onSelectionChange={setSelectedActivos}
@@ -787,6 +790,7 @@ export function ActivosCampoList({
           onActivoDeleted={onActivoDeleted}
           onPrintBatch={onPrintBatch}
           onEditActivo={onEditActivo}
+          onEditarSeleccion={onEditarSeleccion}
           onAbrirAmbienteDestino={onAbrirAmbienteDestino}
           onSelectionChange={setSelectedActivos}
           gestionPreregistros={gestionPreregistros}
@@ -935,6 +939,7 @@ export function ActivosCampoList({
         onActivoDeleted={onActivoDeleted}
         onPrintBatch={onPrintBatch}
         onEditActivo={onEditActivo}
+        onEditarSeleccion={onEditarSeleccion}
         onIrAmbiente={isGlobal ? onIrAmbiente : undefined}
         onAbrirAmbienteDestino={onAbrirAmbienteDestino}
         onSelectionChange={setSelectedActivos}
