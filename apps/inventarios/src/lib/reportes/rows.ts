@@ -127,7 +127,7 @@ const HEADERS_LEVANTAMIENTO: ReporteTableHeaderDef[] = [
   { key: KEY_NUM, line1: "N°" },
   { key: KEY_CANT, line1: "Cant." },
   { key: "und", line1: "Und" },
-  { key: "codigo", line1: "Código patrimonial" },
+  { key: "codigo", line1: "Código", line2: "patrimonial" },
   { key: "nombre", line1: "Nombre del bien" },
   { key: "descripcion", line1: "Descripción" },
   { key: "estado", line1: "Estado" },
@@ -481,8 +481,8 @@ const AMBIENTE_VALORIZADO_COL_WEIGHTS = [
   4, 4, 4, 5, 10, 14, 18, 7, 10, 6, 10, 9, 9, 9, 9, 9,
 ] as const;
 
-/** Pesos relativos (ficha de levantamiento patrimonial). */
-const LEVANTAMIENTO_COL_WEIGHTS = [5, 6, 6, 18, 52, 32, 8, 18] as const;
+/** Pesos relativos (ficha de levantamiento patrimonial). Código justo al texto; nombre y descripción iguales. */
+const LEVANTAMIENTO_COL_WEIGHTS = [5, 6, 6, 12, 45, 45, 8, 18] as const;
 
 /** Pesos relativos (ficha de menajes por ambiente). */
 const MENAJE_AMBIENTE_COL_WEIGHTS = [5, 6, 6, 16, 28, 28, 8, 16] as const;
@@ -532,7 +532,10 @@ function pdfColumnStylesFromWeights(
     };
   });
 
-  if (weights === AMBIENTE_SIN_VALOR_COL_WEIGHTS && styles[3]) {
+  if (
+    (weights === AMBIENTE_SIN_VALOR_COL_WEIGHTS || weights === LEVANTAMIENTO_COL_WEIGHTS) &&
+    styles[3]
+  ) {
     styles[3].cellPadding = { top: 1.2, right: 0.4, bottom: 1.2, left: 0.4 };
   }
 
