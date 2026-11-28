@@ -699,10 +699,14 @@ async function bajarRepresentacion(page: Page, frame: Frame): Promise<Uint8Array
   const delPanel = await pdfDeResultado(page, frame);
   if (delPanel) return delPanel;
   if (await hayIconoPdf(frame)) {
-    const bajada = await clicDescarga(page, async () => {
-      await taparImpresion(page);
-      await hayIconoPdf(frame, true);
-    });
+    const bajada = await clicDescarga(
+      page,
+      async () => {
+        await taparImpresion(page);
+        await hayIconoPdf(frame, true);
+      },
+      12_000,
+    );
     await taparImpresion(page);
     if (bajada.bytes && esPdf(bajada.bytes)) return bajada.bytes;
   }
