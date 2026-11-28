@@ -85,7 +85,7 @@ export type ActivoConUbicacion = Activo & {
 const POSIBLE_AMBIENTE_SELECT = "posible_ambiente:posible_ambiente_id(nombre, sede_id)";
 
 const AMBIENTE_UBICACION_SELECT =
-  "ambientes:ambiente_id(nombre, espacios(nombre, piso, edificios(nombre)))";
+  "ambientes:ambiente_id(nombre, edificio:edificio_id(nombre), espacios(nombre, piso, edificios(nombre)))";
 
 const ACTIVO_SELECT_SIN_ENTIDAD =
   `*, sedes:sede_id(nombre), ${AMBIENTE_UBICACION_SELECT}, ${POSIBLE_AMBIENTE_SELECT}`;
@@ -130,8 +130,14 @@ export interface CreateActivoInput {
 
 export type UpdateActivoInput = Omit<CreateActivoInput, "entidad_id">;
 
+function nombreEmbed(valor: { nombre: string } | { nombre: string }[] | null | undefined) {
+  if (!valor) return "";
+  return (Array.isArray(valor) ? valor[0]?.nombre : valor.nombre)?.trim() ?? "";
+}
+
 function rutaDesdeAmbiente(
   ambiente: {
+    edificio?: { nombre: string } | { nombre: string }[] | null;
     espacios?: {
       nombre: string;
       piso?: number | null;
@@ -140,13 +146,15 @@ function rutaDesdeAmbiente(
   } | null,
   sedeNombre?: string | null,
 ) {
+  const pabellon = nombreEmbed(ambiente?.edificio);
+  if (pabellon) {
+    return rutaUbicacionFisica({ sedeNombre, edificioNombre: pabellon });
+  }
   const espacio = ambiente?.espacios ?? null;
   if (!espacio?.nombre) return "";
-  const edificio = espacio.edificios;
-  const edificioNombre = Array.isArray(edificio) ? edificio[0]?.nombre : edificio?.nombre;
   return rutaUbicacionFisica({
     sedeNombre,
-    edificioNombre,
+    edificioNombre: nombreEmbed(espacio.edificios),
     piso: espacio.piso,
     espacioNombre: espacio.nombre,
   });
@@ -157,6 +165,7 @@ function mapActivoRow(row: Record<string, unknown>): ActivoConUbicacion {
   const sedes = row.sedes as { nombre: string } | null;
   const ambientes = row.ambientes as {
     nombre: string;
+    edificio?: { nombre: string } | { nombre: string }[] | null;
     espacios?: {
       nombre: string;
       piso?: number | null;
@@ -1653,6 +1662,84 @@ export async function updateActivosSimilares(
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.rpc("update_activos_similares", {
     p_activo_id: activoId,
+    p_patch: patch,
+  });
+
+  if (error) return { error: error.message };
+  const result = data as { actualizados?: number };
+  return { data: { actualizados: result.actualizados ?? 0 } };
+}
+
+export async function applyActivosSeleccionPatchLocal(
+  entidadId: string,
+  ids: string[],
+  input: UpdateActivosSimilaresInput,
+): Promise<number> {
+  const patch = buildActivosSimilaresPatch(input);
+  delete patch.sede_id;
+  delete patch.ambiente_id;
+  if (Object.keys(patch).length === 0) return 0;
+
+  const { listCachedActivos, upsertCachedActivo } = await import("./offline");
+  const idSet = new Set(ids);
+  const cached = await listCachedActivos(entidadId);
+  const elegidos = cached.filter((activo) => idSet.has(activo.id));
+  const now = new Date().toISOString();
+
+  for (const activo of elegidos) {
+    const updated: ActivoConUbicacion = {
+      ...activo,
+      ...(patch as Partial<ActivoConUbicacion>),
+      updated_at: now,
+    };
+    if ("observacion_admin" in patch) {
+      updated.observacion = mergeObservacionAdmin(
+        activo.observacion,
+        (patch.observacion_admin as string | null) ?? null,
+      );
+    }
+    await upsertCachedActivo(entidadId, updated);
+  }
+
+  return elegidos.length;
+}
+
+export async function updateActivosSeleccion(
+  ids: string[],
+  input: UpdateActivosSimilaresInput,
+): Promise<{ data?: UpdateActivosSimilaresResult; error?: string }> {
+  const unicos = [...new Set(ids.filter(Boolean))];
+  if (unicos.length < 2) return { error: "Seleccione al menos dos bienes." };
+
+  const patch = buildActivosSimilaresPatch(input);
+  delete patch.sede_id;
+  delete patch.ambiente_id;
+  if (Object.keys(patch).length === 0) {
+    return { error: "No hay cambios para aplicar." };
+  }
+
+  if (!isOnline()) {
+    const found = await findCachedActivoAcrossEntidades(unicos[0]);
+    if (!found) return { error: "Activo no encontrado en caché local." };
+    await enqueueOfflineOp(
+      "activos:updateSeleccion",
+      found.entidadId,
+      { ids: unicos, patch },
+      unicos[0],
+    );
+    const actualizados = await applyActivosSeleccionPatchLocal(found.entidadId, unicos, input);
+    return { data: { actualizados } };
+  }
+
+  const profile = await fetchProfile();
+  if (!profile) return { error: "Sesión no válida." };
+  if (profile.rol !== "CONTADOR" && profile.rol !== "ADMIN_ENTIDAD") {
+    return { error: "No autorizado." };
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc("update_activos_seleccion", {
+    p_ids: unicos,
     p_patch: patch,
   });
 

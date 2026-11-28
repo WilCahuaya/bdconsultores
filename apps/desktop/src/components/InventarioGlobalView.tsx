@@ -19,6 +19,7 @@ interface InventarioGlobalViewProps {
   onPrintLabel: (activo: ActivoConUbicacion) => void;
   onPrintBatch?: (activos: ActivoConUbicacion[]) => void;
   onEditActivo?: (activo: ActivoConUbicacion) => void;
+  onEditarSeleccion?: (activos: ActivoConUbicacion[]) => void;
   onIrAmbiente?: (activo: ActivoConUbicacion) => void;
   onAbrirAmbienteDestino?: (destino: AmbienteDestinoNavigation) => void;
   onActivoUpdated: (activo: ActivoConUbicacion) => void;
@@ -72,6 +73,7 @@ export function InventarioGlobalView({
   onPrintLabel,
   onPrintBatch,
   onEditActivo,
+  onEditarSeleccion,
   onIrAmbiente,
   onAbrirAmbienteDestino,
   onActivoUpdated,
@@ -128,6 +130,7 @@ export function InventarioGlobalView({
       onPrintLabel={onPrintLabel}
       onPrintBatch={onPrintBatch}
       onEditActivo={onEditActivo}
+      onEditarSeleccion={onEditarSeleccion}
       onIrAmbiente={onIrAmbiente}
       onAbrirAmbienteDestino={onAbrirAmbienteDestino}
       onActivoUpdated={onActivoUpdated}

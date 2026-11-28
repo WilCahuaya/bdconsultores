@@ -8,6 +8,10 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+/** Textos de un bien en el formulario: lo escrito se ve en mayúsculas; los ejemplos no. */
+export const datosBienMayusculaClass =
+  "[&_input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=number]):not([type=date]):not([type=datetime-local])]:uppercase [&_textarea]:uppercase [&_select]:uppercase [&_input::placeholder]:normal-case [&_textarea::placeholder]:normal-case";
+
 export function Button({
   className,
   variant = "default",

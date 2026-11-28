@@ -1,11 +1,14 @@
 import type { Activo, RolUsuario } from "@inventario/types";
 
 export type ReporteId =
+  | "ficha_asignacion_ambiente"
   | "inventario_ambiente_sin_valores"
   | "inventario_ambiente_activos_fijos"
   | "inventario_entidad_sin_valores"
   | "inventario_entidad_activos_fijos"
   | "inventario_ambiente_valorizado"
+  | "ficha_asignacion_menaje"
+  | "inventario_menaje_entidad"
   | "inventario_entidad_valorizado"
   | "reporte_bajas"
   | "reporte_activos_estado_malo"
@@ -24,11 +27,12 @@ export interface ReporteDefinicion {
   valorizado: boolean;
   formatos: ReporteFormato[];
   soloContador?: boolean;
+  grupo?: "ambiente" | "entidad" | "situacion" | "menaje";
 }
 
 export const REPORTES: ReporteDefinicion[] = [
   {
-    id: "inventario_ambiente_sin_valores",
+    id: "ficha_asignacion_ambiente",
     label: "Ficha de asignación por ambiente",
     descripcion: "Ficha de asignación de bienes al usuario responsable, sin valores.",
     scope: "ambiente",
@@ -36,17 +40,26 @@ export const REPORTES: ReporteDefinicion[] = [
     formatos: ["pdf", "excel"],
   },
   {
+    id: "inventario_ambiente_sin_valores",
+    label: "Ficha de levantamiento patrimonial",
+    descripcion:
+      "Ficha de levantamiento de información de bienes patrimoniales del ambiente, sin valores.",
+    scope: "ambiente",
+    valorizado: false,
+    formatos: ["pdf", "excel"],
+  },
+  {
     id: "inventario_ambiente_activos_fijos",
-    label: "Inventario de activos fijos por ambiente",
-    descripcion: "Listado físico del ambiente sin valores ni firmas.",
+    label: "Inventario de bienes por ambiente",
+    descripcion: "Listado de bienes del ambiente, sin valores ni firmas.",
     scope: "ambiente",
     valorizado: false,
     formatos: ["pdf", "excel"],
   },
   {
     id: "inventario_entidad_sin_valores",
-    label: "Acta de inventario de activos fijos general",
-    descripcion: "Acta con todos los activos de la entidad sin valores y firmas de conformidad.",
+    label: "Acta de inventario de bienes",
+    descripcion: "Acta de bienes de la entidad, sin valores y con firmas.",
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
@@ -54,25 +67,41 @@ export const REPORTES: ReporteDefinicion[] = [
   },
   {
     id: "inventario_entidad_activos_fijos",
-    label: "Inventario de activos fijos general",
-    descripcion: "Listado completo de la entidad sin valores ni firmas.",
+    label: "Inventario de bienes",
+    descripcion: "Listado de bienes de la entidad, sin valores ni firmas.",
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
   },
   {
     id: "inventario_ambiente_valorizado",
-    label: "Inventario de activos valorizados por ambiente",
-    descripcion: "Listado del ambiente con precio, depreciación y valor neto, sin firmas.",
+    label: "Inventario valorizado de bienes por ambiente",
+    descripcion: "Listado de bienes del ambiente con precio, depreciación y valor neto, sin firmas.",
     scope: "ambiente",
     valorizado: true,
     formatos: ["pdf", "excel"],
     soloContador: true,
   },
   {
+    id: "ficha_asignacion_menaje",
+    label: "Ficha de asignación de menajes por ambiente",
+    descripcion: "Ficha de asignación de menajes al usuario responsable del ambiente.",
+    scope: "ambiente",
+    valorizado: false,
+    formatos: ["pdf", "excel"],
+  },
+  {
+    id: "inventario_menaje_entidad",
+    label: "Menajes de la entidad",
+    descripcion: "Listado de todos los menajes registrados de la entidad, con sede y ambiente.",
+    scope: "entidad",
+    valorizado: false,
+    formatos: ["pdf", "excel"],
+  },
+  {
     id: "inventario_entidad_valorizado",
-    label: "Inventario de activos valorizados general",
-    descripcion: "Inventario completo de la entidad con valores, sin firmas.",
+    label: "Inventario valorizado de bienes",
+    descripcion: "Inventario de bienes de la entidad con valores, sin firmas.",
     scope: "entidad",
     valorizado: true,
     formatos: ["pdf", "excel"],
@@ -88,8 +117,8 @@ export const REPORTES: ReporteDefinicion[] = [
   },
   {
     id: "reporte_activos_estado_malo",
-    label: "Reporte de activos en estado malo",
-    descripcion: "Activos registrados en estado malo con ubicación (sede y ambiente).",
+    label: "Bienes en estado malo",
+    descripcion: "Bienes registrados en estado malo, con sede y ambiente.",
     scope: "entidad",
     valorizado: false,
     formatos: ["pdf", "excel"],
@@ -113,6 +142,26 @@ export const REPORTES: ReporteDefinicion[] = [
     formatos: ["pdf", "excel"],
   },
 ];
+
+function grupoReporte(id: ReporteId): NonNullable<ReporteDefinicion["grupo"]> {
+  if (id === "ficha_asignacion_menaje" || id === "inventario_menaje_entidad") return "menaje";
+  if (
+    id === "reporte_bajas" ||
+    id === "reporte_activos_estado_malo" ||
+    id === "reporte_adquiridos_ejercicio_actual" ||
+    id === "reporte_adquiridos_ejercicio_anterior"
+  ) {
+    return "situacion";
+  }
+  if (id.includes("ambiente")) return "ambiente";
+  return "entidad";
+}
+
+for (const reporte of REPORTES) reporte.grupo = grupoReporte(reporte.id);
+
+export function esReporteMenaje(reporteId: string): boolean {
+  return reporteId === "ficha_asignacion_menaje" || reporteId === "inventario_menaje_entidad";
+}
 
 export function reportesDisponiblesParaRol(rol: RolUsuario): ReporteDefinicion[] {
   if (rol === "ADMIN_ENTIDAD") {

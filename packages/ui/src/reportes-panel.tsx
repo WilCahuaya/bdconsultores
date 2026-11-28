@@ -3,13 +3,6 @@ import { entidadMuestraSelectorSede } from "@inventario/types";
 import { Button, Select } from "./components";
 import { FechaDdMmYyyyInput } from "./fecha-dd-mm-yyyy-input";
 import { PanelBanner, PanelCountLabel, StatusBadge, panelCardClass } from "./panel";
-import { PanelDataTable, panelTableBodyRowClass } from "./panel-list-table";
-import {
-  PanelTableTd,
-  PanelTableTh,
-  panelTableNameCellClass,
-  panelTableNowrapCellClass,
-} from "./panel-table-layout";
 import { panelStickyToolbarClass } from "./responsive-layout";
 
 export interface ReporteDefinicionUI {
@@ -19,7 +12,7 @@ export interface ReporteDefinicionUI {
   scope: "ambiente" | "entidad";
   formatos: ("pdf" | "excel")[];
   valorizado?: boolean;
-  grupo?: "ambiente" | "entidad" | "situacion";
+  grupo?: "ambiente" | "entidad" | "situacion" | "menaje";
 }
 
 export interface ReporteResumenGrupoUI {
@@ -66,6 +59,7 @@ export interface ReportesPanelContentProps {
   onPreview: () => void;
   onExport: (formato: "pdf" | "excel") => void;
   previewHeaders: readonly string[];
+  previewColumnas?: readonly { widthPct: number; align: "left" | "center" }[] | null;
   previewRows: string[][];
   previewTotal: number;
   resumen: ReporteResumenPreviewUI | null;
@@ -96,10 +90,11 @@ function FechaCorteInput({
 function opcionesTipoReporte(reportes: ReporteDefinicionUI[]) {
   const etiquetas = {
     ambiente: "Por ambiente",
+    menaje: "Menajes",
     entidad: "De toda la entidad",
     situacion: "Situación",
   } as const;
-  const orden = ["ambiente", "entidad", "situacion"] as const;
+  const orden = ["ambiente", "menaje", "entidad", "situacion"] as const;
   if (!reportes.some((reporte) => reporte.grupo)) {
     return reportes.map((reporte) => ({ value: reporte.id, label: reporte.label }));
   }
@@ -164,6 +159,7 @@ export function ReportesPanelContent({
   onPreview,
   onExport,
   previewHeaders,
+  previewColumnas,
   previewRows,
   previewTotal,
   resumen: _resumen,
@@ -416,35 +412,61 @@ export function ReportesPanelContent({
             </div>
           )}
 
-          <PanelDataTable layout="auto" scroll>
-            <thead className="border-b border-border/60 bg-muted/40">
-              <tr>
-                {previewHeaders.map((header, index) => (
-                  <PanelTableTh
-                    key={header}
-                    className={index === 0 ? panelTableNameCellClass : panelTableNowrapCellClass}
-                  >
-                    {header}
-                  </PanelTableTh>
+          <div className="min-w-0 overflow-x-auto rounded-lg border border-border/60">
+            <table
+              className="w-full table-fixed border-collapse text-left text-[11px] leading-snug"
+              style={
+                previewHeaders.length > 10
+                  ? { minWidth: `${previewHeaders.length * 4.25}rem` }
+                  : undefined
+              }
+            >
+              <colgroup>
+                {(previewColumnas && previewColumnas.length === previewHeaders.length
+                  ? previewColumnas
+                  : previewHeaders.map(() => ({
+                      widthPct: 100 / Math.max(previewHeaders.length, 1),
+                      align: "left" as const,
+                    }))
+                ).map((columna, index) => (
+                  <col key={index} style={{ width: `${columna.widthPct}%` }} />
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {previewRows.map((row, rowIndex) => (
-                <tr key={rowIndex} className={panelTableBodyRowClass}>
-                  {row.map((cell, cellIndex) => (
-                    <PanelTableTd
-                      key={cellIndex}
-                      title={cell}
-                      className={cellIndex === 0 ? panelTableNameCellClass : panelTableNowrapCellClass}
+              </colgroup>
+              <thead>
+                <tr className="border-b border-border/70 bg-muted/50">
+                  {previewHeaders.map((header, index) => (
+                    <th
+                      key={`${header}-${index}`}
+                      scope="col"
+                      className="px-1.5 py-2 text-center align-middle text-[10px] font-semibold uppercase leading-tight tracking-wide text-muted-foreground"
                     >
-                      {cell}
-                    </PanelTableTd>
+                      {header}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </PanelDataTable>
+              </thead>
+              <tbody>
+                {previewRows.map((row, rowIndex) => (
+                  <tr key={rowIndex} className="border-b border-border/40 last:border-b-0">
+                    {row.map((cell, cellIndex) => {
+                      const align = previewColumnas?.[cellIndex]?.align ?? "left";
+                      return (
+                        <td
+                          key={cellIndex}
+                          title={cell}
+                          className={`px-1.5 py-1.5 align-top uppercase [overflow-wrap:anywhere] ${
+                            align === "center" ? "text-center" : "text-left"
+                          }`}
+                        >
+                          {cell}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {previewTruncado && (
             <p className="text-xs text-muted-foreground">

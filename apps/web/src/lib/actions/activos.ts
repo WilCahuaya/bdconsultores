@@ -107,7 +107,7 @@ export interface ActivoListRow {
 const POSIBLE_AMBIENTE_SELECT = "posible_ambiente:posible_ambiente_id(nombre, sede_id)";
 
 const AMBIENTE_UBICACION_SELECT =
-  "ambientes:ambiente_id(nombre, espacios(nombre, piso, edificios(nombre)))";
+  "ambientes:ambiente_id(nombre, edificio:edificio_id(nombre), espacios(nombre, piso, edificios(nombre)))";
 
 const ACTIVO_SELECT =
   `*, entidades(nombre), sedes:sede_id(nombre), ${AMBIENTE_UBICACION_SELECT}, ${POSIBLE_AMBIENTE_SELECT}`;
@@ -1161,6 +1161,59 @@ export async function updateActivosSimilares(
   return { data: { actualizados: result.actualizados ?? 0 } };
 }
 
+export async function updateActivosSeleccion(
+  ids: string[],
+  input: UpdateActivosSimilaresInput,
+): Promise<{ data?: UpdateActivosSimilaresResult; error?: string }> {
+  const profile = await getProfile();
+  if (!profile) return { error: "Sesión no válida." };
+
+  const unicos = [...new Set(ids.filter(Boolean))];
+  if (unicos.length < 2) return { error: "Seleccione al menos dos bienes." };
+
+  const patch = buildActivosSimilaresPatch(input);
+  delete patch.sede_id;
+  delete patch.ambiente_id;
+  if (Object.keys(patch).length === 0) {
+    return { error: "No hay cambios para aplicar." };
+  }
+
+  const supabase = await createClient();
+  const { data: existentes, error: fetchError } = await supabase
+    .from("activos")
+    .select("entidad_id, ambiente_id")
+    .in("id", unicos);
+
+  if (fetchError) return { error: fetchError.message };
+  if (!existentes || existentes.length !== unicos.length) {
+    return { error: "Alguno de los bienes seleccionados ya no existe." };
+  }
+
+  const entidadId = existentes[0]?.entidad_id;
+  if (profile.rol === "ADMIN_ENTIDAD" && entidadId !== profile.entidad_id) {
+    return { error: "No autorizado." };
+  }
+
+  const { data, error } = await supabase.rpc("update_activos_seleccion", {
+    p_ids: unicos,
+    p_patch: patch,
+  });
+
+  if (error) return { error: error.message };
+
+  const result = data as { actualizados?: number };
+  const ambientes = new Set(
+    existentes.map((row) => row.ambiente_id).filter((id): id is string => Boolean(id)),
+  );
+  if (entidadId) {
+    for (const ambienteId of ambientes) {
+      revalidateActivoPaths(entidadId, ambienteId);
+    }
+  }
+
+  return { data: { actualizados: result.actualizados ?? 0 } };
+}
+
 export async function listActivosPorAmbiente(ambienteId: string) {
   const profile = await getProfile();
   if (!profile) return [];
@@ -1188,8 +1241,14 @@ export async function listActivosPorAmbiente(ambienteId: string) {
 
 export type ActivoConUbicacion = Activo & ActivoListRow;
 
+function nombreEmbed(valor: { nombre: string } | { nombre: string }[] | null | undefined) {
+  if (!valor) return "";
+  return (Array.isArray(valor) ? valor[0]?.nombre : valor.nombre)?.trim() ?? "";
+}
+
 function rutaDesdeAmbiente(
   ambiente: {
+    edificio?: { nombre: string } | { nombre: string }[] | null;
     espacios?: {
       nombre: string;
       piso?: number | null;
@@ -1198,13 +1257,15 @@ function rutaDesdeAmbiente(
   } | null,
   sedeNombre?: string | null,
 ) {
+  const pabellon = nombreEmbed(ambiente?.edificio);
+  if (pabellon) {
+    return rutaUbicacionFisica({ sedeNombre, edificioNombre: pabellon });
+  }
   const espacio = ambiente?.espacios ?? null;
   if (!espacio?.nombre) return "";
-  const edificio = espacio.edificios;
-  const edificioNombre = Array.isArray(edificio) ? edificio[0]?.nombre : edificio?.nombre;
   return rutaUbicacionFisica({
     sedeNombre,
-    edificioNombre,
+    edificioNombre: nombreEmbed(espacio.edificios),
     piso: espacio.piso,
     espacioNombre: espacio.nombre,
   });
@@ -1216,6 +1277,7 @@ function mapActivoRows(data: Record<string, unknown>[] | null): ActivoConUbicaci
     const sedes = row.sedes as { nombre: string } | null;
     const ambientes = row.ambientes as {
       nombre: string;
+      edificio?: { nombre: string } | { nombre: string }[] | null;
       espacios?: {
         nombre: string;
         piso?: number | null;

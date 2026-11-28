@@ -73,6 +73,7 @@ export interface CreateAmbienteInput {
   descripcion?: string;
   responsableId?: string | null;
   espacioId?: string | null;
+  edificioId?: string | null;
 }
 
 const ESPACIO_OCUPADO_MSG = "Ese espacio ya está ocupado por otro ambiente.";
@@ -266,6 +267,23 @@ export async function listAmbientesPorEntidad(
         }
       }
 
+      const edificioIds = [
+        ...new Set(mapped.map((a) => a.edificio_id).filter((id): id is string => Boolean(id))),
+      ];
+      if (edificioIds.length > 0) {
+        const { data: edificiosRows } = await supabase
+          .from("edificios")
+          .select("id, nombre")
+          .in("id", edificioIds);
+        const porEdificio = new Map(
+          (edificiosRows ?? []).map((e) => [e.id as string, ((e.nombre as string) ?? "").trim()]),
+        );
+        for (const amb of mapped) {
+          const nombre = amb.edificio_id ? porEdificio.get(amb.edificio_id) : undefined;
+          if (nombre) amb.edificio_nombre = nombre;
+        }
+      }
+
       const activoCounts = await activoCountByAmbienteIds(mapped.map((ambiente) => ambiente.id));
       const withCounts = mapped.map((ambiente) => ({
         ...ambiente,
@@ -307,7 +325,8 @@ export async function createAmbiente(
       descripcion: input.descripcion?.trim() || null,
       responsable_id: input.responsableId || null,
       responsable: null,
-      espacio_id: input.espacioId || null,
+      espacio_id: input.edificioId ? null : input.espacioId || null,
+      edificio_id: input.edificioId || null,
       es_preregistro: false,
       activo: true,
       created_at: now,
@@ -326,6 +345,7 @@ export async function createAmbiente(
         descripcion: input.descripcion?.trim() || null,
         responsableId: input.responsableId || null,
         espacioId: input.espacioId || null,
+        edificioId: input.edificioId || null,
       },
     });
     return { data: ambiente };
@@ -339,7 +359,8 @@ export async function createAmbiente(
       nombre: trimmed,
       descripcion: input.descripcion?.trim() || null,
       responsable_id: input.responsableId || null,
-      espacio_id: input.espacioId || null,
+      espacio_id: input.edificioId ? null : input.espacioId || null,
+      edificio_id: input.edificioId || null,
     })
     .select()
     .single();
@@ -374,8 +395,13 @@ export async function updateAmbiente(
       nombre: trimmed,
       descripcion: input.descripcion?.trim() || null,
       responsable_id: input.responsableId ?? null,
-      espacio_id: input.espacioId ?? null,
+      espacio_id: input.edificioId ? null : (input.espacioId ?? null),
+      edificio_id: input.edificioId ?? null,
       espacio_nombre: espacioNombre,
+      edificio_nombre: input.edificioId
+        ? (await listEdificios(found.data.sede_id)).find((e) => e.id === input.edificioId)?.nombre ??
+          found.data.edificio_nombre
+        : null,
       updated_at: new Date().toISOString(),
     };
     await upsertMasterItem("ambientes", found.entidadId, updated);
@@ -386,6 +412,7 @@ export async function updateAmbiente(
         descripcion: input.descripcion?.trim() || null,
         responsableId: input.responsableId ?? null,
         espacioId: input.espacioId ?? null,
+        edificioId: input.edificioId ?? null,
       },
     });
     return { success: true };
@@ -408,7 +435,8 @@ export async function updateAmbiente(
       nombre: trimmed,
       descripcion: input.descripcion?.trim() || null,
       responsable_id: input.responsableId ?? null,
-      espacio_id: input.espacioId ?? null,
+      espacio_id: input.edificioId ? null : (input.espacioId ?? null),
+      edificio_id: input.edificioId ?? null,
     })
     .eq("id", ambienteId);
 
@@ -944,22 +972,46 @@ export async function listEdificios(sedeId: string): Promise<Edificio[]> {
     .sort((a, b) => a.orden - b.orden || a.nombre.localeCompare(b.nombre, "es"));
 }
 
-export async function createEdificio(sedeId: string, nombre: string) {
+export async function listEdificiosPorEntidad(entidadId: string): Promise<Edificio[]> {
+  if (isOnline()) {
+    try {
+      const supabase = getSupabaseClient();
+      const { data, error } = await supabase
+        .from("edificios")
+        .select("*, sedes!inner(entidad_id)")
+        .eq("activo", true)
+        .eq("sedes.entidad_id", entidadId)
+        .order("nombre");
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((row) => {
+        const { sedes: _, ...edificio } = row;
+        return edificio as Edificio;
+      });
+    } catch {
+      /* caché */
+    }
+  }
+  const items = await listMasterDomain<Edificio>("edificios", entidadId);
+  return items.filter((e) => e.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+export async function createEdificio(sedeId: string, nombre: string, descripcion?: string) {
   const trimmed = nombre.trim();
-  if (!trimmed) return { error: "Nombre de edificio obligatorio." };
+  if (!trimmed) return { error: "Nombre de pabellón obligatorio." };
 
   if (!isOnline()) {
     const sede = await findMasterItem<Sede>("sedes", sedeId);
     if (!sede) return { error: "Sucursal no encontrada en caché local." };
     const existentes = await listEdificios(sedeId);
     if (existentes.some((e) => e.nombre.trim().toLowerCase() === trimmed.toLowerCase())) {
-      return { error: "Ya existe un edificio con ese nombre en la sucursal." };
+      return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
     }
     const now = new Date().toISOString();
     const edificio: Edificio = {
       id: newLocalId(),
       sede_id: sedeId,
       nombre: trimmed,
+      descripcion: descripcion?.trim() ?? "",
       orden: existentes.length,
       activo: true,
       created_at: now,
@@ -977,6 +1029,7 @@ export async function createEdificio(sedeId: string, nombre: string) {
       id: edificio.id,
       sedeId,
       nombre: trimmed,
+      descripcion: descripcion?.trim() ?? "",
     });
     return { success: true as const, data: edificio };
   }
@@ -988,21 +1041,80 @@ export async function createEdificio(sedeId: string, nombre: string) {
     .eq("sede_id", sedeId)
     .eq("activo", true);
   if ((existentes ?? []).some((e) => e.nombre.trim().toLowerCase() === trimmed.toLowerCase())) {
-    return { error: "Ya existe un edificio con ese nombre en la sucursal." };
+    return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
   }
   const { data, error } = await supabase
     .from("edificios")
-    .insert({ sede_id: sedeId, nombre: trimmed })
+    .insert({ sede_id: sedeId, nombre: trimmed, descripcion: descripcion?.trim() ?? "" })
     .select()
     .single();
   if (error) {
     const msg = error.message.toLowerCase();
     if (msg.includes("duplicate") || msg.includes("idx_edificios_sede_nombre_activo")) {
-      return { error: "Ya existe un edificio con ese nombre en la sucursal." };
+      return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
     }
     return { error: error.message };
   }
   return { success: true as const, data: data as Edificio };
+}
+
+export async function updateEdificio(edificioId: string, nombre: string, descripcion?: string) {
+  const trimmed = nombre.trim();
+  if (!trimmed) return { error: "Nombre de pabellón obligatorio." };
+  const desc = descripcion?.trim() ?? "";
+
+  if (!isOnline()) {
+    const found = await findMasterItem<Edificio>("edificios", edificioId);
+    if (!found) return { error: "Pabellón no encontrado en caché local." };
+    const existentes = await listEdificios(found.data.sede_id);
+    if (
+      existentes.some(
+        (e) => e.id !== edificioId && e.nombre.trim().toLowerCase() === trimmed.toLowerCase(),
+      )
+    ) {
+      return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
+    }
+    const updated: Edificio = {
+      ...found.data,
+      nombre: trimmed,
+      descripcion: desc,
+      updated_at: new Date().toISOString(),
+    };
+    await upsertMasterItem("edificios", found.entidadId, updated);
+    await enqueueOfflineOp("edificio:update", found.entidadId, {
+      edificioId,
+      nombre: trimmed,
+      descripcion: desc,
+    });
+    return { success: true as const };
+  }
+
+  const supabase = getSupabaseClient();
+  const { data: existing } = await supabase
+    .from("edificios")
+    .select("id, sede_id")
+    .eq("id", edificioId)
+    .eq("activo", true)
+    .maybeSingle();
+  if (!existing) return { error: "Pabellón no encontrado." };
+  const { data: hermanos } = await supabase
+    .from("edificios")
+    .select("id, nombre")
+    .eq("sede_id", existing.sede_id)
+    .eq("activo", true);
+  if (
+    (hermanos ?? []).some(
+      (e) => e.id !== edificioId && e.nombre.trim().toLowerCase() === trimmed.toLowerCase(),
+    )
+  ) {
+    return { error: "Ya existe un pabellón con ese nombre en la sucursal." };
+  }
+  const { error } = await supabase
+    .from("edificios")
+    .update({ nombre: trimmed, descripcion: desc })
+    .eq("id", edificioId);
+  if (error) return { error: error.message };
+  return { success: true as const };
 }
 
 export async function listPisos(sedeId: string): Promise<Piso[]> {

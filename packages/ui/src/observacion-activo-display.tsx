@@ -17,7 +17,7 @@ export function ObservacionActivoDisplay({
     : "whitespace-pre-wrap text-sm leading-snug";
 
   return (
-    <span className={`${clampClass} ${className}`.trim()}>
+    <span className={`${clampClass} uppercase ${className}`.trim()}>
       {contador ? <span className="text-foreground">{contador}</span> : null}
       {contador && admin ? <br /> : null}
       {admin ? <span className="text-blue-600 dark:text-blue-400">{admin}</span> : null}

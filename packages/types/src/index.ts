@@ -223,6 +223,8 @@ export interface Edificio {
   id: string;
   sede_id: string;
   nombre: string;
+  /** Descripción opcional del pabellón. */
+  descripcion?: string | null;
   orden: number;
   activo: boolean;
   created_at: string;
@@ -406,8 +408,10 @@ export interface Ambiente {
   descripcion: string | null;
   responsable_id: string | null;
   responsable: string | null;
-  /** Espacio físico opcional que ocupa el ambiente (misma sucursal). */
+  /** Espacio físico heredado. Tras la migración el ambiente apunta al pabellón. */
   espacio_id: string | null;
+  /** Pabellón (edificio) de la misma sucursal. Vacío en preregistro, faltante y ambientes sin pabellón. */
+  edificio_id?: string | null;
   es_preregistro: boolean;
   /** Bienes no hallados en visita. Uno por entidad, no es un local físico. */
   es_faltante?: boolean;
@@ -1142,6 +1146,19 @@ export function formatActivoCodigoDisplay(activo: {
   return activo.codigo_catalogo?.trim() || "—";
 }
 
+/** Varios bienes se pueden editar juntos solo si comparten nombre y estado de registro. */
+export function bienesSeleccionMismoNombre(
+  activos: Array<{ nombre: string; estado_registro?: string | null }>,
+): boolean {
+  if (activos.length < 2) return false;
+  const nombre = activos[0].nombre.trim();
+  if (!nombre) return false;
+  const estado = activos[0].estado_registro ?? "";
+  return activos.every(
+    (activo) => activo.nombre.trim() === nombre && (activo.estado_registro ?? "") === estado,
+  );
+}
+
 /** Código de cuenta contable: 1 a 6 dígitos. */
 export const CUENTA_CONTABLE_CODIGO_RE = /^\d{1,6}$/;
 const CUENTA_CONTA_COMBINADA_RE = /^(\d{1,6})\s+(.+)$/;
@@ -1578,6 +1595,37 @@ function caracteristicasPartes(
   if (color?.trim()) partes.push(`color: ${color.trim().toLowerCase()}`);
   if (medidas?.trim()) partes.push(medidas.trim().toLowerCase());
   return partes;
+}
+
+/**
+ * Columna Descripción de los reportes: marca, modelo, serie, color, medidas,
+ * características y, si el menaje lo tiene, material. Solo entran los campos con dato, en mayúsculas.
+ */
+export function descripcionColumnaReporte(activo: {
+  marca?: string | null;
+  modelo?: string | null;
+  serie?: string | null;
+  color?: string | null;
+  medidas?: string | null;
+  caracteristicas?: string | null;
+  material?: string | null;
+}): string {
+  const campos: Array<[string, string | null | undefined]> = [
+    ["MARCA", activo.marca],
+    ["MODELO", activo.modelo],
+    ["SERIE", activo.serie],
+    ["COLOR", activo.color],
+    ["MEDIDAS", activo.medidas],
+    ["CARACTERÍSTICAS", activo.caracteristicas],
+    ["MATERIAL", activo.material],
+  ];
+  return campos
+    .flatMap(([etiqueta, valor]) => {
+      const texto = valor?.trim();
+      if (!texto) return [];
+      return [`${etiqueta}: ${texto.toLocaleUpperCase("es")}`];
+    })
+    .join(", ");
 }
 
 /** Marca, modelo, serie, color y medidas en un solo texto (sin nombre del bien). */

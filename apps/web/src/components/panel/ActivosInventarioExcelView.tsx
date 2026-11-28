@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Activo, InventarioColumnFilterOptions, InventarioColumnFilters } from "@inventario/types";
-import { esActivoPreregistrado, formatActivoCodigoDisplay } from "@inventario/types";
+import {
+  bienesSeleccionMismoNombre,
+  esActivoPreregistrado,
+  formatActivoCodigoDisplay,
+} from "@inventario/types";
 import { Button, useToast } from "@inventario/ui";
 import {
   ActivosInventarioTable,
@@ -44,6 +48,8 @@ export interface GestionPreregistrosConfig {
 interface ActivosInventarioExcelViewProps {
   activos: Activo[];
   onEditActivo: (activo: Activo) => void;
+  /** Editar los bienes marcados cuando todos tienen el mismo nombre. */
+  onEditarSeleccion?: (activos: Activo[]) => void;
   onIrAmbiente?: (activo: Activo) => void;
   puedeDarDeBaja?: boolean;
   puedeValidarPreregistro?: boolean;
@@ -90,6 +96,7 @@ function excelViewShellClass(embeddedInParentScroll: boolean): string {
 export function ActivosInventarioExcelView({
   activos,
   onEditActivo,
+  onEditarSeleccion,
   onIrAmbiente,
   puedeDarDeBaja = true,
   puedeValidarPreregistro = false,
@@ -422,6 +429,16 @@ export function ActivosInventarioExcelView({
             onClick={() => void marcarSiSeleccion()}
           >
             {marcandoSi ? "Marcando…" : `Marcar Sí (${selectedActivos.length})`}
+          </Button>
+        ) : null}
+        {onEditarSeleccion && bienesSeleccionMismoNombre(selectedActivos) ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onEditarSeleccion(selectedActivos)}
+          >
+            Editar ({selectedActivos.length})
           </Button>
         ) : null}
         <Button type="button" size="sm" variant="outline" onClick={() => setMoverOpen(true)}>

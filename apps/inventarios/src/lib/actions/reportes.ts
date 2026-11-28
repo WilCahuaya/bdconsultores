@@ -125,8 +125,8 @@ export async function cargarActivosReporte(
   }
 
   const definicion = definicionReporte(input.reporteId as ReporteId);
-  if (definicion.categoria) query = query.eq("categoria", definicion.categoria);
-  else if (definicion.valorizado) query = query.neq("categoria", "MENAJE");
+  if (definicion.grupo === "menaje") query = query.eq("categoria", "MENAJE");
+  else query = query.neq("categoria", "MENAJE");
 
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
   if (corteISO && aplicaFiltroAdquisicionFechaCorte(input.reporteId as ReporteId, input.fechaCorte)) {

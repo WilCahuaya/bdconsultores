@@ -1,6 +1,6 @@
 import type { EstadoRegistro } from "@inventario/types";
 import { attachCatalogoNacionalPorCodigo, resolveCuentaContableActivo } from "@inventario/types";
-import { REPORTES, definicionReporte } from "@reportes/types";
+import { REPORTES, definicionReporte, esReporteMenaje } from "@reportes/types";
 import type { ActivoReporte } from "@reportes/types";
 import {
   anioEjercicioAdquisicion,
@@ -120,6 +120,12 @@ function filtrarActivosReporteCache(
     );
   } else {
     filtered = filtered.filter((a) => a.estado_registro === ("REGISTRADO" as EstadoRegistro));
+  }
+
+  if (esReporteMenaje(input.reporteId)) {
+    filtered = filtered.filter((a) => a.categoria === "MENAJE");
+  } else {
+    filtered = filtered.filter((a) => a.categoria !== "MENAJE");
   }
 
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
@@ -254,13 +260,8 @@ export async function cargarActivosReporte(
     query = query.eq("estado_registro", "REGISTRADO" as EstadoRegistro);
   }
 
-  try {
-    const definicion = definicionReporte(input.reporteId as ReporteId);
-    if (definicion.categoria) query = query.eq("categoria", definicion.categoria);
-    else if (definicion.valorizado) query = query.neq("categoria", "MENAJE");
-  } catch {
-    /* reporte desconocido: no filtra categoría */
-  }
+  if (esReporteMenaje(input.reporteId)) query = query.eq("categoria", "MENAJE");
+  else query = query.neq("categoria", "MENAJE");
 
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
   if (corteISO && aplicaFiltroAdquisicionFechaCorte(input.reporteId as ReporteId, input.fechaCorte)) {
@@ -305,6 +306,7 @@ export {
   esReporteAdquiridosEjercicio,
   exportReporte,
   reporteHeaders,
+  reportePreviewColumnas,
   reportesDisponiblesParaRol,
   reportesAmbienteParaRol,
 } from "@reportes";

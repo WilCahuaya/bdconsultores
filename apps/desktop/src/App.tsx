@@ -74,12 +74,13 @@ type EntidadesFlow =
       type: "edit";
       activo: ActivoConUbicacion;
       context: AmbienteContext;
+      seleccionIds?: string[];
       returnTo?: "entity-inventario";
     };
 
 type InventarioFlow =
   | { type: "list" }
-  | { type: "edit"; activo: ActivoConUbicacion };
+  | { type: "edit"; activo: ActivoConUbicacion; seleccionIds?: string[] };
 
 function contextFromActivo(activo: ActivoConUbicacion): AmbienteContext {
   return {
@@ -637,6 +638,15 @@ function MainApp({ userId }: { userId: string; email: string }) {
               returnTo: "entity-inventario",
             })
           }
+          onEditarSeleccion={(activos) =>
+            setEntidadesFlow({
+              type: "edit",
+              activo: activos[0],
+              seleccionIds: activos.map((activo) => activo.id),
+              context: contextFromActivo(activos[0]),
+              returnTo: "entity-inventario",
+            })
+          }
           onIrAmbiente={goAmbienteFromActivo}
           onAbrirAmbienteDestino={goAmbienteDestino}
           onActivoUpdated={(activo) => void handleActivoUpdated(activo)}
@@ -688,6 +698,14 @@ function MainApp({ userId }: { userId: string; email: string }) {
                 context: entidadesFlow.context,
               })
             }
+            onEditarSeleccion={(activos) =>
+              setEntidadesFlow({
+                type: "edit",
+                activo: activos[0],
+                seleccionIds: activos.map((activo) => activo.id),
+                context: entidadesFlow.context,
+              })
+            }
             onActivoUpdated={(activo) => void handleActivoUpdated(activo)}
             onActivoDeleted={() => void handleActivoDeleted()}
             onAbrirAmbienteDestino={goAmbienteDestino}
@@ -728,6 +746,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
           fixedSedeId={entidadesFlow.context.sedeId}
           fixedAmbienteId={entidadesFlow.context.ambienteId}
           activo={entidadesFlow.activo}
+          seleccionIds={entidadesFlow.seleccionIds}
           onSuccess={() => {
             returnFromEntidadesEdit();
             void refreshActivos();
@@ -751,6 +770,13 @@ function MainApp({ userId }: { userId: string; email: string }) {
           onPrintLabel={setPrintTarget}
           onPrintBatch={setBatchPrintTargets}
           onEditActivo={(activo) => setInventarioFlow({ type: "edit", activo })}
+          onEditarSeleccion={(activos) =>
+            setInventarioFlow({
+              type: "edit",
+              activo: activos[0],
+              seleccionIds: activos.map((activo) => activo.id),
+            })
+          }
           onIrAmbiente={goAmbienteFromActivo}
           onAbrirAmbienteDestino={goAmbienteDestino}
           onActivoUpdated={(activo) => void handleActivoUpdated(activo)}
@@ -770,6 +796,7 @@ function MainApp({ userId }: { userId: string; email: string }) {
           fixedSedeId={inventarioFlow.activo.sede_id ?? undefined}
           fixedAmbienteId={inventarioFlow.activo.ambiente_id ?? undefined}
           activo={inventarioFlow.activo}
+          seleccionIds={inventarioFlow.seleccionIds}
           onSuccess={() => {
             setInventarioFlow({ type: "list" });
             void refreshActivos();

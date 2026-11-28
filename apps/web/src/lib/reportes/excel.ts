@@ -3,8 +3,11 @@ import type { Range, WorkSheet } from "xlsx-js-style";
 import {
   ambienteDisenoExportFilename,
   buildFichaActualizacionLabel,
+  esFichaLevantamiento,
   esReporteAmbienteDiseno,
+  fechaFichaLevantamiento,
   reporteAmbienteIncluyeFirmas,
+  subtituloInventarioPatrimonial,
   tituloReporteAmbienteDiseno,
 } from "./ficha-asignacion";
 import {
@@ -17,6 +20,9 @@ import {
 import { buildInstitutionalHeader, fechaCorteCalculo } from "./header-meta";
 import {
   STYLE_BODY,
+  STYLE_FORM_BODY,
+  STYLE_FORM_BODY_LEFT,
+  STYLE_FORM_TABLE_HEAD,
   STYLE_HEADER_BOLD,
   STYLE_HEADER_MUTED,
   STYLE_HEADER_NORMAL,
@@ -79,6 +85,75 @@ function textoFicha(value: string | null | undefined): string {
   return t || "—";
 }
 
+function textoMayusFicha(value: string | null | undefined): string {
+  const t = value?.trim();
+  return t ? t.toUpperCase() : "—";
+}
+
+function writeFichaLevantamientoHeader(
+  ws: WorkSheet,
+  merges: Range[],
+  colCount: number,
+  ctx: ReporteContexto,
+): number {
+  const lastCol = Math.max(colCount - 1, 0);
+  const mid = Math.max(Math.floor(colCount / 2), 1);
+  const leftBold = {
+    ...STYLE_HEADER_BOLD,
+    alignment: { horizontal: "left", vertical: "center", wrapText: true },
+  };
+  const leftNormal = {
+    ...STYLE_HEADER_NORMAL,
+    alignment: { horizontal: "left", vertical: "center", wrapText: true },
+  };
+  const centered = {
+    ...STYLE_HEADER_TITLE,
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  };
+  let r = 0;
+
+  setCell(ws, r, 0, textoMayusFicha(ctx.entidadNombre), leftBold);
+  addMerge(merges, r, 0, mid - 1);
+  setCell(ws, r, mid, fechaFichaLevantamiento(ctx), {
+    ...STYLE_HEADER_NORMAL,
+    alignment: { horizontal: "right", vertical: "center", wrapText: true },
+  });
+  if (mid < lastCol) addMerge(merges, r, mid, lastCol);
+  r++;
+
+  setCell(ws, r, 0, tituloReporteAmbienteDiseno(ctx.reporteId), centered);
+  addMerge(merges, r, 0, lastCol);
+  r++;
+
+  setCell(ws, r, 0, subtituloInventarioPatrimonial(ctx), {
+    font: { name: "Calibri", sz: 14, bold: true },
+    alignment: { horizontal: "center", vertical: "center", wrapText: true },
+  });
+  addMerge(merges, r, 0, lastCol);
+  r += 2;
+
+  setCell(ws, r, 0, "LOCALIZACIÓN DEL BIEN:", leftBold);
+  addMerge(merges, r, 0, mid - 1);
+  setCell(ws, r, mid, "USUARIO RESPONSABLE:", leftBold);
+  if (mid < lastCol) addMerge(merges, r, mid, lastCol);
+  r++;
+
+  setCell(ws, r, 0, `SEDE: ${textoMayusFicha(ctx.sedeNombre)}`, leftNormal);
+  addMerge(merges, r, 0, mid - 1);
+  setCell(ws, r, mid, `APELLIDOS Y NOMBRES: ${textoMayusFicha(ctx.responsable)}`, leftNormal);
+  if (mid < lastCol) addMerge(merges, r, mid, lastCol);
+  r++;
+
+  setCell(ws, r, 0, `AMBIENTE: ${textoMayusFicha(ctx.ambienteNombre)}`, leftNormal);
+  addMerge(merges, r, 0, mid - 1);
+  setCell(ws, r, mid, `DNI: ${textoFicha(ctx.responsableDni)}`, leftNormal);
+  if (mid < lastCol) addMerge(merges, r, mid, lastCol);
+  r++;
+
+  ws["!rows"] = [{ hpt: 18 }, { hpt: 18 }, { hpt: 22 }];
+  return r + 1;
+}
+
 function writeAmbienteDisenoHeader(
   ws: WorkSheet,
   merges: Range[],
@@ -86,6 +161,10 @@ function writeAmbienteDisenoHeader(
   ctx: ReporteContexto,
   totalRegistros: number,
 ): number {
+  if (esFichaLevantamiento(ctx.reporteId)) {
+    return writeFichaLevantamientoHeader(ws, merges, colCount, ctx);
+  }
+
   const lastCol = Math.max(colCount - 1, 0);
   const split = Math.max(Math.floor(colCount / 2) - 1, 0);
   let r = 0;
@@ -288,10 +367,13 @@ function writeTableSection(
   rows: string[][],
   footRow?: ValorizacionTotalesFila,
   fichaTable = false,
+  formulario = false,
 ): number {
   let r = startRow;
 
-  const headStyle = fichaTable
+  const headStyle = formulario
+    ? STYLE_FORM_TABLE_HEAD
+    : fichaTable
     ? {
         ...STYLE_TABLE_HEAD,
         fill: { fgColor: { rgb: "1D4E89" }, patternType: "solid" as const },
@@ -313,7 +395,11 @@ function writeTableSection(
           fill: { fgColor: { rgb: "F8F8F8" }, patternType: "solid" as const },
         }
       : STYLE_BODY;
-    row.forEach((value, c) => setCell(ws, r, c, value, bodyStyle));
+    row.forEach((value, c) => {
+      const left = formulario && (c === 4 || c === 5 || c === 7);
+      const style = formulario ? (left ? STYLE_FORM_BODY_LEFT : STYLE_FORM_BODY) : bodyStyle;
+      setCell(ws, r, c, value, style);
+    });
     r++;
   }
 
@@ -383,6 +469,7 @@ export async function exportReporteExcel(
   const def = REPORTES.find((r) => r.id === ctx.reporteId)!;
   const fechaCorte = fechaCorteCalculo(ctx);
   const useAmbienteDiseno = esReporteAmbienteDiseno(ctx.reporteId);
+  const formulario = esFichaLevantamiento(ctx.reporteId);
   const useEntidadDiseno = esReporteEntidadDiseno(ctx.reporteId);
   const useDisenoExtendido = esReporteDisenoExtendido(ctx.reporteId);
   const institutional = buildInstitutionalHeader(ctx, activos.length);
@@ -415,6 +502,7 @@ export async function exportReporteExcel(
       ? buildValorizacionTotalesFila(headerDefs, totales, ctx.reporteId)
       : undefined,
     useDisenoExtendido,
+    formulario,
   );
 
   if (reporteIncluyeResumenClasificacion(ctx.reporteId) && activos.length > 0) {
@@ -441,8 +529,22 @@ export async function exportReporteExcel(
   setReportColumnWidths(ws, ctx.reporteId);
   ws["!views"] = [{ state: "frozen", ySplit: tableStartRow + 1, activeCell: "A1" }];
 
+  if (formulario) {
+    ws["!pageSetup"] = {
+      orientation: "landscape",
+      paperSize: 9,
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+    };
+  }
+
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, useDisenoExtendido ? "Informe" : "Reporte");
+  XLSX.utils.book_append_sheet(
+    wb,
+    ws,
+    formulario ? "Inventario patrimonial" : useDisenoExtendido ? "Informe" : "Reporte",
+  );
 
   const baseName = useAmbienteDiseno
     ? ambienteDisenoExportFilename(ctx)

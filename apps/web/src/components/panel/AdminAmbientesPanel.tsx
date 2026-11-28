@@ -3,9 +3,9 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { CreateResponsableInput, Entidad, Espacio, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
+import type { CreateResponsableInput, Edificio, Entidad, ResponsableConConteo, SedeConConteo, VisitaCampoActiva, VisitaCampoHistorial } from "@inventario/types";
 import { entidadMuestraSelectorSede, sedeIdSinSelector } from "@inventario/types";
-import { Button, CrearResponsableDialog, Dialog, EspaciosGestionPanel, ResponsablesPanel } from "@inventario/ui";
+import { Button, CrearResponsableDialog, Dialog, PabellonesGestionPanel, ResponsablesPanel } from "@inventario/ui";
 import {
   EditIcon,
   PanelDataTable,
@@ -40,16 +40,11 @@ import {
 import {
   createAmbiente,
   createEdificio,
-  createEspacio,
-  createPiso,
-  deleteEspacio,
-  updateEspacio,
   listAmbientesPorEntidad,
   listEdificios,
-  listEspacios,
-  listPisos,
-  listEspaciosPorEntidad,
+  listEdificiosPorEntidad,
   updateAmbiente,
+  updateEdificio,
 } from "@/lib/actions/ubicacion";
 import {
   createResponsable,
@@ -58,7 +53,7 @@ import {
   setResponsableActivo,
   updateResponsable,
 } from "@/lib/actions/responsables";
-import { AmbienteFormFields, ambienteFromForm, etiquetaEspacioAmbiente, EspacioOcupaCelda } from "./AmbienteFormFields";
+import { AmbienteFormFields, ambienteFromForm, etiquetaPabellonAmbiente } from "./AmbienteFormFields";
 import { GestionarSucursales } from "./GestionarSucursales";
 import {
   PanelCountLabel,
@@ -73,7 +68,7 @@ type AdminEntityTab = "ambientes" | "espacios" | "sucursales" | "responsables" |
 
 const ADMIN_ENTITY_TABS: { id: AdminEntityTab; label: string }[] = [
   { id: "ambientes", label: "Ambientes" },
-  { id: "espacios", label: "Ubicación física" },
+  { id: "espacios", label: "Pabellones" },
   { id: "sucursales", label: "Sucursales" },
   { id: "responsables", label: "Responsables" },
   { id: "visitas", label: "Visitas de campo" },
@@ -125,12 +120,12 @@ export function AdminAmbientesPanel({
   const [createOpen, setCreateOpen] = useState(false);
   const [createResponsableOpen, setCreateResponsableOpen] = useState(false);
   const [createResponsableId, setCreateResponsableId] = useState("");
-  const [createEspacioId, setCreateEspacioId] = useState("");
+  const [createPabellonId, setCreatePabellonId] = useState("");
   const [editResponsableOpen, setEditResponsableOpen] = useState(false);
   const [editResponsableId, setEditResponsableId] = useState("");
-  const [editEspacioId, setEditEspacioId] = useState("");
+  const [editPabellonId, setEditPabellonId] = useState("");
   const [editAmbiente, setEditAmbiente] = useState<AmbienteConVisita | null>(null);
-  const [espacios, setEspacios] = useState<Espacio[]>([]);
+  const [pabellones, setPabellones] = useState<Edificio[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useStoredViewMode("inventario-view-ambientes", "list");
@@ -146,7 +141,7 @@ export function AdminAmbientesPanel({
     setResponsables(initialResponsables);
   }, [initialResponsables]);
   useEffect(() => {
-    void listEspaciosPorEntidad(entidad.id).then(setEspacios);
+    void listEdificiosPorEntidad(entidad.id).then(setPabellones);
   }, [entidad.id]);
   useEffect(() => {
     setVisitasHistorial(initialVisitasHistorial);
@@ -169,7 +164,7 @@ export function AdminAmbientesPanel({
   useEffect(() => {
     if (editAmbiente) {
       setEditResponsableId(editAmbiente.responsable_id ?? "");
-      setEditEspacioId(editAmbiente.espacio_id ?? "");
+      setEditPabellonId(editAmbiente.edificio_id ?? "");
       setEditResponsableOpen(false);
     }
   }, [editAmbiente]);
@@ -178,7 +173,7 @@ export function AdminAmbientesPanel({
     setCreateOpen(false);
     setCreateResponsableOpen(false);
     setCreateResponsableId("");
-    setCreateEspacioId("");
+    setCreatePabellonId("");
     setError(null);
   }
 
@@ -186,25 +181,25 @@ export function AdminAmbientesPanel({
     setEditAmbiente(null);
     setEditResponsableOpen(false);
     setEditResponsableId("");
-    setEditEspacioId("");
+    setEditPabellonId("");
     setError(null);
   }
 
-  async function syncEspaciosEntidad() {
-    const list = await listEspaciosPorEntidad(entidad.id);
-    setEspacios(list);
+  async function syncPabellonesEntidad() {
+    const list = await listEdificiosPorEntidad(entidad.id);
+    setPabellones(list);
   }
 
   async function syncAmbientesYResponsables() {
     const [ambList, respList, espacioList] = await Promise.all([
       listAmbientesPorEntidad(entidad.id),
       listResponsables(entidad.id),
-      listEspaciosPorEntidad(entidad.id),
+      listEdificiosPorEntidad(entidad.id),
     ]);
     const enriched = await attachVisitaEstadoToAmbientes(ambList, entidad.id);
     setAmbientes(enriched);
     setResponsables(respList);
-    setEspacios(espacioList);
+    setPabellones(espacioList);
     router.refresh();
   }
 
@@ -245,7 +240,7 @@ export function AdminAmbientesPanel({
         a.nombre.toLowerCase().includes(q) ||
         (a.descripcion?.toLowerCase().includes(q) ?? false) ||
         (a.responsable?.toLowerCase().includes(q) ?? false) ||
-        (a.espacio_nombre?.toLowerCase().includes(q) ?? false) ||
+        (a.edificio_nombre?.toLowerCase().includes(q) ?? false) ||
         (entidadMultiplesSedes && !sedeFiltrada && a.sede_nombre.toLowerCase().includes(q)),
     );
   }, [ambientesBase, busqueda, entidadMultiplesSedes, sedeFiltrada]);
@@ -279,7 +274,7 @@ export function AdminAmbientesPanel({
       nombre: input.nombre,
       descripcion: input.descripcion,
       responsableId: input.responsableId,
-      espacioId: input.espacioId,
+      edificioId: input.edificioId,
     });
 
     setPending(false);
@@ -288,13 +283,14 @@ export function AdminAmbientesPanel({
       return;
     }
 
-    const espacioNombre =
-      espacios.find((e) => e.id === input.espacioId)?.nombre ?? null;
+    const pabellonNombre =
+      pabellones.find((e) => e.id === input.edificioId)?.nombre ?? null;
     const nuevo: AmbienteConVisita = {
       ...result.data!,
       sede_nombre: sede?.nombre ?? "",
       sede_es_principal: sede?.es_principal ?? false,
-      espacio_nombre: espacioNombre,
+      edificio_id: input.edificioId,
+      edificio_nombre: pabellonNombre,
       activo_count: 0,
       visita_estado: visitaAbierta ? "EN_PROCESO" : null,
       visita_revisados: visitaAbierta ? 0 : null,
@@ -314,7 +310,7 @@ export function AdminAmbientesPanel({
     setCreateOpen(false);
     form.reset();
     setCreateResponsableId("");
-    setCreateEspacioId("");
+    setCreatePabellonId("");
     await syncAmbientesYResponsables();
     router.refresh();
   }
@@ -343,9 +339,9 @@ export function AdminAmbientesPanel({
               descripcion: input.descripcion.trim() || null,
               responsable_id: input.responsableId,
               responsable: responsableNombreById(input.responsableId),
-              espacio_id: input.espacioId,
-              espacio_nombre:
-                espacios.find((e) => e.id === input.espacioId)?.nombre ?? null,
+              edificio_id: input.edificioId,
+              edificio_nombre:
+                pabellones.find((e) => e.id === input.edificioId)?.nombre ?? null,
             }
           : a,
       ),
@@ -396,39 +392,19 @@ export function AdminAmbientesPanel({
           }}
         />
       ) : tab === "espacios" ? (
-        <EspaciosGestionPanel
+        <PabellonesGestionPanel
           sedes={sedes}
-          onList={listEspacios}
-          onCreate={async (sedeId, nombre, descripcion, ubicacion) => {
-            const result = await createEspacio(sedeId, nombre, descripcion, ubicacion);
+          onList={listEdificios}
+          onCreate={async (sedeId, nombre, descripcion) => {
+            const result = await createEdificio(sedeId, nombre, descripcion);
             if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
+            void syncPabellonesEntidad();
             return {};
           }}
-          onUpdateDescripcion={async (espacioId, descripcion, ubicacion) => {
-            const result = await updateEspacio(espacioId, descripcion, ubicacion);
+          onUpdate={async (edificioId, nombre, descripcion) => {
+            const result = await updateEdificio(edificioId, nombre, descripcion);
             if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
-            return {};
-          }}
-          onListEdificios={listEdificios}
-          onCreateEdificio={async (sedeId, nombre) => {
-            const result = await createEdificio(sedeId, nombre);
-            if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
-            return {};
-          }}
-          onListPisos={listPisos}
-          onCreatePiso={async (edificioId) => {
-            const result = await createPiso(edificioId);
-            if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
-            return {};
-          }}
-          onDelete={async (espacioId) => {
-            const result = await deleteEspacio(espacioId);
-            if (result.error) return { error: result.error };
-            void syncEspaciosEntidad();
+            void syncPabellonesEntidad();
             return {};
           }}
         />
@@ -540,7 +516,7 @@ export function AdminAmbientesPanel({
           <thead className={panelTableStickyHeadClass}>
             <tr className={panelTableHeadRowClass}>
               <PanelTableTh>Ambiente</PanelTableTh>
-              <PanelTableTh className={panelTableNowrapCellClass}>Espacio que ocupa</PanelTableTh>
+              <PanelTableTh className={panelTableNowrapCellClass}>Pabellón</PanelTableTh>
               <PanelTableTh>Responsable</PanelTableTh>
               <PanelTableTh>Descripción</PanelTableTh>
               {!ocultarSucursalEnLista && <PanelTableTh className={panelTableShrinkCellClass}>Sucursal</PanelTableTh>}
@@ -575,14 +551,11 @@ export function AdminAmbientesPanel({
                   {amb.nombre}
                 </PanelTableTd>
                 <PanelTableTd className={panelTableNowrapCellClass}>
-                  <EspacioOcupaCelda
-                    esPreregistro={amb.es_preregistro}
-                    esFaltante={amb.es_faltante}
-                    espacioNombre={amb.espacio_local}
-                    piso={amb.piso}
-                    edificioNombre={amb.edificio_nombre}
-                    descripcion={amb.espacio_descripcion}
-                  />
+                  {etiquetaPabellonAmbiente({
+                    esPreregistro: amb.es_preregistro,
+                    esFaltante: amb.es_faltante,
+                    pabellonNombre: amb.edificio_nombre,
+                  })}
                 </PanelTableTd>
                 <PanelTableTd title={amb.responsable ?? undefined}>
                   {amb.responsable ?? "—"}
@@ -653,10 +626,11 @@ export function AdminAmbientesPanel({
                         : undefined
                     }
                   >
-                    Espacio:{" "}
-                    {etiquetaEspacioAmbiente({
+                    Pabellón:{" "}
+                    {etiquetaPabellonAmbiente({
                       esPreregistro: amb.es_preregistro,
-                      espacioNombre: amb.espacio_nombre,
+                      esFaltante: amb.es_faltante,
+                      pabellonNombre: amb.edificio_nombre,
                     })}
                   </p>
                   {amb.descripcion ? (
@@ -717,10 +691,11 @@ export function AdminAmbientesPanel({
                               : undefined
                           }
                         >
-                          Espacio:{" "}
-                          {etiquetaEspacioAmbiente({
+                          Pabellón:{" "}
+                          {etiquetaPabellonAmbiente({
                             esPreregistro: amb.es_preregistro,
-                            espacioNombre: amb.espacio_nombre,
+                            esFaltante: amb.es_faltante,
+                            pabellonNombre: amb.edificio_nombre,
                           })}
                         </p>
                         {amb.descripcion ? (
@@ -768,14 +743,14 @@ export function AdminAmbientesPanel({
           <AmbienteFormFields
             sedes={sedes}
             responsables={responsables}
-            espacios={espacios}
+            pabellones={pabellones}
             defaultSedeId={sedeFilterId || sedeIdSinSelector(sedes) || undefined}
             showSedeSelect={entidadMultiplesSedes}
             responsableId={createResponsableId}
             onResponsableIdChange={setCreateResponsableId}
             onRequestCreateResponsable={() => setCreateResponsableOpen(true)}
-            espacioId={createEspacioId}
-            onEspacioIdChange={setCreateEspacioId}
+            pabellonId={createPabellonId}
+            onPabellonIdChange={setCreatePabellonId}
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
@@ -811,12 +786,12 @@ export function AdminAmbientesPanel({
               ambiente={editAmbiente}
               sedes={sedes}
               responsables={responsables}
-              espacios={espacios}
+              pabellones={pabellones}
               responsableId={editResponsableId}
               onResponsableIdChange={setEditResponsableId}
               onRequestCreateResponsable={() => setEditResponsableOpen(true)}
-              espacioId={editEspacioId}
-              onEspacioIdChange={setEditEspacioId}
+              pabellonId={editPabellonId}
+              onPabellonIdChange={setEditPabellonId}
               esPreregistro={editAmbiente.es_preregistro}
             />
             {error && <p className="text-sm text-destructive">{error}</p>}

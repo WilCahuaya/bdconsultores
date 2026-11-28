@@ -128,6 +128,11 @@ export function InventarioGlobalPanel({
   const [fechaCorteError, setFechaCorteError] = useState<string | null>(null);
   const [orden, setOrden] = useState<OrdenInventario>("codigo");
   const [editActivo, setEditActivo] = useState<InventarioItem | null>(null);
+  const [editSeleccionIds, setEditSeleccionIds] = useState<string[] | null>(null);
+  const cerrarEdicion = useCallback(() => {
+    setEditActivo(null);
+    setEditSeleccionIds(null);
+  }, []);
   const [editScope, setEditScope] = useState<ActivoEditScope>("single");
   const { resumen: ejemplaresResumen } = useEjemplaresResumen(editActivo?.id);
   const ejemplaresTotal = ejemplaresResumen?.total ?? 0;
@@ -347,7 +352,7 @@ export function InventarioGlobalPanel({
   }
 
   function handleSuccess() {
-    setEditActivo(null);
+    cerrarEdicion();
     router.refresh();
   }
 
@@ -373,18 +378,18 @@ export function InventarioGlobalPanel({
           ...(entityPageHref
             ? [{ label: fixedEntidadNombre ?? "Entidad", href: entityPageHref }]
             : [{ label: fixedEntidadNombre ?? "Entidad" }]),
-          { label: "Inventario", onClick: () => setEditActivo(null) },
+          { label: "Inventario", onClick: () => cerrarEdicion() },
           { label: editActivo.nombre },
           { label: editTitle },
         ]
       : isAdmin
         ? [
             { label: "Inventario global", href: "/admin/inventario" },
-            { label: editActivo.nombre, onClick: () => setEditActivo(null) },
+            { label: editActivo.nombre, onClick: () => cerrarEdicion() },
             { label: editTitle },
           ]
         : [
-            { label: "Inventario global", onClick: () => setEditActivo(null) },
+            { label: "Inventario global", onClick: () => cerrarEdicion() },
             { label: editActivo.nombre },
             { label: editTitle },
           ];
@@ -392,11 +397,13 @@ export function InventarioGlobalPanel({
     return (
       <div className="space-y-5">
         <PanelPageHeader breadcrumbs={editBreadcrumbs} />
-        <ActivoEditScopeNav
-          scope={editScope}
-          ejemplaresTotal={ejemplaresTotal}
-          onScopeChange={setEditScope}
-        />
+        {!editSeleccionIds && (
+          <ActivoEditScopeNav
+            scope={editScope}
+            ejemplaresTotal={ejemplaresTotal}
+            onScopeChange={setEditScope}
+          />
+        )}
         <ActivoForm
           entidades={entidades}
           fixedEntidadId={editActivo.entidad_id}
@@ -406,6 +413,7 @@ export function InventarioGlobalPanel({
           mode="edit"
           editScope={editScope}
           ejemplaresTotal={ejemplaresTotal}
+          seleccionIds={editSeleccionIds ?? undefined}
           submitLabel={
             editScope === "bulk" && ejemplaresTotal > 1
               ? `Guardar en ${ejemplaresTotal} ejemplares`
@@ -420,7 +428,7 @@ export function InventarioGlobalPanel({
           asignaCodigoInmediato={!isAdmin && editActivo.estado_registro !== "PREREGISTRADO"}
           variant="page"
           onSuccess={handleSuccess}
-          onCancel={() => setEditActivo(null)}
+          onCancel={() => cerrarEdicion()}
         />
       </div>
     );
@@ -561,7 +569,14 @@ export function InventarioGlobalPanel({
             </div>
           )}
           activos={filtrados}
-          onEditActivo={setEditActivo}
+          onEditActivo={(activo) => {
+            setEditSeleccionIds(null);
+            setEditActivo(activo);
+          }}
+          onEditarSeleccion={(activos) => {
+            setEditSeleccionIds(activos.map((activo) => activo.id));
+            setEditActivo(activos[0] ?? null);
+          }}
           onIrAmbiente={irAlAmbiente}
           puedeDarDeBaja={!isAdmin}
           puedeValidarPreregistro={!isAdmin}

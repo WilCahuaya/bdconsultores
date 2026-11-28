@@ -317,7 +317,7 @@ function SerieInlineCell<T extends Activo>({
   }, [activo.id, guardada]);
 
   async function commit(nextRaw: string) {
-    const next = nextRaw.trim();
+    const next = nextRaw.trim().toLocaleUpperCase("es");
     if (next === guardada.trim()) {
       setValue(guardada);
       return;
@@ -336,7 +336,7 @@ function SerieInlineCell<T extends Activo>({
         aria-label={`Serie de ${activo.nombre}`}
         maxLength={120}
         autoComplete="off"
-        className="h-6 w-full min-w-0 rounded-sm border border-transparent bg-transparent px-1 text-xs leading-snug outline-none hover:border-border focus:border-ring focus:bg-background focus:ring-1 focus:ring-ring disabled:opacity-60"
+        className="h-6 w-full min-w-0 rounded-sm border border-transparent bg-transparent px-1 text-xs uppercase leading-snug outline-none hover:border-border focus:border-ring focus:bg-background focus:ring-1 focus:ring-ring disabled:opacity-60"
         onChange={(event) => setValue(event.target.value)}
         onClick={(event) => event.stopPropagation()}
         onBlur={() => {

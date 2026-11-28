@@ -10,6 +10,7 @@ import {
   esReporteAdquiridosEjercicio,
   exportReporte,
   reporteHeaders,
+  reportePreviewColumnas,
   reportesDisponiblesParaRol,
   type ActivoReporte,
   type ReporteFormato,
@@ -131,6 +132,7 @@ export function ReportesView({
     const rows = buildReporteRows(activos, reporteId, definicion.valorizado, fecha);
     return {
       headers,
+      columnas: reportePreviewColumnas(reporteId),
       rows: rows.slice(0, REPORTE_PREVIEW_MAX_ROWS),
       total: activos.length,
       resumen: buildReporteResumenPreview(activos, reporteId, fechaCorteISO ?? undefined),
@@ -285,6 +287,7 @@ export function ReportesView({
         onPreview={() => void handlePreview()}
         onExport={(formato) => void handleExport(formato)}
         previewHeaders={preview?.headers ?? []}
+        previewColumnas={preview?.columnas ?? null}
         previewRows={preview?.rows ?? []}
         previewTotal={preview?.total ?? 0}
         resumen={preview?.resumen ?? null}

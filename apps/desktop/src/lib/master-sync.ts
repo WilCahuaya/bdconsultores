@@ -157,6 +157,23 @@ async function fetchAmbientesRemote(entidadId: string) {
     }
   }
 
+  const edificioIds = [
+    ...new Set(mapped.map((a) => a.edificio_id).filter((id): id is string => Boolean(id))),
+  ];
+  if (edificioIds.length > 0) {
+    const { data: edificiosRows } = await supabase
+      .from("edificios")
+      .select("id, nombre")
+      .in("id", edificioIds);
+    const porEdificio = new Map(
+      (edificiosRows ?? []).map((e) => [e.id as string, ((e.nombre as string) ?? "").trim()]),
+    );
+    for (const amb of mapped) {
+      const nombre = amb.edificio_id ? porEdificio.get(amb.edificio_id) : undefined;
+      if (nombre) amb.edificio_nombre = nombre;
+    }
+  }
+
   return mapped;
 }
 

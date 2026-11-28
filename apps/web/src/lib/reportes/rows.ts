@@ -1,7 +1,6 @@
 import {
-  buildDescripcionBien,
-  descripcionMenaje,
-  esMenaje,
+  cantidadInventarioBien,
+  descripcionColumnaReporte,
   nombreEnReporteBaja,
   calcPeriodoMesesHasta,
   calcValorizacionActivo,
@@ -16,6 +15,8 @@ import {
   valorActivoEfectivo,
 } from "@inventario/types";
 import {
+  FICHA_ASIGNACION_BIENES_TITULO,
+  FICHA_ASIGNACION_MENAJE_TITULO,
   FICHA_ASIGNACION_TITULO,
   INVENTARIO_ACTIVOS_FIJOS_AMBIENTE_TITULO,
   INVENTARIO_ACTIVOS_VALORIZADOS_AMBIENTE_TITULO,
@@ -24,6 +25,7 @@ import {
 import {
   ACTA_DE_INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO,
   INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO,
+  INVENTARIO_MENAJES_TITULO,
   INVENTARIO_ACTIVOS_VALORIZADOS_GENERAL_TITULO,
   REPORTE_BAJAS_TITULO,
   REPORTE_ACTIVOS_ESTADO_MALO_TITULO,
@@ -130,6 +132,53 @@ export function buildValorizacionTotalesFilaPdf(
   return out;
 }
 
+const HEADERS_LEVANTAMIENTO: ReporteTableHeaderDef[] = [
+  { key: KEY_NUM, line1: "N°" },
+  { key: KEY_CANT, line1: "Cant." },
+  { key: "und", line1: "Und" },
+  { key: "codigo", line1: "Código patrimonial" },
+  { key: "nombre", line1: "Nombre del bien" },
+  { key: "descripcion", line1: "Descripción" },
+  { key: "estado", line1: "Estado" },
+  { key: "observacion", line1: "Observación" },
+];
+
+function esReporteMenajeId(reporteId: ReporteId): boolean {
+  return reporteId === "ficha_asignacion_menaje" || reporteId === "inventario_menaje_entidad";
+}
+
+function headersMenaje(reporteId: ReporteId): ReporteTableHeaderDef[] {
+  const headers: ReporteTableHeaderDef[] = [
+    { key: KEY_NUM, line1: "N°" },
+    { key: KEY_CANT, line1: "Cant." },
+    { key: "und", line1: "Und" },
+    { key: "codigo", line1: "Código" },
+    { key: "nombre", line1: "Nombre del bien" },
+    { key: "descripcion", line1: "Descripción" },
+    { key: "estado", line1: "Estado" },
+    { key: "observacion", line1: "Observación" },
+  ];
+  if (!omitUbicacionEnTabla(reporteId)) {
+    headers.push({ key: "ubicacion", line1: columnaUbicacionLabel(reporteId) });
+  }
+  return headers;
+}
+
+function filaMenaje(activo: ActivoReporte, index: number, reporteId: ReporteId): string[] {
+  const fila = [
+    String(index + 1),
+    String(cantidadInventarioBien(activo)),
+    "Und",
+    formatActivoCodigoDisplay(activo),
+    activo.nombre,
+    descripcionColumnaReporte(activo) || "—",
+    estadoBienLabel(activo.estado_bien),
+    activo.observacion?.trim() || "—",
+  ];
+  if (!omitUbicacionEnTabla(reporteId)) fila.push(ubicacionReporteLabel(activo, reporteId));
+  return fila;
+}
+
 const HEADERS_SIN_VALORES_BASE = [
   "N°",
   "Cant.",
@@ -215,7 +264,8 @@ function esReporteScopeEntidad(reporteId: ReporteId): boolean {
     reporteId === "reporte_bajas" ||
     reporteId === "reporte_activos_estado_malo" ||
     reporteId === "reporte_adquiridos_ejercicio_actual" ||
-    reporteId === "reporte_adquiridos_ejercicio_anterior"
+    reporteId === "reporte_adquiridos_ejercicio_anterior" ||
+    reporteId === "inventario_menaje_entidad"
   );
 }
 
@@ -252,9 +302,11 @@ export function ordenarActivosParaReporte(
 /** Reportes por ambiente: la ubicación ya figura en el membrete. */
 export function omitUbicacionEnTabla(reporteId: ReporteId): boolean {
   return (
+    reporteId === "ficha_asignacion_ambiente" ||
     reporteId === "inventario_ambiente_sin_valores" ||
     reporteId === "inventario_ambiente_activos_fijos" ||
-    reporteId === "inventario_ambiente_valorizado"
+    reporteId === "inventario_ambiente_valorizado" ||
+    reporteId === "ficha_asignacion_menaje"
   );
 }
 
@@ -390,6 +442,8 @@ export function reporteTableHeaderDefs(
   reporteId: ReporteId,
   valorizado: boolean,
 ): readonly ReporteTableHeaderDef[] {
+  if (reporteId === "inventario_ambiente_sin_valores") return HEADERS_LEVANTAMIENTO;
+  if (esReporteMenajeId(reporteId)) return headersMenaje(reporteId);
   if (reporteId === "reporte_bajas") {
     return headerDefFromStrings([...HEADERS_BAJAS, columnaUbicacionLabel(reporteId)]);
   }
@@ -441,10 +495,14 @@ const AMBIENTE_VALORIZADO_COL_WEIGHTS = [
   4, 4, 4, 5, 10, 14, 18, 7, 10, 6, 10, 9, 9, 9, 9, 9,
 ] as const;
 
-/**
- * Ficha e inventario por ambiente.
- * Código patrimonial justo al texto; nombre y descripción, iguales y prioritarios.
- */
+/** Pesos relativos (ficha de levantamiento patrimonial). */
+const LEVANTAMIENTO_COL_WEIGHTS = [5, 6, 6, 18, 52, 32, 8, 18] as const;
+
+const MENAJE_AMBIENTE_COL_WEIGHTS = [5, 6, 6, 16, 28, 28, 8, 16] as const;
+
+const MENAJE_ENTIDAD_COL_WEIGHTS = [5, 6, 6, 14, 22, 22, 8, 14, 18] as const;
+
+/** Pesos relativos (inventario de bienes por ambiente, sin valores). */
 const AMBIENTE_SIN_VALOR_COL_WEIGHTS = [
   4, // N°
   5, // Cant.
@@ -512,11 +570,17 @@ export function reporteDisenoPdfColumnStyles(
   if (reporteId === "inventario_ambiente_valorizado") {
     return pdfColumnStylesFromWeights(tableWidthMm, AMBIENTE_VALORIZADO_COL_WEIGHTS, [5, 6]);
   }
-  if (
-    reporteId === "inventario_ambiente_sin_valores" ||
-    reporteId === "inventario_ambiente_activos_fijos"
-  ) {
-    return pdfColumnStylesFromWeights(tableWidthMm, AMBIENTE_SIN_VALOR_COL_WEIGHTS, [4, 5, 7]);
+  if (reporteId === "inventario_ambiente_sin_valores") {
+    return pdfColumnStylesFromWeights(tableWidthMm, LEVANTAMIENTO_COL_WEIGHTS, [4, 5, 7]);
+  }
+  if (reporteId === "ficha_asignacion_menaje") {
+    return pdfColumnStylesFromWeights(tableWidthMm, MENAJE_AMBIENTE_COL_WEIGHTS, [4, 5, 7]);
+  }
+  if (reporteId === "inventario_menaje_entidad") {
+    return pdfColumnStylesFromWeights(tableWidthMm, MENAJE_ENTIDAD_COL_WEIGHTS, [4, 5, 7, 8]);
+  }
+  if (reporteId === "inventario_ambiente_activos_fijos" || reporteId === "ficha_asignacion_ambiente") {
+    return pdfColumnStylesFromWeights(tableWidthMm, AMBIENTE_SIN_VALOR_COL_WEIGHTS, [6, 7, 10]);
   }
   if (
     reporteId === "inventario_entidad_sin_valores" ||
@@ -536,6 +600,27 @@ export function reporteDisenoPdfColumnStyles(
   return undefined;
 }
 
+export interface ReportePreviewColumna {
+  widthPct: number;
+  align: "left" | "center";
+}
+
+/** Mismos anchos y alineaciones que la tabla del PDF, en porcentaje. */
+export function reportePreviewColumnas(reporteId: ReporteId): ReportePreviewColumna[] | null {
+  const styles = reporteDisenoPdfColumnStyles(100, reporteId);
+  if (!styles) return null;
+  return Object.keys(styles)
+    .map((key) => Number(key))
+    .sort((a, b) => a - b)
+    .map((index) => {
+      const style = styles[index];
+      return {
+        widthPct: style?.cellWidth ?? 0,
+        align: style?.halign === "left" ? "left" : "center",
+      };
+    });
+}
+
 /** @deprecated Use reporteDisenoPdfColumnStyles */
 export function ambienteDisenoPdfColumnStyles(
   tableWidthMm: number,
@@ -549,9 +634,15 @@ export function reporteDisenoExcelColWidths(reporteId: ReporteId): number[] | un
   const weights =
     reporteId === "inventario_ambiente_valorizado"
       ? AMBIENTE_VALORIZADO_COL_WEIGHTS
-      : reporteId === "inventario_ambiente_sin_valores" ||
-          reporteId === "inventario_ambiente_activos_fijos"
-        ? AMBIENTE_SIN_VALOR_COL_WEIGHTS
+      : reporteId === "inventario_ambiente_sin_valores"
+        ? LEVANTAMIENTO_COL_WEIGHTS
+        : reporteId === "ficha_asignacion_menaje"
+          ? MENAJE_AMBIENTE_COL_WEIGHTS
+          : reporteId === "inventario_menaje_entidad"
+            ? MENAJE_ENTIDAD_COL_WEIGHTS
+        : reporteId === "inventario_ambiente_activos_fijos" ||
+            reporteId === "ficha_asignacion_ambiente"
+          ? AMBIENTE_SIN_VALOR_COL_WEIGHTS
         : reporteId === "inventario_entidad_sin_valores" ||
             reporteId === "inventario_entidad_activos_fijos" ||
             reporteId === "reporte_activos_estado_malo" ||
@@ -581,6 +672,10 @@ export function ambienteValorizadoPdfColumnStyles(
   return ambienteDisenoPdfColumnStyles(tableWidthMm, "inventario_ambiente_valorizado")!;
 }
 
+function filasReporteMayusculas(filas: string[][]): string[][] {
+  return filas.map((fila) => fila.map((celda) => (celda ? celda.toLocaleUpperCase("es") : celda)));
+}
+
 export function buildReporteRows(
   activos: ActivoReporte[],
   reporteId: ReporteId,
@@ -589,8 +684,28 @@ export function buildReporteRows(
 ): string[][] {
   const ordenados = ordenarActivosParaReporte(activos, reporteId);
 
+  if (esReporteMenajeId(reporteId)) {
+    return filasReporteMayusculas(ordenados.map((activo, index) => filaMenaje(activo, index, reporteId)));
+  }
+
+  if (reporteId === "inventario_ambiente_sin_valores") {
+    return filasReporteMayusculas(ordenados.map((activo, index) => {
+      const descripcion = descripcionColumnaReporte(activo);
+      return [
+        String(index + 1),
+        String(cantidadInventarioBien(activo)),
+        "Und",
+        formatActivoCodigoDisplay(activo),
+        activo.nombre,
+        descripcion || "—",
+        estadoBienLabel(activo.estado_bien),
+        activo.observacion?.trim() || "—",
+      ];
+    }));
+  }
+
   if (reporteId === "reporte_bajas") {
-    return ordenados.map((activo, index) => [
+    return filasReporteMayusculas(ordenados.map((activo, index) => [
       String(index + 1),
       activo.codigo_barras ?? activo.codigo_catalogo,
       formatCorrelativoDisplay(activo.correlativo),
@@ -598,19 +713,11 @@ export function buildReporteRows(
       activo.motivo_baja?.trim() || "—",
       formatFechaISOToDDMMYYYY(activo.updated_at.slice(0, 10)) || "—",
       ubicacionReporteLabel(activo, reporteId),
-    ]);
+    ]));
   }
 
-  return ordenados.map((activo, index) => {
-    const descripcion = esMenaje(activo.categoria)
-      ? descripcionMenaje(activo)
-      : buildDescripcionBien(
-          activo.marca,
-          activo.modelo,
-          activo.serie,
-          activo.color,
-          activo.medidas,
-        );
+  return filasReporteMayusculas(ordenados.map((activo, index) => {
+    const descripcion = descripcionColumnaReporte(activo);
 
     const sinUbicacion = omitUbicacionEnTabla(reporteId);
     if (!valorizado && sinUbicacion) {
@@ -669,7 +776,7 @@ export function buildReporteRows(
     const fila = [...comun, ...colaComun, activo.observacion?.trim() || "—"];
     if (!sinUbicacion) fila.push(ubicacionReporteLabel(activo, reporteId));
     return fila;
-  });
+  }));
 }
 
 export function reporteTitulo(
@@ -681,6 +788,9 @@ export function reporteTitulo(
     return tituloReporteAdquiridosEjercicio(reporteId, fechaCorte);
   }
   const map: Record<ReporteId, string> = {
+    ficha_asignacion_ambiente: FICHA_ASIGNACION_BIENES_TITULO,
+    ficha_asignacion_menaje: FICHA_ASIGNACION_MENAJE_TITULO,
+    inventario_menaje_entidad: INVENTARIO_MENAJES_TITULO,
     inventario_ambiente_sin_valores: FICHA_ASIGNACION_TITULO,
     inventario_ambiente_activos_fijos: INVENTARIO_ACTIVOS_FIJOS_AMBIENTE_TITULO,
     inventario_entidad_sin_valores: ACTA_DE_INVENTARIO_ACTIVOS_FIJOS_GENERAL_TITULO,

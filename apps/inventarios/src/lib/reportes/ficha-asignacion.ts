@@ -1,4 +1,4 @@
-import { labelFechaCorte, labelFechaEmision } from "@inventario/types";
+import { formatFechaISOToDDMMYYYY, labelFechaCorte, labelFechaEmision } from "@inventario/types";
 import { definicionReporte, plantillaReporte, type ReporteContexto, type ReporteId } from "./types";
 
 export const FICHA_TABLE_HEAD_RGB: [number, number, number] = [29, 78, 137];
@@ -18,8 +18,25 @@ export function tituloReporteAmbienteDiseno(reporteId: ReporteId): string {
   return definicionReporte(reporteId).titulo;
 }
 
-export function reporteAmbienteIncluyeFirmas(reporteId: ReporteId): boolean {
+export function esFichaLevantamiento(reporteId: ReporteId): boolean {
   return plantillaReporte(reporteId) === "ficha_ambiente";
+}
+
+/** Firmas del administrador y del responsable en las fichas por ambiente. */
+export function reporteAmbienteIncluyeFirmas(reporteId: ReporteId): boolean {
+  return esFichaLevantamiento(reporteId) || plantillaReporte(reporteId) === "ficha_asignacion" || plantillaReporte(reporteId) === "ficha_menaje";
+}
+
+export function subtituloInventarioPatrimonial(ctx: ReporteContexto): string {
+  const iso = ctx.fechaCorte?.trim() || ctx.fechaGeneracion.toISOString().slice(0, 10);
+  const year = iso.slice(0, 4);
+  const anio = /^\d{4}$/.test(year) ? year : String(ctx.fechaGeneracion.getFullYear());
+  return `INVENTARIO PATRIMONIAL – ${anio}`;
+}
+
+export function fechaFichaLevantamiento(ctx: ReporteContexto): string {
+  const iso = ctx.fechaGeneracion.toISOString().slice(0, 10);
+  return `FECHA: ${formatFechaISOToDDMMYYYY(iso)}`;
 }
 
 export function buildFichaActualizacionLabel(fechaCorte: string): string {
@@ -50,8 +67,16 @@ function textoFicha(value: string | null | undefined): string {
   return value?.trim() ?? "";
 }
 
+function textoMayus(value: string | null | undefined): string {
+  const t = value?.trim();
+  return t ? t.toUpperCase() : "";
+}
+
 /** Altura Y donde debe comenzar la tabla (sin dibujar el membrete). */
 export function measureAmbienteDisenoHeaderEndY(ctx: ReporteContexto, startY = 10): number {
+  if (esFichaLevantamiento(ctx.reporteId)) {
+    return measureFichaLevantamientoHeaderEndY(startY);
+  }
   let y = startY;
   y += 6;
   y += 4;
@@ -68,12 +93,74 @@ export function measureAmbienteDisenoHeaderEndY(ctx: ReporteContexto, startY = 1
   return y + 3;
 }
 
+function measureFichaLevantamientoHeaderEndY(startY: number): number {
+  return startY + 5 + 5 + 6 + 4 + 4 + 4 + 5;
+}
+
+export function addFichaLevantamientoHeaderPdf(
+  doc: JsPDFDoc,
+  ctx: ReporteContexto,
+  startY = 10,
+): number {
+  const margin = 10;
+  const pageW = doc.internal.pageSize.getWidth();
+  const right = pageW - margin;
+  let y = startY;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(textoMayus(ctx.entidadNombre) || "—", margin, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.text(fechaFichaLevantamiento(ctx), right, y, { align: "right" });
+  y += 5;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(tituloReporteAmbienteDiseno(ctx.reporteId), pageW / 2, y, { align: "center" });
+  y += 5;
+
+  doc.setFontSize(12);
+  doc.text(subtituloInventarioPatrimonial(ctx), pageW / 2, y, { align: "center" });
+  y += 6;
+
+  const gap = 8;
+  const blockW = (pageW - margin * 2 - gap) / 2;
+  const rightX = margin + blockW + gap;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.2);
+  doc.rect(margin, y - 3.5, blockW, 14);
+  doc.rect(rightX, y - 3.5, blockW, 14);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text("LOCALIZACIÓN DEL BIEN:", margin + 2, y);
+  doc.text("USUARIO RESPONSABLE:", rightX + 2, y);
+  y += 4;
+
+  doc.setFont("helvetica", "normal");
+  doc.text(`SEDE: ${textoMayus(ctx.sedeNombre)}`, margin + 2, y);
+  doc.text(`APELLIDOS Y NOMBRES: ${textoMayus(ctx.responsable)}`, rightX + 2, y, {
+    maxWidth: blockW - 4,
+  });
+  y += 4;
+
+  doc.text(`AMBIENTE: ${textoMayus(ctx.ambienteNombre)}`, margin + 2, y);
+  doc.text(`DNI: ${textoFicha(ctx.responsableDni)}`, rightX + 2, y);
+  y += 4;
+
+  return y + 5;
+}
+
 export function addAmbienteDisenoHeaderPdf(
   doc: JsPDFDoc,
   ctx: ReporteContexto,
   totalRegistros: number,
   startY = 10,
 ): number {
+  if (esFichaLevantamiento(ctx.reporteId)) {
+    return addFichaLevantamientoHeaderPdf(doc, ctx, startY);
+  }
   const margin = 10;
   const pageW = doc.internal.pageSize.getWidth();
   const mid = pageW / 2 + 2;

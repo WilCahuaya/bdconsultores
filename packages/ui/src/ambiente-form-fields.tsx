@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Ambiente, Espacio, Responsable, SedeConConteo, TrabajadorPlanillaOpcion } from "@inventario/types";
-import { etiquetaNombreEspacio, normalizeResponsableDni, normalizeResponsableNombre, rutaUbicacionFisica } from "@inventario/types";
+import type { Ambiente, Edificio, Responsable, SedeConConteo, TrabajadorPlanillaOpcion } from "@inventario/types";
+import { normalizeResponsableDni, normalizeResponsableNombre } from "@inventario/types";
 import { Button, Dialog, Input, Label, Select, Textarea } from "./components";
 
 const TRABAJADOR_RESPONSABLE_PREFIX = "trabajador:";
@@ -31,6 +31,7 @@ export type AmbienteFormAmbiente = Pick<
   "nombre" | "descripcion" | "responsable_id" | "responsable" | "espacio_id" | "sede_id"
 > & {
   es_preregistro?: boolean;
+  edificio_id?: string | null;
 };
 
 /** Texto de espacio en listas: preregistro no es local físico. */
@@ -119,15 +120,24 @@ export function EspacioOcupaCelda({
   );
 }
 
+export function etiquetaPabellonAmbiente(opts: {
+  esPreregistro?: boolean;
+  esFaltante?: boolean;
+  pabellonNombre?: string | null;
+}): string {
+  if (opts.esPreregistro || opts.esFaltante) return "No aplica";
+  return opts.pabellonNombre?.trim() || "Sin pabellón";
+}
+
 export function ambienteFromForm(form: FormData) {
   const responsableId = String(form.get("responsable_id") || "").trim();
-  const espacioId = String(form.get("espacio_id") || "").trim();
+  const edificioId = String(form.get("edificio_id") || "").trim();
   return {
     sedeId: String(form.get("sede_id") || ""),
     nombre: String(form.get("nombre")),
     descripcion: String(form.get("descripcion") || ""),
     responsableId: responsableId || null,
-    espacioId: espacioId || null,
+    edificioId: edificioId || null,
   };
 }
 
@@ -135,7 +145,7 @@ export function AmbienteFormFields({
   ambiente,
   sedes,
   responsables,
-  espacios = [],
+  pabellones = [],
   defaultSedeId,
   showSedeSelect,
   responsableId,
@@ -143,15 +153,15 @@ export function AmbienteFormFields({
   trabajadores,
   onElegirTrabajador,
   onRequestCreateResponsable,
-  espacioId,
-  onEspacioIdChange,
+  pabellonId,
+  onPabellonIdChange,
   esPreregistro = false,
 }: {
   ambiente?: AmbienteFormAmbiente;
   sedes: Array<SedeConConteo | { id: string; nombre: string; es_principal?: boolean }>;
   responsables: Responsable[];
-  /** Espacios de la entidad (se filtran por sucursal seleccionada). */
-  espacios?: Espacio[];
+  /** Pabellones de la entidad (se filtran por sucursal seleccionada). */
+  pabellones?: Edificio[];
   defaultSedeId?: string;
   showSedeSelect?: boolean;
   responsableId: string;
@@ -160,9 +170,9 @@ export function AmbienteFormFields({
   trabajadores?: TrabajadorPlanillaOpcion[] | null;
   onElegirTrabajador?: (relacionId: string) => Promise<{ id?: string; error?: string }>;
   onRequestCreateResponsable?: () => void;
-  espacioId: string;
-  onEspacioIdChange: (id: string) => void;
-  /** Ambiente buzón de preregistros: no ocupa espacio físico. */
+  pabellonId: string;
+  onPabellonIdChange: (id: string) => void;
+  /** Ambiente buzón de preregistros: no es un local físico. */
   esPreregistro?: boolean;
 }) {
   const [nombre, setNombre] = useState(ambiente?.nombre ?? "");
@@ -172,7 +182,7 @@ export function AmbienteFormFields({
 
   useEffect(() => {
     setNombre(ambiente?.nombre ?? "");
-  }, [ambiente?.nombre, ambiente?.responsable_id, ambiente?.espacio_id]);
+  }, [ambiente?.nombre, ambiente?.responsable_id, ambiente?.edificio_id]);
 
   useEffect(() => {
     if (ambiente?.sede_id) setSedeId(ambiente.sede_id);
@@ -184,11 +194,10 @@ export function AmbienteFormFields({
     [responsables],
   );
 
-  const espaciosSede = useMemo(
-    () => espacios.filter((e) => e.sede_id === sedeId && e.activo),
-    [espacios, sedeId],
+  const pabellonesSede = useMemo(
+    () => pabellones.filter((e) => e.sede_id === sedeId && e.activo),
+    [pabellones, sedeId],
   );
-  const espacioSeleccionado = espaciosSede.find((e) => e.id === espacioId) ?? null;
 
   const puedeElegirResponsable = Boolean(ambiente) || nombre.trim().length > 0;
   const [asignandoResponsable, setAsignandoResponsable] = useState(false);
@@ -246,7 +255,7 @@ export function AmbienteFormFields({
             value={sedeId}
             onChange={(next) => {
               setSedeId(next);
-              onEspacioIdChange("");
+              onPabellonIdChange("");
             }}
             options={sedes.map((sede) => ({ value: sede.id, label: sede.nombre }))}
           />
@@ -260,7 +269,7 @@ export function AmbienteFormFields({
           id="amb_nombre"
           name="nombre"
           required
-          placeholder="Ej. Secretaría, Nivel 3…"
+          placeholder="Ej. Aula 01 - Nivel II"
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           autoFocus={!ambiente}
@@ -276,45 +285,33 @@ export function AmbienteFormFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="amb_espacio_id">Espacio que ocupa</Label>
+        <Label htmlFor="amb_edificio_id">Pabellón</Label>
         {esPreregistro ? (
           <>
-            <input type="hidden" name="espacio_id" value="" />
+            <input type="hidden" name="edificio_id" value="" />
             <p className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              No aplica. Este ambiente es solo para preregistros: no es un local físico. El espacio
-              se asigna al validar y ubicar cada bien.
+              No aplica. Este ambiente es solo para preregistros: no es un local físico.
             </p>
           </>
         ) : (
           <>
             <Select
-              id="amb_espacio_id"
-              name="espacio_id"
-              value={espacioId}
-              onChange={onEspacioIdChange}
+              id="amb_edificio_id"
+              name="edificio_id"
+              value={pabellonId}
+              onChange={onPabellonIdChange}
               disabled={!sedeId}
               options={[
-                { value: "", label: "Sin espacio asignado (opcional)" },
-                ...espaciosSede.map((e) => ({
-                  value: e.id,
-                  label: etiquetaNombreEspacio(e.nombre, e.descripcion),
+                { value: "", label: "Sin pabellón" },
+                ...pabellonesSede.map((pabellon) => ({
+                  value: pabellon.id,
+                  label: pabellon.nombre,
                 })),
               ]}
             />
             <p className="text-xs text-muted-foreground">
-              Varios ambientes pueden ocupar el mismo espacio. Puede cambiarlo si el área se muda.
+              El nombre del ambiente es libre. Varios ambientes pueden estar en el mismo pabellón.
             </p>
-            {espacioSeleccionado ? (
-              <p className="text-sm text-foreground">
-                Ubicación:{" "}
-                {rutaUbicacionFisica({
-                  sedeNombre: sedes.find((s) => s.id === sedeId)?.nombre,
-                  edificioNombre: espacioSeleccionado.edificio_nombre,
-                  piso: espacioSeleccionado.piso,
-                  espacioNombre: espacioSeleccionado.nombre,
-                }) || espacioSeleccionado.nombre}
-              </p>
-            ) : null}
           </>
         )}
       </div>

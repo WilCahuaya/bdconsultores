@@ -48,13 +48,13 @@ function DetalleMetric({
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       <p
         className={cn(
-          "mt-1 truncate text-sm tabular-nums",
+          "mt-1 truncate text-sm uppercase tabular-nums",
           highlight ? "font-semibold text-primary" : "text-foreground",
         )}
       >
         {value}
       </p>
-      {sub && <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{sub}</p>}
+      {sub && <p className="mt-0.5 truncate text-[10px] uppercase text-muted-foreground">{sub}</p>}
     </div>
   );
 }
@@ -82,7 +82,7 @@ function DetalleField({
       <dt className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</dt>
       <dd
         className={cn(
-          "mt-0.5 break-words text-sm text-foreground",
+          "mt-0.5 break-words text-sm uppercase text-foreground",
           mono && "font-mono text-xs",
           isEmpty && "text-muted-foreground",
         )}
@@ -252,7 +252,7 @@ export function ActivoDetalleSheet({
           <div className="flex flex-wrap items-start justify-between gap-2">
             <h3
               className={cn(
-                "text-base font-semibold leading-snug text-foreground",
+                "text-base font-semibold uppercase leading-snug text-foreground",
                 inactivo && "line-through decoration-muted-foreground/50",
               )}
             >
@@ -261,7 +261,7 @@ export function ActivoDetalleSheet({
             {ejemplaresHint}
           </div>
           {descripcion && (
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{descripcion}</p>
+            <p className="mt-1.5 text-sm uppercase leading-relaxed text-muted-foreground">{descripcion}</p>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <DetalleChip>{categoriaBienCorto(activo.categoria)}</DetalleChip>
@@ -463,7 +463,7 @@ function ArchivosSection({
         {activo.comprobante_path && onVerComprobante && (
           <ArchivoButton
             titulo="Ver comprobante"
-            subtitulo={activo.comprobante_serie?.trim() || "Documento PDF"}
+            subtitulo={(activo.comprobante_serie?.trim() || "Documento PDF").toLocaleUpperCase("es")}
             onClick={onVerComprobante}
             icon="pdf"
           />

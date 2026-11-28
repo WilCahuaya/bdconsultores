@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { Activo, InventarioColumnFilterOptions, InventarioColumnFilters } from "@inventario/types";
-import { esActivoPreregistrado, formatActivoCodigoDisplay } from "@inventario/types";
+import {
+  bienesSeleccionMismoNombre,
+  esActivoPreregistrado,
+  formatActivoCodigoDisplay,
+} from "@inventario/types";
 import { Button, useToast } from "@inventario/ui";
 import {
   ActivosInventarioTable,
@@ -35,6 +39,7 @@ export interface CopiarToolbarState {
   count: number;
   onOpen: () => void;
   onMover: () => void;
+  onEditar?: () => void;
   onMarcarSi?: () => void;
 }
 
@@ -52,6 +57,8 @@ export interface GestionPreregistrosConfig {
 interface ActivosInventarioExcelViewProps {
   activos: Activo[];
   onEditActivo: (activo: Activo) => void;
+  /** Editar los bienes marcados cuando todos tienen el mismo nombre. */
+  onEditarSeleccion?: (activos: Activo[]) => void;
   onIrAmbiente?: (activo: Activo) => void;
   puedeDarDeBaja?: boolean;
   puedeValidarPreregistro?: boolean;
@@ -103,6 +110,7 @@ function excelViewShellClass(embeddedInParentScroll: boolean): string {
 export function ActivosInventarioExcelView({
   activos,
   onEditActivo,
+  onEditarSeleccion,
   onIrAmbiente,
   puedeDarDeBaja = true,
   puedeValidarPreregistro = false,
@@ -410,6 +418,11 @@ export function ActivosInventarioExcelView({
   const [marcandoSi, setMarcandoSi] = useState(false);
   const selectedRef = useRef(selectedActivos);
   selectedRef.current = selectedActivos;
+  const editarSeleccionRef = useRef(onEditarSeleccion);
+  editarSeleccionRef.current = onEditarSeleccion;
+  const openEditar = useCallback(() => {
+    editarSeleccionRef.current?.(selectedRef.current);
+  }, []);
   const marcarSiRef = useRef(onMarcarSiVisita);
   marcarSiRef.current = onMarcarSiVisita;
   const marcarSiSeleccion = useCallback(async () => {
@@ -427,6 +440,11 @@ export function ActivosInventarioExcelView({
   }, [marcandoSi, pushToast]);
   const visitaActiva = Boolean(onMarcarSiVisita);
 
+  const seleccionFirma = selectedActivos
+    .map((activo) => `${activo.id}\t${activo.nombre}\t${activo.estado_registro}`)
+    .join("\n");
+  const hayEditarSeleccion = Boolean(onEditarSeleccion);
+
   useEffect(() => {
     if (!onCopiarStateChange) return;
     if (!copiaEnabled || selectedActivos.length === 0) {
@@ -437,15 +455,19 @@ export function ActivosInventarioExcelView({
       count: selectedActivos.length,
       onOpen: openCopiar,
       onMover: openMover,
+      onEditar:
+        hayEditarSeleccion && bienesSeleccionMismoNombre(selectedActivos) ? openEditar : undefined,
       onMarcarSi: visitaActiva ? () => void marcarSiSeleccion() : undefined,
     });
   }, [
     copiaEnabled,
     marcarSiSeleccion,
     onCopiarStateChange,
+    hayEditarSeleccion,
     openCopiar,
+    openEditar,
     openMover,
-    selectedActivos.length,
+    seleccionFirma,
     visitaActiva,
   ]);
 
@@ -470,6 +492,11 @@ export function ActivosInventarioExcelView({
             onClick={() => void marcarSiSeleccion()}
           >
             {marcandoSi ? "Marcando…" : `Marcar Sí (${selectedActivos.length})`}
+          </Button>
+        ) : null}
+        {onEditarSeleccion && bienesSeleccionMismoNombre(selectedActivos) ? (
+          <Button type="button" size="sm" variant="outline" onClick={openEditar}>
+            Editar ({selectedActivos.length})
           </Button>
         ) : null}
         <Button type="button" size="sm" variant="outline" onClick={openMover}>

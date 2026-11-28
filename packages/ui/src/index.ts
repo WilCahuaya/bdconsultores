@@ -31,6 +31,7 @@ export * from "./crear-responsable-dialog";
 export * from "./ambiente-form-fields";
 export * from "./espacios-sede-dialog";
 export * from "./espacios-gestion-panel";
+export * from "./pabellones-gestion-panel";
 export * from "./label-print-text-preview";
 export * from "./usuarios-gestion-panel";
 export * from "./eliminar-preregistrados-bulk-dialog";

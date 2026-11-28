@@ -55,7 +55,7 @@ function InfoItem({
   return (
     <div className="min-w-0">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={`truncate text-sm ${valueClassName ?? "text-foreground"}`}>{value?.trim() || "—"}</p>
+      <p className={`truncate text-sm uppercase ${valueClassName ?? "text-foreground"}`}>{value?.trim() || "—"}</p>
     </div>
   );
 }
@@ -157,7 +157,7 @@ export function ActivosInventarioMobileCards({
                       : formatActivoCodigoDisplay(activo)}
                 </p>
                 <h3
-                  className={`mt-1 text-base font-semibold leading-snug text-foreground ${
+                  className={`mt-1 text-base font-semibold uppercase leading-snug text-foreground ${
                     inactivo ? "line-through decoration-red-400/60" : ""
                   }`}
                 >
@@ -176,7 +176,7 @@ export function ActivosInventarioMobileCards({
             </div>
 
             {procedenciaPorActivo ? (
-              <p className="mb-3 text-xs text-foreground">
+              <p className="mb-3 text-xs uppercase text-foreground">
                 <span className="font-semibold uppercase tracking-wide text-muted-foreground">
                   Viene de:{" "}
                 </span>
@@ -198,7 +198,7 @@ export function ActivosInventarioMobileCards({
             )}
 
             {mostrarUbicacion && (
-              <p className="mb-3 text-xs text-foreground">
+              <p className="mb-3 text-xs uppercase text-foreground">
                 <span className="font-semibold uppercase tracking-wide text-muted-foreground">
                   Ubicación:{" "}
                 </span>
