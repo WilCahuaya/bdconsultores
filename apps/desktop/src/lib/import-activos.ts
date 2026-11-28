@@ -83,6 +83,12 @@ async function loadCatalogoForImport(codigos: string[]): Promise<Map<string, Imp
 async function loadCuentasContablesLookup(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   if (!isOnline()) {
+    const rows = await listMasterDomain<{ codigo: string; nombre: string }>("cuentas", "");
+    for (const row of rows) {
+      const codigo = row.codigo?.trim();
+      if (!codigo) continue;
+      map.set(codigo, row.nombre?.trim() || codigo);
+    }
     return map;
   }
 

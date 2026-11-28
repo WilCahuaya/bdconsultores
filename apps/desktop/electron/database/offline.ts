@@ -222,7 +222,11 @@ export type MasterCacheDomain =
   | "pisos"
   | "responsables"
   | "visitas"
-  | "visita_ambientes";
+  | "visita_ambientes"
+  | "visita_revisiones"
+  | "historial"
+  | "cuentas"
+  | "catalogo_opciones";
 
 export function replaceMasterCache(
   domain: MasterCacheDomain,

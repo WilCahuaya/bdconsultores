@@ -1,4 +1,5 @@
 import type { Ambiente, Entidad } from "@inventario/types";
+import { isOnline, listMasterDomain } from "./master-cache";
 import { getSupabaseClient } from "./supabase";
 
 export interface FichaAsignacionExportMeta {
@@ -14,10 +15,34 @@ export async function resolveFichaAsignacionExportMeta(
   ambiente: Pick<Ambiente, "responsable_id" | "responsable">,
   sedeNombre?: string | null,
 ): Promise<FichaAsignacionExportMeta> {
-  const supabase = getSupabaseClient();
-
   let responsable = ambiente.responsable?.trim() || null;
   let responsableDni: string | null = null;
+  const adminNombre = entidad.admin_nombre?.trim() || null;
+  let adminDni: string | null = null;
+  const adminEmail = entidad.admin_email?.trim().toLowerCase();
+
+  if (!isOnline()) {
+    const responsables = await listMasterDomain<{
+      id: string;
+      nombre: string;
+      dni: string | null;
+      email: string | null;
+    }>("responsables", entidad.id);
+    if (ambiente.responsable_id) {
+      const resp = responsables.find((row) => row.id === ambiente.responsable_id);
+      if (resp) {
+        responsable = resp.nombre?.trim() || responsable;
+        responsableDni = resp.dni?.trim() || null;
+      }
+    }
+    if (adminEmail) {
+      const admin = responsables.find((row) => row.email?.trim().toLowerCase() === adminEmail);
+      adminDni = admin?.dni?.trim() || null;
+    }
+    return { sedeNombre: sedeNombre?.trim() || null, responsable, responsableDni, adminNombre, adminDni };
+  }
+
+  const supabase = getSupabaseClient();
 
   if (ambiente.responsable_id) {
     const { data: resp } = await supabase
@@ -31,9 +56,6 @@ export async function resolveFichaAsignacionExportMeta(
     }
   }
 
-  const adminNombre = entidad.admin_nombre?.trim() || null;
-  let adminDni: string | null = null;
-  const adminEmail = entidad.admin_email?.trim().toLowerCase();
   if (adminEmail) {
     const { data: adminResp } = await supabase
       .from("responsables")

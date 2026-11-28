@@ -91,9 +91,9 @@ function arrancarEscucha(): void {
       "chrome-win64",
       "chrome.exe",
     );
-    env.BAJADA_BAJAR = path.join(process.resourcesPath, "bundle", "bajar.mjs");
+    env.BAJADA_BAJAR = path.join(process.resourcesPath, "bundle", "bajar.cjs");
     env.ELECTRON_RUN_AS_NODE = "1";
-    const script = path.join(process.resourcesPath, "bundle", "escuchar.mjs");
+    const script = path.join(process.resourcesPath, "bundle", "escuchar.cjs");
     hijo = spawn(process.execPath, [script], { env, windowsHide: true });
   } else {
     let raiz: string;

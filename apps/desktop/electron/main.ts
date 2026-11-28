@@ -1,6 +1,7 @@
-import { app, BrowserWindow, ipcMain, Menu, session } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, net, protocol, session } from "electron";
 import fs from "fs";
 import path from "path";
+import { pathToFileURL } from "url";
 import { ensureOAuthCallbackServer } from "./auth/callback-server";
 import { registerAuthIpcHandlers } from "./auth/ipc";
 import {
@@ -54,7 +55,21 @@ import {
   upsertMasterCacheItem,
   type MasterCacheDomain,
 } from "./database/offline";
+import { mediaExists, resolveMediaPath, writeMedia } from "./database/media";
 import { buildLabelZpl, listSystemPrinters, saveZplDialog, sendZplToPrinter } from "./print";
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "media",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -332,6 +347,14 @@ ipcMain.handle("users:accesoEstado", (_event, emails: string[]) =>
   getUsuariosAccesoEstado(emails),
 );
 ipcMain.handle("users:deleteAuth", (_event, userId: string) => deleteAuthUser(userId));
+ipcMain.handle("media:exists", (_event, bucket: string, storagePath: string) =>
+  mediaExists(bucket, storagePath),
+);
+ipcMain.handle(
+  "media:put",
+  (_event, bucket: string, storagePath: string, bytes: Uint8Array) =>
+    writeMedia(bucket, storagePath, bytes),
+);
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
@@ -352,6 +375,14 @@ registerAuthProtocol();
 attachProtocolListeners();
 
 app.whenReady().then(() => {
+  protocol.handle("media", (request) => {
+    const url = new URL(request.url);
+    const filePath = resolveMediaPath(url.hostname, decodeURIComponent(url.pathname.replace(/^\//, "")));
+    if (!filePath || !fs.existsSync(filePath)) {
+      return new Response("No encontrado", { status: 404 });
+    }
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
   attachSessionNavigationGuards();
   void ensureOAuthCallbackServer().catch((err) => {
     console.error("[auth] No se pudo iniciar servidor OAuth local:", err);

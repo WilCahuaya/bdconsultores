@@ -11,6 +11,13 @@ import type {
 } from "@inventario/types";
 import { etiquetaNombreEspacio, pisoEspacio, resumenOcupacionEspacio } from "@inventario/types";
 import { replaceMasterDomain } from "./master-cache";
+import {
+  syncArchivosEntidad,
+  syncCuentasToLocal,
+  syncHistorialEntidad,
+  syncOpcionesCatalogoToLocal,
+  syncRevisionesEntidad,
+} from "./sync-pull";
 import { getSupabaseClient } from "./supabase";
 import { loadSedesForEntidad } from "./sede-principal-direccion";
 import { syncVisitasForEntidad } from "./visitas-campo";
@@ -271,6 +278,31 @@ export async function syncMasterDataForEntidad(entidadId: string): Promise<void>
   } catch {
     /* las visitas de campo no son críticas para el resto del caché offline */
   }
+
+  try {
+    const { listActivosForEntidad } = await import("./activos");
+    await listActivosForEntidad(entidadId);
+  } catch {
+    /* el inventario se vuelve a intentar al abrir la entidad */
+  }
+
+  try {
+    await syncRevisionesEntidad(entidadId);
+  } catch {
+    /* las marcas de visita se reintentan en la próxima sync */
+  }
+
+  try {
+    await syncHistorialEntidad(entidadId);
+  } catch {
+    /* el historial no bloquea el resto */
+  }
+
+  try {
+    await syncArchivosEntidad(entidadId);
+  } catch {
+    /* fotos y PDF se bajan de a uno; un fallo no corta la sync */
+  }
 }
 
 export async function syncAllMasterData(): Promise<{ entidades: number }> {
@@ -285,6 +317,24 @@ export async function syncAllMasterData(): Promise<{ entidades: number }> {
     } catch (err) {
       console.warn("[master-sync] entidad", entidad.id, err);
     }
+  }
+
+  try {
+    await syncCuentasToLocal();
+  } catch (err) {
+    console.warn("[master-sync] cuentas", err);
+  }
+  try {
+    await syncOpcionesCatalogoToLocal();
+  } catch (err) {
+    console.warn("[master-sync] opciones de catálogo", err);
+  }
+
+  try {
+    const { reapplyPendingOverlays } = await import("./sync-overlay");
+    await reapplyPendingOverlays();
+  } catch (err) {
+    console.warn("[master-sync] reaplicar cola", err);
   }
 
   return { entidades: entidades.length };

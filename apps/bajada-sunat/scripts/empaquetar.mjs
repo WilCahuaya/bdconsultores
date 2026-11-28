@@ -68,7 +68,7 @@ function empaquetarScript(entrada, salida) {
       entrada,
       "--bundle",
       "--platform=node",
-      "--format=esm",
+      "--format=cjs",
       `--outfile=${salida}`,
       "--external:playwright",
     ],
@@ -79,10 +79,28 @@ function empaquetarScript(entrada, salida) {
 escribirConfig();
 pnpm(["exec", "tsc", "-p", "tsconfig.json"], app);
 mkdirSync(join(app, "bundle"), { recursive: true });
-rmSync(join(app, "bundle", "escuchar.cjs"), { force: true });
-rmSync(join(app, "bundle", "bajar.cjs"), { force: true });
-empaquetarScript(join(planillas, "scripts", "escuchar-compras.ts"), join(app, "bundle", "escuchar.mjs"));
-empaquetarScript(join(planillas, "scripts", "bajar-compras.ts"), join(app, "bundle", "bajar.mjs"));
+for (const viejo of ["escuchar.mjs", "bajar.mjs", "escuchar.cjs", "bajar.cjs", "probe.cjs"]) {
+  rmSync(join(app, "bundle", viejo), { force: true });
+}
+empaquetarScript(join(planillas, "scripts", "escuchar-compras.ts"), join(app, "bundle", "escuchar.cjs"));
+empaquetarScript(join(planillas, "scripts", "bajar-compras.ts"), join(app, "bundle", "bajar.cjs"));
+writeFileSync(
+  join(app, "bundle", "probe-entrada.mjs"),
+  `import ws from "ws";
+import { createClient } from "@supabase/supabase-js";
+createClient("https://example.supabase.co", "clave-publica", { realtime: { transport: ws } });
+console.log("probe-ok", process.versions.node);
+`,
+);
+empaquetarScript(join(app, "bundle", "probe-entrada.mjs"), join(app, "bundle", "probe.cjs"));
+rmSync(join(app, "bundle", "probe-entrada.mjs"), { force: true });
+execFileSync("pnpm", ["exec", "electron", join(app, "bundle", "probe.cjs")], {
+  cwd: app,
+  stdio: "inherit",
+  shell: true,
+  env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+});
+rmSync(join(app, "bundle", "probe.cjs"), { force: true });
 copiarPaquete("playwright", join(app, "vendor", "node_modules", "playwright"));
 copiarPaquete("playwright-core", join(app, "vendor", "node_modules", "playwright-core"));
 copiarNavegador();

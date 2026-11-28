@@ -193,5 +193,7 @@ interface Window {
       Record<string, "confirmado" | "pendiente" | "sin_cuenta" | "desconocido">
     >;
     deleteAuthUser: (userId: string) => Promise<{ error?: string }>;
+    mediaExists: (bucket: string, storagePath: string) => Promise<boolean>;
+    mediaPut: (bucket: string, storagePath: string, bytes: Uint8Array) => Promise<boolean>;
   };
 }

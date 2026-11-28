@@ -141,6 +141,18 @@ const HEADERS_SIN_VALORES_BASE = [
   "Descripción",
 ] as const;
 
+/** Ficha e inventario por ambiente: código completo en una sola columna estrecha. */
+const HEADERS_AMBIENTE_SIN_VALORES: ReporteTableHeaderDef[] = [
+  { key: KEY_NUM, line1: "N°" },
+  { key: KEY_CANT, line1: "Cant." },
+  { key: "und", line1: "Und." },
+  { key: "codigo", line1: "Código", line2: "patrimonial" },
+  { key: "nombre", line1: "Nombre del bien" },
+  { key: "descripcion", line1: "Descripción" },
+  { key: "estado", line1: "Estado" },
+  { key: "observacion", line1: "Observación" },
+];
+
 const HEADERS_SIN_VALORES_COLA = ["Fecha adq.", "Estado", "Observación"] as const;
 
 const HEADERS_VALORIZADOS_BASE = [
@@ -383,6 +395,7 @@ export function reporteTableHeaderDefs(
   }
   if (reporteId === "inventario_ambiente_valorizado") return HEADERS_AMBIENTE_VALORIZADO;
   if (reporteId === "inventario_entidad_valorizado") return HEADERS_ENTIDAD_VALORIZADO;
+  if (!valorizado && omitUbicacionEnTabla(reporteId)) return HEADERS_AMBIENTE_SIN_VALORES;
 
   const sinUbicacion = omitUbicacionEnTabla(reporteId);
   if (valorizado) {
@@ -428,19 +441,43 @@ const AMBIENTE_VALORIZADO_COL_WEIGHTS = [
   4, 4, 4, 5, 10, 14, 18, 7, 10, 6, 10, 9, 9, 9, 9, 9,
 ] as const;
 
-/** Pesos relativos (ficha de asignación y activos fijos por ambiente). */
+/**
+ * Ficha e inventario por ambiente.
+ * Código patrimonial justo al texto; nombre y descripción, iguales y prioritarios.
+ */
 const AMBIENTE_SIN_VALOR_COL_WEIGHTS = [
-  4, 4, 4, 5, 8, 6, 16, 22, 8, 7, 12,
+  4, // N°
+  5, // Cant.
+  6, // Und.
+  9, // Código patrimonial
+  31, // Nombre del bien
+  31, // Descripción
+  7, // Estado
+  7, // Observación
 ] as const;
 
 function pdfColumnStylesFromWeights(
   tableWidthMm: number,
   weights: readonly number[],
   leftAlignIndices: readonly number[] = [6, 7],
-): Record<number, { cellWidth: number; halign?: "left" | "center" | "right" }> {
+): Record<
+  number,
+  {
+    cellWidth: number;
+    halign?: "left" | "center" | "right";
+    cellPadding?: { top: number; right: number; bottom: number; left: number };
+  }
+> {
   const totalWeight = weights.reduce((sum, w) => sum + w, 0);
   const leftAlign = new Set(leftAlignIndices);
-  const styles: Record<number, { cellWidth: number; halign?: "left" | "center" | "right" }> = {};
+  const styles: Record<
+    number,
+    {
+      cellWidth: number;
+      halign?: "left" | "center" | "right";
+      cellPadding?: { top: number; right: number; bottom: number; left: number };
+    }
+  > = {};
 
   weights.forEach((weight, index) => {
     styles[index] = {
@@ -448,6 +485,10 @@ function pdfColumnStylesFromWeights(
       halign: leftAlign.has(index) ? "left" : "center",
     };
   });
+
+  if (weights === AMBIENTE_SIN_VALOR_COL_WEIGHTS && styles[3]) {
+    styles[3].cellPadding = { top: 1.2, right: 0.4, bottom: 1.2, left: 0.4 };
+  }
 
   return styles;
 }
@@ -475,7 +516,7 @@ export function reporteDisenoPdfColumnStyles(
     reporteId === "inventario_ambiente_sin_valores" ||
     reporteId === "inventario_ambiente_activos_fijos"
   ) {
-    return pdfColumnStylesFromWeights(tableWidthMm, AMBIENTE_SIN_VALOR_COL_WEIGHTS, [6, 7, 10]);
+    return pdfColumnStylesFromWeights(tableWidthMm, AMBIENTE_SIN_VALOR_COL_WEIGHTS, [4, 5, 7]);
   }
   if (
     reporteId === "inventario_entidad_sin_valores" ||
@@ -572,6 +613,18 @@ export function buildReporteRows(
         );
 
     const sinUbicacion = omitUbicacionEnTabla(reporteId);
+    if (!valorizado && sinUbicacion) {
+      return [
+        String(index + 1),
+        String(activo.categoria === "MENAJE" ? (activo.cantidad ?? 1) : 1),
+        "Und.",
+        formatActivoCodigoDisplay(activo),
+        activo.nombre,
+        descripcion || "—",
+        estadoBienLabel(activo.estado_bien),
+        activo.observacion?.trim() || "—",
+      ];
+    }
     const tablaValorizadoAmbiente = valorizado && esReporteValorizadoTablaAmbiente(reporteId);
     const comun = [
       ...filaComunActivo(activo, index, {

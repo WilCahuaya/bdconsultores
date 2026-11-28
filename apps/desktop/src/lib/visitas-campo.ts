@@ -15,9 +15,12 @@ import {
   isOnline,
   listMasterDomain,
   newLocalId,
+  removeMasterItem,
   replaceMasterDomain,
   upsertMasterItem,
 } from "./master-cache";
+import { listCachedActivos, upsertCachedActivo } from "./offline";
+import type { ActivoConUbicacion } from "./activos";
 
 type ProfileJoin = { nombre: string } | { nombre: string }[] | null;
 type SedeJoin = { nombre: string } | { nombre: string }[] | null;
@@ -427,15 +430,22 @@ export async function attachVisitaEstadoToAmbientes(
   for (const fila of filas) {
     if (visitaIds.has(fila.visita_id)) {
       porAmbiente.set(fila.ambiente_id, fila.estado);
+      visitaPorAmbiente.set(fila.ambiente_id, fila.visita_id);
     }
   }
+  const conteo = await conteoRevisionDesdeCache(entidadId, visitaPorAmbiente);
 
-  return ambientes.map((a) => ({
-    ...a,
-    visita_estado: a.es_preregistro || a.es_faltante ? null : (porAmbiente.get(a.id) ?? null),
-    visita_revisados: null,
-    visita_total: null,
-  }));
+  return ambientes.map((a) => {
+    const enVisita = !a.es_preregistro && !a.es_faltante && porAmbiente.has(a.id);
+    const cifras = conteo.get(a.id);
+    const completo = cifras != null && cifras.total > 0 && cifras.revisados === cifras.total;
+    return {
+      ...a,
+      visita_estado: enVisita ? (completo ? "CULMINADO" : "EN_PROCESO") : null,
+      visita_revisados: enVisita ? (cifras?.revisados ?? 0) : null,
+      visita_total: enVisita ? (cifras?.total ?? 0) : null,
+    };
+  });
 }
 
 export async function listVisitasCampoHistorial(entidadId: string): Promise<VisitaCampoHistorial[]> {
@@ -669,11 +679,294 @@ export type RevisionVisitaItem = {
   accion: "BAJA" | "FALTANTE" | null;
 };
 
+type RevisionLocal = {
+  id: string;
+  visita_id: string;
+  activo_id: string | null;
+  ambiente_id: string;
+  hallado: boolean;
+  accion: "BAJA" | "FALTANTE" | null;
+  estado_bien_anterior: string | null;
+  motivo: string | null;
+};
+
+function revisionLocalId(visitaId: string, activoId: string): string {
+  return `local:${visitaId}:${activoId}`;
+}
+
+async function findActivoLocal(
+  activoId: string,
+): Promise<{ entidadId: string; activo: ActivoConUbicacion } | null> {
+  const entidades = await listMasterDomain<{ id: string }>("entidades", "");
+  for (const entidad of entidades) {
+    const lista = (await listCachedActivos(entidad.id)) as ActivoConUbicacion[];
+    const activo = lista.find((item) => item.id === activoId);
+    if (activo) return { entidadId: entidad.id, activo };
+  }
+  return null;
+}
+
+async function visitaAbiertaDeAmbiente(entidadId: string, ambienteId: string, sedeId: string) {
+  const visitas = await listMasterDomain<VisitaCampoCache>("visitas", entidadId);
+  const filas = await listMasterDomain<VisitaAmbienteCache>("visita_ambientes", entidadId);
+  const abiertas = visitas.filter(
+    (visita) => visita.estado === "ABIERTO" && (visita.sede_id == null || visita.sede_id === sedeId),
+  );
+  const ids = new Set(abiertas.map((visita) => visita.id));
+  const fila = filas.find((item) => item.ambiente_id === ambienteId && ids.has(item.visita_id));
+  return abiertas.find((visita) => visita.id === fila?.visita_id) ?? null;
+}
+
+function revisionesDelAmbiente(
+  rows: RevisionLocal[],
+  visitaId: string,
+  ambienteId: string,
+): RevisionVisitaItem[] {
+  const porActivo = new Map<string, RevisionLocal>();
+  for (const row of rows) {
+    if (row.visita_id !== visitaId || row.ambiente_id !== ambienteId || !row.activo_id) continue;
+    const previa = porActivo.get(row.activo_id);
+    if (!previa || row.id.startsWith("local:")) porActivo.set(row.activo_id, row);
+  }
+  return [...porActivo.values()].map((row) => ({
+    activo_id: row.activo_id as string,
+    hallado: Boolean(row.hallado),
+    accion: row.accion,
+  }));
+}
+
+async function conteoRevisionDesdeCache(
+  entidadId: string,
+  visitaPorAmbiente: Map<string, string>,
+): Promise<Map<string, { revisados: number; total: number }>> {
+  const resultado = new Map<string, { revisados: number; total: number }>();
+  const ambienteIds = [...visitaPorAmbiente.keys()];
+  if (ambienteIds.length === 0) return resultado;
+
+  const revisiones = await listMasterDomain<RevisionLocal>("visita_revisiones", entidadId);
+  const activos = (await listCachedActivos(entidadId)) as ActivoConUbicacion[];
+  const revisadosPorAmbiente = new Map<string, Set<string>>();
+  for (const fila of revisiones) {
+    if (!fila.activo_id) continue;
+    if (visitaPorAmbiente.get(fila.ambiente_id) !== fila.visita_id) continue;
+    const ids = revisadosPorAmbiente.get(fila.ambiente_id) ?? new Set<string>();
+    ids.add(fila.activo_id);
+    revisadosPorAmbiente.set(fila.ambiente_id, ids);
+  }
+
+  const revisadosCount = new Map<string, number>();
+  const totalCount = new Map<string, number>();
+  for (const bien of activos) {
+    const ambienteId = bien.ambiente_id;
+    if (!ambienteId || !visitaPorAmbiente.get(ambienteId)) continue;
+    if (bien.estado_registro !== "REGISTRADO") continue;
+    totalCount.set(ambienteId, (totalCount.get(ambienteId) ?? 0) + 1);
+    if (revisadosPorAmbiente.get(ambienteId)?.has(bien.id)) {
+      revisadosCount.set(ambienteId, (revisadosCount.get(ambienteId) ?? 0) + 1);
+    }
+  }
+
+  for (const ambienteId of ambienteIds) {
+    resultado.set(ambienteId, {
+      revisados: revisadosCount.get(ambienteId) ?? 0,
+      total: totalCount.get(ambienteId) ?? 0,
+    });
+  }
+  return resultado;
+}
+
+async function getRevisionVisitaAmbienteLocal(ambienteId: string) {
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return null;
+  const ambiente = await findMasterItem<AmbienteConSede>("ambientes", ambienteId);
+  if (!ambiente || ambiente.data.es_preregistro || ambiente.data.es_faltante) return null;
+  const visita = await visitaAbiertaDeAmbiente(ambiente.entidadId, ambienteId, ambiente.data.sede_id);
+  if (!visita) return null;
+  const rows = await listMasterDomain<RevisionLocal>("visita_revisiones", ambiente.entidadId);
+  return {
+    visitaId: visita.id,
+    items: revisionesDelAmbiente(rows, visita.id, ambienteId),
+  };
+}
+
+export async function aplicarRevisionVisitaLocal(input: {
+  activoId: string;
+  hallado: boolean;
+  estadoBien?: "BUENO" | "REGULAR" | "MALO" | null;
+  accion?: "BAJA" | "FALTANTE" | null;
+  motivo?: string | null;
+}): Promise<{ error?: string; entidadId?: string }> {
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
+
+  const found = await findActivoLocal(input.activoId);
+  if (!found) return { error: "Bien no encontrado en este equipo." };
+  const { entidadId, activo } = found;
+  if (activo.estado_registro !== "REGISTRADO") {
+    return { error: "Solo se revisan bienes registrados." };
+  }
+  if (!activo.ambiente_id || !activo.sede_id) {
+    return { error: "El bien no tiene ambiente." };
+  }
+
+  const ambiente = await findMasterItem<AmbienteConSede>("ambientes", activo.ambiente_id);
+  if (!ambiente || ambiente.data.es_preregistro || ambiente.data.es_faltante) {
+    return { error: "Este bien no se revisa en la ronda del ambiente." };
+  }
+
+  const visita = await visitaAbiertaDeAmbiente(entidadId, ambiente.data.id, ambiente.data.sede_id);
+  if (!visita) return { error: "No hay una visita abierta para este ambiente." };
+
+  const revisiones = await listMasterDomain<RevisionLocal>("visita_revisiones", entidadId);
+  const previa = revisiones.find(
+    (row) => row.visita_id === visita.id && row.activo_id === activo.id,
+  );
+  const estadoAnterior = previa?.estado_bien_anterior ?? activo.estado_bien ?? null;
+
+  let next: ActivoConUbicacion = { ...activo };
+  let accion: "BAJA" | "FALTANTE" | null = null;
+  let motivo: string | null = null;
+
+  if (input.hallado) {
+    if (!input.estadoBien) return { error: "Indique el estado del bien." };
+    next = { ...next, estado_bien: input.estadoBien };
+  } else if (input.accion === "BAJA") {
+    motivo = input.motivo?.trim() || "Defectuoso en visita de campo";
+    accion = "BAJA";
+    next = {
+      ...next,
+      estado_registro: "DADO_DE_BAJA",
+      estado_bien: "MALO",
+      motivo_baja: motivo,
+    };
+  } else if (input.accion === "FALTANTE") {
+    const ambientes = await listMasterDomain<AmbienteConSede>("ambientes", entidadId);
+    const faltante = ambientes.find((item) => item.es_faltante);
+    if (!faltante) return { error: "No está el ambiente Faltante en este equipo. Sincronice con internet." };
+    accion = "FALTANTE";
+    next = {
+      ...next,
+      ambiente_id: faltante.id,
+      sede_id: faltante.sede_id,
+      ambiente_nombre: faltante.nombre,
+      sede_nombre: faltante.sede_nombre,
+    };
+  } else {
+    return { error: "Indique si se da de baja o pasa a Faltante." };
+  }
+
+  await upsertCachedActivo(entidadId, next);
+  await upsertMasterItem("visita_revisiones", entidadId, {
+    id: previa?.id ?? revisionLocalId(visita.id, activo.id),
+    visita_id: visita.id,
+    activo_id: activo.id,
+    ambiente_id: ambiente.data.id,
+    hallado: input.hallado,
+    accion,
+    estado_bien_anterior: estadoAnterior,
+    motivo,
+  });
+  return { entidadId };
+}
+
+export async function aplicarAnularRevisionLocal(
+  activoId: string,
+): Promise<{ error?: string; entidadId?: string }> {
+  const profile = await fetchProfile();
+  if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
+  const found = await findActivoLocal(activoId);
+  if (!found) return { error: "Bien no encontrado en este equipo." };
+  const { entidadId, activo } = found;
+  if (activo.estado_registro !== "REGISTRADO" || !activo.ambiente_id || !activo.sede_id) {
+    return { error: "Solo se revisan bienes registrados." };
+  }
+  const visita = await visitaAbiertaDeAmbiente(entidadId, activo.ambiente_id, activo.sede_id);
+  if (!visita) return { error: "No hay una visita abierta para este ambiente." };
+  const revisiones = await listMasterDomain<RevisionLocal>("visita_revisiones", entidadId);
+  const previa = revisiones.find(
+    (row) => row.visita_id === visita.id && row.activo_id === activoId && row.hallado,
+  );
+  if (!previa) return { error: "Este bien no tiene un Sí marcado en la visita." };
+  if (previa.estado_bien_anterior) {
+    await upsertCachedActivo(entidadId, {
+      ...activo,
+      estado_bien: previa.estado_bien_anterior as ActivoConUbicacion["estado_bien"],
+    });
+  }
+  await removeMasterItem("visita_revisiones", entidadId, previa.id);
+  return { entidadId };
+}
+
+export async function aplicarResolverFaltanteLocal(input: {
+  activoId: string;
+  accion: "MOVER" | "BAJA";
+  destinoAmbienteId?: string | null;
+  motivo?: string | null;
+}): Promise<{ error?: string; entidadId?: string }> {
+  const profile = await fetchProfile();
+  if (!profile || !esPersonalEstudio(profile.rol)) {
+    return { error: "Solo el contador o el asistente puede mover un bien de Faltantes." };
+  }
+  const found = await findActivoLocal(input.activoId);
+  if (!found) return { error: "Bien no encontrado en este equipo." };
+  const { entidadId, activo } = found;
+  if (activo.estado_registro !== "REGISTRADO" || !activo.ambiente_id) {
+    return { error: "El bien no está activo." };
+  }
+  const actual = await findMasterItem<AmbienteConSede>("ambientes", activo.ambiente_id);
+  if (!actual?.data.es_faltante) return { error: "El bien no está en el ambiente Faltante." };
+
+  if (input.accion === "MOVER") {
+    if (!input.destinoAmbienteId) return { error: "Elija un ambiente real de la misma entidad." };
+    const destino = await findMasterItem<AmbienteConSede>("ambientes", input.destinoAmbienteId);
+    if (
+      !destino ||
+      destino.entidadId !== entidadId ||
+      destino.data.es_preregistro ||
+      destino.data.es_faltante
+    ) {
+      return { error: "Elija un ambiente real de la misma entidad." };
+    }
+    await upsertCachedActivo(entidadId, {
+      ...activo,
+      ambiente_id: destino.data.id,
+      sede_id: destino.data.sede_id,
+      ambiente_nombre: destino.data.nombre,
+      sede_nombre: destino.data.sede_nombre,
+      responsable: destino.data.responsable?.trim() || null,
+    });
+    const abiertas = new Set(
+      (await listMasterDomain<VisitaCampoCache>("visitas", entidadId))
+        .filter((visita) => visita.estado === "ABIERTO")
+        .map((visita) => visita.id),
+    );
+    const revisiones = await listMasterDomain<RevisionLocal>("visita_revisiones", entidadId);
+    for (const row of revisiones) {
+      if (row.activo_id === input.activoId && abiertas.has(row.visita_id)) {
+        await removeMasterItem("visita_revisiones", entidadId, row.id);
+      }
+    }
+    return { entidadId };
+  }
+
+  if (activo.estado_bien !== "MALO") {
+    return { error: "Solo se da de baja desde Faltante si el bien está en estado Malo." };
+  }
+  const motivo = input.motivo?.trim();
+  if (!motivo) return { error: "Indique el motivo de baja." };
+  await upsertCachedActivo(entidadId, {
+    ...activo,
+    estado_registro: "DADO_DE_BAJA",
+    motivo_baja: motivo,
+  });
+  return { entidadId };
+}
+
 export async function getRevisionVisitaAmbiente(ambienteId: string): Promise<{
   visitaId: string;
   items: RevisionVisitaItem[];
 } | null> {
-  if (!isOnline()) return null;
+  if (!isOnline()) return getRevisionVisitaAmbienteLocal(ambienteId);
   const profile = await fetchProfile();
   if (!profile || profile.rol !== "CONTADOR") return null;
 
@@ -725,7 +1018,14 @@ export async function registrarRevisionVisita(input: {
   accion?: "BAJA" | "FALTANTE" | null;
   motivo?: string | null;
 }) {
-  if (!isOnline()) return { error: "Sin conexión. La revisión de la visita requiere internet." };
+  if (!isOnline()) {
+    const applied = await aplicarRevisionVisitaLocal(input);
+    if (applied.error || !applied.entidadId) {
+      return { error: applied.error ?? "No se pudo guardar la revisión." };
+    }
+    await enqueueOfflineOp("visita:revision", applied.entidadId, input, input.activoId);
+    return { success: true };
+  }
   const profile = await fetchProfile();
   if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
 
@@ -743,7 +1043,14 @@ export async function registrarRevisionVisita(input: {
 }
 
 export async function anularRevisionVisitaSi(input: { activoId: string }) {
-  if (!isOnline()) return { error: "Sin conexión. La revisión de la visita requiere internet." };
+  if (!isOnline()) {
+    const applied = await aplicarAnularRevisionLocal(input.activoId);
+    if (applied.error || !applied.entidadId) {
+      return { error: applied.error ?? "No se pudo anular la revisión." };
+    }
+    await enqueueOfflineOp("visita:anularSi", applied.entidadId, input, input.activoId);
+    return { success: true };
+  }
   const profile = await fetchProfile();
   if (!profile || profile.rol !== "CONTADOR") return { error: "No autorizado." };
 
@@ -762,7 +1069,12 @@ export async function resolverBienFaltante(input: {
   destinoAmbienteId?: string | null;
   motivo?: string | null;
 }) {
-  if (!isOnline()) return { error: "Sin conexión. Resolver un bien de Faltante requiere internet." };
+  if (!isOnline()) {
+    const applied = await aplicarResolverFaltanteLocal(input);
+    if (applied.error || !applied.entidadId) return { error: applied.error ?? "No se pudo resolver el faltante." };
+    await enqueueOfflineOp("visita:resolver", applied.entidadId, input, input.activoId);
+    return { success: true };
+  }
   const profile = await fetchProfile();
   if (!profile || !esPersonalEstudio(profile.rol)) {
     return { error: "Solo el contador o el asistente puede mover un bien de Faltantes." };
@@ -801,7 +1113,8 @@ function etiquetaProcedencia(ambiente: string, sede: string): string {
 /** Ambiente del que salió cada bien al pasar a Faltante. */
 export async function listProcedenciaFaltante(activoIds: string[]): Promise<Record<string, string>> {
   const ids = [...new Set(activoIds.filter(Boolean))];
-  if (ids.length === 0 || !isOnline()) return {};
+  if (ids.length === 0) return {};
+  if (!isOnline()) return listProcedenciaFaltanteLocal(ids);
 
   const supabase = getSupabaseClient();
   const { data: revisiones, error } = await supabase
@@ -856,6 +1169,42 @@ export async function listProcedenciaFaltante(activoIds: string[]): Promise<Reco
   const out: Record<string, string> = {};
   for (const [activoId, origenId] of origenIdPorActivo) {
     const etiqueta = etiquetaPorAmbiente.get(origenId);
+    if (etiqueta) out[activoId] = etiqueta;
+  }
+  return out;
+}
+
+async function listProcedenciaFaltanteLocal(ids: string[]): Promise<Record<string, string>> {
+  const wanted = new Set(ids);
+  const entidades = await listMasterDomain<{ id: string }>("entidades", "");
+  const origenIdPorActivo = new Map<string, string>();
+  for (const entidad of entidades) {
+    const revisiones = await listMasterDomain<RevisionLocal>("visita_revisiones", entidad.id);
+    for (const row of revisiones) {
+      if (row.accion !== "FALTANTE" || !row.activo_id || !wanted.has(row.activo_id)) continue;
+      if (!origenIdPorActivo.has(row.activo_id)) origenIdPorActivo.set(row.activo_id, row.ambiente_id);
+    }
+    const historial = await listMasterDomain<{
+      activo_id: string;
+      campo: string | null;
+      valor_anterior: string | null;
+      created_at: string;
+    }>("historial", entidad.id);
+    const ordenado = [...historial].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    for (const row of ordenado) {
+      if (row.campo !== "ambiente_id" || !wanted.has(row.activo_id) || origenIdPorActivo.has(row.activo_id)) {
+        continue;
+      }
+      const origen = row.valor_anterior?.trim();
+      if (origen) origenIdPorActivo.set(row.activo_id, origen);
+    }
+  }
+
+  const out: Record<string, string> = {};
+  for (const [activoId, origenId] of origenIdPorActivo) {
+    const ambiente = await findMasterItem<AmbienteConSede>("ambientes", origenId);
+    if (!ambiente) continue;
+    const etiqueta = etiquetaProcedencia(ambiente.data.nombre, ambiente.data.sede_nombre);
     if (etiqueta) out[activoId] = etiqueta;
   }
   return out;

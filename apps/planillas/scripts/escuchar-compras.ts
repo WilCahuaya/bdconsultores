@@ -1,10 +1,11 @@
 import { spawn } from "node:child_process";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cargarEnv, crearCliente, entrar, portalDe, renovarSesion } from "./estudio-local";
 
 cargarEnv();
 const supabase = crearCliente();
-const repo = fileURLToPath(new URL("../../../", import.meta.url));
+const repo = typeof __dirname === "string" ? join(__dirname, "../../..") : fileURLToPath(new URL("../../../", import.meta.url));
 
 escuchar().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : "No se pudo esperar los pedidos.");

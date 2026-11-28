@@ -22,6 +22,8 @@ export interface ArchivosSol {
   cdr: Uint8Array | null;
   pdf: Uint8Array | null;
   aviso: string | null;
+  /** El icono de XML no estaba. El PDF se arma al final, no en esta pasada. */
+  dejarPdf?: boolean;
 }
 
 export async function bajarFacturasSol(
@@ -57,18 +59,33 @@ export async function bajarFacturasSol(
     await page.goto(LOGIN, { waitUntil: "domcontentloaded", timeout: 60_000 });
     await entrar(page, cred, log);
     await abrirConsulta(page, log);
+    const paraPdf: FacturaSol[] = [];
     for (let i = 0; i < facturas.length; i++) {
       const factura = facturas[i];
       log(`${i + 1}/${facturas.length} ${factura.tipo} ${factura.serie}-${factura.numero}`);
       try {
         const archivos = await consultarUna(page, factura);
-        await onUna(factura, archivos);
+        if (archivos.dejarPdf) paraPdf.push(factura);
+        else await onUna(factura, archivos);
       } catch (error) {
         const aviso = error instanceof Error ? error.message : "No se pudo consultar este comprobante.";
         await onUna(factura, { xml: null, cdr: null, pdf: null, aviso });
       }
-      await page.waitForTimeout(2_000).catch(() => undefined);
       if (page.isClosed()) break;
+    }
+    if (paraPdf.length && !page.isClosed()) {
+      log(`Armo el PDF de ${paraPdf.length} comprobantes que no mostraron el icono de XML.`);
+      for (let i = 0; i < paraPdf.length; i++) {
+        const factura = paraPdf[i];
+        log(`PDF ${i + 1}/${paraPdf.length} ${factura.tipo} ${factura.serie}-${factura.numero}`);
+        try {
+          await onUna(factura, await consultarRepresentacion(page, factura));
+        } catch (error) {
+          const aviso = error instanceof Error ? error.message : "No se pudo armar el PDF.";
+          await onUna(factura, { xml: null, cdr: null, pdf: null, aviso });
+        }
+        if (page.isClosed()) break;
+      }
     }
   } finally {
     await browser.close().catch(() => undefined);
@@ -230,46 +247,67 @@ async function abrirConsulta(page: Page, log: (mensaje: string) => void): Promis
 }
 
 async function consultarUna(page: Page, factura: FacturaSol): Promise<ArchivosSol> {
-  for (let intento = 0; intento < 2; intento++) {
+  for (let intento = 0; intento < 3; intento++) {
     const frame = await esperarFrame(page, 15_000);
     if (!frame) return { xml: null, cdr: null, pdf: null, aviso: "No está abierta la consulta de comprobantes." };
     const aviso = await buscar(page, frame, factura);
-    if (aviso === "servidor" && intento === 0) {
-      await page.waitForTimeout(20_000);
-      continue;
+    if (aviso === "servidor") {
+      console.log("SUNAT mostró Error del Servidor. Pulso Aceptar y vuelvo a consultar.");
+      if (intento < 2) {
+        await page.waitForTimeout(2_000);
+        continue;
+      }
+      break;
     }
     if (aviso === "vacio") {
       return { xml: null, cdr: null, pdf: null, aviso: "SUNAT no tiene el XML de este comprobante para quien lo recibió." };
     }
     if (aviso) return { xml: null, cdr: null, pdf: null, aviso };
-    const xmlBajada = await bajar(page, frame, "XML");
-    const cdrBajada = await bajar(page, frame, "CDR");
+    let xmlBajada = await bajar(page, frame, "XML");
+    if (!xmlBajada.bytes && !xmlBajada.previo && (xmlBajada.iconos === 4 || xmlBajada.iconos === 5)) {
+      console.log("El icono de XML está. Lo pulso otra vez y espero el ZIP.");
+      const otra = await bajar(page, frame, "XML");
+      xmlBajada = { ...otra, iconos: xmlBajada.iconos || otra.iconos };
+    }
+    const xmlEnFila = xmlBajada.iconos === 4 || xmlBajada.iconos === 5;
+    const cdrBajada = xmlBajada.iconos === 4 ? { bytes: null, previo: false, iconos: 4 } : await bajar(page, frame, "CDR");
     const xml = xmlBajada.bytes ? xmlDeArchivo(xmlBajada.bytes) : null;
-    const cdrBytes = cdrBajada.bytes;
-    const pdf = xml || cdrBytes ? null : await bajarRepresentacion(page, frame);
+    if (xml && xmlBajada.bytes && xmlBajada.bytes[0] === 0x50 && xmlBajada.bytes[1] === 0x4b) {
+      console.log("El XML venía dentro de un ZIP.");
+    }
     await cerrarRepresentacionesAbiertas(page);
     await page.keyboard.press("Escape").catch(() => undefined);
     await cerrarResultado(frame);
-    if (!xml && !cdrBytes && !pdf) {
-      if (xmlBajada.previo || cdrBajada.previo) {
-        return {
-          xml: null,
-          cdr: null,
-          pdf: null,
-          aviso: "SUNAT ya había descargado este archivo y no lo volvió a enviar.",
-        };
+    if (xml) return { xml, cdr: cdrBajada.bytes, pdf: null, aviso: null };
+    if (xmlEnFila) {
+      if (xmlBajada.previo) {
+        return { xml: null, cdr: null, pdf: null, aviso: "SUNAT ya había descargado este XML y no lo volvió a enviar." };
       }
-      const texto = ((await frame.locator("body").innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim();
-      console.log(`Resultado: ${texto.slice(0, 280)}`);
-      await page.screenshot({ path: "C:/Users/Willl/AppData/Local/Temp/sunat-resultado.png" }).catch(() => undefined);
-      if (/no hay resultados|no se encontr|sin resultado/i.test(texto)) {
-        return { xml: null, cdr: null, pdf: null, aviso: "SUNAT no tiene el XML de este comprobante para quien lo recibió." };
-      }
-      return { xml: null, cdr: null, pdf: null, aviso: "No encontré el XML en la respuesta de SUNAT." };
+      console.log(
+        xmlBajada.iconos === 4
+          ? "Hay 4 iconos: el XML está, en ZIP o en XML. No armo el PDF."
+          : "SUNAT mostró el icono de XML y el archivo no llegó. No armo el PDF.",
+      );
+      return { xml: null, cdr: cdrBajada.bytes, pdf: null, aviso: "SUNAT mostró el icono de XML y el archivo no llegó." };
     }
-    return { xml, cdr: cdrBytes, pdf, aviso: xml ? null : pdf ? null : "SUNAT entregó el CDR y no el XML." };
+    return { xml: null, cdr: cdrBajada.bytes, pdf: null, aviso: null, dejarPdf: true };
   }
   return { xml: null, cdr: null, pdf: null, aviso: "SUNAT no respondió la consulta de este comprobante." };
+}
+
+async function consultarRepresentacion(page: Page, factura: FacturaSol): Promise<ArchivosSol> {
+  const frame = await esperarFrame(page, 15_000);
+  if (!frame) return { xml: null, cdr: null, pdf: null, aviso: "No está abierta la consulta de comprobantes." };
+  const aviso = await buscar(page, frame, factura);
+  if (aviso === "vacio") {
+    return { xml: null, cdr: null, pdf: null, aviso: "SUNAT no tiene el XML de este comprobante para quien lo recibió." };
+  }
+  if (aviso) return { xml: null, cdr: null, pdf: null, aviso };
+  const pdf = await bajarRepresentacion(page, frame);
+  await cerrarRepresentacionesAbiertas(page);
+  await cerrarResultado(frame);
+  if (!pdf) return { xml: null, cdr: null, pdf: null, aviso: "No encontré el XML en la respuesta de SUNAT." };
+  return { xml: null, cdr: null, pdf, aviso: null };
 }
 
 async function quitarEspera(frame: Frame): Promise<void> {
@@ -289,14 +327,16 @@ async function cerrarResultado(frame: Frame): Promise<void> {
 
 async function buscar(page: Page, frame: Frame, factura: FacturaSol): Promise<string | null> {
   await cerrarResultado(frame);
-  const recibido = frame.getByText("Recibido", { exact: true }).first();
-  if (await recibido.count()) {
-    await cerrarAvisos(page);
-    if (!(await recibido.click({ timeout: 5_000 }).then(() => true).catch(() => false))) {
-      await recibido.click({ force: true }).catch(() => undefined);
+  const ruc = frame.locator("input[name*='ruc' i]:not([disabled]), input[id*='ruc' i]:not([disabled])").last();
+  if (!(await ruc.count())) {
+    const recibido = frame.getByText("Recibido", { exact: true }).first();
+    if (await recibido.count()) {
+      await cerrarAvisos(page);
+      if (!(await recibido.click({ timeout: 3_000 }).then(() => true).catch(() => false))) {
+        await recibido.click({ force: true }).catch(() => undefined);
+      }
     }
   }
-  const ruc = frame.locator("input[name*='ruc' i]:not([disabled]), input[id*='ruc' i]:not([disabled])").last();
   if (!(await ruc.count())) return "No encontré el campo del RUC del proveedor.";
   await ruc.fill(factura.rucEmisor);
   if (!(await elegirTipo(page, frame, factura.tipo))) {
@@ -329,8 +369,12 @@ async function buscar(page: Page, frame: Frame, factura: FacturaSol): Promise<st
   if (await obligatorio.isVisible().catch(() => false)) {
     return `SUNAT no dejó elegir ${NOMBRE_TIPO[factura.tipo]} en el tipo de comprobante.`;
   }
+  if (await aceptarErrorServidor(page)) return "servidor";
   const texto = await frame.locator("body").innerText().catch(() => "");
-  if (/error del servidor/i.test(texto)) return "servidor";
+  if (/error del servidor|no se puede acceder a los servicios de SUNAT/i.test(texto)) {
+    await aceptarErrorServidor(page);
+    return "servidor";
+  }
   if (/no hay resultados|no se encontr|sin resultado/i.test(texto)) return "vacio";
   if (!new RegExp(factura.serie.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(texto)) {
     return "SUNAT dejó en pantalla el resultado de otro comprobante.";
@@ -440,14 +484,15 @@ async function bajar(
   page: Page,
   frame: Frame,
   etiqueta: "XML" | "CDR",
-): Promise<{ bytes: Uint8Array | null; previo: boolean }> {
+): Promise<{ bytes: Uint8Array | null; previo: boolean; iconos: number }> {
   const marcado = await pulsarIcono(frame, etiqueta, false);
-  if (marcado === "sin-cdr") return { bytes: null, previo: false };
+  const iconos = iconosDe(marcado);
+  if (marcado === "sin-cdr") return { bytes: null, previo: false, iconos: 4 };
   if (marcado) {
-    const bajada = await clicDescarga(page, () => pulsarIcono(frame, etiqueta, true));
-    if (bajada.previo) return bajada;
-    if (bajada.bytes && etiqueta === "XML" && !xmlDeArchivo(bajada.bytes)) return { bytes: null, previo: false };
-    return bajada;
+    const bajada = await clicDescarga(page, () => pulsarIcono(frame, etiqueta, true), 12_000);
+    if (bajada.previo) return { ...bajada, iconos };
+    if (bajada.bytes && etiqueta === "XML" && !xmlDeArchivo(bajada.bytes)) return { bytes: null, previo: false, iconos };
+    return { ...bajada, iconos };
   }
   const selector = [
     `[title*='${etiqueta}' i]`,
@@ -465,12 +510,18 @@ async function bajar(
       const boton = botones.nth(i);
       if (!(await boton.isVisible().catch(() => false))) continue;
       if (await esIconoDeImpresion(boton)) continue;
-      const bajada = await clicDescarga(page, () => boton.click({ force: true }));
-      if (bajada.previo) return bajada;
-      if (bajada.bytes && (etiqueta === "CDR" || xmlDeArchivo(bajada.bytes))) return bajada;
+      const bajada = await clicDescarga(page, () => boton.click({ force: true }), 12_000);
+      if (bajada.previo) return { ...bajada, iconos: 0 };
+      if (bajada.bytes && (etiqueta === "CDR" || xmlDeArchivo(bajada.bytes))) return { ...bajada, iconos: 0 };
     }
   }
-  return { bytes: null, previo: false };
+  return { bytes: null, previo: false, iconos: 0 };
+}
+
+function iconosDe(info: string): number {
+  if (info === "sin-cdr") return 4;
+  const cantidad = /^(\d+) iconos/.exec(info);
+  return cantidad ? Number(cantidad[1]) : 0;
 }
 
 async function esIconoDeImpresion(boton: Locator): Promise<boolean> {
@@ -514,7 +565,9 @@ async function pulsarIcono(frame: Frame, etiqueta: "XML" | "CDR", pulsar: boolea
           if (estilo.display === "none" || estilo.visibility === "hidden" || Number(estilo.opacity) === 0) continue;
           const destino = nodo.closest("a, button");
           const icono = destino instanceof HTMLElement ? destino : nodo;
-          if (/\bopacidad-60\b|disabled/i.test(String(icono.className)) || icono.getAttribute("disabled") !== null) continue;
+          const estiloIcono = window.getComputedStyle(icono);
+          if (estiloIcono.display === "none" || estiloIcono.visibility === "hidden" || estiloIcono.pointerEvents === "none") continue;
+          if (icono.getAttribute("disabled") !== null || icono.getAttribute("aria-disabled") === "true") continue;
           if (vistos.has(icono)) continue;
           vistos.add(icono);
           iconos.push(icono);
@@ -539,16 +592,18 @@ async function pulsarIcono(frame: Frame, etiqueta: "XML" | "CDR", pulsar: boolea
 async function clicDescarga(
   page: Page,
   pulsar: () => Promise<unknown>,
+  esperaMs: number,
 ): Promise<{ bytes: Uint8Array | null; previo: boolean }> {
-  const espera = page.waitForEvent("download", { timeout: 15_000 }).catch(() => null);
+  const espera = page.waitForEvent("download", { timeout: esperaMs }).catch(() => null);
   await pulsar().catch(() => undefined);
-  const vence = Date.now() + 15_000;
+  const vence = Date.now() + esperaMs;
   let previo = false;
   let descarga: Download | null = null;
   while (Date.now() < vence) {
     if (await aceptarSiDescargaPrevia(page)) {
       if (!previo) console.log("SUNAT avisó que el archivo ya se había descargado. Pulso Aceptar.");
       previo = true;
+      break;
     }
     await cerrarRepresentacionesAbiertas(page);
     const llegado = await Promise.race([
@@ -570,7 +625,36 @@ async function clicDescarga(
     if (previo) console.log("SUNAT ya había entregado este archivo y no volvió a bajarlo.");
     return { bytes: null, previo };
   }
+  console.log(`Archivo de SUNAT: ${descarga.suggestedFilename()}`);
   return { bytes: await leerDescarga(descarga), previo };
+}
+
+async function aceptarErrorServidor(page: Page): Promise<boolean> {
+  for (const frame of page.frames()) {
+    const pulso = await frame
+      .evaluate(() => {
+        for (const boton of document.querySelectorAll("button, a, input[type='button'], input[type='submit']")) {
+          if (!(boton instanceof HTMLElement)) continue;
+          const rotulo = (boton.innerText || (boton as HTMLInputElement).value || "").replace(/\s+/g, " ").trim();
+          if (!/^aceptar$/i.test(rotulo)) continue;
+          let nodo: HTMLElement | null = boton;
+          while (nodo) {
+            const texto = (nodo.innerText || "").replace(/\s+/g, " ");
+            if (/error del servidor|no se puede acceder a los servicios de SUNAT/i.test(texto) && texto.length < 900) {
+              const estilo = window.getComputedStyle(boton);
+              if (estilo.display === "none" || estilo.visibility === "hidden") return false;
+              boton.click();
+              return true;
+            }
+            nodo = nodo.parentElement;
+          }
+        }
+        return false;
+      })
+      .catch(() => false);
+    if (pulso) return true;
+  }
+  return false;
 }
 
 async function aceptarSiDescargaPrevia(page: Page): Promise<boolean> {

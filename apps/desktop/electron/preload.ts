@@ -139,4 +139,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     >,
   deleteAuthUser: (userId: string) =>
     ipcRenderer.invoke("users:deleteAuth", userId) as Promise<{ error?: string }>,
+  mediaExists: (bucket: string, storagePath: string) =>
+    ipcRenderer.invoke("media:exists", bucket, storagePath) as Promise<boolean>,
+  mediaPut: (bucket: string, storagePath: string, bytes: Uint8Array) =>
+    ipcRenderer.invoke("media:put", bucket, storagePath, bytes) as Promise<boolean>,
 });

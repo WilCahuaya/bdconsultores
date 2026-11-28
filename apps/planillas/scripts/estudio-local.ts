@@ -1,15 +1,21 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import ws from "ws";
 import { abrirNavegador } from "../src/lib/sunat/navegador";
 
-const envFile = new URL("../.env.local", import.meta.url);
+function carpetaDeEsteArchivo(): string {
+  if (typeof __dirname === "string") return __dirname;
+  return dirname(fileURLToPath(import.meta.url));
+}
+
+const envFile = join(carpetaDeEsteArchivo(), "..", ".env.local");
 
 function archivoSesion(): string {
   const marcada = process.env.SUNAT_SESION_FILE?.trim();
   if (marcada) return marcada;
-  return fileURLToPath(new URL("../.sunat-session.json", import.meta.url));
+  return join(carpetaDeEsteArchivo(), "..", ".sunat-session.json");
 }
 
 function guardarSesion(tokens: { access_token: string; refresh_token: string }): void {
@@ -56,6 +62,7 @@ function esLocal(url: string): boolean {
 export function crearCliente(): SupabaseClient {
   return createClient(requerido("NEXT_PUBLIC_SUPABASE_URL"), requerido("NEXT_PUBLIC_SUPABASE_ANON_KEY"), {
     auth: { persistSession: false, autoRefreshToken: true },
+    realtime: { transport: ws as never },
   });
 }
 

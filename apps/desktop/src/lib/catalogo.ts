@@ -37,7 +37,7 @@ import {
 } from "@inventario/types";
 import { fetchProfile } from "./profile";
 import { getSupabaseClient } from "./supabase";
-import { enqueueOfflineOp, isOnline, listMasterDomain } from "./master-cache";
+import { enqueueOfflineOp, isOnline, listMasterDomain, removeMasterItem, upsertMasterItem } from "./master-cache";
 import { listCachedActivos } from "./offline";
 
 const CATALOGO_SYNC_ENTIDAD = "";
@@ -461,6 +461,13 @@ async function listCatalogoOpcionesPersonalizadas(tipo: CatalogoOpcionTipo): Pro
   const profile = await fetchProfile();
   if (!profile || profile.rol !== "CONTADOR") return [];
 
+  if (!isOnline()) {
+    const rows = await listMasterDomain<{ tipo: string; valor: string }>("catalogo_opciones", "");
+    return rows
+      .filter((row) => row.tipo === tipo && row.valor?.trim())
+      .map((row) => row.valor.trim());
+  }
+
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.rpc("list_catalogo_opciones_personalizadas", {
     p_tipo: tipo,
@@ -503,6 +510,12 @@ export async function registerCatalogoOpcionPersonalizada(
     return {};
   }
 
+  if (!isOnline()) {
+    await upsertMasterItem("catalogo_opciones", "", { id: `${tipo}::${texto}`, tipo, valor: texto });
+    await enqueueOfflineOp("catalogo:opcionUpsert", CATALOGO_SYNC_ENTIDAD, { tipo, valor: texto });
+    return {};
+  }
+
   const supabase = getSupabaseClient();
   const { error } = await supabase.from("catalogo_opciones_personalizadas").upsert(
     { tipo, valor: texto },
@@ -523,6 +536,12 @@ export async function deleteCatalogoOpcionPersonalizada(
 
   const texto = valor.trim();
   if (!texto) return { error: "Valor inválido." };
+
+  if (!isOnline()) {
+    await removeMasterItem("catalogo_opciones", "", `${tipo}::${texto}`);
+    await enqueueOfflineOp("catalogo:opcionDelete", CATALOGO_SYNC_ENTIDAD, { tipo, valor: texto });
+    return {};
+  }
 
   const supabase = getSupabaseClient();
   const { error } = await supabase.rpc("delete_catalogo_opcion_personalizada", {
@@ -963,6 +982,20 @@ export async function searchCuentasContables(
 ): Promise<CuentaContable[]> {
   const profile = await fetchProfile();
   if (!profile) return [];
+
+  if (!isOnline()) {
+    const rows = await listMasterDomain<CuentaContable & { id: string }>("cuentas", "");
+    const q = query.trim().toLowerCase();
+    return rows
+      .filter(
+        (row) =>
+          !q ||
+          row.codigo.toLowerCase().includes(q) ||
+          (row.nombre ?? "").toLowerCase().includes(q),
+      )
+      .slice(0, limit)
+      .map((row) => ({ codigo: row.codigo, nombre: row.nombre }));
+  }
 
   const supabase = getSupabaseClient();
   const { data, error } = await supabase.rpc("search_cuentas_contables", {

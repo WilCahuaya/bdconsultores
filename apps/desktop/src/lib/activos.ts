@@ -333,7 +333,26 @@ export async function listActivosGlobal(): Promise<ActivoConUbicacion[]> {
         .select(ACTIVO_SELECT_GLOBAL)
         .order("created_at", { ascending: false });
       if (error) throw new Error(error.message);
-      return mapActivoRowsEnriched(data as Record<string, unknown>[]);
+      const mapped = await mapActivoRowsEnriched(data as Record<string, unknown>[]);
+      const { listCachedActivos, refreshActivosCache } = await import("./offline");
+      const byEntidad = new Map<string, ActivoConUbicacion[]>();
+      for (const activo of mapped) {
+        const lista = byEntidad.get(activo.entidad_id) ?? [];
+        lista.push(activo);
+        byEntidad.set(activo.entidad_id, lista);
+      }
+      for (const [entidadId, rows] of byEntidad) {
+        const cached = await listCachedActivos(entidadId);
+        const pendingLocal = (cached as ActivoConUbicacion[]).filter((item) =>
+          String(item.id).startsWith("pending-"),
+        );
+        const remoteIds = new Set(rows.map((row) => row.id));
+        await refreshActivosCache(entidadId, [
+          ...pendingLocal.filter((item) => !remoteIds.has(item.id)),
+          ...rows,
+        ]);
+      }
+      return mapped;
     } catch {
       /* caché */
     }
@@ -963,13 +982,87 @@ export async function darDeBajaActivo(
   return { data: activo };
 }
 
+export async function aplicarBajaMenajeLocal(
+  activoId: string,
+  motivoRaw: string,
+  cantidad: number,
+): Promise<{ error?: string; aviso?: string; entidadId?: string; localBajaId?: string }> {
+  const motivo = motivoRaw.trim();
+  if (!motivo) return { error: "Indique el motivo de baja." };
+  const pedida = Math.floor(cantidad);
+  if (!Number.isFinite(pedida) || pedida < 1) return { error: "La cantidad no es válida." };
+
+  const found = await findCachedActivoAcrossEntidades(activoId);
+  if (!found) return { error: "Menaje no encontrado en este equipo." };
+  const { entidadId, activo } = found;
+  if (!esMenaje(activo.categoria)) return { error: "Esta acción es solo para menaje." };
+  if (activo.estado_registro === "DADO_DE_BAJA") return { error: "El menaje ya está dado de baja." };
+  if (activo.estado_registro === "PREREGISTRADO") {
+    return { error: "Un menaje preregistrado no puede darse de baja. Elimínelo si fue un error." };
+  }
+
+  const actual = Number(activo.cantidad ?? 1);
+  if (pedida > actual) return { error: `Solo hay ${actual} en este ambiente.` };
+  const { upsertCachedActivo, listCachedActivos } = await import("./offline");
+
+  if (pedida === actual) {
+    await upsertCachedActivo(entidadId, {
+      ...activo,
+      estado_registro: "DADO_DE_BAJA",
+      motivo_baja: motivo,
+      updated_at: new Date().toISOString(),
+    });
+    return { aviso: `${activo.nombre} quedó dado de baja.`, entidadId };
+  }
+
+  const localBajaId = `pending-baja-${activoId}-${pedida}`;
+  const cached = await listCachedActivos(entidadId);
+  if (cached.some((row) => (row as { id: string }).id === localBajaId)) {
+    return {
+      aviso: `Se dieron de baja ${pedida} de ${activo.nombre}. Quedan ${actual - pedida}.`,
+      entidadId,
+      localBajaId,
+    };
+  }
+
+  const quedan = actual - pedida;
+  await upsertCachedActivo(entidadId, {
+    ...activo,
+    cantidad: quedan,
+    updated_at: new Date().toISOString(),
+  });
+  await upsertCachedActivo(entidadId, {
+    ...activo,
+    id: localBajaId,
+    cantidad: pedida,
+    estado_registro: "DADO_DE_BAJA",
+    motivo_baja: motivo,
+    codigo_barras: null,
+    correlativo: null,
+    updated_at: new Date().toISOString(),
+  });
+  return {
+    aviso: `Se dieron de baja ${pedida} de ${activo.nombre}. Quedan ${quedan}.`,
+    entidadId,
+    localBajaId,
+  };
+}
+
 export async function darDeBajaMenaje(
   activoId: string,
   motivo: string,
   cantidad: number,
 ): Promise<{ error?: string; aviso?: string }> {
   if (!isOnline()) {
-    return { error: "Dar de baja menaje requiere conexión." };
+    const applied = await aplicarBajaMenajeLocal(activoId, motivo, cantidad);
+    if (applied.error || !applied.entidadId) return { error: applied.error ?? "No se pudo dar de baja el menaje." };
+    await enqueueOfflineOp(
+      "menaje:baja",
+      applied.entidadId,
+      { activoId, motivo, cantidad, localBajaId: applied.localBajaId ?? null },
+      activoId,
+    );
+    return { aviso: applied.aviso };
   }
   const profile = await fetchProfile();
   if (!profile) return { error: "Sesión no válida." };
@@ -985,9 +1078,29 @@ export async function darDeBajaMenaje(
   });
 }
 
+export async function aplicarEliminarMenajeLocal(
+  activoId: string,
+  missingOk = false,
+): Promise<{ error?: string; entidadId?: string }> {
+  const found = await findCachedActivoAcrossEntidades(activoId);
+  if (!found) {
+    return missingOk ? {} : { error: "Menaje no encontrado en este equipo." };
+  }
+  if (!esMenaje(found.activo.categoria)) return { error: "Esta acción es solo para menaje." };
+  if (found.activo.estado_registro === "DADO_DE_BAJA") {
+    return { error: "Un menaje dado de baja no se elimina. Ya quedó en el historial de bajas." };
+  }
+  const { removeCachedActivo } = await import("./offline");
+  await removeCachedActivo(found.entidadId, activoId);
+  return { entidadId: found.entidadId };
+}
+
 export async function eliminarMenaje(activoId: string): Promise<{ error?: string }> {
   if (!isOnline()) {
-    return { error: "Eliminar menaje requiere conexión." };
+    const applied = await aplicarEliminarMenajeLocal(activoId);
+    if (applied.error || !applied.entidadId) return { error: applied.error ?? "No se pudo eliminar el menaje." };
+    await enqueueOfflineOp("menaje:eliminar", applied.entidadId, { activoId }, activoId);
+    return {};
   }
   const profile = await fetchProfile();
   if (!profile) return { error: "Sesión no válida." };

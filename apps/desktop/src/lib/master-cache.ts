@@ -7,7 +7,11 @@ export type MasterDomain =
   | "pisos"
   | "responsables"
   | "visitas"
-  | "visita_ambientes";
+  | "visita_ambientes"
+  | "visita_revisiones"
+  | "historial"
+  | "cuentas"
+  | "catalogo_opciones";
 
 export async function replaceMasterDomain(
   domain: MasterDomain,

@@ -8,6 +8,8 @@ import {
   recuperarActivo,
   registrarActivo,
   updateActivo,
+  darDeBajaMenaje,
+  eliminarMenaje,
   type ActivoConUbicacion,
   type CreateActivoInput,
   type UpdateActivoInput,
@@ -23,6 +25,12 @@ import { syncAdminResponsableForEntidad } from "./responsables-admin-sync";
 import { syncSedePrincipalDireccionFromEntidad } from "./sede-principal-direccion";
 import { getSupabaseClient } from "./supabase";
 import { updateActivoPaths, uploadActivoFile } from "./storage";
+import {
+  anularRevisionVisitaSi,
+  registrarRevisionVisita,
+  resolverBienFaltante,
+} from "./visitas-campo";
+import { aplicarComprobantesMenajeDesdeCola } from "./menaje-comprobantes-client";
 import type {
   CreateResponsableInput,
   UpdateResponsableInput,
@@ -693,6 +701,84 @@ async function processMasterOp(
     if (result.data) {
       await upsertCachedActivo(item.entidad_id, result.data);
     }
+    return;
+  }
+
+  if (op === "visita:revision") {
+    const result = await registrarRevisionVisita({
+      ambienteId: String(payload.ambienteId),
+      activoId: String(payload.activoId),
+      hallado: Boolean(payload.hallado),
+      estadoBien: (payload.estadoBien as "BUENO" | "REGULAR" | "MALO" | null) ?? null,
+      accion: (payload.accion as "BAJA" | "FALTANTE" | null) ?? null,
+      motivo: (payload.motivo as string | null) ?? null,
+    });
+    if (result.error) throw new Error(result.error);
+    return;
+  }
+
+  if (op === "visita:anularSi") {
+    const result = await anularRevisionVisitaSi({ activoId: String(payload.activoId) });
+    if (result.error) throw new Error(result.error);
+    return;
+  }
+
+  if (op === "visita:resolver") {
+    const result = await resolverBienFaltante({
+      activoId: String(payload.activoId),
+      accion: payload.accion === "BAJA" ? "BAJA" : "MOVER",
+      destinoAmbienteId: (payload.destinoAmbienteId as string | null) ?? null,
+      motivo: (payload.motivo as string | null) ?? null,
+    });
+    if (result.error) throw new Error(result.error);
+    return;
+  }
+
+  if (op === "menaje:baja") {
+    const result = await darDeBajaMenaje(
+      String(payload.activoId),
+      String(payload.motivo ?? ""),
+      Number(payload.cantidad),
+    );
+    if (result.error) throw new Error(result.error);
+    if (payload.localBajaId) {
+      await removeCachedActivo(item.entidad_id, String(payload.localBajaId));
+    }
+    return;
+  }
+
+  if (op === "menaje:eliminar") {
+    const result = await eliminarMenaje(String(payload.activoId));
+    if (result.error) throw new Error(result.error);
+    return;
+  }
+
+  if (op === "menaje:comprobantes") {
+    const result = await aplicarComprobantesMenajeDesdeCola({
+      entidadId: item.entidad_id,
+      activoId: String(payload.activoId),
+      nuevo: (payload.nuevo as null) ?? null,
+      cambios: (payload.cambios as []) ?? [],
+    });
+    if (result.error) throw new Error(result.error);
+    return;
+  }
+
+  if (op === "catalogo:opcionUpsert") {
+    const { error } = await supabase.from("catalogo_opciones_personalizadas").upsert(
+      { tipo: payload.tipo, valor: payload.valor },
+      { onConflict: "tipo,valor" },
+    );
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (op === "catalogo:opcionDelete") {
+    const { error } = await supabase.rpc("delete_catalogo_opcion_personalizada", {
+      p_tipo: payload.tipo,
+      p_valor: payload.valor,
+    });
+    if (error) throw new Error(error.message);
     return;
   }
 

@@ -1,6 +1,6 @@
 import type { EstadoRegistro } from "@inventario/types";
 import { attachCatalogoNacionalPorCodigo, resolveCuentaContableActivo } from "@inventario/types";
-import { REPORTES } from "@reportes/types";
+import { REPORTES, definicionReporte } from "@reportes/types";
 import type { ActivoReporte } from "@reportes/types";
 import {
   anioEjercicioAdquisicion,
@@ -14,9 +14,10 @@ import {
 } from "@reportes/fecha-corte";
 import type { ReporteId } from "@reportes/types";
 import type { ActivoConUbicacion } from "./activos";
-import { isOnline } from "./master-cache";
+import { isOnline, listMasterDomain } from "./master-cache";
 import { listCachedActivos } from "./offline";
 import { getSupabaseClient } from "./supabase";
+import { listProcedenciaFaltante } from "./visitas-campo";
 
 function esReportePorAmbiente(reporteId: string): boolean {
   const def = REPORTES.find((r) => r.id === reporteId);
@@ -99,6 +100,13 @@ function filtrarActivosReporteCache(
     filtered = filtered.filter(
       (a) => a.estado_registro === ("REGISTRADO" as EstadoRegistro) && a.estado_bien === "MALO",
     );
+  } else if (input.reporteId === "reporte_faltantes") {
+    filtered = filtered.filter(
+      (a) =>
+        a.estado_registro === ("REGISTRADO" as EstadoRegistro) &&
+        input.ambienteFaltanteId != null &&
+        a.ambiente_id === input.ambienteFaltanteId,
+    );
   } else if (esReporteAdquiridosEjercicio(input.reporteId as ReporteId)) {
     const anio = anioEjercicioAdquisicion(input.reporteId as ReporteId, input.fechaCorte);
     if (anio == null) return [];
@@ -125,6 +133,7 @@ function filtrarActivosReporteCache(
   }
 
   filtered = filtrarActivosPorFechaCorte(filtered, input.reporteId as ReporteId, input.fechaCorte);
+  filtered = filtrarCategoriaReporte(filtered, input.reporteId);
   return [...filtered].sort(sortActivosReporte);
 }
 
@@ -142,6 +151,42 @@ export interface CargarActivosReporteInput {
   ambienteId?: string;
   sedeId?: string;
   fechaCorte?: string;
+  ambienteFaltanteId?: string | null;
+}
+
+function filtrarCategoriaReporte<T extends { categoria?: string | null }>(
+  activos: T[],
+  reporteId: string,
+): T[] {
+  let definicion: { categoria?: string; valorizado?: boolean } | null = null;
+  try {
+    definicion = definicionReporte(reporteId as ReporteId);
+  } catch {
+    return activos;
+  }
+  if (definicion.categoria) {
+    return activos.filter((activo) => activo.categoria === definicion?.categoria);
+  }
+  if (definicion.valorizado) {
+    return activos.filter((activo) => activo.categoria !== "MENAJE");
+  }
+  return activos;
+}
+
+async function ambienteFaltanteId(entidadId: string): Promise<string | null> {
+  if (!isOnline()) {
+    const ambientes = await listMasterDomain<{ id: string; es_faltante?: boolean }>("ambientes", entidadId);
+    return ambientes.find((ambiente) => ambiente.es_faltante)?.id ?? null;
+  }
+  const supabase = getSupabaseClient();
+  const { data } = await supabase
+    .from("ambientes")
+    .select("id, sedes!inner(entidad_id)")
+    .eq("es_faltante", true)
+    .eq("activo", true)
+    .eq("sedes.entidad_id", entidadId)
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
 }
 
 export async function cargarActivosReporte(
@@ -149,8 +194,20 @@ export async function cargarActivosReporte(
 ): Promise<{ data?: ActivoReporte[]; error?: string }> {
   if (!input.entidadId) return { error: "Seleccione una entidad." };
 
+  const faltanteId =
+    input.reporteId === "reporte_faltantes" ? await ambienteFaltanteId(input.entidadId) : null;
+  const scoped = { ...input, ambienteFaltanteId: faltanteId };
+
   if (!isOnline()) {
-    return { data: await cargarActivosReporteFromCache(input) };
+    let data = await cargarActivosReporteFromCache(scoped);
+    if (input.reporteId === "reporte_faltantes" && data.length > 0) {
+      const procedencia = await listProcedenciaFaltante(data.map((activo) => activo.id));
+      data = data.map((activo) => ({
+        ...activo,
+        procedencia: procedencia[activo.id] ?? null,
+      }));
+    }
+    return { data };
   }
 
   const supabase = getSupabaseClient();
@@ -174,6 +231,11 @@ export async function cargarActivosReporte(
     query = query
       .eq("estado_registro", "REGISTRADO" as EstadoRegistro)
       .eq("estado_bien", "MALO");
+  } else if (input.reporteId === "reporte_faltantes") {
+    if (!faltanteId) return { data: [] };
+    query = query
+      .eq("ambiente_id", faltanteId)
+      .eq("estado_registro", "REGISTRADO" as EstadoRegistro);
   } else if (esReporteAdquiridosEjercicio(input.reporteId as ReporteId)) {
     const anio = anioEjercicioAdquisicion(
       input.reporteId as ReporteId,
@@ -192,6 +254,14 @@ export async function cargarActivosReporte(
     query = query.eq("estado_registro", "REGISTRADO" as EstadoRegistro);
   }
 
+  try {
+    const definicion = definicionReporte(input.reporteId as ReporteId);
+    if (definicion.categoria) query = query.eq("categoria", definicion.categoria);
+    else if (definicion.valorizado) query = query.neq("categoria", "MENAJE");
+  } catch {
+    /* reporte desconocido: no filtra categoría */
+  }
+
   const corteISO = resolverFechaCorteISO(input.fechaCorte);
   if (corteISO && aplicaFiltroAdquisicionFechaCorte(input.reporteId as ReporteId, input.fechaCorte)) {
     query = query.or(`fecha_adquisicion.is.null,fecha_adquisicion.lte.${corteISO}`);
@@ -199,7 +269,7 @@ export async function cargarActivosReporte(
 
   const { data, error } = await query;
   if (error) {
-    const cached = await cargarActivosReporteFromCache(input);
+    const cached = await cargarActivosReporteFromCache(scoped);
     if (cached.length > 0) return { data: cached };
     return { error: error.message };
   }
@@ -214,6 +284,14 @@ export async function cargarActivosReporte(
     input.reporteId as ReporteId,
     input.fechaCorte,
   );
+  activos = filtrarCategoriaReporte(activos, input.reporteId);
+  if (input.reporteId === "reporte_faltantes" && activos.length > 0) {
+    const procedencia = await listProcedenciaFaltante(activos.map((activo) => activo.id));
+    activos = activos.map((activo) => ({
+      ...activo,
+      procedencia: procedencia[activo.id] ?? null,
+    }));
+  }
 
   return { data: activos };
 }
