@@ -25,7 +25,6 @@ export function desktopNavSections(preregistrados = 0): PanelNavSection[] {
           badgeTitle: "Preregistrados pendientes",
         },
         { href: "entidades", label: "Entidades", icon: "entities" },
-        { href: "espacios", label: "Ubicación física", icon: "spaces" },
         { href: "reportes", label: "Reportes", icon: "reports" },
       ],
     },
